@@ -1,0 +1,45 @@
+{
+  "_source": "Extracted live from the user's installed Microsoft Word via PowerShell COM automation (Word.Application). Version 16.0, build 16.0.19929 (Microsoft 365, Aptos theme).",
+  "_method": "powershell.exe -ComObject Word.Application (run hidden); read Document/Styles/PageSetup/DocumentTheme; verified live by typing text + toggling Font.Bold and reading it back.",
+  "defaults": {
+    "themeName": "Aptos (current M365 default; NOT Calibri)",
+    "bodyFont": "Aptos",
+    "bodySizePt": 12,
+    "headingFont": "Aptos Display",
+    "normalSpaceAfterPt": 8,
+    "normalLineSpacing": "Multiple ~1.16 (13.9pt at 12pt)",
+    "page": { "sizePt": [612, 792], "size": "US Letter 8.5x11in", "marginsPt": 72, "marginsIn": 1 }
+  },
+  "styles": [
+    { "name": "Normal", "font": "Aptos", "sizePt": 12, "spaceAfter": 8 },
+    { "name": "No Spacing", "font": "Aptos", "sizePt": 12, "spaceAfter": 0 },
+    { "name": "Heading 1", "font": "Aptos Display", "sizePt": 20, "italic": false, "spaceBefore": 18, "spaceAfter": 4, "color": "theme Text2 (#0E2841)" },
+    { "name": "Heading 2", "font": "Aptos Display", "sizePt": 16, "spaceBefore": 8, "spaceAfter": 4, "color": "theme Text2 (#0E2841)" },
+    { "name": "Heading 3", "font": "Aptos", "sizePt": 14, "spaceBefore": 8, "spaceAfter": 4 },
+    { "name": "Heading 4", "font": "Aptos", "sizePt": 12, "italic": true, "spaceBefore": 4, "spaceAfter": 2 },
+    { "name": "Title", "font": "Aptos Display", "sizePt": 28, "color": "#000000", "spaceAfter": 4 },
+    { "name": "Subtitle", "font": "Aptos", "sizePt": 14, "spaceAfter": 8, "color": "theme accent/gray" },
+    { "name": "Quote", "font": "Aptos", "sizePt": 12, "italic": true, "spaceBefore": 8, "spaceAfter": 8 },
+    { "name": "Intense Quote", "font": "Aptos", "sizePt": 12, "italic": true, "spaceBefore": 18, "spaceAfter": 18 },
+    { "name": "Strong", "bold": true },
+    { "name": "Emphasis", "italic": true },
+    { "name": "Subtle Emphasis", "italic": true, "color": "gray" },
+    { "name": "Intense Emphasis", "italic": true, "color": "accent" },
+    { "name": "List Paragraph", "font": "Aptos", "sizePt": 12, "spaceAfter": 8 }
+  ],
+  "aptosThemePalette": {
+    "dark1_text1": "#000000",
+    "light1_bg1": "#FFFFFF",
+    "dark2_text2": "#0E2841",
+    "light2_bg2": "#E8E8E8",
+    "accent1": "#156082",
+    "accent2": "#E97132",
+    "accent3": "#196B24",
+    "accent4": "#0F9ED5",
+    "accent5": "#A02B93",
+    "accent6": "#4EA72E",
+    "hyperlink": "#467886",
+    "followedHyperlink": "#96607D"
+  },
+  "note": "Theme heading colors read via Font.TextColor.RGB returned theme-enum sentinels, not resolved RGB; the resolved heading color is the theme Text2 (#0E2841). Font/size/spacing values above are reliable."
+}

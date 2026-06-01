@@ -1,0 +1,108 @@
+/* ===========================================================================
+   titlebar.css — custom frameless title bar with QAT + window controls
+   =========================================================================== */
+#titlebar {
+  height: var(--titlebar-h);
+  min-height: var(--titlebar-h);
+  background: var(--titlebar-bg);
+  display: flex;
+  align-items: center;
+  -webkit-app-region: drag;
+  border-bottom: 0;
+  position: relative;
+  z-index: 30;
+}
+/* Every interactive child must opt OUT of the drag region, or the frameless
+   window's drag handler swallows the click and the button "does nothing". */
+#titlebar .no-drag,
+#titlebar button,
+#titlebar .qat-btn,
+#titlebar .wc-btn,
+#titlebar .autosave,
+#titlebar .doc-title-edit,
+#titlebar input { -webkit-app-region: no-drag; }
+
+/* Quick Access Toolbar */
+.qat {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 6px;
+  gap: 1px;
+}
+.qat .qat-btn {
+  width: 28px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  position: relative;
+}
+.qat .qat-btn:hover { background: var(--btn-hover); }
+.qat .qat-btn:active { background: var(--btn-pressed); }
+.qat .qat-btn svg { width: 16px; height: 16px; }
+.qat .qat-sep { width: 1px; height: 18px; background: var(--divider); margin: 0 3px; }
+.qat .autosave {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; height: 22px;
+  font-size: 12px; color: #444;
+}
+.qat .autosave .toggle {
+  width: 30px; height: 14px; border-radius: 7px; background: #c8c6c4; position: relative; transition: background .15s;
+}
+.qat .autosave.on .toggle { background: var(--word-blue); }
+.qat .autosave .toggle::after {
+  content: ''; position: absolute; top: 1px; left: 1px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left .15s;
+}
+.qat .autosave.on .toggle::after { left: 17px; }
+
+.title-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #323130;
+  white-space: nowrap;
+  pointer-events: none;
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+/* Window caption buttons */
+.window-controls { display: flex; height: 100%; }
+.window-controls .wc-btn {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #444;
+  font-size: 10px;
+}
+.window-controls .wc-btn:hover { background: rgba(0,0,0,0.06); }
+.window-controls .wc-btn.close:hover { background: #e81123; color: #fff; }
+.window-controls .wc-btn svg { width: 10px; height: 10px; }
+
+/* Account / share / comments cluster on the tab row */
+.ribbon-right-cluster {
+  display: flex; align-items: center; gap: 4px; margin-left: auto; padding-right: 6px;
+  -webkit-app-region: no-drag;
+}
+.ribbon-right-cluster .pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+  border: 1px solid #c8c6c4; border-radius: 4px; font-size: 12px; color: #323130; background: #fff;
+}
+.ribbon-right-cluster .pill:hover { background: var(--btn-hover); }
+.ribbon-right-cluster .account { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; height: 26px; font-size: 12px; }
+.ribbon-right-cluster .account .avatar {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--word-blue); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+}

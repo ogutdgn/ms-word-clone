@@ -1,0 +1,38 @@
+{
+  "summary": "Adversarial correctness review of the new Insert-tab modules, with verified findings",
+  "agentCount": 19,
+  "logs": [
+    "2 confirmed of 15 candidates."
+  ],
+  "result": {
+    "confirmed": [
+      {
+        "title": "Cross-reference: Page number hardcoded to 1",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/insert-features.js",
+        "line": "272",
+        "severity": "high",
+        "detail": "When inserting a cross-reference with 'Page number' type, the code hardcodes 'page ' + 1 instead of computing the actual page number of the target element. All cross-references to page numbers will show 'page 1' regardless of where the target actually is.",
+        "fix": "Compute the target element's actual page number using Editor.currentPage() or a similar calculation based on the element's position in the document.",
+        "verdict": {
+          "isReal": true,
+          "reasoning": "Confirmed real by reading /home/ogutd/msword-clone/src/renderer/js/insert-features.js line 272: in the Cross-reference dialog's Insert handler, when refType.value === 'Page number', the inserted text is literally set as `text = 'page ' + 1`, ignoring the resolved target element (`tgt`). So every page-number cross-reference renders \"page 1\" no matter where the target heading/bookmark actually sits.\n\nThis is reachable in normal use: crossRefDialog is a fully-implemented Insert feature (not a stub) — it populates Heading/Bookmark targets, supports Text and Above/below ref types (both of which compute real values in the same handler), and inserts a working anchor link. Only the \"Page number\" branch is hardcoded.\n\nThe fix is feasible because the page-number infrastructure already exists in editor.js: `this.pageH`, `pageCount()`, and `currentPage()` (line 292) which derives a page from an element's vertical position via `Math.floor(y / this.pageH) + 1`. The handler already has the target element via `document.getElementById(id)`, so the actual page could be computed with `tgt.getBoundingClientRect()` the same way. This is a genuine correctness bug, not a documented NOT_IMPLEMENTED limitation.\n\nUser-visible failure: any cross-reference to a target on page 2+ displays \"page 1\". Severity is low/cosmetic — the displayed page number is wrong, but the cross-reference's anchor link still navigates correctly to the target.",
+          "severity": "low"
+        }
+      },
+      {
+        "title": "Page number fields show incorrect page number when caret moves",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/header-footer.js",
+        "line": "79",
+        "severity": "high",
+        "detail": "In the refresh() method, E().currentPage() is called to update all '.wc-field[data-field=\"page\"]' elements. However, E().currentPage() returns the page where the caret is currently positioned, not the page where each field is located. This causes all page number fields on the page to show the same page number (the caret's current page) regardless of their actual location in the document. When a user inserts a page number field on page 2, then navigates to page 5, the field will incorrectly show \"5\" instead of \"2\" after any repagination.",
+        "fix": "Calculate the correct page number for each field based on its DOM position, not the caret position. For example: iterate through fields and calculate their page based on their getBoundingClientRect().top relative to the editor's position and page height (this.pageH).",
+        "verdict": {
+          "reasoning": "Verified against the real files. The literal claim about line 79 is correct: HeaderFooter.refresh() does `n.textContent = fmt(E().currentPage(), n.dataset.format)` for every `.wc-field[data-field=\"page\"]`, where editor.js:292 `currentPage()` returns the page of the CARET (computed from the selection's bounding rect / pageH), not the field's own DOM position. The same flaw exists in Insert.refreshFields() (insert-features.js:244, using fieldValue('page') -> currentPage()). Both run on every repaginate(), and repaginate() fires on every input/change (editor.js:26), so the value updates live as the caret moves.\n\nConcrete user-visible failure: The \"Current Position\" page-number field is a documented, supported feature (docs/INSERT_TAB.md:48 \"top/bottom/current + format + auto-update — Page Number\", marked ✅). A user inserts it mid-document on page 2 (header-footer.js:62 inserts it inline at the caret with the correct value at insert time). Later they type/click on page 5; repaginate -> refresh overwrites that field to \"5\" instead of leaving \"2\". The field tracks the caret rather than its location. This is wrong and reproducible in normal use. It also affects header (should be 1) and footer (should be last page) single fields, which show the caret's page instead.\n\nCaveat on the claim's framing: it asserts \"all page number fields on the page show the same number\" implying multiple per-sheet repeated footers. That part overreaches — the app deliberately renders the header/footer ONCE (header-footer.js:14/19; docs line 67 explicitly documents that per-sheet repetition is NOT implemented and \"needs a full pagination engine\"). So the multi-field-per-page scenario is partly a misunderstanding of a documented approximation. But the underlying defect (field value follows caret, not field position) is genuine and produces a wrong, user-visible page number for the supported single header/footer/Current-Position fields. The proposed fix (derive each field's page from getBoundingClientRect().top / pageH, the same math currentPage() already uses) is the correct remedy.\n\nNet: a real correctness bug, though the claim's per-sheet description is somewhat inaccurate. Severity moderate: the displayed page number is frequently wrong, but this is a non-WYSIWYG clone where pagination is explicitly an approximation and PDF export paginates separately, so impact is cosmetic within an app that already documents pagination limitations.",
+          "isReal": true,
+          "severity": "moderate"
+        }
+      }
+    ],
+    "candidateCount": 15
+  }
+}

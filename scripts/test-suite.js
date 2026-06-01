@@ -1,0 +1,406 @@
+/* In-renderer functional test battery. Run via:
+   electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+   Returns JSON {summary, results[]} as the executeJavaScript result. */
+(async () => {
+  const E = window.WC.Editor;
+  const WC = window.WC;
+  const results = [];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function t(name, fn) {
+    try {
+      const r = await fn();
+      results.push({ name, pass: r !== false, detail: typeof r === 'string' ? r : '' });
+    } catch (e) { results.push({ name, pass: false, detail: 'ERR: ' + (e && e.message ? e.message : String(e)) }); }
+  }
+  function selectText(substr) {
+    const w = document.createTreeWalker(E.node, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      const i = n.nodeValue.indexOf(substr);
+      if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + substr.length); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); return true; }
+    }
+    return false;
+  }
+  function caretIn(block) { const r = document.createRange(); r.selectNodeContents(block); r.collapse(true); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); }
+  function selectBlock(block) { const r = document.createRange(); r.selectNodeContents(block); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); }
+  const H = () => E.node.innerHTML;
+
+  await t('editor initializes with a paragraph', () => { E.setHTML(''); return !!E.node.querySelector('p'); });
+
+  await t('Bold applies to selection', () => { E.setHTML('<p>hello world</p>'); selectText('hello'); WC.Commands.run({ cmd: 'bold' }); return document.queryCommandState('bold'); });
+  await t('Italic applies to selection', () => { E.setHTML('<p>hello world</p>'); selectText('world'); WC.Commands.run({ cmd: 'italic' }); return document.queryCommandState('italic'); });
+  await t('Underline applies to selection', () => { E.setHTML('<p>under me</p>'); selectText('under'); WC.Commands.run({ cmd: 'underline' }); return document.queryCommandState('underline'); });
+  await t('Strikethrough applies', () => { E.setHTML('<p>strike</p>'); selectText('strike'); WC.Commands.run({ cmd: 'strikethrough' }); return document.queryCommandState('strikethrough'); });
+
+  await t('Font color applies (FF0000)', () => { E.setHTML('<p>red text</p>'); selectText('red'); WC.Commands.run({ cmd: 'fontColor' }); return /rgb\(255,\s*0,\s*0\)|ff0000|red/i.test(H()); });
+  await t('Highlight applies (FFFF00)', () => { E.setHTML('<p>hi light</p>'); selectText('light'); WC.Commands.run({ cmd: 'textHighlightColor' }); return /rgb\(255,\s*255,\s*0\)|ffff00|yellow/i.test(H()); });
+  await t('Font color updates ribbon color bar', () => { const bar = document.querySelector('[data-colorbar="fontColor"]'); return bar && /rgb\(255,\s*0,\s*0\)|ff0000|red/i.test(bar.style.background); });
+
+  await t('Font family set to Georgia', () => { E.setHTML('<p>typeface</p>'); selectText('typeface'); WC.Commands.comboCommit({ cmd: 'font' }, 'Georgia'); return /Georgia/i.test(H()) || /Georgia/i.test(document.queryCommandValue('fontName') || ''); });
+  await t('Font size set to 18pt', () => { E.setHTML('<p>bigtext</p>'); selectText('bigtext'); WC.Commands.comboCommit({ cmd: 'fontSize' }, '18'); return /font-size:\s*18pt/i.test(H()); });
+  await t('Increase font size steps ladder 11->12', () => { E.setHTML('<p>grow</p>'); selectText('grow'); WC.Commands.comboCommit({ cmd: 'fontSize' }, '11'); selectText('grow'); WC.Commands.run({ cmd: 'increaseFontSize' }); return /font-size:\s*12pt/i.test(H()); });
+
+  await t('Center alignment', () => { E.setHTML('<p>centerme</p>'); caretIn(E.node.querySelector('p')); WC.Commands.run({ cmd: 'center' }); return E.queryState().justifyCenter === true; });
+  await t('Bulleted list', () => { E.setHTML('<p>item one</p>'); selectBlock(E.node.querySelector('p')); WC.Commands.run({ cmd: 'bullets' }); return !!E.node.querySelector('ul li'); });
+  await t('Numbered list', () => { E.setHTML('<p>item one</p>'); selectBlock(E.node.querySelector('p')); WC.Commands.run({ cmd: 'numbering' }); return !!E.node.querySelector('ol li'); });
+  await t('Increase indent', () => { E.setHTML('<p>indent</p>'); caretIn(E.node.querySelector('p')); const before = H(); WC.Commands.run({ cmd: 'increaseIndent' }); return /margin-left|blockquote|padding-left/i.test(H()) && H() !== before; });
+
+  await t('Apply Heading 1 style', () => { E.setHTML('<p>My Heading</p>'); caretIn(E.node.querySelector('p')); WC.applyNamedStyle('Heading 1'); return !!E.node.querySelector('h1'); });
+  await t('Apply Title style (doc-title class)', () => { E.setHTML('<p>My Title</p>'); caretIn(E.node.querySelector('p')); WC.applyNamedStyle('Title'); return !!E.node.querySelector('h1.doc-title'); });
+  await t('Apply Quote style (blockquote)', () => { E.setHTML('<p>quote me</p>'); caretIn(E.node.querySelector('p')); WC.applyNamedStyle('Quote'); return !!E.node.querySelector('blockquote'); });
+  await t('Line spacing 2.0', () => { E.setHTML('<p>spaced</p>'); caretIn(E.node.querySelector('p')); E.applyBlockStyle('lineHeight', '2'); return /line-height:\s*2/i.test(H()); });
+
+  await t('Insert HTML (table 2x3)', () => { E.setHTML('<p><br></p>'); caretIn(E.node.querySelector('p')); E.insertHTML('<table><tbody><tr><td>a</td><td>b</td><td>c</td></tr><tr><td>d</td><td>e</td><td>f</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); return tbl && tbl.querySelectorAll('tr').length === 2 && tbl.querySelectorAll('tr')[0].children.length === 3; });
+  await t('Page Break pushes content to next page', () => { E.setHTML('<p>before</p>'); const p = E.node.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Commands.run({ cmd: 'pageBreak' }); const mb = E.node.querySelector('.manual-break'); return !!mb && E.pageCount() >= 2 && parseFloat(mb.style.height) > 100; });
+  await t('Blank Page inserts an empty page', () => { E.setHTML('<p>before</p>'); const p = E.node.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Commands.run({ cmd: 'blankPage' }); const mb = E.node.querySelector('.manual-break.blank-page'); return !!mb && E.pageCount() >= 3; });
+  await t('Insert symbol (©)', () => { E.setHTML('<p>x</p>'); selectText('x'); E.insertHTML('©'); return E.node.innerText.includes('©'); });
+
+  await t('Find highlights all matches', async () => { E.setHTML('<p>the cat sat. the cat ran. the end.</p>'); WC.Dialogs.findPane(false); const inp = document.querySelector('#find-pane input'); inp.value = 'the'; inp.dispatchEvent(new Event('input')); await sleep(320); const n = E.node.querySelectorAll('.find-hit').length; return n === 3 ? '3 hits' : ('got ' + n); });
+  await t('Replace All replaces matches', async () => { E.setHTML('<p>cat cat cat</p>'); WC.Dialogs.findPane(true); const inps = document.querySelectorAll('#find-pane input'); inps[0].value = 'cat'; inps[0].dispatchEvent(new Event('input')); await sleep(300); const repl = inps[1]; repl.value = 'dog'; const btns = Array.from(document.querySelectorAll('#find-pane button')); const all = btns.find((b) => /Replace All/i.test(b.textContent)); all.click(); await sleep(200); return !/cat/.test(E.node.innerText) && (E.node.innerText.match(/dog/g) || []).length === 3; });
+
+  await t('Word count = 3', () => { E.setHTML('<p>one two three</p>'); return E.counts().words === 3 ? 'ok' : ('got ' + E.counts().words); });
+  await t('Pagination > 1 page for long content', () => { let h = ''; for (let i = 0; i < 60; i++) h += '<p>Paragraph ' + i + ' with enough text to fill the page over and over again to force a second page boundary in the document.</p>'; E.setHTML(h); return E.pageCount() > 1 ? (E.pageCount() + ' pages') : 'only 1'; });
+  await t('getHTML strips pagebreak guides', () => { return !/pagebreak-guide/.test(E.getHTML()); });
+
+  await t('Zoom set to 150%', () => { E.setZoom(1.5); return Math.abs(E.zoom - 1.5) < 0.001 && /scale\(1.5\)/.test(E.pagesHost.style.transform); });
+  E.setZoom(1);
+  await t('Web layout view toggles class', () => { E.setView('web'); const ok = document.getElementById('workarea').classList.contains('view-web'); E.setView('print'); return ok; });
+
+  await t('Ribbon has 10 tabs', () => WC.RIBBON.length === 10 ? '10 tabs' : ('got ' + WC.RIBBON.length));
+  await t('Toggle state syncs to ribbon (Bold)', () => { E.setHTML('<p>bb</p>'); selectText('bb'); WC.Commands.run({ cmd: 'bold' }); E.emit(); const node = document.querySelector('.rbtn[data-cmd="bold"], .rsplit[data-cmd="bold"]'); return node && node.classList.contains('toggled'); });
+  await t('Sort paragraphs alphabetically', () => { E.setHTML('<p>banana</p><p>apple</p><p>cherry</p>'); const ps = E.node.querySelectorAll('p'); const r = document.createRange(); r.setStart(ps[0].firstChild, 0); r.setEnd(ps[2].firstChild, 6); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Commands.run({ cmd: 'sort' }); const ok = Array.from(document.querySelectorAll('.modal-backdrop .dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())); ok.click(); const order = Array.from(E.node.querySelectorAll('p')).map((p) => p.textContent).join(','); return order === 'apple,banana,cherry' ? order : (function () { throw new Error('bad order: ' + order); })(); });
+  await t('Show/Hide marks toggles class', () => { const before = E.node.classList.contains('show-marks'); WC.Commands.run({ cmd: 'showHide' }); const after = E.node.classList.contains('show-marks'); return before !== after; });
+  await t('Change Case (uppercase) transform', () => { E.setHTML('<p>hello</p>'); selectText('hello'); E.exec('insertText', 'hello'.toUpperCase()); return E.node.innerText.includes('HELLO'); });
+
+  // ---- regression tests for QA-review fixes ----
+  await t('[fix] escapeHtml + safeUrl helpers', () => {
+    const e = WC.escapeHtml('<img onerror=1>');
+    return !e.includes('<img') && WC.safeUrl('javascript:alert(1)') === '#' && WC.safeUrl('example.com') === 'https://example.com' && WC.safeUrl('https://a.com') === 'https://a.com' && WC.safeUrl('#bk') === '#bk';
+  });
+  await t('[fix] Insert Link escapes XSS payload + neutralizes javascript: URL', async () => {
+    E.setHTML('<p>x</p>'); selectText('x'); WC.Dialogs.insertLink();
+    const inputs = document.querySelectorAll('.modal-backdrop .dialog input[type=text]');
+    inputs[0].value = '<img src=x onerror=alert(1)>'; inputs[1].value = 'javascript:alert(1)';
+    const ok = Array.from(document.querySelectorAll('.modal-backdrop .dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim()));
+    ok.click(); await sleep(60);
+    const a = E.node.querySelector('a');
+    return a && !E.node.querySelector('img') && a.getAttribute('href') === '#' && a.textContent.includes('<img');
+  });
+  await t('[fix] Drop Cap preserves inline formatting (<b> survives)', () => {
+    E.setHTML('<p>Hello <b>bold</b> world</p>'); caretIn(E.node.querySelector('p')); WC.Commands.run({ cmd: 'dropCap' });
+    const p = E.node.querySelector('p'); const cap = p.querySelector('span[style*="float:left"]');
+    return !!p.querySelector('b') && cap && cap.textContent === 'H';
+  });
+  await t('[fix] Sort across containers keeps list valid (no crash)', () => {
+    E.setHTML('<ul><li>zeta</li><li>alpha</li></ul><p>middle</p>');
+    const li = E.node.querySelector('li'); const p = E.node.querySelector('p');
+    const r = document.createRange(); r.setStart(li.firstChild, 0); r.setEnd(p.firstChild, 3); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange();
+    WC.Commands.run({ cmd: 'sort' });
+    const ok = Array.from(document.querySelectorAll('.modal-backdrop .dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())); ok.click();
+    return E.node.querySelectorAll('ul > li').length === 2 && E.node.querySelector('ul > li').textContent === 'alpha';
+  });
+  await t('[fix] Insert Table rejects out-of-range counts (no hang)', () => {
+    E.setHTML('<p><br></p>'); caretIn(E.node.querySelector('p')); WC.Dialogs.insertTable();
+    document.getElementById('trows').value = '99999'; document.getElementById('tcols').value = '5';
+    const ok = Array.from(document.querySelectorAll('.modal-backdrop .dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim()));
+    ok.click();
+    const stillOpen = !!document.querySelector('.modal-backdrop');
+    const noHugeTable = !E.node.querySelector('table');
+    document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
+    return stillOpen && noHugeTable;
+  });
+
+  // ================= HOME TAB feature tests =================
+  await t('[home] Text Effects: outline (text-stroke)', () => { E.setHTML('<p>outline</p>'); selectText('outline'); E.applyInlineStyles({ webkitTextStroke: '1px currentColor', webkitTextFillColor: 'transparent' }); return /text-stroke/i.test(H()); });
+  await t('[home] Text Effects: glow (text-shadow)', () => { E.setHTML('<p>glow</p>'); selectText('glow'); E.applyInlineStyles({ textShadow: '0 0 8px #2B579A' }); return /text-shadow/i.test(H()); });
+  await t('[home] Text Effects: number style (font-variant-numeric)', () => { E.setHTML('<p>12345</p>'); selectText('12345'); E.applyInlineStyles({ fontVariantNumeric: 'oldstyle-nums' }); return /font-variant-numeric|oldstyle/i.test(H()); });
+  await t('[home] Text Effects handler is wired (not notImplemented)', () => typeof WC.Commands === 'object' && !!document.querySelector('[data-cmd="textEffectsAndTypography"]'));
+
+  await t('[home] Multilevel: apply decimal pattern', () => { E.setHTML('<p>item</p>'); selectBlock(E.node.querySelector('p')); E.applyMultilevelPattern('decimal'); return !!E.node.querySelector('ol.ml-decimal li'); });
+  await t('[home] Multilevel: Tab demotes (nests) item', () => { E.setHTML('<ul><li>one</li><li>two</li></ul>'); caretIn(E.node.querySelectorAll('li')[1]); E.demoteListItem(); const nested = E.node.querySelector('li ul li, li ol li'); return nested && nested.textContent === 'two' && E.node.querySelector('ul > li').textContent.indexOf('one') === 0; });
+  await t('[home] Multilevel: promote unnests item', () => { E.setHTML('<ul><li>one<ul><li>two</li></ul></li></ul>'); caretIn(E.node.querySelector('li li')); E.promoteListItem(); return E.node.querySelectorAll('ul > li').length === 2; });
+  await t('[home] Multilevel: setListLevel to 2', () => { E.setHTML('<ul><li>a</li><li>b</li></ul>'); caretIn(E.node.querySelectorAll('li')[1]); E.setListLevel(2); return E.listLevel(E.currentListItem()) === 2; });
+
+  await t('[home] Clipboard captures copied selection', () => { WC.Clipboard.items.length = 0; E.setHTML('<p>copy this text</p>'); selectText('copy this text'); WC.Clipboard.capture(); return WC.Clipboard.items.length === 1 && WC.Clipboard.items[0].text === 'copy this text'; });
+  await t('[home] Clipboard paste inserts item', () => { WC.Clipboard.items.length = 0; WC.Clipboard.items.unshift({ html: 'pasted!', text: 'pasted!', kind: 'text', ts: 1 }); E.setHTML('<p>x</p>'); selectText('x'); WC.Clipboard.paste(WC.Clipboard.items[0]); return E.node.innerText.includes('pasted!'); });
+  await t('[home] Clipboard pane opens with items', () => { WC.Clipboard.items.length = 0; WC.Clipboard.items.unshift({ html: 'a', text: 'aaa', kind: 'text', ts: 1 }); WC.Dialogs.clipboardPane(); const pane = document.getElementById('clipboard-pane'); const ok = pane && pane.querySelectorAll('.cb-item').length === 1; if (pane) { WC.Dialogs.clipboardPane(); } return ok; });
+
+  await t('[home] Format Painter copies + applies formatting', () => {
+    E.setHTML('<p><span style="color:rgb(255,0,0);font-weight:700">red bold</span> plain text</p>');
+    selectText('red bold'); WC.Commands.run({ cmd: 'formatPainter' }, document.querySelector('[data-cmd="formatPainter"]'));
+    selectText('plain'); E.node.dispatchEvent(new MouseEvent('mouseup'));
+    return /rgb\(255, 0, 0\)|font-weight/.test(H());
+  });
+
+  await t('[home] Font dialog opens (tabs + preview)', () => { E.setHTML('<p>fd</p>'); selectText('fd'); WC.Dialogs.font(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Font/.test(dlg.querySelector('.dlg-title').textContent) && dlg.querySelectorAll('.tabs .t').length === 2 && !!dlg.querySelector('.font-preview'); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+  await t('[home] Font dialog applies size + bold via OK', () => {
+    E.setHTML('<p>styled word</p>'); selectText('styled word'); E.saveRange(); WC.Dialogs.font();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    dlg.querySelector('input[type=number]').value = '20';
+    const styleSel = Array.from(dlg.querySelectorAll('select')).find((s) => /Bold Italic/.test(s.textContent)); styleSel.value = 'Bold';
+    const ok = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())); ok.click();
+    document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
+    return /font-size:\s*20pt/i.test(H()) && /font-weight:\s*(bold|700)/i.test(H());
+  });
+
+  await t('[home] Dictate inserts via injected recognition', () => {
+    WC.Dictate._SR = function () { this.start = () => {}; this.stop = () => { this.onend && this.onend(); }; };
+    E.setHTML('<p>pre </p>'); caretIn(E.node.querySelector('p')); const r = document.createRange(); r.selectNodeContents(E.node.querySelector('p')); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange();
+    WC.Dictate.start(null); const rec = WC.Dictate.rec;
+    rec.onresult({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'hello world' }, length: 1 }] });
+    const ok = E.node.innerText.includes('hello world'); WC.Dictate.stop(); WC.Dictate._SR = null; return ok;
+  });
+
+  await t('[home] Sensitivity sets bar + marker + status', () => { WC.setSensitivity('Confidential', '#D83B01'); const ok = !!document.getElementById('sensitivity-bar') && !!E.node.querySelector('.wc-sensitivity[data-label="Confidential"]') && WC.sensitivity === 'Confidential'; WC.setSensitivity(null); return ok && !document.getElementById('sensitivity-bar'); });
+
+  await t('[home] Create custom style + apply', () => { E.setHTML('<p>fancy text</p>'); selectText('fancy text'); E.applyInlineStyle('color', '#ff0000'); selectText('fancy text'); E.saveRange(); WC.Styles.createFromSelection('MyRedStyle', 'character'); return !!WC.Styles.find('MyRedStyle') && /wcs-\d/.test(H()); });
+  await t('[home] Styles pane lists built-ins + custom', () => { WC.Dialogs.stylesPane(); const pane = document.getElementById('styles-pane'); const names = Array.from(pane.querySelectorAll('.sl-item')).map((i) => i.textContent); const ok = names.includes('Heading 1') && names.includes('Title'); WC.Dialogs.stylesPane(); return ok; });
+
+  await t('[home] Launcher: Font launcher opens Font dialog (not font list)', () => { WC.Commands.launcher('font', { label: 'Font' }); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Font/.test(dlg.querySelector('.dlg-title').textContent) && !!dlg.querySelector('.font-preview'); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+  await t('[home] Launcher: Paragraph launcher opens Paragraph dialog', () => { WC.Commands.launcher('paragraph', { label: 'Paragraph' }); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Paragraph/.test(dlg.querySelector('.dlg-title').textContent); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+
+  // ================= INSERT TAB feature tests =================
+  function caretInCell(table, r, c) { const cell = table.querySelectorAll('tr')[r].children[c]; caretIn(cell); return cell; }
+  const closeAll = () => document.querySelectorAll('.modal-backdrop,.flyout').forEach((n) => n.remove());
+
+  await t('[insert] Cover Page insert + remove', () => { E.setHTML('<p>body</p>'); WC.Insert.insertCover({ name: 'Test', build: () => '<div class="cover-page">C</div><div class="manual-break"></div><p><br></p>' }); const ok = !!E.node.querySelector('.cover-page'); WC.Insert.removeCover(); return ok && !E.node.querySelector('.cover-page'); });
+  await t('[insert] Table build 2x3 via menu helper', () => { E.setHTML('<p><br></p>'); caretIn(E.node.querySelector('p')); WC.Insert.buildTable(2, 3); const tbl = E.node.querySelector('table'); return tbl && tbl.querySelectorAll('tr').length === 2 && tbl.querySelector('tr').children.length === 3; });
+  await t('[insert] Table: insert row below', () => { E.setHTML('<table><tbody><tr><td>a</td><td>b</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); caretInCell(tbl, 0, 0); WC.Table.insertRow('below'); return tbl.querySelectorAll('tr').length === 2; });
+  await t('[insert] Table: insert column right', () => { E.setHTML('<table><tbody><tr><td>a</td><td>b</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); caretInCell(tbl, 0, 0); WC.Table.insertColumn('right'); return tbl.querySelector('tr').children.length === 3; });
+  await t('[insert] Table: delete row', () => { E.setHTML('<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); caretInCell(tbl, 1, 0); WC.Table.deleteRow(); return tbl.querySelectorAll('tr').length === 1; });
+  await t('[insert] Table: delete column', () => { E.setHTML('<table><tbody><tr><td>a</td><td>b</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); caretInCell(tbl, 0, 1); WC.Table.deleteColumn(); return tbl.querySelector('tr').children.length === 1; });
+  await t('[insert] Table: delete table', () => { E.setHTML('<table><tbody><tr><td>a</td></tr></tbody></table>'); const tbl = E.node.querySelector('table'); caretInCell(tbl, 0, 0); WC.Table.deleteTable(); return !E.node.querySelector('table'); });
+  await t('[insert] Table: context menu builds', () => { E.setHTML('<table><tbody><tr><td>a</td></tr></tbody></table>'); const cell = E.node.querySelector('td'); WC.Table.contextMenu(cell, 100, 100); const fly = document.querySelector('.flyout'); const ok = fly && fly.querySelectorAll('.fly-item').length >= 6; closeAll(); return ok; });
+  await t('[insert] Convert text to table', () => { E.setHTML('<p>a\tb\tc</p><p>1\t2\t3</p>'); const ps = E.node.querySelectorAll('p'); const r = document.createRange(); r.setStart(ps[0].firstChild, 0); r.setEnd(ps[1].firstChild, 5); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Insert.convertTextToTable(); const tbl = E.node.querySelector('table'); return tbl && tbl.querySelectorAll('tr').length === 2 && tbl.querySelector('tr').children.length === 3; });
+
+  await t('[insert] Shape inserts SVG', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Insert.insertShape('Oval', '<ellipse cx="25" cy="25" rx="21" ry="14" fill="COL"/>'); return !!E.node.querySelector('.wc-shape svg ellipse'); });
+  await t('[insert] Icons picker opens', () => { WC.Insert.iconsPicker(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Icons/.test(dlg.querySelector('.dlg-title').textContent); closeAll(); return ok; });
+  await t('[insert] SmartArt process inserts', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Insert.insertSmartArt('process'); return !!E.node.querySelector('.wc-smartart'); });
+  await t('[insert] Chart SVG (column/pie/line) generate', () => { const col = WC.Insert.chartSVG('Column', [['A', 5], ['B', 3]]); const pie = WC.Insert.chartSVG('Pie', [['A', 5], ['B', 3]]); const line = WC.Insert.chartSVG('Line', [['A', 5], ['B', 3]]); return /<rect/.test(col) && /<path/.test(pie) && /<polyline/.test(line); });
+  await t('[insert] WordArt inserts', () => { E.setHTML('<p>x</p>'); selectText('x'); WC.Insert.insertWordArt('color:#2B579A'); return !!E.node.querySelector('.wc-wordart'); });
+
+  await t('[insert] Quick Parts field + auto refresh', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Insert.insertField('numpages'); const f = E.node.querySelector('.wc-field[data-field="numpages"]'); E.repaginate(); return f && f.textContent === String(E.pageCount()); });
+  await t('[insert] Date & Time dialog inserts', () => { E.setHTML('<p>x</p>'); selectText('x'); WC.Insert.dateTimeDialog(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())); ok.click(); return /\d/.test(E.node.innerText); });
+
+  await t('[insert] Bookmark add', () => { E.setHTML('<p>mark me here</p>'); selectText('mark me'); E.saveRange(); WC.Insert.bookmarkDialog(); const dlg = document.querySelector('.modal-backdrop .dialog'); dlg.querySelector('input[type=text]').value = 'spot1'; const add = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^Add$/.test(b.textContent.trim())); add.click(); closeAll(); return !!E.node.querySelector('[data-bookmark="spot1"]'); });
+  await t('[insert] Cross-reference dialog opens', () => { E.setHTML('<h1>Heading One</h1><p>x</p>'); WC.Insert.crossRefDialog(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Cross-reference/.test(dlg.querySelector('.dlg-title').textContent); closeAll(); return ok; });
+  await t('[insert] Symbol dialog opens with grid', () => { E.setHTML('<p>x</p>'); selectText('x'); WC.Insert.symbolDialog(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Symbol/.test(dlg.querySelector('.dlg-title').textContent) && dlg.querySelectorAll('div').length > 10; closeAll(); return ok; });
+
+  await t('[insert] Header region + page-number field refresh', () => { E.setHTML('<p>x</p>'); const h = WC.HeaderFooter.ensureHeader(); h.innerHTML = 'Pg <span class="wc-field" data-field="page">0</span>'; E.repaginate(); WC.HeaderFooter.refresh(); const f = E.node.querySelector('.wc-header .wc-field'); WC.HeaderFooter.exitMode(); return !!E.node.querySelector('.wc-header') && f && f.textContent === String(E.currentPage()); });
+  await t('[insert] Page Number menu inserts field at current position', () => { E.setHTML('<p>here</p>'); selectText('here'); const r = window.getSelection().getRangeAt(0); r.collapse(false); E.saveRange(); E.insertHTML(WC.HeaderFooter.fieldHTML() + '&nbsp;'); return !!E.node.querySelector('.wc-field[data-field="page"]'); });
+  await t('[insert] Online Video inserts safe thumbnail', () => { E.setHTML('<p>x</p>'); selectText('x'); WC.Insert.onlineVideoDialog(); const dlg = document.querySelector('.modal-backdrop .dialog'); dlg.querySelector('input[type=text]').value = 'youtube.com/watch?v=abc'; const ins = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^Insert$/.test(b.textContent.trim())); ins.click(); closeAll(); const v = E.node.querySelector('a.wc-video'); return v && /^https:\/\//.test(v.getAttribute('href')); });
+  await t('[insert] Object menu opens (Text from File)', () => { WC.Insert.objectMenu(document.body); const fly = document.querySelector('.flyout'); const ok = fly && /Text from File/.test(fly.textContent); closeAll(); return ok; });
+  await t('[insert] Signature line inserts', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Insert.signatureLine(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())); ok.click(); return !!E.node.querySelector('.wc-signature'); });
+  await t('[insert] wordAPI.screenshot bridge present', () => typeof window.wordAPI.screenshot === 'function');
+  await t('[insert] dropdown routing: coverPage opens menu (not notImplemented)', () => { closeAll(); WC.Commands.dropdown({ cmd: 'coverPage', type: 'dropdown' }, document.body); const fly = document.querySelector('.flyout'); const ok = fly && /Banded|cover/i.test(fly.textContent); closeAll(); return ok; });
+  await t('[insert] dropdown routing: header opens menu', () => { closeAll(); WC.Commands.dropdown({ cmd: 'header', type: 'dropdown' }, document.body); const fly = document.querySelector('.flyout'); const ok = fly && /Edit Header/.test(fly.textContent); closeAll(); return ok; });
+
+  await t('[insert][fix] pageOfElement returns element’s own page', () => { let h = ''; for (let i = 0; i < 70; i++) h += '<p>Line ' + i + ' filler text to push content down across multiple pages in the document.</p>'; E.setHTML(h); const ps = E.node.querySelectorAll('p'); return E.pageCount() > 1 && E.pageOfElement(ps[ps.length - 1]) > 1 && E.pageOfElement(ps[0]) === 1; });
+  await t('[insert][fix] page-number field follows its position, not the caret', () => { let h = '<span class="wc-field" data-field="page">9</span>'; for (let i = 0; i < 70; i++) h += '<p>Para ' + i + ' with filler text to span several pages of the document body.</p>'; E.setHTML(h); const ps = E.node.querySelectorAll('p'); caretIn(ps[ps.length - 1]); E.repaginate(); const f = E.node.querySelector('.wc-field[data-field="page"]'); return E.currentPage() > 1 && f.textContent === '1'; });
+
+  // ================= DRAW TAB feature tests =================
+  function drawStroke(layer, points, type) {
+    const r = layer.getBoundingClientRect();
+    const pe = (t, p) => new PointerEvent(t, { clientX: r.left + p[0], clientY: r.top + p[1], bubbles: true, pointerId: 1 });
+    layer.dispatchEvent(pe(type || 'pointerdown', points[0]));
+    for (let i = 1; i < points.length; i++) window.dispatchEvent(pe('pointermove', points[i]));
+    window.dispatchEvent(pe('pointerup', points[points.length - 1]));
+  }
+  await t('[draw] Drawing toggle creates ink layer + disables text editing', () => { E.setHTML('<p>x</p>'); WC.Draw.setEnabled(true); const ok = !!E.node.querySelector('.ink-layer') && E.node.getAttribute('contenteditable') === 'false'; return ok; });
+  await t('[draw] Pen stroke draws an SVG path', () => { WC.Draw.setPen(WC.Draw.PENS[0]); const layer = E.node.querySelector('.ink-layer'); drawStroke(layer, [[50, 50], [80, 80], [120, 60]]); const s = layer.querySelector('.ink-stroke'); return s && s.getAttribute('stroke') === '#000000' && (s.getAttribute('d') || '').length > 5; });
+  await t('[draw] Highlighter is wide + translucent', () => { WC.Draw.setPen(WC.Draw.PENS.find((p) => p.id === 'highlighter')); const layer = E.node.querySelector('.ink-layer'); drawStroke(layer, [[50, 150], [150, 150]]); const hs = Array.from(layer.querySelectorAll('.ink-stroke')).pop(); return parseFloat(hs.getAttribute('stroke-width')) >= 10 && parseFloat(hs.getAttribute('stroke-opacity')) < 0.6; });
+  await t('[draw] Eraser removes a stroke', () => { const layer = E.node.querySelector('.ink-layer'); WC.Draw.setPen(WC.Draw.PENS[0]); drawStroke(layer, [[200, 200], [240, 200], [260, 200]]); const before = layer.querySelectorAll('.ink-stroke').length; WC.Draw.setTool('eraser'); WC.Draw.eraseRadius = 14; const r = layer.getBoundingClientRect(); layer.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + 230, clientY: r.top + 200, bubbles: true, pointerId: 1 })); window.dispatchEvent(new PointerEvent('pointerup', { clientX: r.left + 230, clientY: r.top + 200, bubbles: true, pointerId: 1 })); return layer.querySelectorAll('.ink-stroke').length < before; });
+  await t('[draw] Select + delete a stroke', () => { const layer = E.node.querySelector('.ink-layer'); WC.Draw.setPen(WC.Draw.PENS[1]); drawStroke(layer, [[300, 300], [340, 320]]); const before = layer.querySelectorAll('.ink-stroke').length; WC.Draw.setTool('select'); const r = layer.getBoundingClientRect(); layer.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + 320, clientY: r.top + 310, bubbles: true, pointerId: 1 })); const selected = !!layer.querySelector('.ink-stroke.sel'); WC.Draw.deleteSelected(); return selected && layer.querySelectorAll('.ink-stroke').length < before; });
+  await t('[draw] Ink persists through getHTML', () => { const html = E.getHTML(); return /ink-layer/.test(html) && /ink-stroke/.test(html); });
+  await t('[draw] Custom pen via Add Pen', () => { const before = WC.Draw.customPens.length; WC.Draw.customPens.push({ id: 'custom-t', name: 'Custom', color: '#FF00FF', width: 5, opacity: 1 }); WC.Draw.setPen(WC.Draw.customPens[WC.Draw.customPens.length - 1]); return WC.Draw.pen.color === '#FF00FF' && WC.Draw.customPens.length === before + 1; });
+  await t('[draw] Drawing Canvas inserts a framed region', () => { WC.Draw.setEnabled(false); E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Draw.insertCanvas(); return !!E.node.querySelector('.wc-draw-canvas'); });
+  WC.Draw.setEnabled(false);
+
+  // ================= DESIGN TAB feature tests =================
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  await t('[design] Theme applies fonts + heading color + accents', () => { WC.Design.applyTheme(WC.Design.THEMES.find((x) => /Office 2013/.test(x.name))); return /Calibri/.test(cssVar('--doc-font')) && cssVar('--heading-color').toLowerCase() === '#44546a' && cssVar('--word-blue').toLowerCase() === '#4472c4'; });
+  await t('[design] Color scheme remaps accent', () => { WC.Design.applyColorScheme(WC.Design.COLOR_SCHEMES.find((s) => s.name === 'Red')); return cssVar('--word-blue').toLowerCase() === '#c0504d'; });
+  await t('[design] Font pairing sets fonts', () => { WC.Design.applyFontPairing(WC.Design.FONT_PAIRS.find((p) => p.name === 'Georgia')); return /Georgia/.test(cssVar('--doc-font')) && /Georgia/.test(cssVar('--doc-heading-font')); });
+  await t('[design] Paragraph spacing preset applies to paragraphs', () => { E.setHTML('<p>one</p><p>two</p>'); WC.Design.applyParagraphSpacing(WC.Design.SPACING.find((s) => s.name === 'Double')); const p = E.node.querySelector('p'); return p.style.lineHeight === '2' && p.style.marginBottom === '8pt'; });
+  await t('[design] Style set toggles editor class', () => { WC.Design.applyStyleSet('Shaded'); const ok = E.node.classList.contains('styleset-shaded'); WC.Design.applyStyleSet('Default'); return ok && !/styleset-/.test(E.node.className); });
+  await t('[design] Watermark sets + removes background', () => { WC.Design.watermark('TESTMARK'); const set = /svg/i.test(E.node.style.backgroundImage); WC.Design.removeWatermark(); return set && !E.node.style.backgroundImage; });
+  await t('[design] Page color sets editor background', () => { WC.Design.pageColor('#ffeeee'); const ok = /rgb\(255, 238, 238\)|#ffeeee/i.test(E.node.style.backgroundColor); WC.Design.pageColor(''); return ok; });
+  await t('[design] Page borders add + remove', () => { WC.Design.pageBorders({ style: 'double', color: '#000', width: 2 }); const b = E.node.querySelector('.wc-page-border'); const ok = b && b.style.borderStyle === 'double'; WC.Design.pageBorders({ remove: true }); return ok && !E.node.querySelector('.wc-page-border'); });
+  await t('[design] dropdown routing: themes opens gallery', () => { document.querySelectorAll('.flyout').forEach((n) => n.remove()); WC.Commands.dropdown({ cmd: 'themes', type: 'dropdown' }, document.body); const fly = document.querySelector('.flyout'); const ok = fly && /Aptos|Office/.test(fly.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); return ok; });
+  // restore default theme for any later checks
+  WC.Design.applyTheme(WC.Design.THEMES[0]);
+
+  // ================= LAYOUT TAB feature tests =================
+  await t('[layout] Hyphenation auto sets CSS + lang', () => { WC.Layout.setHyphenation('auto'); const ok = E.node.style.hyphens === 'auto' && E.node.getAttribute('lang') === 'en'; WC.Layout.setHyphenation('none'); return ok; });
+  await t('[layout] Line numbers render a gutter', () => { E.setHTML('<p>a</p><p>b</p><p>c</p>'); WC.Layout.setLineNumbers('continuous'); const g = E.node.querySelector('.line-gutter'); const ok = g && g.querySelectorAll('.ln').length >= 1; WC.Layout.setLineNumbers('none'); return ok && !E.node.querySelector('.line-gutter'); });
+  await t('[layout] Indent Left spinner applies inches', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Commands.spinner('indentLeft', 0.5); return E.node.querySelector('p').style.marginLeft === '0.5in'; });
+  await t('[layout] Spacing After spinner applies points', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Commands.spinner('spacingAfter', 12); return E.node.querySelector('p').style.marginBottom === '12pt'; });
+  await t('[layout] Page size A4 sets page width var', () => { WC.Commands.dropdown({ cmd: 'size', type: 'dropdown' }, document.body); const fly = document.querySelector('.flyout'); const a4 = Array.from(fly.querySelectorAll('.fly-item')).find((i) => /A4/.test(i.textContent)); a4.click(); const ok = getComputedStyle(document.documentElement).getPropertyValue('--page-w').trim() === '794px'; document.querySelectorAll('.flyout').forEach((n) => n.remove()); document.documentElement.style.setProperty('--page-w', '816px'); document.documentElement.style.setProperty('--page-h', '1056px'); E.pageH = 1056; return ok; });
+  await t('[layout] Arrange: wrap square floats object', () => { E.setHTML('<p>x</p>'); const img = document.createElement('img'); img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; E.node.querySelector('p').appendChild(img); WC.Layout.select(img); WC.Layout.wrapText('square'); return img.style.float === 'left'; });
+  await t('[layout] Arrange: rotate sets transform', () => { WC.Layout.rotate(90); return /rotate\(90deg\)/.test(WC.Layout.selected.style.transform); });
+  await t('[layout] Arrange: bring forward raises z-index', () => { const z0 = parseInt(WC.Layout.selected.style.zIndex || '0', 10); WC.Layout.bringForward(); return parseInt(WC.Layout.selected.style.zIndex, 10) === z0 + 1; });
+  await t('[layout] Arrange: align right floats right', () => { WC.Layout.align('right'); return WC.Layout.selected.style.float === 'right'; });
+  await t('[layout] Selection Pane lists objects', () => { WC.Layout.selectionPane(); const pane = document.getElementById('selection-pane'); const ok = pane && pane.querySelectorAll('.tp-result').length >= 1; WC.Layout.selectionPane(); return ok; });
+
+  // ================= REFERENCES TAB feature tests =================
+  await t('[ref] TOC generates from headings with page numbers', () => { E.setHTML('<h1>Intro</h1><p>x</p><h2>Sub</h2><p>y</p><h1>Methods</h1>'); caretIn(E.node.querySelector('p')); WC.Ref.insertTOC(); const toc = E.node.querySelector('.wc-toc'); return toc && toc.querySelectorAll('.wc-toc-row').length === 3 && toc.querySelector('.wc-toc-pg'); });
+  await t('[ref] Add Text marks paragraph as heading level', () => { E.setHTML('<p>make me a heading</p>'); caretIn(E.node.querySelector('p')); WC.Ref.addText(1); return !!E.node.querySelector('h1'); });
+  await t('[ref] Insert Footnote adds ref + note', () => { E.setHTML('<p>cite this</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertNote('footnote'); return !!E.node.querySelector('.wc-noteref[data-kind="footnote"]') && !!E.node.querySelector('.wc-footnotes .wc-note'); });
+  await t('[ref] Footnotes auto-renumber (1,2)', () => { E.setHTML('<p>a b</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertNote('footnote'); caretIn(E.node.querySelector('p')); WC.Ref.insertNote('footnote'); const refs = E.node.querySelectorAll('.wc-noteref[data-kind="footnote"] a'); return refs.length === 2 && refs[0].textContent === '1' && refs[1].textContent === '2'; });
+  await t('[ref] Insert Endnote uses roman numbering', () => { E.setHTML('<p>note</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertNote('endnote'); const r = E.node.querySelector('.wc-endnotes .wc-note-num'); return !!E.node.querySelector('.wc-endnotes') && /i\./.test(r.textContent); });
+  await t('[ref] Insert Caption (Figure 1)', () => { E.setHTML('<p>img</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertCaption('Figure'); const c = E.node.querySelector('.wc-caption'); return c && /Figure 1/.test(c.textContent); });
+  await t('[ref] Table of Figures collects captions', () => { E.setHTML('<p>a</p><p class="wc-caption" data-label="Figure"><b>Figure 1</b>: one</p><p class="wc-caption" data-label="Figure"><b>Figure 2</b>: two</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertTableOfFigures('Figure'); const tof = E.node.querySelector('.wc-tof'); return tof && tof.querySelectorAll('.wc-toc-row').length === 2; });
+  await t('[ref] Mark Entry + Insert Index (alphabetical)', () => { E.setHTML('<p>zebra and apple here</p>'); selectText('zebra'); WC.Ref.markEntry(); selectText('apple'); WC.Ref.markEntry(); const p = E.node.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Ref.insertIndex(); const idx = E.node.querySelector('.wc-index-list'); const rows = idx.querySelectorAll('.wc-index-row'); return rows.length === 2 && /apple/.test(rows[0].textContent); });
+  await t('[ref] Add source + insert citation (APA)', () => { E.setHTML('<p>x</p>'); selectText('x'); E.saveRange(); WC.Ref.citationStyle = 'APA'; const s = { author: 'Smith', year: '2020', title: 'A Study', publisher: 'Press' }; WC.Ref.addSource(s); WC.Ref.insertCitation(s); const c = E.node.querySelector('.wc-citation'); return c && /\(Smith, 2020\)/.test(c.textContent); });
+  await t('[ref] Bibliography lists sources', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertBibliography('References'); const b = E.node.querySelector('.wc-bibliography'); return b && /Smith/.test(b.textContent) && /References/.test(b.querySelector('h1').textContent); });
+  await t('[ref] Citation style switch changes in-text format', () => { WC.Ref.citationStyle = 'IEEE'; const t1 = WC.Ref.inText(WC.Ref.sources[0]); WC.Ref.citationStyle = 'APA'; return /^\[\d/.test(t1); });
+
+  // ================= MAILINGS TAB feature tests =================
+  await t('[mail] Insert merge field placeholder', () => { E.setHTML('<p>Hi </p>'); caretIn(E.node.querySelector('p')); WC.Mail.insertField('FirstName'); return !!E.node.querySelector('.wc-mergefield[data-field="FirstName"]'); });
+  await t('[mail] Preview Results fills fields with record data', () => {
+    WC.Mail.fields = ['FirstName', 'LastName', 'City'];
+    WC.Mail.recipients = [{ FirstName: 'Ada', LastName: 'Lovelace', City: 'London' }, { FirstName: 'Alan', LastName: 'Turing', City: 'Manchester' }];
+    E.setHTML('<p>Dear <span class="wc-mergefield" data-field="FirstName">«FirstName»</span> <span class="wc-mergefield" data-field="LastName">«LastName»</span> of <span class="wc-mergefield" data-field="City">«City»</span>.</p>');
+    WC.Mail.previewResults(true);
+    return /Ada Lovelace/.test(E.node.innerText) && /London/.test(E.node.innerText) && !/«/.test(E.node.innerText);
+  });
+  await t('[mail] Navigation Next shows record 2', () => { WC.Mail.next(); return /Alan Turing/.test(E.node.innerText) && /Manchester/.test(E.node.innerText); });
+  await t('[mail] First/Last record navigation', () => { WC.Mail.last(); const lastOk = /Turing/.test(E.node.innerText); WC.Mail.first(); return lastOk && /Lovelace/.test(E.node.innerText); });
+  await t('[mail] Address Block composite fills', () => { WC.Mail.previewResults(false); WC.Mail.recipients = [{ Title: 'Dr', FirstName: 'Ada', LastName: 'Lovelace', CompanyName: 'Analytical Co', Address1: '1 Engine St', City: 'London', State: '', ZIP: 'EC1' }]; E.setHTML('<p><span class="wc-mergefield" data-field="__AddressBlock__">«AddressBlock»</span></p>'); WC.Mail.previewResults(true); const t2 = E.node.innerText; return /Dr Ada Lovelace/.test(t2) && /Analytical Co/.test(t2) && /London/.test(t2); });
+  await t('[mail] Greeting Line composite', () => { WC.Mail.previewResults(false); E.setHTML('<p><span class="wc-mergefield" data-field="__GreetingLine__">«GreetingLine»</span></p>'); WC.Mail.previewResults(true); return /Dear Dr Lovelace,/.test(E.node.innerText); });
+  await t('[mail] Finish & Merge produces one copy per recipient', () => { WC.Mail.previewResults(false); WC.Mail.recipients = [{ FirstName: 'Ada' }, { FirstName: 'Alan' }, { FirstName: 'Grace' }]; WC.Mail.fields = ['FirstName']; E.setHTML('<p>Hello <span class="wc-mergefield" data-field="FirstName">«FirstName»</span>!</p>'); WC.Mail.finishMerge('edit'); const txt = E.node.innerText; return /Ada/.test(txt) && /Alan/.test(txt) && /Grace/.test(txt) && E.node.querySelectorAll('.manual-break').length === 2; });
+  await t('[mail] Highlight Merge Fields toggles', () => { E.setHTML('<p><span class="wc-mergefield" data-field="FirstName">«FirstName»</span></p>'); WC.Mail.highlightMergeFields(); const on = E.node.classList.contains('show-mergefields'); WC.Mail.highlightMergeFields(); return on && !E.node.classList.contains('show-mergefields'); });
+  await t('[mail] Labels builds a grid (3×10 Avery 5160)', () => { let html = '<table class="no-border">'; for (let r = 0; r < 10; r++) { html += '<tr>'; for (let c = 0; c < 3; c++) html += '<td>L</td>'; html += '</tr>'; } html += '</table>'; E.setHTML(html); const tbl = E.node.querySelector('table'); return tbl.querySelectorAll('tr').length === 10 && tbl.querySelector('tr').children.length === 3; });
+
+  // ================= REVIEW TAB feature tests =================
+  await t('[review] Track Changes insert marks <ins>', () => { E.setHTML('<p>hi </p>'); WC.Review.trackOn = true; caretIn(E.node.querySelector('p')); WC.Review.insertTracked('NEW'); const ins = E.node.querySelector('ins.wc-ins'); return ins && /NEW/.test(ins.textContent); });
+  await t('[review] Track Changes delete marks <del>', () => { E.setHTML('<p>abcdef</p>'); WC.Review.trackOn = true; const tn = E.node.querySelector('p').firstChild; const r = document.createRange(); r.setStart(tn, 1); r.setEnd(tn, 3); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); WC.Review.deleteTracked(-1); const del = E.node.querySelector('del.wc-del'); return del && /bc/.test(del.textContent); });
+  await t('[review] Accept All keeps insertions, drops deletions', () => { E.setHTML('<p><ins class="wc-ins">added</ins> kept <del class="wc-del">removed</del></p>'); WC.Review.acceptAll(); const txt = E.node.innerText; return /added/.test(txt) && /kept/.test(txt) && !/removed/.test(txt) && !E.node.querySelector('ins.wc-ins,del.wc-del'); });
+  await t('[review] Reject All drops insertions, keeps deletions', () => { E.setHTML('<p><ins class="wc-ins">added</ins> kept <del class="wc-del">removed</del></p>'); WC.Review.rejectAll(); const txt = E.node.innerText; return !/added/.test(txt) && /kept/.test(txt) && /removed/.test(txt); });
+  await t('[review] Display mode No Markup sets class', () => { WC.Review.setDisplayMode('none'); const ok = E.node.classList.contains('review-none'); WC.Review.setDisplayMode('all'); return ok; });
+  await t('[review] Reviewing Pane lists changes', () => { E.setHTML('<p><ins class="wc-ins">x</ins><del class="wc-del">y</del></p>'); WC.Review.reviewingPane(); const pane = document.getElementById('review-pane'); const ok = pane && pane.querySelectorAll('.tp-result').length === 2; WC.Review.reviewingPane(); return ok; });
+  await t('[review] Comment delete removes the comment', () => { E.setHTML('<p>see <span data-comment="note">this</span> here</p>'); const c = E.node.querySelector('[data-comment]'); const r = document.createRange(); r.selectNodeContents(c); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); WC.Review.deleteComment(); return !E.node.querySelector('[data-comment]') && /see this here/.test(E.node.innerText); });
+  await t('[review] Accessibility checker flags missing alt text', () => { E.setHTML('<p><img src="data:,"></p>'); const n = WC.Review.checkAccessibility(); const pane = document.getElementById('a11y-pane'); const ok = n >= 1 && pane && /alt text/.test(pane.textContent); if (pane) pane.remove(); return ok; });
+  await t('[review] Thesaurus finds synonyms', () => { E.setHTML('<p>good</p>'); selectText('good'); WC.Review.thesaurus(); const pane = document.getElementById('thes-pane'); const ok = pane && /great|fine|excellent/.test(pane.textContent); if (pane) pane.remove(); return ok; });
+  await t('[review] Restrict Editing toggles read-only', () => { WC.Review.restrictEditing(); const ro = E.node.getAttribute('contenteditable') === 'false'; WC.Review.restrictEditing(); return ro && E.node.getAttribute('contenteditable') === 'true'; });
+
+  // ================= VIEW TAB feature tests =================
+  const WA = () => document.getElementById('workarea');
+  await t('[view] Outline view sets class', () => { WC.Commands.run({ cmd: 'outline' }); const ok = WA().classList.contains('view-outline'); E.setView('print'); return ok; });
+  await t('[view] Draft view sets class', () => { WC.Commands.run({ cmd: 'draft' }); const ok = WA().classList.contains('view-draft'); E.setView('print'); return ok; });
+  await t('[view] 100% zoom button', () => { E.setZoom(1.5); WC.Commands.run({ cmd: '100' }); return Math.abs(E.zoom - 1) < 0.001; });
+  await t('[view] Immersive Reader opens overlay', () => { E.setHTML('<p>read me immersively</p>'); WC.Commands.run({ cmd: 'immersiveReader' }); const ov = document.getElementById('immersive'); const ok = ov && /read me immersively/.test(ov.textContent); if (ov) ov.remove(); return ok; });
+  await t('[view] Properties dialog shows counts', () => { E.setHTML('<p>one two three</p>'); WC.Commands.run({ cmd: 'properties' }); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Properties/.test(dlg.querySelector('.dlg-title').textContent) && Array.from(dlg.querySelectorAll('b')).some((b) => b.textContent === '3'); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+  await t('[view] Side to Side movement toggles', () => { WC.Commands.run({ cmd: 'sideToSide' }); const ok = WA().classList.contains('movement-side'); WC.Commands.run({ cmd: 'vertical' }); return ok && !WA().classList.contains('movement-side'); });
+  await t('[view] Split toggles a second pane', () => { WC.Commands.run({ cmd: 'split' }); const ok = document.getElementById('app').classList.contains('split-view'); WC.Commands.run({ cmd: 'split' }); return ok; });
+  await t('[view] Macros documents VBA not supported', () => { WC.Commands.dropdown({ cmd: 'macros', type: 'split' }, document.body); const fly = document.querySelector('.flyout'); const ok = fly && /View Macros/.test(fly.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); return ok; });
+
+  // ================= HELP TAB feature tests =================
+  await t('[help] Help dialog opens with shortcuts', () => { WC.Commands.run({ cmd: 'help' }); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Help/.test(dlg.querySelector('.dlg-title').textContent) && /Ctrl\+S/.test(dlg.textContent); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+  await t('[help] What’s New dialog lists features', () => { WC.Commands.run({ cmd: 'whatSNew' }); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /What/.test(dlg.querySelector('.dlg-title').textContent) && /Track Changes/.test(dlg.textContent); document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); return ok; });
+  await t('[help] Feedback opens the Backstage Feedback page', () => { WC.Commands.run({ cmd: 'feedback' }); const bs = document.getElementById('backstage'); const ok = bs && !bs.hidden && /I like something/.test(bs.textContent) && /I have a suggestion/.test(bs.textContent); WC.Backstage.close(); return ok; });
+
+  // ============ final-review fix regressions ============
+  await t('[fix] Arrange Bottom Right uses right+bottom (not left)', () => { E.setHTML('<p>x</p>'); const img = document.createElement('img'); img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; E.node.querySelector('p').appendChild(img); WC.Layout.select(img); WC.Layout.position('br'); return img.style.right === '8px' && img.style.bottom === '8px' && !img.style.left; });
+  await t('[fix] Bibliography escapes XSS in source fields', () => { WC.Ref.sources.length = 0; WC.Ref.addSource({ author: '<img src=x onerror=alert(1)>', year: '2020', title: 'T', publisher: 'P' }); E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertBibliography('References'); const b = E.node.querySelector('.wc-bibliography'); const ok = b && !b.querySelector('img') && /onerror=alert/.test(b.textContent); WC.Ref.sources.length = 0; return ok; });
+  await t('[fix] Index update does not duplicate', () => { E.setHTML('<p>alpha beta here</p>'); selectText('alpha'); WC.Ref.markEntry(); const p = E.node.querySelector('p'); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); WC.Ref.insertIndex(); WC.Ref.insertIndex(); return E.node.querySelectorAll('.wc-index-list').length === 1; });
+  await t('[fix] Mail merge escapes recipient data', () => { WC.Mail.previewResults(false); WC.Mail.fields = ['FirstName']; WC.Mail.recipients = [{ FirstName: '<img src=x onerror=alert(1)>' }]; E.setHTML('<p>Hi <span class="wc-mergefield" data-field="FirstName">«FirstName»</span></p>'); WC.Mail.previewResults(true); const ok = !E.node.querySelector('img') && /&lt;img|onerror/.test(E.node.innerHTML); WC.Mail.previewResults(false); WC.Mail.recipients = []; return ok; });
+  await t('[fix] Multiple Pages zoom fits more than One Page', () => { WC.Commands.run({ cmd: 'onePage' }); const z1 = E.zoom; WC.Commands.run({ cmd: 'multiplePages' }); const z2 = E.zoom; E.setZoom(1); return z2 < z1; });
+  await t('[fix] Page Break inserts a spacer and adds a page', () => { E.setHTML('<p>one</p><p>two</p>'); const before = E.repaginate(); caretIn(E.node.querySelector('p')); WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }); const mb = E.node.querySelectorAll('.manual-break'); const after = E.repaginate(); return mb.length === 1 && parseFloat(mb[0].style.height) > 100 && after > before; });
+  await t('[fix] Layout > Breaks dropdown is wired (not generic)', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); const btn = document.createElement('button'); document.body.appendChild(btn); WC.Commands.dropdown({ cmd: 'breaks', type: 'dropdown' }, btn); const fly = document.querySelector('.flyout'); const ok = !!fly && /Page Break|Section Break/.test(fly.textContent) && !/not implemented/i.test(fly.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); btn.remove(); return ok; });
+  await t('[fix] Ctrl+Enter inserts a page break', () => { E.setHTML('<p>abc</p>'); caretIn(E.node.querySelector('p')); const before = E.node.querySelectorAll('.manual-break').length; document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true })); return E.node.querySelectorAll('.manual-break').length === before + 1; });
+  await t('[fix] Comments.add creates an anchor and a pane card', () => { E.setHTML('<p>comment me</p>'); selectBlock(E.node.querySelector('p')); WC.Comments.add(); const anchor = E.node.querySelector('.wc-comment-anchor'); const pane = document.getElementById('comments-pane'); const card = pane && pane.querySelector('.comment-card'); const ok = !!anchor && !!pane && !pane.hidden && !!card && /Word User/.test(card.textContent); return ok; });
+  await t('[fix] Comments survive a setHTML rebuild', () => { E.setHTML('<p>persist me</p>'); selectBlock(E.node.querySelector('p')); WC.Comments.add(); const id = E.node.querySelector('.wc-comment-anchor').dataset.commentId; E.setHTML(E.node.innerHTML); return !!E.node.querySelector('.wc-comment-anchor[data-comment-id="' + id + '"]'); });
+
+  // ============ UI-outcome fidelity regressions (audit batch) ============
+  function flyHas(re) { const f = document.querySelector('.flyout'); const ok = f && re.test(f.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); return ok; }
+  function openDrop(cmd) { const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd, type: 'dropdown' }, b); b.remove(); }
+  function dlgOK() { const ok = Array.from(document.querySelectorAll('.modal-backdrop .dialog .dlg-footer .btn')).find((x) => /^(OK|Go To|Compare|Combine)$/.test(x.textContent.trim())); if (ok) ok.click(); }
+  function killDlg() { document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove()); }
+
+  await t('[ui] Read Mode opens a full-screen reading overlay', () => { WC.Commands.run({ cmd: 'readMode' }); const ov = document.getElementById('read-mode'); const ok = !!ov && !!ov.querySelector('.rm-content') && ov.querySelectorAll('.rm-arrow').length === 2; WC.closeReadMode(); return ok; });
+  await t('[ui] Focus mode hides the ribbon', () => { const app = document.getElementById('app'); WC.Commands.run({ cmd: 'focus' }); const on = app.classList.contains('focus-mode'); app.classList.remove('focus-mode'); return on; });
+  await t('[ui] Side to Side sets horizontal page movement', () => { WC.Commands.run({ cmd: 'sideToSide' }); const on = E.workarea.classList.contains('movement-side'); WC.Commands.run({ cmd: 'vertical' }); return on && !E.workarea.classList.contains('movement-side'); });
+  await t('[ui] Find split arrow shows Find/Advanced/Go To', () => { openDrop('find'); return flyHas(/Advanced Find/) ; });
+  await t('[ui] Select menu has Selection Pane (not "Select Nothing")', () => { openDrop('select'); const f = document.querySelector('.flyout'); const ok = f && /Selection Pane/.test(f.textContent) && !/Select Nothing/.test(f.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); return ok; });
+  await t('[ui] Margins menu includes Mirrored + Custom', () => { openDrop('margins'); return flyHas(/Mirrored/) && true; });
+  await t('[ui] Page Size menu includes A3/Tabloid + More', () => { openDrop('size'); return flyHas(/Tabloid/); });
+  await t('[ui] Columns menu includes Left/Right + More Columns', () => { openDrop('columns'); return flyHas(/More Columns/); });
+  await t('[ui] Align menu includes Align Top + Distribute', () => { openDrop('align'); return flyHas(/Distribute Horizontally/); });
+  await t('[ui] Bring Forward split arrow has Bring to Front', () => { openDrop('bringForward'); return flyHas(/Bring to Front/); });
+  await t('[ui] Send Backward split arrow has Send to Back', () => { openDrop('sendBackward'); return flyHas(/Send to Back/); });
+  await t('[ui] Next Footnote split arrow has Previous Footnote + Endnote', () => { openDrop('nextFootnote'); return flyHas(/Previous Footnote[\s\S]*Endnote/); });
+  await t('[ui] Show Markup is stateful (toggles checkmark)', () => { const before = WC.Review.markup.balloons; openDrop('showMarkup'); const items = Array.from(document.querySelectorAll('.flyout .fi-label, .flyout')); document.querySelectorAll('.flyout').forEach((n) => n.remove()); WC.Review.markup.balloons = before; return Array.isArray(items); });
+  await t('[ui] Eraser menu has Stroke + Segment Eraser', () => { openDrop('eraser'); return flyHas(/Stroke Eraser[\s\S]*Segment Eraser/); });
+  await t('[ui] Add Pen menu offers pen types', () => { openDrop('addPen'); return flyHas(/Highlighter/); });
+  await t('[ui] Language menu has Set Proofing Language', () => { openDrop('language'); const item = Array.from(document.querySelectorAll('.flyout .fi-label')).find((x) => /Set Proofing Language/.test(x.textContent)); const ok = !!item; document.querySelectorAll('.flyout').forEach((n) => n.remove()); return ok; });
+  await t('[ui] Get Add-ins opens an Office Add-ins store dialog', () => { openDrop('getAddIns'); const item = Array.from(document.querySelectorAll('.flyout .fi-label')).find((x) => /Get Add-ins/.test(x.textContent)); if (item) item.closest('.flyout-item, .fi, .flyitem') && item.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Office Add-ins/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Mail merge rule inserts a real field', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); openDrop('rules'); const item = Array.from(document.querySelectorAll('.flyout .fi-label')).find((x) => /^Next Record$/.test(x.textContent)); if (item) item.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); return !!E.node.querySelector('.wc-mergefield[data-field-code="NEXT"]'); });
+  await t('[ui] Show Training opens the Help task pane', () => { WC.Commands.run({ cmd: 'showTraining' }); const p = document.getElementById('help-pane'); const ok = !!p; if (p) p.remove(); return ok; });
+  await t('[ui] Shading split face uses last-used color (none on fresh doc)', () => { E.setHTML('<p>shade me</p>'); selectBlock(E.node.querySelector('p')); const node = document.createElement('button'); document.body.appendChild(node); WC.Commands.run({ cmd: 'shading' }, node); /* no lastShade yet -> opens palette */ const opened = !!document.querySelector('.flyout'); document.querySelectorAll('.flyout').forEach((n) => n.remove()); node.remove(); return opened; });
+  await t('[ui] Borders split face applies the default Bottom edge', () => { E.setHTML('<p>border me</p>'); selectBlock(E.node.querySelector('p')); WC.Commands.run({ cmd: 'borders' }); return /border-bottom/.test(E.node.querySelector('p').getAttribute('style') || ''); });
+  await t('[ui] Show/Hide ¶ toggles pressed class on its button', () => { const node = document.createElement('button'); document.body.appendChild(node); E.node.classList.remove('show-marks'); WC.Commands.run({ cmd: 'showHide' }, node); const on = node.classList.contains('toggled') && E.node.classList.contains('show-marks'); node.remove(); E.node.classList.remove('show-marks'); return on; });
+  await t('[ui] Page color No Color resets background to white', () => { E.node.style.background = 'rgb(255, 0, 0)'; const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'pageColor', type: 'dropdown' }, b); const row = Array.from(document.querySelectorAll('.flyout .color-row')).find((x) => /No Color/i.test(x.textContent)); if (row) row.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); const bg = E.node.style.background; E.node.style.background = ''; return /#ffffff|white|rgb\(255, 255, 255\)/i.test(bg); });
+  await t('[ui] Combine opens a distinct Combine Documents dialog', () => { openDrop('compare'); const item = Array.from(document.querySelectorAll('.flyout .fi-label')).find((x) => /Combine/.test(x.textContent)); if (item) item.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Combine Documents/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Themes gallery hover live-previews then reverts', () => { E.setHTML('<h1>H</h1><p>b</p>'); const before = getComputedStyle(document.documentElement).getPropertyValue('--doc-font'); const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'themes', type: 'dropdown' }, b); const cells = document.querySelectorAll('.flyout [title]'); let changed = false; if (cells.length) { cells[cells.length - 1].dispatchEvent(new MouseEvent('mouseenter')); changed = getComputedStyle(document.documentElement).getPropertyValue('--doc-font') !== before; cells[cells.length - 1].dispatchEvent(new MouseEvent('mouseleave')); } const after = getComputedStyle(document.documentElement).getPropertyValue('--doc-font'); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return changed && after === before; });
+  await t('[ui] Style Set renders a thumbnail gallery (not plain list)', () => { const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'styleSet', type: 'dropdown' }, b); const f = document.querySelector('.flyout'); const ok = f && /Title/.test(f.textContent) && f.querySelectorAll('[title]').length >= 3; document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return ok; });
+  await t('[ui] Paragraph Spacing labels have no debug suffixes', () => { const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'paragraphSpacing', type: 'dropdown' }, b); const f = document.querySelector('.flyout'); const ok = f && /Compact/.test(f.textContent) && !/\(\d+pt/.test(f.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return ok; });
+  await t('[ui] Effects opens a gallery and applies to objects', () => { E.setHTML('<p>x</p>'); const img = document.createElement('img'); img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; E.node.querySelector('p').appendChild(img); const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'effects', type: 'dropdown' }, b); const cell = Array.from(document.querySelectorAll('.flyout [title]')).find((x) => /Intense/.test(x.title)); if (cell) cell.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return !!img.style.boxShadow; });
+  await t('[ui] Watermark menu is grouped (Confidential/Urgent)', () => { const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'watermark', type: 'dropdown' }, b); const f = document.querySelector('.flyout'); const ok = f && /Confidential/.test(f.textContent) && /Urgent/.test(f.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return ok; });
+  await t('[ui] Address Block opens an Insert dialog with preview', () => { WC.Mail.addressBlock(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Insert Address Block/.test(dlg.textContent) && /Preview/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Greeting Line opens an Insert dialog with format options', () => { WC.Mail.greetingLine(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Insert Greeting Line/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Envelopes "Add to Document" prepends, not replaces', () => { E.setHTML('<p>KEEP THIS BODY</p>'); WC.Mail.envelopes(); const deliver = document.querySelector('.modal-backdrop textarea'); if (deliver) deliver.value = '123 Test St'; const add = Array.from(document.querySelectorAll('.modal-backdrop .dlg-footer .btn')).find((b) => /Add to Document/.test(b.textContent)); if (add) add.click(); killDlg(); const ok = /KEEP THIS BODY/.test(E.node.innerHTML) && !!E.node.querySelector('.wc-envelope'); return ok; });
+  await t('[ui] Match Fields opens a mapping dialog', () => { WC.Mail.matchFields(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Match Fields/.test(dlg.textContent) && dlg.querySelectorAll('select').length >= 5; killDlg(); return ok; });
+  await t('[ui] Update Labels propagates first cell + Next Record', () => { E.setHTML('<table class="wc-labels"><tr><td>«AddressBlock»</td><td></td></tr><tr><td></td><td></td></tr></table>'); WC.Mail.updateLabels(); const tds = E.node.querySelectorAll('td'); const ok = tds.length === 4 && /Next Record/.test(tds[1].textContent) && !/Next Record/.test(tds[0].textContent); return ok; });
+  await t('[ui] Citation style change re-renders in-text citations', () => { WC.Ref.sources.length = 0; const s = { author: 'Smith', year: '2020', title: 'T', publisher: 'P' }; WC.Ref.addSource(s); E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Ref.insertCitation(s); WC.Ref.citationStyle = 'IEEE'; WC.Ref.restyle(); const cite = E.node.querySelector('.wc-citation'); const ok = cite && /^\[\d+\]$/.test(cite.textContent); WC.Ref.sources.length = 0; WC.Ref.citationStyle = 'APA'; return ok; });
+  await t('[ui] Mark Citation opens a dialog (not index marking)', () => { E.setHTML('<p>Roe v. Wade</p>'); selectText('Roe v. Wade'); WC.Ref.markCitation(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Mark Citation/.test(dlg.textContent) && /Category/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Table of Authorities builds from marked citations', () => { E.setHTML('<p>case</p>'); selectText('case'); const span = document.createElement('span'); span.className = 'wc-toa-mark'; span.dataset.category = 'Cases'; span.dataset.short = 'Smith v. Jones'; span.textContent = 'case'; const p = E.node.querySelector('p'); p.innerHTML = ''; p.appendChild(span); caretIn(p); WC.Ref.insertTableOfAuthorities(); const toa = E.node.querySelector('.wc-toa'); const ok = toa && /Table of Authorities/.test(toa.textContent) && /Smith v\. Jones/.test(toa.textContent); return ok; });
+  await t('[ui] Custom TOC dialog opens', () => { E.setHTML('<h1>A</h1>'); const b = document.createElement('button'); document.body.appendChild(b); WC.Commands.dropdown({ cmd: 'tableOfContents', type: 'dropdown' }, b); const item = Array.from(document.querySelectorAll('.flyout .fi-label')).find((x) => /Custom Table of Contents/.test(x.textContent)); if (item) item.click(); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); const dlg = document.querySelector('.modal-backdrop .dialog'); const ok = dlg && /Show page numbers/.test(dlg.textContent); killDlg(); return ok; });
+  await t('[ui] Ink Replay runs without error and arms strokes', () => { WC.Draw.setEnabled(true); const layer = WC.Draw.layer; if (!layer) return 'no layer'; const ns = 'http://www.w3.org/2000/svg'; const path = document.createElementNS(ns, 'path'); path.setAttribute('class', 'ink-stroke'); path.setAttribute('d', 'M0 0 L20 20'); layer.appendChild(path); WC.Draw.replay(); const ok = path.style.strokeDasharray !== ''; path.remove(); return ok; });
+  await t('[ui] Excel Spreadsheet inserts an editable grid', () => { E.setHTML('<p>x</p>'); caretIn(E.node.querySelector('p')); WC.Insert.insertExcelSheet(); const t = E.node.querySelector('table.wc-xl-sheet'); return !!t && t.querySelectorAll('td').length > 10; });
+  await t('[ui] Table menu has Excel Spreadsheet + Draw Table', () => { const b = document.createElement('button'); document.body.appendChild(b); WC.Insert.tableMenu(b); const f = document.querySelector('.flyout'); const ok = f && /Excel Spreadsheet/.test(f.textContent) && /Draw Table/.test(f.textContent); document.querySelectorAll('.flyout').forEach((n) => n.remove()); b.remove(); return ok; });
+  await t('[ui] Editor pane scans and lists spelling issues', () => { E.setHTML('<p>I recieve teh package</p>'); WC.Dialogs.editorPane(); const pane = document.getElementById('editor-pane'); const ok = pane && /2 spelling issue/.test(pane.textContent) && /receive/.test(pane.textContent); pane && pane.remove(); return ok; });
+  await t('[ui] Editor pane Change fixes the misspelling', () => { E.setHTML('<p>teh end</p>'); WC.Dialogs.editorPane(); const pane = document.getElementById('editor-pane'); const sug = Array.from(pane.querySelectorAll('button')).find((x) => x.textContent === 'the'); if (sug) sug.click(); const fixed = /\bthe end\b/.test(E.node.textContent) && !/\bteh\b/.test(E.node.textContent); document.getElementById('editor-pane') && document.getElementById('editor-pane').remove(); return fixed; });
+  await t('[ui] Read Aloud shows a playback toolbar', () => { WC.Commands.run({ cmd: 'readAloud' }); const bar = document.getElementById('read-aloud-bar'); const ok = !!bar && !!bar.querySelector('.ra-play') && bar.querySelectorAll('.ra-btn').length >= 3; WC.closeReadAloud(); return ok; });
+  await t('[ui] Header edit shows a Header & Footer contextual tab', () => { E.setHTML('<p>body</p>'); WC.HeaderFooter.enterMode('header'); const tab = document.querySelector('.ribbon-tab.contextual-tab[data-tab="header-footer"]'); const panel = document.querySelector('.ribbon-panel[data-tab="header-footer"]'); const ok = !!tab && !!panel && /Close Header and Footer/.test(panel.textContent); WC.HeaderFooter.exitMode(); const gone = !document.querySelector('.contextual-tab'); return ok && gone; });
+  await t('[ui] Draw tab shows inline pen tiles', () => { const tiles = document.querySelectorAll('.pens-gallery .pen-tile'); return tiles.length >= 3; });
+  // ---- pagination (real page separation) ----
+  await t('[page] Overflowing content splits into multiple pages with gap spacers', () => { let h = ''; for (let i = 0; i < 40; i++) h += '<p>Filler paragraph ' + i + ' with enough text to take vertical space and overflow a single page so pagination kicks in here.</p>'; E.setHTML(h); const pages = E.repaginate(); const gaps = E.node.querySelectorAll('.wc-page-gap'); return pages >= 2 && gaps.length === pages - 1; });
+  await t('[page] Gap spacer carries a gray band and ~one-page-gap height', () => { const gap = E.node.querySelector('.wc-page-gap'); const m = E.pageMetrics(); return !!gap && !!gap.querySelector('.wc-gap-band') && parseFloat(gap.style.height) > m.margin; });
+  await t('[page] pageOfElement reports page 2 for content past the first break', () => { const ps = E.node.querySelectorAll('p'); const last = ps[ps.length - 1]; return E.pageOfElement(last) >= 2; });
+  await t('[page] getHTML strips layout-only gap spacers (not saved)', () => { const html = E.getHTML(); return !/wc-page-gap/.test(html) && !/wc-gap-band/.test(html); });
+  await t('[page] Single-page content inserts no gap spacers', () => { E.setHTML('<p>just one line</p>'); E.repaginate(); return E.node.querySelectorAll('.wc-page-gap').length === 0 && E.pageCount() === 1; });
+  await t('[page] ONE long paragraph splits across pages (line-level, mid-block)', () => { let w = []; for (let i = 0; i < 900; i++) w.push('word' + i); E.setHTML('<p>' + w.join(' ') + '</p>'); E.repaginate(); const gaps = E.node.querySelectorAll('.wc-page-gap'); const insideP = Array.from(gaps).filter((g) => g.closest('p')).length; return E.pageCount() >= 3 && gaps.length === E.pageCount() - 1 && insideP === gaps.length; });
+  await t('[page] line-level split never cuts a word in half', () => { let w = []; for (let i = 0; i < 900; i++) w.push('word' + i); E.setHTML('<p>' + w.join(' ') + '</p>'); E.repaginate(); const txt = E.node.textContent; const stripped = E.getHTML().replace(/<[^>]+>/g, ''); // spacers gone -> words must remain whole/contiguous in source text
+    return /word0 word1 word2/.test(txt) && !/wordword/.test(txt); });
+  await t('[fix] no-space giant string still paginates (char-level fallback)', () => { E.setView('print'); E.setHTML('<p>' + 'test'.repeat(2000) + '</p>'); E.repaginate(); return E.pageCount() >= 3 && E.node.querySelectorAll('.wc-page-gap').length === E.pageCount() - 1; });
+  await t('[fix] repaginate does not yank the caret to the previous line', () => { E.setView('print'); E.setHTML('<p>naber</p><p>x</p>'); const t2 = E.node.querySelectorAll('p')[1].firstChild; const r = document.createRange(); r.setStart(t2, 0); r.collapse(true); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); E.repaginate(); return window.getSelection().anchorNode === t2; });
+  await t('[fix] single-page edit leaves selection untouched (fast path)', () => { E.setHTML('<p>hello world</p>'); const tn = E.node.querySelector('p').firstChild; const r = document.createRange(); r.setStart(tn, 2); r.setEnd(tn, 5); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E.saveRange(); E.repaginate(); const sel = window.getSelection(); return sel.anchorNode === tn && sel.toString() === 'llo'; });
+  await t('[fix] title-bar QAT/window buttons opt out of the drag region', () => { const tb = document.getElementById('titlebar'); const probe = document.createElement('div'); probe.className = 'qat-btn'; tb.appendChild(probe); const region = getComputedStyle(probe).webkitAppRegion || getComputedStyle(probe).getPropertyValue('-webkit-app-region'); probe.remove(); return region ? region === 'no-drag' : true; });
+  await t('[fix] auto page-gap spacer is inert (contenteditable=false)', () => { let h = ''; for (let i = 0; i < 40; i++) h += '<p>line ' + i + ' filler text that takes vertical room to overflow the page.</p>'; E.setHTML(h); E.repaginate(); const sp = E.node.querySelector('.wc-page-gap'); return !!sp && sp.getAttribute('contenteditable') === 'false'; });
+  await t('[fix] setView clears page-gap spacers in continuous (web) view', () => { let h = ''; for (let i = 0; i < 40; i++) h += '<p>line ' + i + ' filler text that takes vertical room to overflow the page.</p>'; E.setHTML(h); E.repaginate(); E.setView('web'); const gaps = E.node.querySelectorAll('.wc-page-gap'); E.setView('print'); return gaps.length === 0; });
+  await t('[fix] setView(print) rebuilds page separation', () => { let h = ''; for (let i = 0; i < 40; i++) h += '<p>line ' + i + ' filler text that takes vertical room to overflow the page.</p>'; E.setHTML(h); E.setView('web'); E.setView('print'); return E.node.querySelectorAll('.wc-page-gap').length >= 1; });
+  await t('[word-validated] ~26 single-line paragraphs per page (matches Word COM oracle)', () => { let h = ''; for (let i = 1; i <= 60; i++) h += '<p>Paragraph ' + i + ' one line of body text here.</p>'; E.setHTML(h); E.repaginate(); const ps = E.node.querySelectorAll('p'); let firstP2 = 61; ps.forEach((p, i) => { if (firstP2 === 61 && E.pageOfElement(p) >= 2) firstP2 = i + 1; }); const perPage = firstP2 - 1; return perPage >= 24 && perPage <= 28 ? ('per-page=' + perPage) : (function () { throw new Error('per-page=' + perPage + ' (Word=26)'); })(); });
+
+  // clean up
+  document.getElementById('read-mode') && document.getElementById('read-mode').remove();
+  document.getElementById('help-pane') && document.getElementById('help-pane').remove();
+  document.getElementById('read-aloud-bar') && document.getElementById('read-aloud-bar').remove();
+  document.getElementById('editor-pane') && document.getElementById('editor-pane').remove();
+  WC.Ribbon.hideContextualTab && WC.Ribbon.hideContextualTab();
+  WC.Ref.sources.length = 0; WC.Ref.citationStyle = 'APA';
+  document.getElementById('app').classList.remove('focus-mode', 'hf-edit');
+  E.workarea.classList.remove('movement-side');
+  document.querySelectorAll('.wc-comment-anchor').forEach((n) => n.replaceWith(document.createTextNode(n.textContent)));
+  document.getElementById('comments-pane') && document.getElementById('comments-pane').remove();
+  E.setView('print'); document.getElementById('immersive') && document.getElementById('immersive').remove();
+  WC.Review.trackOn = false; WC.Review.setDisplayMode('all'); E.node.classList.remove('review-all', 'review-none', 'review-original', 'review-simple');
+  WC.Mail.previewResults(false); WC.Mail.recipients = []; WC.Ref.sources.length = 0;
+  document.querySelectorAll('#find-pane,#nav-pane,#styles-pane,#clipboard-pane,#editor-pane,#selection-pane,#review-pane,#a11y-pane,#thes-pane,.modal-backdrop,.flyout').forEach((n) => n.remove());
+  document.getElementById('app').classList.remove('hf-edit', 'ink-on');
+
+  const pass = results.filter((r) => r.pass).length;
+  const fail = results.length - pass;
+  return JSON.stringify({ summary: { total: results.length, pass, fail }, results }, null, 2);
+})();

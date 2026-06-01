@@ -1,0 +1,25 @@
+{
+  "summary": "Adversarial correctness review of the Word-clone renderer JS, with verification of each finding",
+  "agentCount": 20,
+  "logs": [
+    "Confirmed 1 real bug(s) of 15 candidate(s)."
+  ],
+  "result": {
+    "confirmed": [
+      {
+        "title": "Alt+1 keyboard shortcut dead — unreachable condition for Ctrl+Alt+1",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/app.js",
+        "line": "78-79",
+        "severity": "high",
+        "detail": "Line 78 returns null whenever Alt+1 is pressed (regardless of Ctrl/Cmd). This makes line 79's condition `if (mod && e.altKey && k === '1')` unreachable because any Alt+1 press triggers the return on line 78 first. Users cannot trigger the Ctrl+Alt+1 (Apply Heading 1) shortcut.",
+        "fix": "Remove line 78 entirely. The logic should only prevent Alt+1 without Ctrl/Cmd, not all Alt+1 presses. The correct condition is already on line 79.",
+        "verdict": {
+          "reasoning": "CONFIRMED as a real bug. Traced the full control flow in /home/ogutd/msword-clone/src/renderer/js/app.js bindKeys handler:\n\n- Line 50: `const mod = e.ctrlKey || e.metaKey;`\n- Line 53: `if (!mod) return;` — early-returns the entire keydown handler whenever neither Ctrl nor Cmd is held. So map() and everything after it ONLY runs when mod === true. A bare Alt+1 (no Ctrl/Cmd) never even reaches line 78.\n- Line 78: `if (k === '1' && e.altKey) return null;`\n- Line 79: `if (mod && e.altKey && k === '1') return () => WC.applyNamedStyle('Heading 1');`\n\nBecause mod is guaranteed true at line 78, the condition on line 78 (`k === '1' && e.altKey`) is logically identical to the condition on line 79 (`mod && e.altKey && k === '1'`, with mod===true). Line 78 is evaluated first and returns null, so line 79 is genuinely unreachable. Pressing Ctrl+Alt+1 hits line 78, returns null, map() yields null, `if (action)` is false, no preventDefault and no style applied. The Ctrl+Alt+1 = Apply Heading 1 shortcut is dead.\n\nVerified the handler is real and wired: WC.applyNamedStyle is defined in formatting.js:15 and maps 'Heading 1' to WC.formatBlock('h1') (formatting.js:22), so line 79 would otherwise do real work. Ctrl+Alt+1 is in fact Word's standard Apply-Heading-1 shortcut, so this is normal expected use, not an edge case.\n\nThe defensive considerations don't rescue it: optional chaining, contenteditable/execCommand, and WC.* globals are all irrelevant — this is pure local control-flow dead code. The suggested fix (remove line 78) is correct: since line 53 already returns for non-mod presses, line 78's stated purpose of blocking plain Alt+1 is moot, and it only shadows the intended line 79.\n\nSeverity caveat: this is a dead keyboard shortcut, not a crash. Heading 1 remains reachable via the ribbon style gallery and the styles dialog (dialogs.js:277), so the feature is not entirely inaccessible — only the Ctrl+Alt+1 hotkey is broken. User-visible but moderate.",
+          "isReal": true,
+          "severity": "moderate"
+        }
+      }
+    ],
+    "allCandidates": 15
+  }
+}

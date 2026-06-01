@@ -1,0 +1,106 @@
+/* ===========================================================================
+   dialogs.css — modal dialogs (Font, Paragraph, Insert Table, Find/Replace…)
+   and the right-side task panes, toasts.
+   =========================================================================== */
+#modal-root { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.18); pointer-events: auto;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.dialog {
+  margin-top: 8vh;
+  background: #fff;
+  border: 1px solid #b3b3b3;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+  border-radius: 4px;
+  min-width: 360px;
+  max-width: 640px;
+  pointer-events: auto;
+  font-size: 13px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.dialog .dlg-title {
+  background: #fff; padding: 12px 16px 6px; font-size: 15px; font-weight: 600; color: #201f1e;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.dialog .dlg-title .x { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 3px; }
+.dialog .dlg-title .x:hover { background: var(--btn-hover); }
+.dialog .dlg-body { padding: 8px 16px 16px; overflow-y: auto; max-height: 70vh; }
+.dialog .dlg-footer { padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #eee; }
+.dialog .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.dialog label { font-size: 13px; color: #201f1e; }
+.dialog .field { display: flex; flex-direction: column; gap: 4px; }
+.dialog .grow { flex: 1; }
+.dialog input[type=text], .dialog input[type=number], .dialog select, .dialog textarea {
+  border: 1px solid #c8c6c4; border-radius: 2px; height: 28px; padding: 0 6px; font-family: inherit; font-size: 13px;
+}
+.dialog textarea { height: auto; padding: 6px; }
+.dialog .tabs { display: flex; gap: 2px; border-bottom: 1px solid #e1dfdd; margin: 4px 0 12px; }
+.dialog .tabs .t { padding: 6px 14px; font-size: 13px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
+.dialog .tabs .t.active { background: #fff; border-color: #e1dfdd; border-bottom: 2px solid var(--word-blue); color: var(--word-blue); }
+
+.btn {
+  height: 28px; padding: 0 16px; border: 1px solid #8a8886; background: #fff; border-radius: 2px; font-size: 13px;
+  min-width: 76px;
+}
+.btn:hover { background: #f3f2f1; }
+.btn.primary { background: var(--word-blue); color: #fff; border-color: var(--word-blue); }
+.btn.primary:hover { background: var(--word-blue-dark); }
+
+/* Font dialog preview */
+.font-preview {
+  border: 1px solid #c8c6c4; height: 70px; display: flex; align-items: center; justify-content: center;
+  margin-top: 10px; background: #fff; font-size: 20px; overflow: hidden;
+}
+
+/* Insert-table grid picker */
+.tablegrid { display: grid; grid-template-columns: repeat(10, 18px); gap: 2px; padding: 8px; }
+.tablegrid .cell { width: 18px; height: 18px; border: 1px solid #c8c6c4; background: #fff; }
+.tablegrid .cell.on { background: var(--word-blue-tint); border-color: var(--word-blue); }
+.tablegrid-label { text-align: center; font-size: 12px; padding: 2px 0 6px; color: #444; }
+
+/* Find & Replace task pane (Navigation pane style on the left) */
+.taskpane {
+  position: absolute; top: 0; bottom: 0; width: 300px; background: #fff; border-right: 1px solid #e1dfdd;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.06); z-index: 40; display: flex; flex-direction: column;
+}
+.taskpane.right { right: 0; left: auto; border-left: 1px solid #e1dfdd; border-right: none; box-shadow: -2px 0 6px rgba(0,0,0,0.06); }
+.taskpane .tp-head { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; }
+.taskpane .tp-head .tp-title { font-size: 15px; font-weight: 600; }
+.taskpane .tp-body { padding: 0 12px 12px; overflow-y: auto; flex: 1; }
+.taskpane .tp-search { display: flex; align-items: center; border: 1px solid #c8c6c4; border-radius: 2px; height: 30px; }
+.taskpane .tp-search input { border: none; outline: none; flex: 1; height: 100%; padding: 0 8px; font-family: inherit; font-size: 13px; }
+.taskpane .tp-search .go { width: 30px; display: flex; align-items: center; justify-content: center; }
+.taskpane .tp-result { padding: 8px; border-bottom: 1px solid #f0f0f0; font-size: 12px; cursor: pointer; }
+.taskpane .tp-result:hover { background: #f5f5f5; }
+.taskpane .tp-result b { background: #ffe28a; }
+
+/* Toast / status message */
+.toast-wrap { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 9500; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast {
+  background: #323130; color: #fff; padding: 10px 16px; border-radius: 4px; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3); max-width: 520px; animation: toastin .18s ease;
+}
+.toast .t-info { opacity: .8; font-size: 11px; margin-top: 3px; }
+@keyframes toastin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Context menu */
+.context-menu { position: fixed; z-index: 9990; }
+
+/* Styles task pane list */
+.styles-list .sl-item { padding: 6px 10px; border: 1px solid transparent; cursor: pointer; }
+.styles-list .sl-item:hover { background: var(--word-blue-tint); }
+
+/* Office Clipboard pane items */
+.cb-actions { display: flex; gap: 6px; padding: 8px 0; }
+.cb-actions .btn { flex: 1; min-width: 0; }
+.cb-count { font-size: 12px; color: #666; padding: 0 0 6px; }
+.cb-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid #edebe9; border-radius: 2px; margin-bottom: 6px; cursor: pointer; position: relative; }
+.cb-item:hover { background: var(--word-blue-tint); border-color: var(--word-blue); }
+.cb-item .cb-ic { flex: 0 0 18px; color: #666; }
+.cb-item .cb-prev { font-size: 12px; line-height: 1.35; color: #222; overflow: hidden; max-height: 60px; }
+.cb-item .cb-prev img { max-height: 40px; max-width: 100%; }
+.cb-item-menu { position: absolute; top: 4px; right: 4px; opacity: 0; cursor: pointer; }
+.cb-item:hover .cb-item-menu { opacity: 1; }
+.cb-empty { color: #888; text-align: center; padding: 24px 8px; font-size: 13px; }

@@ -1,0 +1,19 @@
+{
+  "_source": "Live differential test against the user's real Microsoft Word (v16.0 build 16.0.19929, Aptos theme) via PowerShell COM. Script: C:\\Users\\Public\\wcprobe\\oracle.ps1",
+  "home": {
+    "Bold": {"Font.Bold": -1}, "Italic": {"Font.Italic": -1}, "Underline": {"Underline": 1},
+    "Strikethrough": {"StrikeThrough": -1}, "Superscript": {"Superscript": -1},
+    "FontName+Size": {"name": "Georgia", "size": 18}, "FontColorRed": {"color": "#FF0000"},
+    "Highlight": {"index": 7}, "ChangeCaseUpper": {"text": "HELLO WORLD"},
+    "AlignCenter": {"alignment": 1}, "AlignJustify": {"alignment": 3},
+    "Bullets": {"ListType": 2}, "Numbering": {"ListType": 3}, "IncreaseIndent": {"leftIndentPt": 36},
+    "LineSpacing2": {"lineSpacing": 24}, "Style_Heading1": {"font": "Aptos Display", "size": 20},
+    "Style_Title": {"font": "Aptos Display", "size": 28}
+  },
+  "insert": {
+    "Table_2x3": {"tables": 1, "rows": 2, "cols": 3}, "PageBreak": {"pages": 2},
+    "Hyperlink": {"count": 1, "address": "https://example.com/"}, "Bookmark": {"count": 1, "name": "spot1"},
+    "PageNumberField": {"type": 33, "result": "1"}, "DateField": {"type": 31},
+    "Header": {"text": "My Header"}, "Symbol": {"inserted": "(c)"}, "Shape": {"count": 1}
+  }
+}

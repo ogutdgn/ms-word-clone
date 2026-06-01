@@ -1,0 +1,284 @@
+/* ===========================================================================
+   ribbon.css — tab strip, ribbon body, groups, and every control type
+   =========================================================================== */
+
+/* ---- Tab strip row ---- */
+#tabstrip {
+  height: var(--tabstrip-h);
+  min-height: var(--tabstrip-h);
+  background: var(--tabstrip-bg);
+  display: flex;
+  align-items: stretch;
+  padding-left: 4px;
+  position: relative;
+  z-index: 20;
+  user-select: none;
+}
+.ribbon-tabs { display: flex; align-items: stretch; }
+.ribbon-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 11px;
+  font-size: 14px;
+  color: var(--inactive-tab-text);
+  position: relative;
+  white-space: nowrap;
+}
+.ribbon-tab:hover { background: rgba(0,0,0,0.04); }
+.ribbon-tab.active { color: var(--word-blue); }
+.ribbon-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 8px; right: 8px; bottom: 0;
+  height: 2.5px;
+  background: var(--tab-underline);
+  border-radius: 2px;
+}
+/* Contextual tab (e.g. Header & Footer) — tinted like Word's contextual tabs */
+.ribbon-tab.contextual-tab { color: #00665a; }
+.ribbon-tab.contextual-tab::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #1a9c8f;
+}
+.ribbon-tab.contextual-tab.active { color: #00665a; }
+.ribbon-tab.contextual-tab.active::after { background: #1a9c8f; }
+/* File chip */
+.ribbon-tab.file-tab {
+  background: var(--word-blue);
+  color: #fff;
+  font-weight: 600;
+  padding: 0 16px;
+  margin-right: 4px;
+}
+.ribbon-tab.file-tab:hover { background: var(--word-blue-dark); }
+.ribbon-tab.file-tab::after { display: none; }
+
+/* Search box */
+.ribbon-search {
+  align-self: center;
+  display: flex; align-items: center; gap: 6px;
+  height: 26px;
+  flex: 0 1 460px;
+  margin: 0 14px;
+  padding: 0 10px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 4px;
+  color: #605E5C;
+  font-size: 12px;
+}
+.ribbon-search:focus-within { background: #fff; box-shadow: inset 0 0 0 1px var(--word-blue); }
+.ribbon-search svg { width: 14px; height: 14px; flex: none; }
+.ribbon-search input {
+  border: none; background: transparent; outline: none; flex: 1; font-size: 12px; color: #201f1e; font-family: inherit;
+}
+
+/* ---- Ribbon body ---- */
+#ribbon {
+  height: var(--ribbon-body-h);
+  min-height: var(--ribbon-body-h);
+  background: var(--active-tab-bg);
+  border-bottom: 1px solid var(--divider);
+  position: relative;
+  z-index: 10;
+  transition: height .12s ease, min-height .12s ease;
+}
+#ribbon.collapsed { height: 0; min-height: 0; overflow: hidden; border-bottom: none; }
+.ribbon-panel { display: none; height: 100%; padding: 4px 0 0; overflow: hidden; }
+.ribbon-panel.active { display: flex; align-items: stretch; }
+.ribbon-scroll { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; width: 100%; }
+.ribbon-scroll::-webkit-scrollbar { height: 8px; }
+
+/* ---- Group ---- */
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 2px 6px 0;
+  position: relative;
+  border-right: 1px solid var(--divider);
+  /* Never shrink below content — otherwise groups overlap their neighbours and
+     clicks land on the wrong control. The ribbon scrolls horizontally instead. */
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.ribbon-group-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 0;
+}
+.ribbon-group-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--group-label);
+  height: 16px;
+  line-height: 16px;
+  position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.ribbon-group-label .launcher {
+  width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 2px; opacity: .8;
+}
+.ribbon-group-label .launcher:hover { background: var(--btn-hover); opacity: 1; }
+.ribbon-group-label .launcher svg { width: 9px; height: 9px; }
+
+/* ---- Controls: large button ---- */
+.rbtn {
+  display: inline-flex;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  position: relative;
+  color: #444;
+  background: transparent;
+}
+.rbtn:hover { background: var(--btn-hover); border-color: var(--btn-border); }
+.rbtn:active { background: var(--btn-pressed); }
+.rbtn.toggled { background: var(--btn-toggled); border-color: var(--btn-toggled-border); }
+.rbtn[disabled], .rbtn.disabled { opacity: .4; pointer-events: none; }
+
+/* large vertical button (icon over 1-2 line label) */
+.rbtn.large {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: auto;
+  min-width: 40px;
+  max-width: 86px;
+  height: 66px;
+  padding: 4px 6px 2px;
+}
+.rbtn.large .ic { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.rbtn.large .ic svg { width: 28px; height: 28px; }
+.rbtn.large .lbl { font-size: 11px; text-align: center; line-height: 1.15; margin-top: 2px; max-width: 78px; }
+.rbtn.large .caret { font-size: 8px; margin-top: 1px; }
+
+/* small horizontal button (icon + optional label) in a 3-row stack */
+.rbtn.small {
+  align-items: center;
+  height: 22px;
+  padding: 0 4px;
+  gap: 4px;
+  min-width: 22px;
+}
+.rbtn.small .ic { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.rbtn.small .ic svg { width: 16px; height: 16px; }
+.rbtn.small .lbl { font-size: 12px; white-space: nowrap; }
+.rbtn.small .caret { font-size: 8px; color: #666; margin-left: 2px; }
+.rbtn.icononly .lbl { display: none; }
+
+/* 3-row stack container for small controls */
+.ctrl-stack { display: flex; flex-direction: column; justify-content: center; gap: 1px; height: 66px; }
+.ctrl-row { display: flex; align-items: center; gap: 1px; }
+
+/* split button: main action + dropdown arrow as two hit areas */
+.rsplit { display: inline-flex; border-radius: 3px; border: 1px solid transparent; }
+.rsplit:hover { border-color: var(--btn-border); }
+.rsplit .main, .rsplit .arrow { background: transparent; }
+.rsplit.large { flex-direction: column; width: auto; min-width: 44px; max-width: 88px; height: 66px; }
+.rsplit.large .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 4px 6px 0; border-radius: 3px 3px 0 0; }
+.rsplit.large .main .ic { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.rsplit.large .main .ic svg { width: 28px; height: 28px; }
+.rsplit.large .arrow { display: flex; align-items: center; justify-content: center; gap: 3px; height: 20px; font-size: 8px; border-radius: 0 0 3px 3px; padding: 0 4px; }
+.rsplit.large .arrow .lbl { font-size: 11px; }
+.rsplit.large .main:hover, .rsplit.large .arrow:hover { background: var(--btn-hover); }
+.rsplit.small { align-items: center; height: 22px; }
+.rsplit.small .main { display: flex; align-items: center; gap: 4px; padding: 0 4px; height: 100%; border-radius: 3px 0 0 3px; }
+.rsplit.small .main .ic { width: 16px; height: 16px; display:flex; align-items:center; justify-content:center;}
+.rsplit.small .main .ic svg { width: 16px; height: 16px; }
+.rsplit.small .main .lbl { font-size: 12px; }
+.rsplit.small .arrow { display: flex; align-items: center; padding: 0 3px; height: 100%; font-size: 8px; }
+.rsplit.small .main:hover, .rsplit.small .arrow:hover { background: var(--btn-hover); }
+.rsplit.toggled .main { background: var(--btn-toggled); }
+
+/* combo box (font name / size) */
+.rcombo {
+  display: inline-flex; align-items: center;
+  height: 22px;
+  border: 1px solid var(--btn-border);
+  background: #fff;
+  border-radius: 2px;
+  margin: 0 2px;
+}
+.rcombo input {
+  border: none; outline: none; font-family: inherit; font-size: 12px; padding: 0 4px; height: 100%;
+  background: transparent;
+}
+.rcombo .combo-arrow { width: 16px; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #444; border-left: 0; }
+.rcombo .combo-arrow:hover { background: var(--btn-hover); }
+.rcombo.font-name { width: 132px; }
+.rcombo.font-name input { width: 108px; }
+.rcombo.font-size { width: 48px; }
+.rcombo.font-size input { width: 26px; text-align: left; }
+
+/* dropdown button (label + caret, no split) */
+.rdrop { display: inline-flex; align-items: center; }
+
+/* Layout paragraph spinners */
+.rspinner { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 4px; }
+.rspinner .sp-ic { width: 14px; height: 14px; display: inline-flex; }
+.rspinner input { width: 44px; height: 20px; border: 1px solid var(--btn-border); border-radius: 2px; font-size: 12px; padding: 0 3px; font-family: inherit; }
+.rspinner .sp-unit { font-size: 11px; color: #666; }
+
+/* color split-button: shows a color bar under the glyph */
+.rbtn .color-bar { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 18px; height: 3px; background: #c00000; border-radius: 1px; }
+.rsplit .color-bar { width: 18px; height: 3px; border-radius: 1px; margin-top: 1px; }
+
+/* Styles gallery */
+.styles-gallery { display: flex; align-items: center; height: 66px; gap: 0; }
+.styles-grid {
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 1fr);
+  gap: 2px; height: 62px; overflow: hidden;
+}
+.style-cell {
+  width: 64px; height: 29px; border: 1px solid #eee; border-radius: 2px; background: #fff;
+  display: flex; align-items: center; padding: 0 6px; overflow: hidden; white-space: nowrap;
+  font-size: 11px;
+}
+.style-cell:hover { border-color: var(--word-blue); background: var(--word-blue-tint); }
+.style-cell.active { border-color: var(--word-blue); box-shadow: inset 0 0 0 1px var(--word-blue); }
+.styles-more { display: flex; flex-direction: column; margin-left: 2px; }
+.styles-more button { width: 18px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--btn-border); border-radius: 2px; font-size: 8px; }
+.styles-more button:hover { background: var(--btn-hover); }
+
+/* Ribbon display options + collapse chevron at far right of ribbon body */
+.ribbon-collapse {
+  position: absolute; right: 6px; bottom: 4px; width: 22px; height: 18px;
+  display: flex; align-items: center; justify-content: center; border-radius: 3px; color: #666;
+}
+.ribbon-collapse:hover { background: var(--btn-hover); }
+
+/* Dropdown / flyout menus */
+.flyout {
+  position: fixed;
+  z-index: 9998;
+  background: #fff;
+  border: 1px solid #c8c6c4;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  border-radius: 3px;
+  padding: 4px 0;
+  min-width: 180px;
+  max-height: 70vh;
+  overflow-y: auto;
+  font-size: 13px;
+}
+.flyout .fly-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 14px; white-space: nowrap; color: #201f1e;
+}
+.flyout .fly-item:hover { background: var(--word-blue-tint); }
+.flyout .fly-item .fi-ic { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+.flyout .fly-item .fi-ic svg { width: 16px; height: 16px; }
+.flyout .fly-item .fi-key { margin-left: auto; color: #888; font-size: 11px; padding-left: 24px; }
+.flyout .fly-sep { height: 1px; background: var(--divider); margin: 4px 0; }
+.flyout .fly-header { padding: 4px 14px; font-size: 11px; color: #605E5C; font-weight: 600; }
+
+/* Color picker palette */
+.color-palette { padding: 8px; min-width: 200px; }
+.color-section-title { font-size: 11px; color: #605E5C; margin: 6px 2px 3px; }
+.color-grid { display: grid; grid-template-columns: repeat(10, 18px); gap: 2px; }
+.color-swatch { width: 18px; height: 18px; border: 1px solid rgba(0,0,0,0.15); cursor: pointer; }
+.color-swatch:hover { outline: 2px solid var(--word-blue); outline-offset: 0; }
+.color-row { display: flex; gap: 6px; align-items: center; padding: 5px 4px; }
+.color-row:hover { background: var(--word-blue-tint); }
+.color-row .sw { width: 16px; height: 16px; border: 1px solid #999; }

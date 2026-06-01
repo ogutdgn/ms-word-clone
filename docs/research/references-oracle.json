@@ -1,0 +1,6 @@
+{ "_source": "MS Word COM oracle (references_probe.ps1)",
+  "caption": { "scriptable": true, "format": "Figure 1: A sample figure", "note": "label + ' ' + number + caption text; positions above/below" },
+  "footnotes": { "scriptable": true, "numbering": "arabic auto, note at bottom of page" },
+  "endnotes": { "scriptable": true, "numbering": "lower-roman auto, note at end of document" },
+  "toc": { "scriptable": true, "levels": "1-3 from Heading 1-3, with page numbers + leader dots" },
+  "index": { "scriptable": true, "marking": "MarkIndexEntry adds XE fields; Insert Index builds alphabetical with page numbers" } }

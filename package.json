@@ -1,0 +1,23 @@
+{
+  "name": "msword-clone",
+  "productName": "Word",
+  "version": "1.0.0",
+  "description": "A faithful Microsoft Word desktop clone (UI, features, functionality) built with Electron.",
+  "main": "src/main/main.js",
+  "author": "Word Clone Project",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging"
+  },
+  "dependencies": {
+    "@fluentui/svg-icons": "^1.1.328",
+    "dompurify": "^3.4.7",
+    "html-to-docx": "^1.8.0",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.8.0"
+  },
+  "devDependencies": {
+    "electron": "^31.7.6"
+  }
+}

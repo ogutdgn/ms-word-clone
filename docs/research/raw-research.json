@@ -1,0 +1,3902 @@
+{
+  "summary": "Deep parallel research into MS Word UI, features, visual design, and Electron implementation strategy",
+  "agentCount": 7,
+  "logs": [
+    "Research complete — returning structured spec to main loop for synthesis & implementation."
+  ],
+  "result": {
+    "ribbon": {
+      "homeInsert": {
+        "tabs": [
+          {
+            "name": "Home",
+            "groups": [
+              {
+                "name": "Clipboard",
+                "controls": [
+                  {
+                    "label": "Paste",
+                    "type": "split",
+                    "shortcut": "Ctrl+V",
+                    "tooltip": "Paste content from the Clipboard. Dropdown offers Paste Options: Keep Source Formatting, Merge Formatting, Picture, Keep Text Only, and Paste Special / Set Default Paste.",
+                    "feasible": "partial",
+                    "items": [
+                      "Keep Source Formatting",
+                      "Merge Formatting",
+                      "Picture",
+                      "Keep Text Only",
+                      "Paste Special...",
+                      "Set Default Paste..."
+                    ]
+                  },
+                  {
+                    "label": "Cut",
+                    "type": "button",
+                    "shortcut": "Ctrl+X",
+                    "tooltip": "Remove the selection and put it on the Clipboard so you can paste it elsewhere.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Copy",
+                    "type": "button",
+                    "shortcut": "Ctrl+C",
+                    "tooltip": "Put a copy of the selection on the Clipboard so you can paste it somewhere else.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Format Painter",
+                    "type": "button",
+                    "shortcut": "Ctrl+Shift+C / Ctrl+Shift+V",
+                    "tooltip": "Copy formatting from one place and apply it to another. Double-click to apply to multiple selections.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Clipboard",
+                    "type": "button",
+                    "tooltip": "Dialog Box Launcher: opens the Clipboard task pane showing collected cut/copied items.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Font",
+                "controls": [
+                  {
+                    "label": "Font",
+                    "type": "combo",
+                    "shortcut": "Ctrl+Shift+F",
+                    "tooltip": "Change the font face. Editable combo box with live preview of installed fonts.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Font Size",
+                    "type": "combo",
+                    "shortcut": "Ctrl+Shift+P",
+                    "tooltip": "Change the size of your text. Editable combo box.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Increase Font Size",
+                    "type": "button",
+                    "shortcut": "Ctrl+>",
+                    "tooltip": "Make the text a bit bigger.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Decrease Font Size",
+                    "type": "button",
+                    "shortcut": "Ctrl+<",
+                    "tooltip": "Make the text a bit smaller.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Change Case",
+                    "type": "dropdown",
+                    "tooltip": "Change all the selected text to UPPERCASE, lowercase, Capitalize Each Word, or other capitalization.",
+                    "feasible": "yes",
+                    "items": [
+                      "Sentence case.",
+                      "lowercase",
+                      "UPPERCASE",
+                      "Capitalize Each Word",
+                      "tOGGLE cASE"
+                    ]
+                  },
+                  {
+                    "label": "Clear All Formatting",
+                    "type": "button",
+                    "tooltip": "Remove all formatting from the selection, leaving only plain text.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Bold",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+B",
+                    "tooltip": "Make your text bold.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Italic",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+I",
+                    "tooltip": "Italicize your text.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Underline",
+                    "type": "split",
+                    "shortcut": "Ctrl+U",
+                    "tooltip": "Underline your text. Dropdown chooses underline style and color (single, double, dotted, etc.).",
+                    "feasible": "partial",
+                    "items": [
+                      "Underline styles",
+                      "More Underlines...",
+                      "Underline Color"
+                    ]
+                  },
+                  {
+                    "label": "Strikethrough",
+                    "type": "toggle",
+                    "tooltip": "Draw a line through the middle of the selected text.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Subscript",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+=",
+                    "tooltip": "Type very small letters just below the line of text.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Superscript",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+Shift+=",
+                    "tooltip": "Type very small letters just above the line of text.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Text Effects and Typography",
+                    "type": "dropdown",
+                    "tooltip": "Add visual effects such as shadow, glow, reflection, and outline. Also Number Styles, Ligatures, Stylistic Sets.",
+                    "feasible": "partial",
+                    "items": [
+                      "Outline",
+                      "Shadow",
+                      "Reflection",
+                      "Glow",
+                      "Number Styles",
+                      "Ligatures",
+                      "Stylistic Sets"
+                    ]
+                  },
+                  {
+                    "label": "Text Highlight Color",
+                    "type": "split",
+                    "tooltip": "Make text look like it was marked with a highlighter pen. Dropdown picks the highlight color or No Color / Stop Highlighting.",
+                    "feasible": "yes",
+                    "items": [
+                      "Color swatches",
+                      "No Color",
+                      "Stop Highlighting"
+                    ]
+                  },
+                  {
+                    "label": "Font Color",
+                    "type": "split",
+                    "tooltip": "Change the color of your text. Dropdown opens the color palette: Automatic, Theme Colors, Standard Colors, More Colors, Gradient.",
+                    "feasible": "yes",
+                    "items": [
+                      "Automatic",
+                      "Theme Colors",
+                      "Standard Colors",
+                      "More Colors...",
+                      "Gradient"
+                    ]
+                  },
+                  {
+                    "label": "Font",
+                    "type": "button",
+                    "shortcut": "Ctrl+D",
+                    "tooltip": "Dialog Box Launcher: opens the Font dialog for detailed character formatting (effects, advanced spacing, OpenType).",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Paragraph",
+                "controls": [
+                  {
+                    "label": "Bullets",
+                    "type": "split",
+                    "tooltip": "Create a bulleted list. Dropdown shows the Bullet Library and Define New Bullet.",
+                    "feasible": "partial",
+                    "items": [
+                      "Bullet Library",
+                      "Document Bullets",
+                      "Change List Level",
+                      "Define New Bullet..."
+                    ]
+                  },
+                  {
+                    "label": "Numbering",
+                    "type": "split",
+                    "tooltip": "Create a numbered list. Dropdown shows the Numbering Library, Set Numbering Value, and Define New Number Format.",
+                    "feasible": "partial",
+                    "items": [
+                      "Numbering Library",
+                      "Change List Level",
+                      "Define New Number Format...",
+                      "Set Numbering Value..."
+                    ]
+                  },
+                  {
+                    "label": "Multilevel List",
+                    "type": "dropdown",
+                    "tooltip": "Create a multilevel list to organize items or create an outline. Includes Define New Multilevel List and Define New List Style.",
+                    "feasible": "partial",
+                    "items": [
+                      "Current List",
+                      "List Library",
+                      "Change List Level",
+                      "Define New Multilevel List...",
+                      "Define New List Style..."
+                    ]
+                  },
+                  {
+                    "label": "Decrease Indent",
+                    "type": "button",
+                    "tooltip": "Move your paragraph closer to the margin.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Increase Indent",
+                    "type": "button",
+                    "tooltip": "Move your paragraph farther away from the margin.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Sort",
+                    "type": "button",
+                    "tooltip": "Arrange the current selection in alphabetical or numerical order.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Show/Hide ¶",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+*",
+                    "tooltip": "Show paragraph marks and other hidden formatting symbols.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Align Left",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+L",
+                    "tooltip": "Align your content to the left margin.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Center",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+E",
+                    "tooltip": "Center your content on the page.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Align Right",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+R",
+                    "tooltip": "Align your content to the right margin.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Justify",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+J",
+                    "tooltip": "Distribute your text evenly between the margins.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Line and Paragraph Spacing",
+                    "type": "dropdown",
+                    "tooltip": "Choose how much space appears between lines of text or between paragraphs. Add/Remove Space Before/After Paragraph.",
+                    "feasible": "partial",
+                    "items": [
+                      "1.0",
+                      "1.15",
+                      "1.5",
+                      "2.0",
+                      "2.5",
+                      "3.0",
+                      "Line Spacing Options...",
+                      "Add Space Before Paragraph",
+                      "Remove Space After Paragraph"
+                    ]
+                  },
+                  {
+                    "label": "Shading",
+                    "type": "split",
+                    "tooltip": "Color the background behind the selected text or paragraph. Dropdown opens the color palette.",
+                    "feasible": "yes",
+                    "items": [
+                      "Theme Colors",
+                      "Standard Colors",
+                      "No Color",
+                      "More Colors..."
+                    ]
+                  },
+                  {
+                    "label": "Borders",
+                    "type": "split",
+                    "tooltip": "Add or remove borders from your selection. Dropdown lists border edge options, Draw Table, View Gridlines, Borders and Shading.",
+                    "feasible": "partial",
+                    "items": [
+                      "Bottom Border",
+                      "Top Border",
+                      "Left Border",
+                      "Right Border",
+                      "No Border",
+                      "All Borders",
+                      "Outside Borders",
+                      "Inside Borders",
+                      "Draw Table",
+                      "View Gridlines",
+                      "Borders and Shading..."
+                    ]
+                  },
+                  {
+                    "label": "Paragraph",
+                    "type": "button",
+                    "tooltip": "Dialog Box Launcher: opens the Paragraph dialog for indents, spacing, and line/page breaks.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Styles",
+                "controls": [
+                  {
+                    "label": "Styles Gallery",
+                    "type": "gallery",
+                    "tooltip": "Apply a style (Normal, No Spacing, Heading 1, Heading 2, Title, etc.) for consistent formatting. Includes a scroll/More button to expand the gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "Normal",
+                      "No Spacing",
+                      "Heading 1",
+                      "Heading 2",
+                      "Heading 3",
+                      "Title",
+                      "Subtitle",
+                      "Subtle Emphasis",
+                      "Emphasis",
+                      "Intense Emphasis",
+                      "Strong",
+                      "Quote",
+                      "Intense Quote",
+                      "List Paragraph",
+                      "Create a Style",
+                      "Clear Formatting",
+                      "Apply Styles..."
+                    ]
+                  },
+                  {
+                    "label": "Styles",
+                    "type": "button",
+                    "shortcut": "Ctrl+Alt+Shift+S",
+                    "tooltip": "Dialog Box Launcher: opens the Styles task pane listing all available styles with management options.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Editing",
+                "controls": [
+                  {
+                    "label": "Find",
+                    "type": "split",
+                    "shortcut": "Ctrl+F",
+                    "tooltip": "Find text or other content in the document. Dropdown: Find, Advanced Find, Go To.",
+                    "feasible": "yes",
+                    "items": [
+                      "Find",
+                      "Advanced Find...",
+                      "Go To..."
+                    ]
+                  },
+                  {
+                    "label": "Replace",
+                    "type": "button",
+                    "shortcut": "Ctrl+H",
+                    "tooltip": "Search for text you'd like to change and replace it with something else.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Select",
+                    "type": "dropdown",
+                    "tooltip": "Select text or objects in the document: Select All, Select Objects, Select All Text With Similar Formatting, Selection Pane.",
+                    "feasible": "partial",
+                    "items": [
+                      "Select All",
+                      "Select Objects",
+                      "Select All Text With Similar Formatting",
+                      "Selection Pane..."
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Voice",
+                "controls": [
+                  {
+                    "label": "Dictate",
+                    "type": "split",
+                    "tooltip": "Use your voice to type anywhere on your computer. Dropdown selects spoken language and dictation settings.",
+                    "feasible": "no",
+                    "items": [
+                      "Spoken Language",
+                      "Settings"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Sensitivity",
+                "controls": [
+                  {
+                    "label": "Sensitivity",
+                    "type": "dropdown",
+                    "tooltip": "Apply a sensitivity label to classify and protect this document (requires Microsoft Purview / organizational policy).",
+                    "feasible": "no",
+                    "items": [
+                      "Public",
+                      "General",
+                      "Confidential",
+                      "Highly Confidential"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Editor",
+                "controls": [
+                  {
+                    "label": "Editor",
+                    "type": "button",
+                    "shortcut": "F7",
+                    "tooltip": "Check spelling, grammar, and refinements (clarity, conciseness) with the Editor pane.",
+                    "feasible": "no"
+                  }
+                ]
+              },
+              {
+                "name": "Add-ins",
+                "controls": [
+                  {
+                    "label": "Add-ins",
+                    "type": "dropdown",
+                    "tooltip": "Quick access to installed Office Add-ins; opens the Get Add-ins store and My Add-ins list.",
+                    "feasible": "no",
+                    "items": [
+                      "Get Add-ins",
+                      "My Add-ins"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Reuse Files",
+                "controls": [
+                  {
+                    "label": "Reuse Files",
+                    "type": "button",
+                    "tooltip": "Find and reuse content from your existing files (Microsoft 365 cloud feature). May not appear on all builds.",
+                    "feasible": "no"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Insert",
+            "groups": [
+              {
+                "name": "Pages",
+                "controls": [
+                  {
+                    "label": "Cover Page",
+                    "type": "dropdown",
+                    "tooltip": "Add a stylish, fully formatted cover page from a gallery of designs (Built-in templates, Remove Current Cover Page).",
+                    "feasible": "partial",
+                    "items": [
+                      "Built-in cover page gallery",
+                      "More Cover Pages from Office.com",
+                      "Remove Current Cover Page",
+                      "Save Selection to Cover Page Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Blank Page",
+                    "type": "button",
+                    "tooltip": "Add a blank page anywhere in your document.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Page Break",
+                    "type": "button",
+                    "shortcut": "Ctrl+Enter",
+                    "tooltip": "End the current page and move to the next one.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Tables",
+                "controls": [
+                  {
+                    "label": "Table",
+                    "type": "dropdown",
+                    "tooltip": "Insert a table. Use the grid to pick rows/columns, or Insert Table, Draw Table, Convert Text to Table, Excel Spreadsheet, Quick Tables.",
+                    "feasible": "partial",
+                    "items": [
+                      "Insert Table grid",
+                      "Insert Table...",
+                      "Draw Table",
+                      "Convert Text to Table...",
+                      "Excel Spreadsheet",
+                      "Quick Tables"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Illustrations",
+                "controls": [
+                  {
+                    "label": "Pictures",
+                    "type": "dropdown",
+                    "tooltip": "Insert a picture from This Device, Stock Images, or Online Pictures.",
+                    "feasible": "partial",
+                    "items": [
+                      "This Device...",
+                      "Stock Images...",
+                      "Online Pictures..."
+                    ]
+                  },
+                  {
+                    "label": "Shapes",
+                    "type": "dropdown",
+                    "tooltip": "Insert ready-made shapes such as rectangles, circles, arrows, lines, flowchart symbols, and callouts. Includes New Drawing Canvas.",
+                    "feasible": "partial",
+                    "items": [
+                      "Recently Used Shapes",
+                      "Lines",
+                      "Rectangles",
+                      "Basic Shapes",
+                      "Block Arrows",
+                      "Equation Shapes",
+                      "Flowchart",
+                      "Stars and Banners",
+                      "Callouts",
+                      "New Drawing Canvas"
+                    ]
+                  },
+                  {
+                    "label": "Icons",
+                    "type": "button",
+                    "tooltip": "Insert an icon to visually communicate using symbols (opens the icon/stock content picker).",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "3D Models",
+                    "type": "split",
+                    "tooltip": "Insert a 3D model to rotate and view from any angle. Dropdown: This Device, Stock 3D Models.",
+                    "feasible": "no",
+                    "items": [
+                      "This Device...",
+                      "Stock 3D Models..."
+                    ]
+                  },
+                  {
+                    "label": "SmartArt",
+                    "type": "button",
+                    "tooltip": "Insert a SmartArt graphic to visually communicate information (lists, processes, cycles, hierarchies).",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Chart",
+                    "type": "button",
+                    "tooltip": "Insert a chart to illustrate and compare data (Column, Line, Pie, Bar, etc.).",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Screenshot",
+                    "type": "dropdown",
+                    "tooltip": "Insert a picture of any open window or a clipping of a screen area (Available Windows, Screen Clipping).",
+                    "feasible": "no",
+                    "items": [
+                      "Available Windows",
+                      "Screen Clipping"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Add-ins",
+                "controls": [
+                  {
+                    "label": "Get Add-ins",
+                    "type": "button",
+                    "tooltip": "Browse and add Office Add-ins from the Office Store to extend Word's functionality.",
+                    "feasible": "no"
+                  },
+                  {
+                    "label": "My Add-ins",
+                    "type": "split",
+                    "tooltip": "Insert an add-in you already have. Dropdown lists your installed add-ins and See All.",
+                    "feasible": "no",
+                    "items": [
+                      "Recently Used Add-ins",
+                      "See All..."
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Media",
+                "controls": [
+                  {
+                    "label": "Online Video",
+                    "type": "button",
+                    "tooltip": "Insert a video from an online source by pasting its address; play it directly in the document.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Links",
+                "controls": [
+                  {
+                    "label": "Link",
+                    "type": "split",
+                    "shortcut": "Ctrl+K",
+                    "tooltip": "Create a link in your document for quick access to webpages and files. Dropdown: Insert Link, recent items.",
+                    "feasible": "yes",
+                    "items": [
+                      "Insert Link...",
+                      "Recent Items"
+                    ]
+                  },
+                  {
+                    "label": "Bookmark",
+                    "type": "button",
+                    "tooltip": "Create a bookmark to assign a name to a specific point in a document so you can link to it.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Cross-reference",
+                    "type": "button",
+                    "tooltip": "Refer to specific places in your document, such as headings, figures, and tables; updates automatically if content moves.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Comments",
+                "controls": [
+                  {
+                    "label": "Comment",
+                    "type": "button",
+                    "shortcut": "Ctrl+Alt+M",
+                    "tooltip": "Add a note or annotation about this part of the document.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Header & Footer",
+                "controls": [
+                  {
+                    "label": "Header",
+                    "type": "dropdown",
+                    "tooltip": "Content in the top margin of each page. Built-in gallery, Edit Header, Remove Header, Save Selection to Header Gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "Built-in header gallery",
+                      "More Headers from Office.com",
+                      "Edit Header",
+                      "Remove Header",
+                      "Save Selection to Header Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Footer",
+                    "type": "dropdown",
+                    "tooltip": "Content in the bottom margin of each page. Built-in gallery, Edit Footer, Remove Footer, Save Selection to Footer Gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "Built-in footer gallery",
+                      "More Footers from Office.com",
+                      "Edit Footer",
+                      "Remove Footer",
+                      "Save Selection to Footer Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Page Number",
+                    "type": "dropdown",
+                    "tooltip": "Insert page numbers. Top of Page, Bottom of Page, Page Margins, Current Position, Format Page Numbers, Remove Page Numbers.",
+                    "feasible": "partial",
+                    "items": [
+                      "Top of Page",
+                      "Bottom of Page",
+                      "Page Margins",
+                      "Current Position",
+                      "Format Page Numbers...",
+                      "Remove Page Numbers"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Text",
+                "controls": [
+                  {
+                    "label": "Text Box",
+                    "type": "dropdown",
+                    "tooltip": "Add a text box that can be positioned anywhere on the page. Built-in gallery, Draw Text Box, Save Selection to Text Box Gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "Built-in text box gallery",
+                      "More Text Boxes from Office.com",
+                      "Draw Text Box",
+                      "Save Selection to Text Box Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Quick Parts",
+                    "type": "dropdown",
+                    "tooltip": "Insert reusable pieces of content: AutoText, Document Property, Field, Building Blocks Organizer, Save Selection to Quick Part Gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "AutoText",
+                      "Document Property",
+                      "Field...",
+                      "Building Blocks Organizer...",
+                      "Save Selection to Quick Part Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "WordArt",
+                    "type": "dropdown",
+                    "tooltip": "Insert decorative text. Pick a WordArt style from the gallery.",
+                    "feasible": "partial",
+                    "items": [
+                      "WordArt style gallery"
+                    ]
+                  },
+                  {
+                    "label": "Drop Cap",
+                    "type": "dropdown",
+                    "tooltip": "Create a large capital letter at the beginning of a paragraph. None, Dropped, In Margin, Drop Cap Options.",
+                    "feasible": "partial",
+                    "items": [
+                      "None",
+                      "Dropped",
+                      "In margin",
+                      "Drop Cap Options..."
+                    ]
+                  },
+                  {
+                    "label": "Signature Line",
+                    "type": "split",
+                    "tooltip": "Insert a signature line that specifies who must sign. Dropdown: Microsoft Office Signature Line, Add Signature Services.",
+                    "feasible": "no",
+                    "items": [
+                      "Microsoft Office Signature Line...",
+                      "Add Signature Services..."
+                    ]
+                  },
+                  {
+                    "label": "Date & Time",
+                    "type": "button",
+                    "tooltip": "Quickly add the current date or time, optionally as a field that updates automatically.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Object",
+                    "type": "split",
+                    "tooltip": "Insert an embedded object (e.g., another document or spreadsheet). Dropdown: Object, Text from File.",
+                    "feasible": "no",
+                    "items": [
+                      "Object...",
+                      "Text from File..."
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Symbols",
+                "controls": [
+                  {
+                    "label": "Equation",
+                    "type": "split",
+                    "shortcut": "Alt+=",
+                    "tooltip": "Add common mathematical equations or build your own with the equation tools. Dropdown: built-in equation gallery, Insert New Equation, Ink Equation.",
+                    "feasible": "partial",
+                    "items": [
+                      "Built-in equation gallery",
+                      "Insert New Equation",
+                      "Ink Equation...",
+                      "Save Selection to Equation Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Symbol",
+                    "type": "dropdown",
+                    "tooltip": "Insert symbols and special characters not on your keyboard. Recently used symbols, More Symbols.",
+                    "feasible": "yes",
+                    "items": [
+                      "Recently used symbols",
+                      "More Symbols..."
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "drawDesignLayoutRefs": {
+        "tabs": [
+          {
+            "name": "Draw",
+            "groups": [
+              {
+                "name": "Tools",
+                "controls": [
+                  {
+                    "label": "Select Objects",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Select ink, shapes, and text areas so you can move or resize them.",
+                    "items": []
+                  },
+                  {
+                    "label": "Lasso Select",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Select ink by drawing a circle around it, instead of selecting word by word.",
+                    "items": []
+                  },
+                  {
+                    "label": "Eraser",
+                    "type": "split",
+                    "feasible": "partial",
+                    "tooltip": "Erase ink strokes. Click the arrow to choose Stroke Eraser, Small/Medium/Large Eraser, or Segment Eraser.",
+                    "items": [
+                      "Stroke Eraser",
+                      "Small Eraser",
+                      "Medium Eraser",
+                      "Large Eraser",
+                      "Segment Eraser"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Pens",
+                "controls": [
+                  {
+                    "label": "Pens Gallery",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Gallery of ink pens, pencils, and highlighters. Click a pen once to select it; click again to set its Thickness, Color, and Effects (Rainbow, Galaxy, Gold, etc.).",
+                    "items": [
+                      "Pen",
+                      "Pencil",
+                      "Highlighter"
+                    ]
+                  },
+                  {
+                    "label": "Add Pen",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add a new Pen, Pencil, Highlighter, or Action pen to the gallery.",
+                    "items": [
+                      "Pen",
+                      "Pencil",
+                      "Highlighter",
+                      "Action Pen"
+                    ]
+                  },
+                  {
+                    "label": "Draw with Trackpad",
+                    "type": "toggle",
+                    "feasible": "partial",
+                    "tooltip": "Use the trackpad to draw ink when you do not have a touchscreen or pen.",
+                    "items": []
+                  },
+                  {
+                    "label": "Drawing",
+                    "type": "toggle",
+                    "feasible": "partial",
+                    "tooltip": "Toggle ink drawing mode on or off (Draw with Touch / Draw Ink).",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Convert",
+                "controls": [
+                  {
+                    "label": "Ink to Shape",
+                    "type": "toggle",
+                    "feasible": "no",
+                    "tooltip": "Automatically convert ink drawings into clean geometric shapes as you draw.",
+                    "items": []
+                  },
+                  {
+                    "label": "Ink to Math",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Convert a handwritten mathematical expression into a typeset equation.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Insert",
+                "controls": [
+                  {
+                    "label": "Drawing Canvas",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Insert a drawing canvas to help arrange and keep parts of a drawing together.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Replay",
+                "controls": [
+                  {
+                    "label": "Ink Replay",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Replay your ink strokes in the order they were drawn; pause and play to review.",
+                    "items": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Design",
+            "groups": [
+              {
+                "name": "Document Formatting",
+                "controls": [
+                  {
+                    "label": "Themes",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Change the overall design of the entire document, including colors, fonts, and effects.",
+                    "items": [
+                      "Built-In themes gallery",
+                      "Reset to Theme from Template",
+                      "Browse for Themes...",
+                      "Save Current Theme..."
+                    ]
+                  },
+                  {
+                    "label": "Style Set",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Gallery of built-in style sets (heading and body styling). Includes Reset to the Default Style Set and Save as a New Style Set.",
+                    "items": [
+                      "Built-in style sets",
+                      "Reset to the Default Style Set",
+                      "Save as a New Style Set..."
+                    ]
+                  },
+                  {
+                    "label": "Colors",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Change the colors for the current theme.",
+                    "items": [
+                      "Color scheme gallery",
+                      "Customize Colors..."
+                    ]
+                  },
+                  {
+                    "label": "Fonts",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Change the fonts for the current theme (heading and body font pairs).",
+                    "items": [
+                      "Font pair gallery",
+                      "Customize Fonts..."
+                    ]
+                  },
+                  {
+                    "label": "Paragraph Spacing",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Quickly change the line and paragraph spacing for the whole document.",
+                    "items": [
+                      "No Paragraph Space",
+                      "Compact",
+                      "Tight",
+                      "Open",
+                      "Relaxed",
+                      "Double",
+                      "Custom Paragraph Spacing..."
+                    ]
+                  },
+                  {
+                    "label": "Effects",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Change the effects for the current theme (shadows, reflections, etc. for shapes).",
+                    "items": [
+                      "Effect style gallery"
+                    ]
+                  },
+                  {
+                    "label": "Set as Default",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Use this document's formatting as the default for all new documents.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Page Background",
+                "controls": [
+                  {
+                    "label": "Watermark",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Insert ghosted text behind the content, such as Confidential or Draft.",
+                    "items": [
+                      "Confidential gallery",
+                      "Disclaimers gallery",
+                      "Urgent gallery",
+                      "Custom Watermark...",
+                      "Remove Watermark",
+                      "Save Selection to Watermark Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Page Color",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Choose a color for the background of the page.",
+                    "items": [
+                      "Theme Colors",
+                      "Standard Colors",
+                      "No Color",
+                      "More Colors...",
+                      "Fill Effects..."
+                    ]
+                  },
+                  {
+                    "label": "Page Borders",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add or change the border around the page (opens the Borders and Shading dialog).",
+                    "items": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Layout",
+            "groups": [
+              {
+                "name": "Page Setup",
+                "controls": [
+                  {
+                    "label": "Margins",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Set the margin sizes for the entire document or current section.",
+                    "items": [
+                      "Normal",
+                      "Narrow",
+                      "Moderate",
+                      "Wide",
+                      "Mirrored",
+                      "Office 2003 Default",
+                      "Custom Margins..."
+                    ]
+                  },
+                  {
+                    "label": "Orientation",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Switch the pages between portrait and landscape layouts.",
+                    "items": [
+                      "Portrait",
+                      "Landscape"
+                    ]
+                  },
+                  {
+                    "label": "Size",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Choose a paper size for the document.",
+                    "items": [
+                      "Letter",
+                      "Legal",
+                      "A4",
+                      "A3",
+                      "Tabloid",
+                      "Executive",
+                      "More Paper Sizes..."
+                    ]
+                  },
+                  {
+                    "label": "Columns",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Split text into two or more columns.",
+                    "items": [
+                      "One",
+                      "Two",
+                      "Three",
+                      "Left",
+                      "Right",
+                      "More Columns..."
+                    ]
+                  },
+                  {
+                    "label": "Breaks",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add page, column, text-wrapping, or section breaks to the document.",
+                    "items": [
+                      "Page",
+                      "Column",
+                      "Text Wrapping",
+                      "Next Page",
+                      "Continuous",
+                      "Even Page",
+                      "Odd Page"
+                    ]
+                  },
+                  {
+                    "label": "Line Numbers",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add line numbers in the margin alongside each line of the document.",
+                    "items": [
+                      "None",
+                      "Continuous",
+                      "Restart Each Page",
+                      "Restart Each Section",
+                      "Suppress for Current Paragraph",
+                      "Line Numbering Options..."
+                    ]
+                  },
+                  {
+                    "label": "Hyphenation",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Turn on hyphenation to break words between lines at the end of a line.",
+                    "items": [
+                      "None",
+                      "Automatic",
+                      "Manual",
+                      "Hyphenation Options..."
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Paragraph",
+                "controls": [
+                  {
+                    "label": "Indent Left",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Set the amount of space the paragraph is indented from the left margin.",
+                    "items": []
+                  },
+                  {
+                    "label": "Indent Right",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Set the amount of space the paragraph is indented from the right margin.",
+                    "items": []
+                  },
+                  {
+                    "label": "Spacing Before",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Change the amount of space above the selected paragraphs.",
+                    "items": []
+                  },
+                  {
+                    "label": "Spacing After",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Change the amount of space below the selected paragraphs.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Arrange",
+                "controls": [
+                  {
+                    "label": "Position",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Position the selected object on the page; text wraps around it automatically.",
+                    "items": [
+                      "In Line with Text",
+                      "Position presets (Top/Middle/Bottom x Left/Center/Right)",
+                      "More Layout Options..."
+                    ]
+                  },
+                  {
+                    "label": "Wrap Text",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Choose how text wraps around the selected object.",
+                    "items": [
+                      "In Line with Text",
+                      "Square",
+                      "Tight",
+                      "Through",
+                      "Top and Bottom",
+                      "Behind Text",
+                      "In Front of Text",
+                      "Edit Wrap Points",
+                      "Move with Text",
+                      "Fix Position on Page",
+                      "More Layout Options..."
+                    ]
+                  },
+                  {
+                    "label": "Bring Forward",
+                    "type": "split",
+                    "feasible": "partial",
+                    "tooltip": "Bring the selected object forward one level or in front of all other objects.",
+                    "items": [
+                      "Bring Forward",
+                      "Bring to Front",
+                      "Bring in Front of Text"
+                    ]
+                  },
+                  {
+                    "label": "Send Backward",
+                    "type": "split",
+                    "feasible": "partial",
+                    "tooltip": "Send the selected object back one level or behind all other objects.",
+                    "items": [
+                      "Send Backward",
+                      "Send to Back",
+                      "Send Behind Text"
+                    ]
+                  },
+                  {
+                    "label": "Selection Pane",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Show the Selection pane to list, select, show, and hide objects on the page.",
+                    "items": []
+                  },
+                  {
+                    "label": "Align",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Align the edges of multiple selected objects, or distribute them evenly.",
+                    "items": [
+                      "Align Left",
+                      "Align Center",
+                      "Align Right",
+                      "Align Top",
+                      "Align Middle",
+                      "Align Bottom",
+                      "Distribute Horizontally",
+                      "Distribute Vertically",
+                      "Align to Page",
+                      "Align to Margin",
+                      "Align Selected Objects",
+                      "View Gridlines",
+                      "Grid Settings..."
+                    ]
+                  },
+                  {
+                    "label": "Group",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Group objects together so they are treated as a single object.",
+                    "items": [
+                      "Group",
+                      "Regroup",
+                      "Ungroup"
+                    ]
+                  },
+                  {
+                    "label": "Rotate",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Rotate or flip the selected object.",
+                    "items": [
+                      "Rotate Right 90",
+                      "Rotate Left 90",
+                      "Flip Vertical",
+                      "Flip Horizontal",
+                      "More Rotation Options..."
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "References",
+            "groups": [
+              {
+                "name": "Table of Contents",
+                "controls": [
+                  {
+                    "label": "Table of Contents",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add a table of contents generated from the document's heading styles.",
+                    "items": [
+                      "Automatic Table 1",
+                      "Automatic Table 2",
+                      "Manual Table",
+                      "More Tables from Office.com",
+                      "Custom Table of Contents...",
+                      "Remove Table of Contents",
+                      "Save Selection to Table of Contents Gallery..."
+                    ]
+                  },
+                  {
+                    "label": "Add Text",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add the current paragraph as an entry in the table of contents at a chosen level.",
+                    "items": [
+                      "Do Not Show in Table of Contents",
+                      "Level 1",
+                      "Level 2",
+                      "Level 3"
+                    ]
+                  },
+                  {
+                    "label": "Update Table",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Update the table of contents so all entries refer to the correct page numbers.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Footnotes",
+                "controls": [
+                  {
+                    "label": "Insert Footnote",
+                    "type": "button",
+                    "shortcut": "Alt+Ctrl+F",
+                    "feasible": "partial",
+                    "tooltip": "Add a footnote, automatically numbered, at the bottom of the page.",
+                    "items": []
+                  },
+                  {
+                    "label": "Insert Endnote",
+                    "type": "button",
+                    "shortcut": "Alt+Ctrl+D",
+                    "feasible": "partial",
+                    "tooltip": "Add an endnote, automatically numbered, at the end of the document.",
+                    "items": []
+                  },
+                  {
+                    "label": "Next Footnote",
+                    "type": "split",
+                    "feasible": "partial",
+                    "tooltip": "Navigate to the next footnote. Click the arrow for Previous Footnote, Next/Previous Endnote.",
+                    "items": [
+                      "Next Footnote",
+                      "Previous Footnote",
+                      "Next Endnote",
+                      "Previous Endnote"
+                    ]
+                  },
+                  {
+                    "label": "Show Notes",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Scroll the document to show where the footnotes or endnotes are located.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Research",
+                "controls": [
+                  {
+                    "label": "Search",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Open the Search pane (Smart Lookup) to find related material from online sources.",
+                    "items": []
+                  },
+                  {
+                    "label": "Researcher",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Explore material related to your topic and add it and its sources to your document.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Citations & Bibliography",
+                "controls": [
+                  {
+                    "label": "Insert Citation",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Cite a source by adding a citation; choose an existing source or add a new one.",
+                    "items": [
+                      "Existing source list",
+                      "Add New Source...",
+                      "Add New Placeholder..."
+                    ]
+                  },
+                  {
+                    "label": "Manage Sources",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Organize the list of sources cited in the document (Source Manager).",
+                    "items": []
+                  },
+                  {
+                    "label": "Style",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Choose the citation style to use, such as APA, MLA, or Chicago.",
+                    "items": [
+                      "APA",
+                      "Chicago",
+                      "IEEE",
+                      "ISO 690",
+                      "MLA",
+                      "Turabian",
+                      "and more"
+                    ]
+                  },
+                  {
+                    "label": "Bibliography",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Add a bibliography listing all sources cited in the document.",
+                    "items": [
+                      "Bibliography",
+                      "References",
+                      "Works Cited",
+                      "Insert Bibliography",
+                      "Save Selection to Bibliography Gallery..."
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Captions",
+                "controls": [
+                  {
+                    "label": "Insert Caption",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add a caption (a numbered label such as Figure 1) to a picture or other object.",
+                    "items": []
+                  },
+                  {
+                    "label": "Insert Table of Figures",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Insert a table of figures listing captioned objects and their page numbers.",
+                    "items": []
+                  },
+                  {
+                    "label": "Update Table",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Update the table of figures to include all captioned entries in the document.",
+                    "items": []
+                  },
+                  {
+                    "label": "Cross-reference",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Refer to a numbered item, heading, figure, or table elsewhere in the document.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Index",
+                "controls": [
+                  {
+                    "label": "Mark Entry",
+                    "type": "button",
+                    "shortcut": "Alt+Shift+X",
+                    "feasible": "partial",
+                    "tooltip": "Include the selected text in the document's index.",
+                    "items": []
+                  },
+                  {
+                    "label": "Insert Index",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add an index listing keywords and the page numbers where they appear.",
+                    "items": []
+                  },
+                  {
+                    "label": "Update Index",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Update the index so all entries point to the correct page numbers.",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Table of Authorities",
+                "controls": [
+                  {
+                    "label": "Mark Citation",
+                    "type": "button",
+                    "shortcut": "Alt+Shift+I",
+                    "feasible": "partial",
+                    "tooltip": "Add the selected text (such as a legal case) to the table of authorities.",
+                    "items": []
+                  },
+                  {
+                    "label": "Insert Table of Authorities",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add a table of authorities listing cases, statutes, and other cited authorities.",
+                    "items": []
+                  },
+                  {
+                    "label": "Update Table",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Update the table of authorities to include all marked citations.",
+                    "items": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "mailingsReviewViewHelp": {
+        "tabs": [
+          {
+            "name": "Mailings",
+            "groups": [
+              {
+                "name": "Create",
+                "controls": [
+                  {
+                    "label": "Envelopes",
+                    "type": "button",
+                    "tooltip": "Create and print envelopes. You can choose the envelope size, formatting, and printing options.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Labels",
+                    "type": "button",
+                    "tooltip": "Create and print labels. Choose from a number of popular label styles and shapes.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Start Mail Merge",
+                "controls": [
+                  {
+                    "label": "Start Mail Merge",
+                    "type": "dropdown",
+                    "tooltip": "Create one document and send it to multiple people. Choose Letters, E-mail Messages, Envelopes, Labels, Directory, Normal Word Document, or the Step-by-Step Mail Merge Wizard.",
+                    "items": [
+                      "Letters",
+                      "E-mail Messages",
+                      "Envelopes...",
+                      "Labels...",
+                      "Directory",
+                      "Normal Word Document",
+                      "Step-by-Step Mail Merge Wizard..."
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Select Recipients",
+                    "type": "dropdown",
+                    "tooltip": "Choose the list of people you want to send the document to. Type a new list, use an existing one, or choose Outlook contacts.",
+                    "items": [
+                      "Type a New List...",
+                      "Use an Existing List...",
+                      "Choose from Outlook Contacts..."
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Edit Recipient List",
+                    "type": "button",
+                    "tooltip": "Make changes to the list of recipients and decide which of them receive your letter. You can sort, filter, find, and remove duplicates.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Write & Insert Fields",
+                "controls": [
+                  {
+                    "label": "Highlight Merge Fields",
+                    "type": "button",
+                    "tooltip": "Highlight the fields you've inserted in the document so you can easily spot the parts of your letter that will be replaced with information from your recipient list.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Address Block",
+                    "type": "button",
+                    "tooltip": "Add an address to your letter. You specify the formatting and location, and Word replaces it with actual addresses from your recipient list when you finish the mail merge.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Greeting Line",
+                    "type": "button",
+                    "tooltip": "Add a greeting line such as 'Dear Mr. Smith' to your document.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Insert Merge Field",
+                    "type": "split",
+                    "tooltip": "Add any field from your recipient list to the document, such as Last Name, Home Phone, Company Name, or any other field.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Rules",
+                    "type": "dropdown",
+                    "tooltip": "Specify rules to add decision-making ability to the mail merge (e.g., If...Then...Else, Fill-in, Ask, Skip Record If, Next Record).",
+                    "items": [
+                      "Ask...",
+                      "Fill-in...",
+                      "If...Then...Else...",
+                      "Merge Record #",
+                      "Merge Sequence #",
+                      "Next Record",
+                      "Next Record If...",
+                      "Set Bookmark...",
+                      "Skip Record If..."
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Match Fields",
+                    "type": "button",
+                    "tooltip": "Tell Word the meaning of different fields in your recipient list. Match the fields with standard names that Word recognizes (e.g., First Name, Last Name, Address).",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Update Labels",
+                    "type": "button",
+                    "tooltip": "If you're creating labels, update all the labels in the document to use the information from the recipient list. (Available only for label merges.)",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Preview Results",
+                "controls": [
+                  {
+                    "label": "Preview Results",
+                    "type": "toggle",
+                    "tooltip": "See your document with the merge fields replaced by actual data from your recipient list, so you can check the way it looks.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "First Record",
+                    "type": "button",
+                    "tooltip": "Preview the first record in your recipient list.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Previous Record",
+                    "type": "button",
+                    "tooltip": "Preview the previous record in your recipient list.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Go to Record",
+                    "type": "spinner",
+                    "tooltip": "Type the number of the record you'd like to preview, or use the arrows to move to the next or previous record.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Next Record",
+                    "type": "button",
+                    "tooltip": "Preview the next record in your recipient list.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Last Record",
+                    "type": "button",
+                    "tooltip": "Preview the last record in your recipient list.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Find Recipient",
+                    "type": "button",
+                    "tooltip": "Find and preview a specific record in your recipient list by searching for text.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Check for Errors",
+                    "type": "button",
+                    "shortcut": "Alt+Shift+K",
+                    "tooltip": "Specify how to handle errors that occur when completing the mail merge. You can also simulate the merge to see what errors might happen.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Finish",
+                "controls": [
+                  {
+                    "label": "Finish & Merge",
+                    "type": "dropdown",
+                    "tooltip": "Complete the mail merge. You can edit individual copies of the document, print them, or send them as e-mail messages.",
+                    "items": [
+                      "Edit Individual Documents...",
+                      "Print Documents...",
+                      "Send E-mail Messages..."
+                    ],
+                    "feasible": "partial"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Review",
+            "groups": [
+              {
+                "name": "Proofing",
+                "controls": [
+                  {
+                    "label": "Editor",
+                    "type": "button",
+                    "shortcut": "F7",
+                    "tooltip": "Check your document for spelling, grammar, and writing style suggestions. (In Microsoft 365 this is the Editor pane; classic Spelling & Grammar in Word 2021.)",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Thesaurus",
+                    "type": "button",
+                    "shortcut": "Shift+F7",
+                    "tooltip": "Find other words with the same meaning (synonyms) for the word you've selected.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Word Count",
+                    "type": "button",
+                    "tooltip": "Find out the number of words, characters, paragraphs, and lines in the document. You can also find the number of pages.",
+                    "feasible": "yes"
+                  }
+                ]
+              },
+              {
+                "name": "Speech",
+                "controls": [
+                  {
+                    "label": "Read Aloud",
+                    "type": "toggle",
+                    "shortcut": "Ctrl+Alt+Space",
+                    "tooltip": "Have your text read aloud while it highlights each word so you can check the text or just listen to your document.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Accessibility",
+                "controls": [
+                  {
+                    "label": "Check Accessibility",
+                    "type": "split",
+                    "tooltip": "Find and fix accessibility issues to make your content easier for people with disabilities to access.",
+                    "items": [
+                      "Check Accessibility",
+                      "Alt Text",
+                      "Accessibility Reminder",
+                      "Options for Always Checking..."
+                    ],
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Language",
+                "controls": [
+                  {
+                    "label": "Translate",
+                    "type": "dropdown",
+                    "tooltip": "Easily translate selected text or your whole document into a different language using Microsoft Translator.",
+                    "items": [
+                      "Translate Selection",
+                      "Translate Document"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Language",
+                    "type": "dropdown",
+                    "tooltip": "Choose the language settings for proofing tools and editing.",
+                    "items": [
+                      "Set Proofing Language...",
+                      "Language Preferences..."
+                    ],
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Comments",
+                "controls": [
+                  {
+                    "label": "New Comment",
+                    "type": "button",
+                    "tooltip": "Add a note about this part of the document. Select the content you want to comment on, then click here.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Delete",
+                    "type": "split",
+                    "tooltip": "Delete the selected comment, or delete all comments in the document.",
+                    "items": [
+                      "Delete",
+                      "Delete All Comments Shown",
+                      "Delete All Comments in Document"
+                    ],
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Previous",
+                    "type": "button",
+                    "tooltip": "Jump to the previous comment in the document.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Next",
+                    "type": "button",
+                    "tooltip": "Jump to the next comment in the document.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Show Comments",
+                    "type": "toggle",
+                    "tooltip": "Choose to see all comments inline alongside the text, or show them in a contextual pane.",
+                    "feasible": "yes"
+                  }
+                ]
+              },
+              {
+                "name": "Tracking",
+                "controls": [
+                  {
+                    "label": "Track Changes",
+                    "type": "split",
+                    "shortcut": "Ctrl+Shift+E",
+                    "tooltip": "Keep track of all the changes made to the document, including insertions, deletions, and formatting changes.",
+                    "items": [
+                      "Track Changes",
+                      "Lock Tracking..."
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Display for Review",
+                    "type": "combo",
+                    "tooltip": "Choose how you want to view changes to the document: Simple Markup, All Markup, No Markup, or Original.",
+                    "items": [
+                      "Simple Markup",
+                      "All Markup",
+                      "No Markup",
+                      "Original"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Show Markup",
+                    "type": "dropdown",
+                    "tooltip": "Choose what kind of markup to show in your document, such as comments, insertions and deletions, formatting, and which reviewers to display.",
+                    "items": [
+                      "Comments",
+                      "Insertions and Deletions",
+                      "Formatting",
+                      "Balloons",
+                      "Specific People",
+                      "Highlight Updates",
+                      "Other Authors",
+                      "Reviewing Pane"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Reviewing Pane",
+                    "type": "split",
+                    "tooltip": "Show revisions in a separate window, vertically or horizontally. This is a handy way to make sure that all tracked changes have been removed from your document.",
+                    "items": [
+                      "Reviewing Pane Vertical",
+                      "Reviewing Pane Horizontal"
+                    ],
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Changes",
+                "controls": [
+                  {
+                    "label": "Accept",
+                    "type": "split",
+                    "tooltip": "Keep this change and move to the next one. Use the dropdown to accept and move to next, accept all changes, accept all and stop tracking, or accept all changes shown.",
+                    "items": [
+                      "Accept and Move to Next",
+                      "Accept This Change",
+                      "Accept All Changes Shown",
+                      "Accept All Changes",
+                      "Accept All Changes and Stop Tracking"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Reject",
+                    "type": "split",
+                    "tooltip": "Reject this change and move to the next one. Use the dropdown to reject all changes or reject all and stop tracking.",
+                    "items": [
+                      "Reject and Move to Next",
+                      "Reject This Change",
+                      "Reject All Changes Shown",
+                      "Reject All Changes",
+                      "Reject All Changes and Stop Tracking"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Previous",
+                    "type": "button",
+                    "tooltip": "Jump to the previous tracked change in the document so you can accept or reject it.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Next",
+                    "type": "button",
+                    "tooltip": "Jump to the next tracked change in the document so you can accept or reject it.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Compare",
+                "controls": [
+                  {
+                    "label": "Compare",
+                    "type": "dropdown",
+                    "tooltip": "Compare or combine multiple versions of a document.",
+                    "items": [
+                      "Compare... (Compare two versions of a document — legal blackline)",
+                      "Combine... (Combine revisions from multiple authors into a single document)"
+                    ],
+                    "feasible": "no"
+                  }
+                ]
+              },
+              {
+                "name": "Protect",
+                "controls": [
+                  {
+                    "label": "Block Authors",
+                    "type": "button",
+                    "tooltip": "Block other authors from making changes to the text you've selected. (Available for documents stored on SharePoint / OneDrive for shared editing.)",
+                    "feasible": "no"
+                  },
+                  {
+                    "label": "Restrict Editing",
+                    "type": "button",
+                    "tooltip": "Limit how much others can edit or format the document. Restrict formatting to a selection of styles, and control the kinds of editing changes that can be made.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Ink",
+                "controls": [
+                  {
+                    "label": "Hide Ink",
+                    "type": "toggle",
+                    "tooltip": "Hide or show ink annotations in the document. (Appears when the document contains ink or on touch/pen-enabled devices.)",
+                    "feasible": "no"
+                  }
+                ]
+              },
+              {
+                "name": "OneNote",
+                "controls": [
+                  {
+                    "label": "Linked Notes",
+                    "type": "button",
+                    "tooltip": "Take notes in OneNote and link them to the part of the document you're working on. (Appears when OneNote integration is available.)",
+                    "feasible": "no"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "View",
+            "groups": [
+              {
+                "name": "Views",
+                "controls": [
+                  {
+                    "label": "Read Mode",
+                    "type": "button",
+                    "tooltip": "Read documents comfortably in a view designed to fit your screen. Hides most toolbars and lets you swipe between pages.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Print Layout",
+                    "type": "button",
+                    "tooltip": "See the document the way it will look on the printed page. This is the default view.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Web Layout",
+                    "type": "button",
+                    "tooltip": "See how your document would look as a webpage. Text wraps to fit the window and graphics are positioned as in a browser.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Outline",
+                    "type": "button",
+                    "tooltip": "See your document in outline form, where content is shown as bulleted points. This view is useful for creating headings and moving whole paragraphs within the document.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Draft",
+                    "type": "button",
+                    "tooltip": "See your document as a simple draft, for quickly editing text. Certain elements such as headers and footers won't be visible.",
+                    "feasible": "yes"
+                  }
+                ]
+              },
+              {
+                "name": "Immersive",
+                "controls": [
+                  {
+                    "label": "Focus",
+                    "type": "toggle",
+                    "tooltip": "Focus on your document by hiding the ribbon and other on-screen elements, leaving just your content on a dark background.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Immersive Reader",
+                    "type": "button",
+                    "tooltip": "Open a focused reading experience that lets you adjust text spacing, column width, page color, line focus, syllables, and read aloud.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Page Movement",
+                "controls": [
+                  {
+                    "label": "Vertical",
+                    "type": "toggle",
+                    "tooltip": "Flip pages vertically by scrolling up and down. This is the default page movement.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Side to Side",
+                    "type": "toggle",
+                    "tooltip": "Flip pages horizontally from one side to the other, like turning pages in a book.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Show",
+                "controls": [
+                  {
+                    "label": "Ruler",
+                    "type": "checkbox",
+                    "tooltip": "Show the rulers next to your document so you can measure and line things up.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Gridlines",
+                    "type": "checkbox",
+                    "tooltip": "Turn on gridlines to line up objects in your document. The gridlines won't be printed.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "Navigation Pane",
+                    "type": "checkbox",
+                    "tooltip": "Open the Navigation Pane to move around the document by heading, page, or by searching for text or objects.",
+                    "feasible": "yes"
+                  }
+                ]
+              },
+              {
+                "name": "Zoom",
+                "controls": [
+                  {
+                    "label": "Zoom",
+                    "type": "button",
+                    "tooltip": "Choose a zoom level for the document. In most cases, you can use the zoom controls in the status bar to do the same thing.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "100%",
+                    "type": "button",
+                    "tooltip": "Zoom the document to 100% of the normal size.",
+                    "feasible": "yes"
+                  },
+                  {
+                    "label": "One Page",
+                    "type": "button",
+                    "tooltip": "Zoom the document so that an entire page fits in the window.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Multiple Pages",
+                    "type": "button",
+                    "tooltip": "Zoom the document so that two or more pages fit in the window at once.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Page Width",
+                    "type": "button",
+                    "tooltip": "Zoom the document so that the width of the page matches the width of the window.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Window",
+                "controls": [
+                  {
+                    "label": "New Window",
+                    "type": "button",
+                    "tooltip": "Open a second window for the document so you can work in different places at the same time.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Arrange All",
+                    "type": "button",
+                    "tooltip": "Stack your open windows so you can see all of them at once.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Split",
+                    "type": "button",
+                    "tooltip": "View two sections of your document at the same time. This is helpful for seeing one part while editing another.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "View Side by Side",
+                    "type": "toggle",
+                    "tooltip": "View two documents side by side so you can compare their contents.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Synchronous Scrolling",
+                    "type": "toggle",
+                    "tooltip": "Scroll two documents at the same time. This is a great way to compare documents line by line. (Enabled with View Side by Side.)",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Reset Window Position",
+                    "type": "button",
+                    "tooltip": "Place the documents you're comparing side by side so they share the screen equally. (Enabled with View Side by Side.)",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Switch Windows",
+                    "type": "dropdown",
+                    "tooltip": "Switch quickly to another open window. The dropdown lists all currently open documents.",
+                    "feasible": "partial"
+                  }
+                ]
+              },
+              {
+                "name": "Macros",
+                "controls": [
+                  {
+                    "label": "Macros",
+                    "type": "split",
+                    "shortcut": "Alt+F8",
+                    "tooltip": "View the list of macros, from which you can run, create, or delete a macro. The dropdown offers View Macros, Record Macro, and Pause Recording.",
+                    "items": [
+                      "View Macros",
+                      "Record Macro...",
+                      "Pause Recording"
+                    ],
+                    "feasible": "no"
+                  }
+                ]
+              },
+              {
+                "name": "SharePoint",
+                "controls": [
+                  {
+                    "label": "Properties",
+                    "type": "button",
+                    "tooltip": "View and edit the SharePoint document properties for this file. (This group appears only when the document is stored in a SharePoint library.)",
+                    "feasible": "no"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Help",
+            "groups": [
+              {
+                "name": "Help",
+                "controls": [
+                  {
+                    "label": "Help",
+                    "type": "button",
+                    "shortcut": "F1",
+                    "tooltip": "Get help using Word. Browse help articles and search for answers to your questions.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Contact Support",
+                    "type": "button",
+                    "tooltip": "Contact Microsoft Support to get help with a problem.",
+                    "feasible": "no"
+                  },
+                  {
+                    "label": "Feedback",
+                    "type": "button",
+                    "tooltip": "Tell Microsoft what you like and don't like, and suggest new features. Opens the Feedback page in the File menu (Backstage).",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Show Training",
+                    "type": "button",
+                    "tooltip": "Watch training videos and learn how to get the most out of Word.",
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "What's New",
+                    "type": "button",
+                    "tooltip": "See what's new and improved in recent updates to Word.",
+                    "feasible": "partial"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "backstage": {
+        "tabs": [
+          {
+            "name": "File",
+            "groups": [
+              {
+                "name": "Home",
+                "controls": [
+                  {
+                    "label": "New blank document card",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Creates a new empty document",
+                    "items": []
+                  },
+                  {
+                    "label": "Template thumbnails (Take a tour, etc.)",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Featured template cards shown on Home",
+                    "items": []
+                  },
+                  {
+                    "label": "Search for online templates",
+                    "type": "combo",
+                    "feasible": "partial",
+                    "tooltip": "Requires a hosted template service / online catalog",
+                    "items": []
+                  },
+                  {
+                    "label": "Recent documents list",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Recently opened files with path and timestamp",
+                    "items": []
+                  },
+                  {
+                    "label": "Pinned documents",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Documents pinned to the top of Recent",
+                    "items": []
+                  },
+                  {
+                    "label": "Shared with Me",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Requires cloud/sharing backend",
+                    "items": []
+                  },
+                  {
+                    "label": "More documents / More templates links",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Jumps to Open or New",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "New",
+                "controls": [
+                  {
+                    "label": "Blank document",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Create a new empty document",
+                    "items": []
+                  },
+                  {
+                    "label": "Featured template gallery",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Local bundled templates feasible; full online catalog needs a service",
+                    "items": [
+                      "Resume",
+                      "Cover letter",
+                      "Flyer",
+                      "Newsletter",
+                      "Calendar"
+                    ]
+                  },
+                  {
+                    "label": "Search online templates box",
+                    "type": "combo",
+                    "feasible": "partial",
+                    "tooltip": "Needs Office template web service",
+                    "items": []
+                  },
+                  {
+                    "label": "Suggested searches chips",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Quick filters: Business, Cards, Flyers, Letters, Education, Resumes",
+                    "items": [
+                      "Business",
+                      "Cards",
+                      "Flyers",
+                      "Letters",
+                      "Education",
+                      "Resumes and Cover Letters",
+                      "Holiday"
+                    ]
+                  },
+                  {
+                    "label": "Template preview dialog (Create)",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Preview then create from a template",
+                    "items": []
+                  },
+                  {
+                    "label": "Take a tour / built-in tutorials",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Interactive welcome/tour content",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Open",
+                "controls": [
+                  {
+                    "label": "Recent",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Recent files and folders",
+                    "items": [
+                      "Documents",
+                      "Folders"
+                    ]
+                  },
+                  {
+                    "label": "Pinned items",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Pinned recent files/folders",
+                    "items": []
+                  },
+                  {
+                    "label": "Shared with Me",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Requires cloud account/sharing",
+                    "items": []
+                  },
+                  {
+                    "label": "OneDrive / Cloud locations",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Needs cloud storage integration",
+                    "items": [
+                      "OneDrive - Personal",
+                      "OneDrive - Business",
+                      "SharePoint sites"
+                    ]
+                  },
+                  {
+                    "label": "This PC",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Browse local folders",
+                    "items": []
+                  },
+                  {
+                    "label": "Add a Place",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Connect additional storage services",
+                    "items": [
+                      "OneDrive",
+                      "SharePoint"
+                    ]
+                  },
+                  {
+                    "label": "Browse",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Open native file picker dialog",
+                    "items": []
+                  },
+                  {
+                    "label": "Recover Unsaved Documents",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Open autosave/temp recovery location",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Info",
+                "controls": [
+                  {
+                    "label": "Document thumbnail / title",
+                    "type": "label",
+                    "feasible": "yes",
+                    "tooltip": "Current file name and path",
+                    "items": []
+                  },
+                  {
+                    "label": "Protect Document",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Mark as Final feasible; encryption/IRM/signatures need crypto backend",
+                    "items": [
+                      "Always Open Read-Only",
+                      "Encrypt with Password",
+                      "Restrict Editing",
+                      "Restrict Access (IRM)",
+                      "Add a Digital Signature",
+                      "Mark as Final"
+                    ]
+                  },
+                  {
+                    "label": "Check for Issues",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Inspector feasible; accessibility/compatibility checks are large work",
+                    "items": [
+                      "Inspect Document",
+                      "Check Accessibility",
+                      "Check Compatibility"
+                    ]
+                  },
+                  {
+                    "label": "Manage Document / Versions",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Autosave version history needs versioning store",
+                    "items": [
+                      "Recover Unsaved Documents",
+                      "Delete All Unsaved Documents"
+                    ]
+                  },
+                  {
+                    "label": "Properties panel",
+                    "type": "label",
+                    "feasible": "yes",
+                    "tooltip": "Size, pages, words, editing time, title, tags, comments",
+                    "items": [
+                      "Size",
+                      "Pages",
+                      "Words",
+                      "Total Editing Time",
+                      "Title",
+                      "Tags",
+                      "Comments"
+                    ]
+                  },
+                  {
+                    "label": "Advanced Properties / Show All Properties",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Expand full metadata fields",
+                    "items": []
+                  },
+                  {
+                    "label": "Related Dates",
+                    "type": "label",
+                    "feasible": "yes",
+                    "tooltip": "Last modified, created, last printed",
+                    "items": [
+                      "Last Modified",
+                      "Created",
+                      "Last Printed"
+                    ]
+                  },
+                  {
+                    "label": "Related People",
+                    "type": "label",
+                    "feasible": "partial",
+                    "tooltip": "Author add/edit; presence info needs identity service",
+                    "items": [
+                      "Author",
+                      "Last Modified By"
+                    ]
+                  },
+                  {
+                    "label": "Version History",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Cloud version history requires sync backend",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Save",
+                "controls": [
+                  {
+                    "label": "Save (to current location)",
+                    "type": "button",
+                    "shortcut": "Ctrl+S",
+                    "feasible": "yes",
+                    "tooltip": "Save changes to the existing file",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Save As",
+                "controls": [
+                  {
+                    "label": "Recent folders",
+                    "type": "gallery",
+                    "feasible": "yes",
+                    "tooltip": "Recently used save locations",
+                    "items": []
+                  },
+                  {
+                    "label": "OneDrive / Cloud locations",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Requires cloud storage integration",
+                    "items": [
+                      "OneDrive",
+                      "SharePoint"
+                    ]
+                  },
+                  {
+                    "label": "This PC",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Save to a local folder",
+                    "items": []
+                  },
+                  {
+                    "label": "Add a Place",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Connect storage services",
+                    "items": []
+                  },
+                  {
+                    "label": "Browse",
+                    "type": "button",
+                    "shortcut": "F12",
+                    "feasible": "yes",
+                    "tooltip": "Open native Save As dialog",
+                    "items": []
+                  },
+                  {
+                    "label": "File name",
+                    "type": "combo",
+                    "feasible": "yes",
+                    "tooltip": "Enter the file name",
+                    "items": []
+                  },
+                  {
+                    "label": "Save as type",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": ".docx feasible; full fidelity .doc/.pdf/.rtf/.odt export varies",
+                    "items": [
+                      ".docx",
+                      ".doc",
+                      ".pdf",
+                      ".rtf",
+                      ".odt",
+                      ".txt",
+                      "Web Page (.htm)",
+                      "Template (.dotx)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Print",
+                "controls": [
+                  {
+                    "label": "Print button",
+                    "type": "button",
+                    "shortcut": "Ctrl+P",
+                    "feasible": "partial",
+                    "tooltip": "Triggers print; relies on OS print pipeline",
+                    "items": []
+                  },
+                  {
+                    "label": "Copies",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Number of copies to print",
+                    "items": []
+                  },
+                  {
+                    "label": "Printer",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Printer enumeration via OS; selection in Electron is limited",
+                    "items": [
+                      "Available printers",
+                      "Microsoft Print to PDF",
+                      "Printer Properties"
+                    ]
+                  },
+                  {
+                    "label": "Print range / Settings",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Which pages to print",
+                    "items": [
+                      "Print All Pages",
+                      "Print Selection",
+                      "Print Current Page",
+                      "Custom Print Range"
+                    ]
+                  },
+                  {
+                    "label": "Pages (custom range box)",
+                    "type": "combo",
+                    "feasible": "yes",
+                    "tooltip": "Enter page numbers/ranges",
+                    "items": []
+                  },
+                  {
+                    "label": "Print One Sided / Duplex",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Duplex depends on printer/driver",
+                    "items": [
+                      "Print One Sided",
+                      "Print on Both Sides (long edge)",
+                      "Print on Both Sides (short edge)"
+                    ]
+                  },
+                  {
+                    "label": "Collation",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Collated vs uncollated",
+                    "items": [
+                      "Collated",
+                      "Uncollated"
+                    ]
+                  },
+                  {
+                    "label": "Orientation",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Portrait or landscape",
+                    "items": [
+                      "Portrait Orientation",
+                      "Landscape Orientation"
+                    ]
+                  },
+                  {
+                    "label": "Paper size",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Letter, A4, etc.",
+                    "items": [
+                      "Letter",
+                      "A4",
+                      "Legal",
+                      "A3",
+                      "Custom"
+                    ]
+                  },
+                  {
+                    "label": "Margins",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Preset margin sets",
+                    "items": [
+                      "Normal",
+                      "Narrow",
+                      "Moderate",
+                      "Wide",
+                      "Custom Margins"
+                    ]
+                  },
+                  {
+                    "label": "Pages per sheet",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Scale multiple pages onto one sheet",
+                    "items": [
+                      "1 Page Per Sheet",
+                      "2",
+                      "4",
+                      "6",
+                      "Scale to Paper Size"
+                    ]
+                  },
+                  {
+                    "label": "Print preview pane",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "Rendering an accurate paginated preview is significant work",
+                    "items": []
+                  },
+                  {
+                    "label": "Page navigation + zoom slider",
+                    "type": "spinner",
+                    "feasible": "yes",
+                    "tooltip": "Navigate preview pages and zoom",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Share",
+                "controls": [
+                  {
+                    "label": "Share with People (cloud)",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Requires cloud co-authoring backend (OneDrive/SharePoint)",
+                    "items": []
+                  },
+                  {
+                    "label": "Invite people / enter emails",
+                    "type": "combo",
+                    "feasible": "no",
+                    "tooltip": "Needs sharing/permissions service",
+                    "items": []
+                  },
+                  {
+                    "label": "Copy Link",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Only meaningful with a cloud link service",
+                    "items": [
+                      "Anyone with the link",
+                      "People in your organization"
+                    ]
+                  },
+                  {
+                    "label": "Email",
+                    "type": "dropdown",
+                    "feasible": "partial",
+                    "tooltip": "Mailto/local mail attach feasible; rich options need integration",
+                    "items": [
+                      "Send as Attachment",
+                      "Send a Link",
+                      "Send as PDF",
+                      "Send as XPS",
+                      "Send as Internet Fax"
+                    ]
+                  },
+                  {
+                    "label": "Present Online",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Requires presentation service",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Export",
+                "controls": [
+                  {
+                    "label": "Create PDF/XPS Document",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "PDF export feasible via print-to-PDF/renderer; XPS less so",
+                    "items": []
+                  },
+                  {
+                    "label": "Change File Type",
+                    "type": "gallery",
+                    "feasible": "partial",
+                    "tooltip": "docx feasible; full-fidelity legacy/ODT/RTF conversion varies",
+                    "items": [
+                      "Document (.docx)",
+                      "Word 97-2003 (.doc)",
+                      "OpenDocument Text (.odt)",
+                      "Template (.dotx)",
+                      "Plain Text (.txt)",
+                      "Rich Text Format (.rtf)",
+                      "Single File Web Page (.mht)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Transform",
+                "controls": [
+                  {
+                    "label": "Transform to Web Page (Sway)",
+                    "type": "button",
+                    "feasible": "no",
+                    "tooltip": "Requires Microsoft Sway cloud service",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Close",
+                "controls": [
+                  {
+                    "label": "Close document",
+                    "type": "button",
+                    "shortcut": "Ctrl+W",
+                    "feasible": "yes",
+                    "tooltip": "Closes the current document with save prompt",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Account",
+                "controls": [
+                  {
+                    "label": "User information (name, photo, email)",
+                    "type": "label",
+                    "feasible": "partial",
+                    "tooltip": "Needs sign-in/identity service to populate",
+                    "items": []
+                  },
+                  {
+                    "label": "Account photo / Change photo",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Requires account service",
+                    "items": []
+                  },
+                  {
+                    "label": "Sign out / Switch account",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Requires auth backend",
+                    "items": []
+                  },
+                  {
+                    "label": "Office Background",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "Decorative title-bar pattern",
+                    "items": [
+                      "No Background",
+                      "Calligraphy",
+                      "Circles and Stripes",
+                      "Clouds",
+                      "Geometry",
+                      "Spring"
+                    ]
+                  },
+                  {
+                    "label": "Office Theme",
+                    "type": "dropdown",
+                    "feasible": "yes",
+                    "tooltip": "App color theme",
+                    "items": [
+                      "Colorful",
+                      "Dark Gray",
+                      "Black",
+                      "White",
+                      "Use system setting"
+                    ]
+                  },
+                  {
+                    "label": "Connected Services",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add storage/services; needs integrations",
+                    "items": [
+                      "OneDrive",
+                      "SharePoint",
+                      "Add a service"
+                    ]
+                  },
+                  {
+                    "label": "Product Information / About / License",
+                    "type": "label",
+                    "feasible": "partial",
+                    "tooltip": "Version/about feasible; license/activation needs backend",
+                    "items": [
+                      "About Word",
+                      "What's New",
+                      "Update Options",
+                      "Manage Account"
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Feedback",
+                "controls": [
+                  {
+                    "label": "I like something / I don't like something / I have a suggestion",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "UI feasible; submission needs a feedback endpoint",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "name": "Options",
+                "controls": [
+                  {
+                    "label": "General",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "UI options, personalization, startup",
+                    "items": []
+                  },
+                  {
+                    "label": "Display",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Page display and printing options",
+                    "items": []
+                  },
+                  {
+                    "label": "Proofing",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "AutoCorrect feasible; full spelling/grammar engine is large",
+                    "items": [
+                      "AutoCorrect Options",
+                      "Spelling",
+                      "Grammar"
+                    ]
+                  },
+                  {
+                    "label": "Save",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "AutoRecover, default format, default locations",
+                    "items": []
+                  },
+                  {
+                    "label": "Language",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Editing/display language packs need resources",
+                    "items": []
+                  },
+                  {
+                    "label": "Accessibility",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Accessibility preferences",
+                    "items": []
+                  },
+                  {
+                    "label": "Advanced",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Large set of editing/display/print toggles",
+                    "items": []
+                  },
+                  {
+                    "label": "Customize Ribbon",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Ribbon customization UI is substantial",
+                    "items": []
+                  },
+                  {
+                    "label": "Quick Access Toolbar",
+                    "type": "button",
+                    "feasible": "yes",
+                    "tooltip": "Customize QAT commands",
+                    "items": []
+                  },
+                  {
+                    "label": "Add-ins",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Add-in framework needed for full support",
+                    "items": []
+                  },
+                  {
+                    "label": "Trust Center",
+                    "type": "button",
+                    "feasible": "partial",
+                    "tooltip": "Macro/privacy/protected-view settings; security model heavy",
+                    "items": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "visual": {
+      "palette": [
+        {
+          "name": "Word brand blue (accent)",
+          "hex": "#2B579A",
+          "usage": "Primary Word accent. App theme color used for active-tab underline/indicator, File-tab and ribbon-launcher accents, focus rings, hyperlink-style highlights, and the Word app icon. RGB(43,87,154), CSS name 'Endeavour'."
+        },
+        {
+          "name": "File tab (Backstage) blue",
+          "hex": "#2B579A",
+          "usage": "The 'File' tab fill in the tab strip (a solid Word-blue chip), and the Backstage left rail uses this same brand blue."
+        },
+        {
+          "name": "Ribbon / window background",
+          "hex": "#F3F2F1",
+          "usage": "Default neutral ribbon body and overall chrome background in the modern (post-2019/M365) light theme. Very light warm gray."
+        },
+        {
+          "name": "Tab strip background",
+          "hex": "#F3F2F1",
+          "usage": "Background behind the ribbon tab labels (Home, Insert, ...). In the flat modern theme it matches the ribbon background; the active tab is distinguished by its underline, not a different fill."
+        },
+        {
+          "name": "Active tab background",
+          "hex": "#FFFFFF",
+          "usage": "Selected ribbon tab body. In modern M365 the selected tab text is brand blue with a ~2px #2B579A underline; the ribbon body below reads as white/near-white."
+        },
+        {
+          "name": "Active tab indicator (underline)",
+          "hex": "#2B579A",
+          "usage": "~2px solid brand-blue underline beneath the currently selected tab label."
+        },
+        {
+          "name": "Inactive tab text",
+          "hex": "#444444",
+          "usage": "Unselected tab labels and most ribbon/group label text. Near-black neutral (#444 to #333)."
+        },
+        {
+          "name": "Button hover background",
+          "hex": "#E1DFDD",
+          "usage": "Hover state fill for ribbon buttons, gallery items, and tabs. Light neutral gray (Fluent neutralLight)."
+        },
+        {
+          "name": "Button pressed / selected background",
+          "hex": "#D2D0CE",
+          "usage": "Pressed/active and toggled-on (e.g. Bold engaged) ribbon button fill. Slightly darker gray (Fluent neutralQuaternaryAlt). Toggled-on buttons also tint subtly toward brand blue."
+        },
+        {
+          "name": "Button hover/pressed border",
+          "hex": "#C8C6C4",
+          "usage": "1px subtle border that appears around a button on hover/press (Fluent neutralTertiaryAlt)."
+        },
+        {
+          "name": "Group divider / separator",
+          "hex": "#E1DFDD",
+          "usage": "1px vertical hairline separating ribbon groups, and the thin rule above group labels. Also used for QAT and status-bar separators."
+        },
+        {
+          "name": "Document canvas (work area) gray",
+          "hex": "#E6E6E6",
+          "usage": "The gray area surrounding the page in the editing view (classic ~#ECECEC to #E6E6E6). The page 'floats' on this neutral gray."
+        },
+        {
+          "name": "Page (paper) white",
+          "hex": "#FFFFFF",
+          "usage": "The document page itself - pure white sheet with a soft drop shadow against the canvas gray."
+        },
+        {
+          "name": "Page drop shadow",
+          "hex": "rgba(0,0,0,0.20)",
+          "usage": "Soft shadow under/around the page giving the floating-paper effect (e.g. 0 1px 4px rgba(0,0,0,0.2))."
+        },
+        {
+          "name": "Selection highlight blue",
+          "hex": "#CCE8FF",
+          "usage": "Text selection highlight in the document when the window is focused (light Windows selection blue, approx #ADD6FF to #CCE8FF). Inactive/out-of-focus selection falls back to a light gray."
+        },
+        {
+          "name": "Status bar background",
+          "hex": "#F3F2F1",
+          "usage": "Bottom status bar fill in the modern light theme (neutral). Earlier 'Colorful' builds painted the status bar in Word-blue #2B579A with white text; the current M365 default is the neutral light bar with dark text."
+        },
+        {
+          "name": "Status bar text",
+          "hex": "#444444",
+          "usage": "Status-bar text and icons (page count, word count, language, zoom). Near-black neutral on the light bar."
+        },
+        {
+          "name": "Title bar background",
+          "hex": "#FFFFFF",
+          "usage": "Modern M365 title bar / QAT region is near-white. (Legacy 'Colorful' theme used Word-blue #2B579A title bar with white caption text and white QAT icons.)"
+        },
+        {
+          "name": "Ribbon icon color (monoline)",
+          "hex": "#444444",
+          "usage": "Fluent monoline ribbon glyphs render in a dark neutral (#424242/#444), with selective brand-blue or category accents on a few icons."
+        }
+      ],
+      "typography": [
+        {
+          "element": "UI font family",
+          "spec": "Segoe UI (Windows). Fallback stack: 'Segoe UI', 'Segoe UI Web', system-ui, Tahoma, Arial, sans-serif. Antialiased/ClearType. Weights used: Regular 400, Semibold 600, Bold 700."
+        },
+        {
+          "element": "Title bar / document name",
+          "spec": "Segoe UI Regular, ~12px (9pt). Centered in modern M365; near-black on white (or white on blue in legacy Colorful)."
+        },
+        {
+          "element": "Ribbon tab labels (Home, Insert, ...)",
+          "spec": "Segoe UI Regular, ~14px (12px-14px range). Selected tab is brand blue #2B579A; unselected #444. Comfortable letter spacing, sentence case."
+        },
+        {
+          "element": "File tab label",
+          "spec": "Segoe UI Semibold, ~14px, white text on the #2B579A blue chip."
+        },
+        {
+          "element": "Ribbon button labels",
+          "spec": "Segoe UI Regular, ~12px (9pt). Two-line wrap allowed under large buttons (e.g. 'Format\\nPainter'). Color #444."
+        },
+        {
+          "element": "Ribbon group labels (bottom captions)",
+          "spec": "Segoe UI Regular, ~11px (9pt). Centered under each group (Clipboard, Font, Paragraph, Styles, Editing). Color #444/#605E5C neutral."
+        },
+        {
+          "element": "Gallery / dropdown item text",
+          "spec": "Segoe UI Regular, ~12px. Style names in the Styles gallery render in their own formatting (e.g. Calibri 11) but the chrome chrome around them is Segoe UI."
+        },
+        {
+          "element": "Status bar text",
+          "spec": "Segoe UI Regular, ~12px (9pt). 'Page 1 of 1', 'X words', language, zoom %. Color #444."
+        },
+        {
+          "element": "QAT tooltips / screen tips",
+          "spec": "Segoe UI Regular ~12px body with Segoe UI Semibold ~12-13px title."
+        },
+        {
+          "element": "Default DOCUMENT body font",
+          "spec": "Calibri 11pt (the Office default body font). Line spacing 1.08, 8pt space-after paragraph (Office default). Calibri is a humanist sans-serif; web fallback: Calibri, 'Carlito', 'Segoe UI', sans-serif."
+        },
+        {
+          "element": "Default DOCUMENT heading font",
+          "spec": "Calibri Light (Headings) for Heading 1/Title in the default Office theme; body style uses Calibri. (Newer 'Aptos' theme ships in latest M365, but Calibri remains the classic default referenced here.)"
+        }
+      ],
+      "metrics": [
+        {
+          "element": "Title bar height",
+          "value": "~32px (standard Windows caption / M365 title+QAT band)."
+        },
+        {
+          "element": "Quick Access Toolbar (QAT) height",
+          "value": "~28-32px. Shares the title-bar band in M365; icons ~16px in a ~24px hit target."
+        },
+        {
+          "element": "Ribbon tab strip height",
+          "value": "~28-30px (tab label row), with ~2px active-tab underline at its base."
+        },
+        {
+          "element": "Ribbon body height",
+          "value": "~92px (range 90-95px). Total ribbon block (tabs + body) is roughly 120-125px tall when expanded."
+        },
+        {
+          "element": "Collapsed/simplified ribbon body",
+          "value": "~40px single-row (Simplified Ribbon option), vs ~92px Classic."
+        },
+        {
+          "element": "Ribbon group min width",
+          "value": "~52-60px for a small group (e.g. Editing) up to ~120-200px for large groups (Font, Paragraph). Groups scale/collapse responsively; collapsed group = single ~52px button with dropdown."
+        },
+        {
+          "element": "Ribbon large button",
+          "value": "~48px tall x ~36-44px wide (icon ~32px + two-line label). Small buttons ~22px square hit targets in a 3-row stack."
+        },
+        {
+          "element": "Group divider",
+          "value": "1px vertical hairline (#E1DFDD) with ~4-6px padding either side between groups."
+        },
+        {
+          "element": "Ruler height (horizontal)",
+          "value": "~18-20px strip below the ribbon when View > Ruler is on; matching ~18px vertical ruler at left."
+        },
+        {
+          "element": "Status bar height",
+          "value": "~22px (range 22-24px)."
+        },
+        {
+          "element": "Scrollbar width",
+          "value": "~16-17px (Windows standard); thin overlay ~8px in newer builds."
+        },
+        {
+          "element": "Page size - US Letter (default, US locale)",
+          "value": "8.5 x 11 in = 215.9 x 279.4 mm. At 96 CSS px/in => 816 x 1056 px."
+        },
+        {
+          "element": "Page size - A4 (default, EU/intl locale)",
+          "value": "210 x 297 mm = 8.27 x 11.69 in. At 96 px/in => ~794 x 1123 px."
+        },
+        {
+          "element": "Default margins",
+          "value": "1 in (2.54 cm) on all four sides (Normal margins). At 96 px/in => 96px each side. Text column on Letter = 816 - 192 = 624px wide."
+        },
+        {
+          "element": "Default page gap (between pages in view)",
+          "value": "~10-14px gray gutter between consecutive page sheets in Print Layout."
+        },
+        {
+          "element": "Page shadow",
+          "value": "Soft drop shadow approx 0 1px 4px rgba(0,0,0,0.20) around each white sheet on the gray canvas."
+        }
+      ],
+      "notes": [
+        "Word brand blue confirmed as #2B579A (RGB 43,87,154, CSS name 'Endeavour'). It is the accent used for the File tab chip, active-tab underline, focus rings, and the legacy Colorful-theme title/status bars. Source: brandcolorcode.com, usbrandcolors.com, colorhexa.",
+        "Default UI font is Segoe UI across all chrome (tabs, group labels, button captions, status bar). Default DOCUMENT font is Calibri 11pt with 1.08 line spacing and 8pt space-after (Office defaults). Newest M365 builds ship 'Aptos' as the document default, but Calibri 11 is the classic/long-standing default this spec targets.",
+        "Theme distinction: The MODERN M365 default ('Colorful' in current builds) uses a flat near-white/neutral chrome (#F3F2F1 ribbon, near-white title bar) with brand-blue accents only on the File tab and active-tab underline. The OLDER 'Colorful' theme (2013-2019) painted the entire title bar AND status bar solid Word-blue #2B579A with white text/icons. State both so the implementer can pick.",
+        "Active tab styling in modern Word: NOT a raised/colored tab. The selected tab shows brand-blue label text plus a ~2px #2B579A underline; the ribbon body below it reads as white. Inactive tabs are #444 text on the neutral strip.",
+        "Button states (Fluent neutrals): rest = transparent on ribbon bg; hover = #E1DFDD fill with 1px #C8C6C4 border and ~2-3px rounded corners; pressed/selected/toggled-on = #D2D0CE fill (toggled-on like engaged Bold also gets a subtle blue tint). Corner radius on ribbon controls is small (~2-3px); the chrome is largely flat/squared per Fluent.",
+        "Group structure: each ribbon group is a cluster of controls with a centered ~11px Segoe UI caption at the bottom (Clipboard | Font | Paragraph | Styles | Editing on the Home tab). Groups are separated by a 1px vertical hairline (#E1DFDD). Many groups have a small dialog-launcher arrow at the bottom-right that opens the full dialog.",
+        "Icons are Fluent monoline glyphs (single-weight outlines) rendered in dark neutral #424242/#444, a few with category accents (e.g. text-highlight yellow, font-color red bar). They are crisp at 16px and 32px. Avoid filled/skeuomorphic icons - that's the pre-2013 look.",
+        "Document canvas: white page (#FFF) with soft drop shadow floating on a light gray work area (~#E6E6E6). Default view is Print Layout showing the full sheet with 1in margins; text selection highlights light blue (~#CCE8FF) when focused.",
+        "Rounded corners overall: the chrome is predominantly flat/squared (Fluent). Only minor 2-3px rounding on hover/pressed button backgrounds, tooltips, and dropdown popovers; the window itself follows the OS (Windows 11 adds ~8px rounded window corners).",
+        "Separators & dividers summary: vertical group dividers (1px #E1DFDD), QAT-to-title separators, and status-bar item separators are all thin 1px neutral hairlines; nothing uses heavy/dark borders."
+      ]
+    },
+    "feasibility": {
+      "categories": [
+        {
+          "area": "Text & paragraph formatting",
+          "features": [
+            {
+              "name": "Inline character formatting (bold, italic, underline, strikethrough, sub/superscript, color, highlight, font family, font size)",
+              "feasibility": "feasible",
+              "rationale": "contenteditable maps directly to inline spans/CSS. These are the cheapest possible wins and round-trip cleanly to OOXML run properties (w:rPr).",
+              "approach": "Use a wrapped command layer (own selection->Range manipulation, not the deprecated document.execCommand, though execCommand works for an MVP). Represent formatting as <span> with inline styles or class-based marks. Map to w:b, w:i, w:u, w:color, w:highlight, w:sz, w:rFonts on export via the 'docx' npm library."
+            },
+            {
+              "name": "Paragraph alignment, indentation, line spacing, space before/after",
+              "feasibility": "feasible",
+              "rationale": "All expressible as CSS on block elements and as w:pPr (w:jc, w:ind, w:spacing) in OOXML.",
+              "approach": "Apply CSS to <p>/<div> blocks; serialize to ParagraphProperties. Watch unit conversion: OOXML uses twips (1/1440 inch) and EMUs; build a units helper."
+            },
+            {
+              "name": "Tabs and custom tab stops (leaders, decimal tabs)",
+              "feasibility": "partial",
+              "rationale": "Browser does not honor Word-style tab stops; the Tab key in contenteditable does not create true tab stops with leaders or decimal alignment. CSS has no decimal-tab.",
+              "approach": "For basic left tab stops, insert tab characters rendered with tab-size or padded spans. Decimal/leader tabs require a custom measurement pass (canvas text metrics) to position content; doable but laborious. Store tab definitions in model and approximate visually; round-trip the w:tabs definitions faithfully even if rendering is approximate."
+            },
+            {
+              "name": "Text effects, WordArt, shadows/glow/reflection on text",
+              "feasibility": "partial",
+              "rationale": "CSS text-shadow / -webkit-text-stroke / gradients can fake most effects visually, but WordArt is a DrawingML construct (txbx) that will not round-trip without serializing the full drawing XML.",
+              "approach": "Implement visually with CSS for the editor. For round-trip, either drop to plain styled text on export or generate minimal DrawingML. Treat full WordArt fidelity as out of scope."
+            },
+            {
+              "name": "Character spacing / kerning / ligatures / OpenType features",
+              "feasibility": "partial",
+              "rationale": "letter-spacing and font-feature-settings exist in CSS, but Word's per-point spacing/kerning controls and the exact metrics differ from the browser's text shaping.",
+              "approach": "Expose letter-spacing and font-feature-settings; map to w:spacing(letterSpacing)/w:kern. Exact metric parity with Word's renderer is not achievable."
+            }
+          ]
+        },
+        {
+          "area": "Styles & themes",
+          "features": [
+            {
+              "name": "Paragraph & character styles (named styles, Normal/Heading 1-9, style inheritance)",
+              "feasibility": "feasible",
+              "rationale": "Maps naturally to CSS classes + a style table. OOXML styles.xml is a well-understood part and the 'docx' library supports defining styles.",
+              "approach": "Maintain a style registry; render via a scoped stylesheet with class names; on export emit styles.xml entries and apply pStyle/rStyle references. Implement basedOn inheritance by CSS cascade or by resolving the chain in the model."
+            },
+            {
+              "name": "Linked styles, table styles, list styles",
+              "feasibility": "partial",
+              "rationale": "Paragraph/character/linked styles are tractable. Table styles (banded rows, conditional first-row formatting) and list styles are more complex but representable.",
+              "approach": "Implement paragraph/character/linked first. Table styles: store the styleId and render banding via CSS nth-child; full conditional formatting (tblStylePr per region) is partial. Round-trip the styleId even when rendering is simplified."
+            },
+            {
+              "name": "Themes (theme colors, theme fonts, color schemes)",
+              "feasibility": "partial",
+              "rationale": "A theme is just a palette + font pair + effect set (theme1.xml). Colors and fonts are easy; effect themes and the full theme switching that recolors everything is more work.",
+              "approach": "Implement theme color/font tokens as CSS variables; a theme switch re-binds variables. Export theme1.xml with the color scheme and font scheme. Effect themes (subtle/moderate/intense shape effects) are out of scope."
+            },
+            {
+              "name": "Style sets, Style Inspector, Reveal Formatting",
+              "feasibility": "partial",
+              "rationale": "These are UI conveniences. Reveal-formatting (showing computed formatting at the cursor) is straightforward with getComputedStyle; style sets (swapping the whole quick-style gallery) require multiple predefined style tables.",
+              "approach": "Reveal Formatting: read computed styles + model props at selection. Style sets: ship a few predefined style tables and swap. Cheap to do partially."
+            }
+          ]
+        },
+        {
+          "area": "Pagination & page layout",
+          "features": [
+            {
+              "name": "Page size, margins, orientation (model + export)",
+              "feasibility": "feasible",
+              "rationale": "These are document/section properties (w:sectPr: pgSz, pgMar). Storing and round-tripping them is easy; the difficulty is only in faithful on-screen pagination.",
+              "approach": "Store section properties; render a page-width container with CSS @page-like padding for the active section; export sectPr accurately."
+            },
+            {
+              "name": "True WYSIWYG pagination (line-accurate page breaks, page count, page-fill flow across pages)",
+              "feasibility": "infeasible",
+              "rationale": "This is THE hard problem of the contenteditable approach. The browser flows content in one continuous box; it has no concept of pages. Replicating Word's line-breaking/widow-orphan/keep-with-next layout engine to compute identical page breaks is a multi-month layout-engine effort, not a one-session task. CSS paged media / Paged.js can fake static pagination but breaks editing (caret/selection across page boxes) and still won't match Word's algorithm.",
+              "approach": "For an MVP, render as a single continuous 'web layout' page (Word has this mode too). Optionally overlay decorative page-break markers. Do NOT promise Word-identical page geometry."
+            },
+            {
+              "name": "Manual page breaks and section breaks",
+              "feasibility": "feasible",
+              "rationale": "Inserting an explicit break marker is trivial in the model and maps to w:br(page)/w:sectPr. Rendering them as visual separators in a continuous layout is fine.",
+              "approach": "Insert a break element; render as a horizontal divider/new-page marker; export as page break run or new sectPr. Continuous/odd/even/next-page section types stored in model."
+            },
+            {
+              "name": "Headers & footers (per-section, first-page-different, odd/even)",
+              "feasibility": "partial",
+              "rationale": "The DATA model (header1.xml/footer1.xml, first/even/default) round-trips fine. But rendering a real repeating header/footer on every printed page requires real pagination, which is infeasible here. You can show ONE editable header/footer region per section, not one-per-page.",
+              "approach": "Provide editable header/footer zones bound to the section; round-trip the three header/footer types. Page-number fields in headers compute only at print/PDF time (see printing). Accept that on-screen they appear once, not per page."
+            },
+            {
+              "name": "Columns (newspaper-style multi-column)",
+              "feasibility": "partial",
+              "rationale": "CSS column-count/column-gap gives multi-column flow easily for display and maps to w:cols. But CSS columns + contenteditable have known caret/selection bugs, and balancing/column breaks won't match Word.",
+              "approach": "Use CSS multicol for rendering and round-trip w:cols. Warn about editing quirks; column breaks stored in model and approximated."
+            },
+            {
+              "name": "Page background, watermark, page borders",
+              "feasibility": "partial",
+              "rationale": "Page color and a watermark image/text are easy as CSS background/overlay; round-trip to w:background and the header-drawing watermark is partial. Page borders (w:pgBorders) render as CSS border on the page container.",
+              "approach": "CSS background + absolutely-positioned watermark overlay; border on page container. Export to background/pgBorders; watermark as header VML/DrawingML is the messy part - implement as best-effort."
+            },
+            {
+              "name": "Line numbers, vertical alignment of page content, gutter/mirror margins",
+              "feasibility": "partial",
+              "rationale": "Without real pagination, per-page line numbering and page-content vertical centering can't be done accurately; gutter/mirror margin is just a sectPr value to round-trip.",
+              "approach": "Round-trip the properties; render line numbers per-paragraph as an approximation; skip true per-page vertical alignment."
+            }
+          ]
+        },
+        {
+          "area": "Tables",
+          "features": [
+            {
+              "name": "Basic tables (insert, rows/cols, cell text, borders, shading, merge/split cells)",
+              "feasibility": "feasible",
+              "rationale": "HTML <table> in contenteditable is well supported; OOXML w:tbl is verbose but standard and the 'docx' library handles it. Merge maps to gridSpan/vMerge.",
+              "approach": "Use native HTML tables; build toolbar for insert/delete row-col, merge (rowspan/colspan), borders, shading. Map to w:tbl/w:tr/w:tc, w:tcBorders, w:shd, w:gridSpan/w:vMerge on export."
+            },
+            {
+              "name": "Cell sizing, autofit, table width modes, alignment",
+              "feasibility": "partial",
+              "rationale": "HTML table layout differs from Word's grid model; autofit-to-contents vs fixed widths approximately maps but exact column widths/twips won't match Word's rendering.",
+              "approach": "Support fixed and percent widths (tblW, tcW); use table-layout:fixed for predictability; round-trip the grid (w:tblGrid). Exact autofit parity not guaranteed."
+            },
+            {
+              "name": "Nested tables, header rows repeating across pages, cell margins, text direction in cells",
+              "feasibility": "partial",
+              "rationale": "Nested tables and cell margins are fine. 'Repeat header row across pages' depends on pagination (infeasible to render, but tblHeader round-trips). Vertical text in cells is CSS writing-mode (approximate).",
+              "approach": "Support nesting and cell margins directly; round-trip tblHeader; writing-mode for vertical text. No per-page header repetition rendering."
+            },
+            {
+              "name": "Formulas in table cells, sort, convert text<->table",
+              "feasibility": "partial",
+              "rationale": "Word table formulas (=SUM(ABOVE)) are simple field evaluations; sort and text<->table conversions are pure data transforms.",
+              "approach": "Implement a small formula evaluator for SUM/AVERAGE/COUNT over cell ranges; text<->table via delimiter parsing; sort by column. Round-trip formulas as fields."
+            }
+          ]
+        },
+        {
+          "area": "Images, shapes, SmartArt, charts, icons, 3D models",
+          "features": [
+            {
+              "name": "Inline raster images (insert, resize, basic crop)",
+              "feasibility": "feasible",
+              "rationale": "<img> with base64/blob is trivial; OOXML inline drawing (a:blip + relationship + media part) is well supported by the 'docx' library.",
+              "approach": "Insert <img>, resize via handles, store bytes in the package media folder, emit the drawing XML + relationship. Crop via CSS clip on screen and srcRect on export."
+            },
+            {
+              "name": "Image wrapping (square/tight/through/behind/in front), text-wrap and absolute positioning",
+              "feasibility": "partial",
+              "rationale": "Inline and simple float (left/right) wrapping work with CSS float; 'tight'/'through' contour wrapping and absolute floating-over-text positioning are hard in flowing HTML and conflict with contenteditable.",
+              "approach": "Support inline + float left/right (square wrap) well; round-trip anchor/wrap XML. Tight/through and free positioning: approximate with float or absolute overlay; full fidelity out of scope."
+            },
+            {
+              "name": "Shapes / text boxes (autoshapes, lines, connectors)",
+              "feasibility": "partial",
+              "rationale": "Simple shapes can be rendered as SVG/divs and round-tripped to DrawingML preset geometries, but the full preset-shape catalog, connectors, and adjust-handles are large.",
+              "approach": "Render basic rectangles/ellipses/lines/text boxes as SVG overlays; map common presets (rect, ellipse, line) to a:prstGeom. Treat the long tail of shapes and connectors as out of scope."
+            },
+            {
+              "name": "Charts",
+              "feasibility": "partial",
+              "rationale": "A chart is an embedded chart part (chart1.xml in DrawingML chart schema) with a cached image. Rendering with a JS chart lib is easy; producing valid c:chart XML for round-trip is significant but bounded for common types.",
+              "approach": "Render via Chart.js/ECharts from a data table; export common types (bar/line/pie) to the chart part with an embedded data cache + fallback image. Less-common chart types out of scope."
+            },
+            {
+              "name": "SmartArt",
+              "feasibility": "infeasible",
+              "rationale": "SmartArt is its own layout engine (diagram data + layout + style XML parts, dozens of layouts with constraint-based positioning). Re-implementing the SmartArt layout engine and its XML in one session is not realistic.",
+              "approach": "Best you can offer: import SmartArt as a flattened static image/grouped shapes (read-only), and let users insert plain grouped shapes instead. No authoring of true SmartArt."
+            },
+            {
+              "name": "Icons (stock icon library)",
+              "feasibility": "feasible",
+              "rationale": "Icons are just SVG images inserted as pictures. Provide a bundled SVG icon set.",
+              "approach": "Ship an SVG icon picker; insert as image (rasterize or embed SVG-as-image). Round-trips as a normal picture/SVG blip."
+            },
+            {
+              "name": "3D models (.glb/.fbx animated models)",
+              "feasibility": "infeasible",
+              "rationale": "Word's 3D model feature embeds 3D model parts with an interactive viewer (camera presets). Rendering needs WebGL/three.js (doable) but the OOXML 3D model packaging and Word-compatible round-trip is niche and not realistic in one session.",
+              "approach": "At most, render an imported 3D model preview with three.js as read-only and substitute a static thumbnail on export. Not a real implementation."
+            }
+          ]
+        },
+        {
+          "area": "Lists",
+          "features": [
+            {
+              "name": "Bulleted and numbered lists, indentation/demote/promote, restart/continue numbering",
+              "feasibility": "feasible",
+              "rationale": "HTML ul/ol cover most cases; OOXML lists use numbering.xml (abstractNum/num + ilvl) which is verbose but standard.",
+              "approach": "Render ul/ol or use the numbering model with CSS counters for fidelity; Tab/Shift-Tab to change level; map to numId/ilvl and numbering.xml on export. Restart/continue via separate num definitions."
+            },
+            {
+              "name": "Multilevel lists, custom number formats (1.1.1, legal, mixed bullet/number), list styles linked to headings",
+              "feasibility": "partial",
+              "rationale": "Multilevel numbering with custom formats and per-level text (e.g. '%1.%2.') requires faithfully modeling abstractNum levels; CSS counters can render most patterns but Word's full level-text/legal/leading-zero options need care.",
+              "approach": "Model abstractNum levels with lvlText/numFmt; render via CSS counters with counter() concatenation. Cover decimal/roman/letter/bullet and dotted patterns; exotic formats partial. Round-trip numbering.xml."
+            },
+            {
+              "name": "Picture bullets, list number alignment/spacing",
+              "feasibility": "partial",
+              "rationale": "Picture bullets need an image as the marker (CSS list-style-image / ::marker), workable; precise number-position/text-indent parity with Word is approximate.",
+              "approach": "list-style-image or pseudo-element marker; round-trip lvlPicBulletId. Spacing approximated."
+            }
+          ]
+        },
+        {
+          "area": "Find & Replace (incl. wildcards)",
+          "features": [
+            {
+              "name": "Plain find & replace, case-sensitive, whole word, highlight all matches",
+              "feasibility": "feasible",
+              "rationale": "Operate over the document text model with JS string search; highlight via the CSS Custom Highlight API or marker spans.",
+              "approach": "Flatten model to text with offset map back to DOM ranges; search; render highlights via Highlight API; replace by splicing the model and re-rendering affected runs."
+            },
+            {
+              "name": "Wildcard / regex find & replace",
+              "feasibility": "feasible",
+              "rationale": "JS RegExp covers Word's wildcard semantics; you translate Word wildcard syntax (e.g. ? * [ ] {n,m} \\1 back-references) to RegExp.",
+              "approach": "Build a Word-wildcard->RegExp translator; apply over the text model; support group back-references in replacement. Straightforward."
+            },
+            {
+              "name": "Find by formatting / style / special characters (paragraph marks, page breaks), Go To",
+              "feasibility": "partial",
+              "rationale": "Find-by-format and find special marks require searching over the rich model, not just text; doable but more plumbing. 'Go To page' depends on pagination (infeasible accurately).",
+              "approach": "Extend search predicates to match run/paragraph properties and special-node types; Go To paragraph/bookmark works, Go To page only approximate."
+            }
+          ]
+        },
+        {
+          "area": "Spelling & grammar (editor)",
+          "features": [
+            {
+              "name": "Spell check with squiggles and suggestions",
+              "feasibility": "feasible",
+              "rationale": "Two cheap paths: native contenteditable spellcheck=true (Chromium built-in), or a JS dictionary (Hunspell via WASM, e.g. nspell + dictionaries) for suggestions and custom dictionary.",
+              "approach": "Enable native spellcheck for an instant MVP; for custom dictionaries/suggestions UI use nspell/hunspell-wasm over tokenized text, render squiggles via Highlight API, offer right-click suggestions."
+            },
+            {
+              "name": "Grammar checking / style critique (Editor pane)",
+              "feasibility": "partial",
+              "rationale": "Word's grammar engine is proprietary ML. You can integrate an open-source grammar checker (LanguageTool, self-hostable or as a library/server) for decent grammar/style, but parity with Microsoft Editor is not achievable.",
+              "approach": "Optionally call a bundled/remote LanguageTool instance for grammar/style suggestions. Honest limitation: quality differs from Word."
+            },
+            {
+              "name": "Multi-language detection, readability stats, thesaurus",
+              "feasibility": "partial",
+              "rationale": "Language tagging and word-count/readability formulas (Flesch) are simple computations; thesaurus needs a dataset (WordNet).",
+              "approach": "Compute readability/word stats directly; ship WordNet for thesaurus; language detection via a small JS lib. All approximate but feasible at small scope."
+            }
+          ]
+        },
+        {
+          "area": "Track Changes, Comments & Compare",
+          "features": [
+            {
+              "name": "Comments (add, reply, resolve, anchored to range)",
+              "feasibility": "feasible",
+              "rationale": "Comments are ranges + a sidebar; OOXML comments live in comments.xml with commentRangeStart/End markers - well supported.",
+              "approach": "Store comment anchors as marker nodes around a range; render margin bubbles; threads/replies in model; round-trip comments.xml (+ commentsExtended for replies/resolve)."
+            },
+            {
+              "name": "Track changes (record insertions/deletions/format changes with author/time, accept/reject)",
+              "feasibility": "partial",
+              "rationale": "Conceptually doable - wrap inserted runs in ins, mark deletions as del with strike rendering, store author/date. Maps to w:ins/w:del/w:rPrChange. The hard parts are correctly tracking EVERY edit (especially formatting and complex structural edits like table/row changes) through contenteditable's unpredictable mutations.",
+              "approach": "Intercept all edits through a command layer (not raw contenteditable input) so every change is a tracked operation; render ins underlined/del struck; accept/reject mutates the model. Cover text + formatting changes well; structural change tracking (moved content, table edits) is partial."
+            },
+            {
+              "name": "Compare / combine documents (diff two docx)",
+              "feasibility": "partial",
+              "rationale": "A document diff over the parsed models is a tree/sequence diff problem; producing a Word-style redline merge is achievable for text but hard for structure.",
+              "approach": "Parse both docx to a normalized model, run a sequence/tree diff (e.g. Myers on flattened runs), render as tracked changes. Good for prose, weaker on tables/structure."
+            }
+          ]
+        },
+        {
+          "area": "References (TOC, footnotes, citations, bibliography, captions, index)",
+          "features": [
+            {
+              "name": "Footnotes & endnotes",
+              "feasibility": "partial",
+              "rationale": "Data model round-trips well (footnotes.xml/endnotes.xml + footnoteReference). Rendering footnotes at the BOTTOM OF THE PAGE requires pagination (infeasible); without it, render them at end-of-document or in a panel.",
+              "approach": "Store notes; render references as superscript links to a notes section at document end (or a hover panel); round-trip footnotes/endnotes XML. True page-bottom placement only at PDF/print stage if at all."
+            },
+            {
+              "name": "Table of contents (TOC)",
+              "feasibility": "partial",
+              "rationale": "Generating a TOC from heading styles is easy as a list of headings with links; the TOC is a field. Page NUMBERS in the TOC require pagination (infeasible accurately on screen).",
+              "approach": "Build TOC from heading nodes with clickable anchors; export as a TOC field with cached entries; page numbers only meaningful in the PDF/print pass, otherwise omit or show '#'."
+            },
+            {
+              "name": "Captions, cross-references, table of figures",
+              "feasibility": "partial",
+              "rationale": "Captions are styled paragraphs with a SEQ field; cross-references are bookmarks+REF fields. Doable, but auto-renumbering and the page-number variants depend on field updates/pagination.",
+              "approach": "Insert caption paragraphs with SEQ counters; cross-refs via bookmarks and REF fields; recompute numbers on edit. Page-number cross-refs limited by pagination."
+            },
+            {
+              "name": "Citations & bibliography (source manager, styles APA/MLA/Chicago)",
+              "feasibility": "feasible",
+              "rationale": "This is pure data + formatting and there's mature open tooling (citation-js / CSL with citeproc-js + CSL style files). Independent of layout.",
+              "approach": "Use citeproc-js + CSL styles for formatting citations and bibliography from a sources store; insert as fields; export bibliography as a paragraph block. Round-trip Word's bibliography part is partial but citations themselves work well."
+            },
+            {
+              "name": "Index (mark entries, generate index)",
+              "feasibility": "partial",
+              "rationale": "Marking XE entries and generating an alphabetized index is straightforward data work; index page numbers again need pagination.",
+              "approach": "Mark index entries (XE fields), generate sorted index block. Page numbers limited; otherwise full feature works."
+            }
+          ]
+        },
+        {
+          "area": "Mail merge",
+          "features": [
+            {
+              "name": "Mail merge (data source -> merge fields -> generated documents, letters/labels/envelopes)",
+              "feasibility": "feasible",
+              "rationale": "Mail merge is data binding + iteration, no layout dependency. CSV/JSON/Excel data source + MERGEFIELD placeholders + generate N documents is a pure data task and a natural fit for JS.",
+              "approach": "Parse data source (CSV via papaparse, XLSX via SheetJS); insert MERGEFIELD placeholders; on merge, clone the template model per record and substitute; export each as docx/PDF or a combined file. Rules (IF/NEXT fields) and label grids are extra but feasible. Envelopes/labels need page templates."
+            }
+          ]
+        },
+        {
+          "area": "Equations",
+          "features": [
+            {
+              "name": "Equation editor (insert/edit math, professional rendering)",
+              "feasibility": "partial",
+              "rationale": "Rendering math is easy with MathJax/KaTeX. The friction is OOXML math (OMML, m:oMath) round-tripping: you must convert between your math representation and OMML. MathML<->OMML converters exist (XSLT/known libs) which makes this tractable but fiddly.",
+              "approach": "Author via a MathLive/MathQuill editor producing MathML/LaTeX; render with MathJax; convert MathML<->OMML (existing XSLT) for round-trip. Common math covered; exotic constructs partial."
+            }
+          ]
+        },
+        {
+          "area": "Macros / VBA",
+          "features": [
+            {
+              "name": "VBA macros (record, run, VBA project storage)",
+              "feasibility": "infeasible",
+              "rationale": "VBA requires a VBA language runtime and the Word object model (Application/Document/Selection/Range with hundreds of members). Implementing a VBA interpreter and the full object model in one session is unrealistic, and round-tripping the binary vbaProject.bin is its own challenge.",
+              "approach": "Not realistic. The only honest alternative is a JavaScript-based scripting/macro API exposing a small subset of the document model (insert text, format selection) - a different, much smaller feature, NOT VBA compatibility. Existing VBA in opened files would be preserved as an opaque part if possible but not executed."
+            }
+          ]
+        },
+        {
+          "area": "Add-ins",
+          "features": [
+            {
+              "name": "Office Add-ins (Office.js task panes / content add-ins / store)",
+              "feasibility": "infeasible",
+              "rationale": "Office Add-ins require implementing the Office.js host API surface and the add-in manifest/runtime that Microsoft defines; matching that contract so real store add-ins run is a massive, moving-target compatibility effort.",
+              "approach": "Out of scope. A homegrown plugin system (your own JS extension API + sandboxed iframe panels) is feasible as a SEPARATE concept, but it would not run actual Microsoft Office add-ins."
+            }
+          ]
+        },
+        {
+          "area": "Real-time co-authoring / cloud",
+          "features": [
+            {
+              "name": "Real-time multi-user co-authoring (live cursors, conflict-free merge)",
+              "feasibility": "partial",
+              "rationale": "The CRDT/OT machinery is feasible in JS (Yjs is mature - note this repo even references '.yrs'/Yrs). The blockers are scope (needs a server + auth + persistence + presence) and binding a CRDT cleanly to a rich contenteditable model. Not a same-session deliverable alongside everything else, but technically tractable.",
+              "approach": "Use Yjs (Y.XmlFragment) bound to the editor with y-websocket and an awareness channel for cursors. Realistic only as a focused effort; full Word/OneDrive cloud parity (versioning, permissions) is out of scope for one session."
+            },
+            {
+              "name": "Cloud storage / autosave / version history integration",
+              "feasibility": "partial",
+              "rationale": "Saving to a cloud provider (e.g. Google Drive API, which is available in this environment) and keeping versions is feasible plumbing; matching Word+OneDrive's exact experience is not.",
+              "approach": "Integrate a storage backend (local + one cloud provider) with periodic autosave and a simple version log. Keep expectations modest."
+            }
+          ]
+        },
+        {
+          "area": "File formats (.docx/.doc/.rtf/.odt/.pdf)",
+          "features": [
+            {
+              "name": ".docx read",
+              "feasibility": "partial",
+              "rationale": "Reading docx is feasible for a meaningful subset (text, runs, paragraphs, styles, tables, images, lists) using mammoth.js (->HTML) or docx-preview, or a custom OOXML parser. But OOXML is a huge spec; full-fidelity import of every feature (fields, complex sections, drawings, math, content controls) is not one-session.",
+              "approach": "Use docx-preview/custom unzip+XML parse for import into the model; cover the common 80%; preserve unknown parts to re-emit on save (round-trip preservation) where possible."
+            },
+            {
+              "name": ".docx write",
+              "feasibility": "partial",
+              "rationale": "The 'docx' npm library generates valid docx for supported constructs. Mapping your full model back to OOXML is bounded but every feature you support needs its own serializer; advanced features won't serialize perfectly.",
+              "approach": "Serialize model -> OOXML via the 'docx' lib (or hand-built XML + jszip). True round-trip fidelity (open Word file, edit, save, byte/semantic-stable) is the hardest correctness goal - aim for semantic preservation, not identity."
+            },
+            {
+              "name": ".doc (legacy binary Word 97-2003)",
+              "feasibility": "infeasible",
+              "rationale": "Legacy .doc is the binary CFB/FIB format - undocumented-feeling, hugely complex, with almost no maintained JS writer. Reading is partial at best (some libs extract text); writing is effectively unavailable in JS.",
+              "approach": "At most extract text on import via a library; do not support saving .doc. Direct users to docx."
+            },
+            {
+              "name": ".rtf",
+              "feasibility": "partial",
+              "rationale": "RTF is a documented text-token format; basic read/write of text+formatting is feasible, full fidelity (every control word) is large.",
+              "approach": "Implement an RTF reader/writer for common constructs (runs, paragraphs, tables, images). Treat exotic control words as out of scope."
+            },
+            {
+              "name": ".odt",
+              "feasibility": "partial",
+              "rationale": "ODT is a zipped XML format (like docx but the ODF schema). Feasible for a subset with effort; no single dominant JS library makes it as easy as docx.",
+              "approach": "Parse/emit ODF XML for the common subset, reusing the same internal model. Lower priority than docx."
+            },
+            {
+              "name": ".pdf export",
+              "feasibility": "partial",
+              "rationale": "Exporting visible content to PDF is easy in Electron (webContents.printToPDF uses Chromium). The catch: it paginates with Chromium's print engine, not Word's, so page breaks/headers/footers/TOC page numbers won't match Word - and only this print path can realize repeating headers/footers and footnote-at-page-bottom.",
+              "approach": "Use Electron printToPDF with a print stylesheet (@page, running headers/footers via CSS, page counters). This is also where header/footer/TOC-page-number features become real (Chromium-paginated, not Word-identical). PDF import/editing is out of scope."
+            }
+          ]
+        },
+        {
+          "area": "Printing",
+          "features": [
+            {
+              "name": "Print to physical printer with options (range, copies, scaling, duplex)",
+              "feasibility": "partial",
+              "rationale": "Electron exposes webContents.print with the OS print dialog/options; this works. But what prints is the Chromium-paginated layout, not a Word-faithful page model, and advanced options (booklet, manual duplex) depend on OS/driver.",
+              "approach": "Use webContents.print with a dedicated print CSS; expose range/copies/scale; rely on the OS dialog for driver options. Print preview = the PDF render. Pagination fidelity caveat applies."
+            }
+          ]
+        },
+        {
+          "area": "Accessibility",
+          "features": [
+            {
+              "name": "Authoring-side: alt text, heading structure, accessibility checker",
+              "feasibility": "feasible",
+              "rationale": "Capturing alt text on images, enforcing heading structure, and running a rule-based accessibility checker (missing alt, contrast, heading order, table headers) are simple data/lint passes; round-trip alt text to docDescr/descr.",
+              "approach": "Alt-text field on media; an accessibility-checker that lints the model against WCAG-like rules; export alt text into OOXML drawing properties."
+            },
+            {
+              "name": "App-side accessibility (screen reader support for the editor UI/content)",
+              "feasibility": "partial",
+              "rationale": "contenteditable has baseline AT support, but making a custom rich editor truly screen-reader friendly (ARIA, navigation, announcing formatting) is significant, ongoing work and rarely fully solved even by mature web editors.",
+              "approach": "Add ARIA roles/labels to chrome and content regions, keyboard navigation, focus management. Achieve basic usability; full parity with Word's MSAA/UIA accessibility is out of scope."
+            }
+          ]
+        },
+        {
+          "area": "Dictation / Read Aloud",
+          "features": [
+            {
+              "name": "Read Aloud (text-to-speech with highlighting)",
+              "feasibility": "feasible",
+              "rationale": "Browser SpeechSynthesis API (available in Electron/Chromium) reads text and fires boundary events for word highlighting.",
+              "approach": "Walk the text model, feed SpeechSynthesisUtterance, use onboundary events to highlight the current word via the Highlight API. Quick win."
+            },
+            {
+              "name": "Dictation (speech-to-text into the document)",
+              "feasibility": "partial",
+              "rationale": "The Web Speech Recognition API exists but in Electron/Chromium it typically needs a cloud backend and is less reliable; quality and offline support vary. Voice commands (formatting by voice) add scope.",
+              "approach": "Use Web Speech Recognition or integrate a cloud STT (e.g. via an API); insert transcribed text at the caret. Treat punctuation/voice-command parity with Word's dictation as partial."
+            }
+          ]
+        },
+        {
+          "area": "Protection & encryption",
+          "features": [
+            {
+              "name": "Document encryption (password to open) compatible with Word",
+              "feasibility": "partial",
+              "rationale": "Word's docx encryption uses MS-OFFCRYPTO (Agile/Standard encryption inside a CFB container with ECMA-376 specifics). Reading password-protected files needs a lib; WRITING Word-compatible encrypted docx in pure JS is uncommon and intricate.",
+              "approach": "For decryption use an existing MS-OFFCRYPTO JS implementation if available; for your own at-rest protection, encrypt the package with WebCrypto (not Word-openable). Word-compatible write-encryption is effectively out of scope for one session."
+            },
+            {
+              "name": "Restrict editing / formatting restrictions / mark as final / read-only",
+              "feasibility": "partial",
+              "rationale": "App-enforced read-only, editing-region restrictions, and 'mark as final' are easy in your own app and round-trip to documentProtection settings - but enforcement is only honored by your app, exactly as Word's is only soft-enforced without IRM.",
+              "approach": "Implement editing restrictions in the editor (toggle editability, permitted regions), round-trip w:documentProtection. Honest note: it's advisory, not cryptographic."
+            },
+            {
+              "name": "Digital signatures, IRM/sensitivity labels",
+              "feasibility": "infeasible",
+              "rationale": "Digital signatures (XML-DSig over the package) and IRM/Azure Information Protection require certificate/PKI and Microsoft rights-management services integration - far beyond a one-session scope.",
+              "approach": "Out of scope. Possibly preserve existing signature parts opaquely, but neither create nor validate them."
+            }
+          ]
+        }
+      ]
+    },
+    "tech": {
+      "recommendations": [
+        {
+          "topic": "Editor core: contenteditable+execCommand vs ProseMirror/TipTap vs Lexical vs Quill",
+          "recommendation": "For a one-session, no-bundler build in an Electron renderer with nodeIntegration + raw require(), pick ProseMirror core (prosemirror-model 1.x, prosemirror-state 1.x, prosemirror-view 1.41.x, prosemirror-transform, prosemirror-schema-basic, prosemirror-commands, prosemirror-keymap, prosemirror-history) loaded via require(). It is the only credible Word-fidelity option whose packages I empirically confirmed require() cleanly in plain CommonJS with zero bundler. Second choice for speed-of-build is raw contenteditable + a thin command layer (NOT document.execCommand). Avoid TipTap, Lexical-as-primary, and Quill for this specific constraint set.",
+          "rationale": "I verified module formats against the live npm registry and then actually ran require() in a clean Node CJS sandbox (mirrors Electron renderer w/ nodeIntegration doing bare require). Results: require('prosemirror-model'/'prosemirror-state'/'prosemirror-view') => OK; require('lexical') => OK (0.45.0 ships dist/Lexical.js CJS main); require('quill') => FAIL with ERR_REQUIRE_ESM (Quill 2.0.3 is now an ESM-only package — its require entry is gone; you can only get it via the UMD dist/quill.js script tag, not require). ProseMirror gives a real document model + schema + transactions, which is what Word fidelity (styles, marks, block structure, tables via prosemirror-tables) actually needs; you serialize to/from HTML with DOMSerializer/DOMParser which dovetails with the mammoth import and html-to-docx export paths. document.execCommand is officially deprecated (MDN/WHATWG), behaves inconsistently, produces garbage nested spans, and has no undo/redo model you can trust — it is a dead end for anything Word-like. Lexical IS require()-able and is excellent, but its real power is the @lexical/react binding + a constellation of @lexical/* plugin packages; using core-only by hand in one session is more friction than ProseMirror core, and its node/transform API churns between 0.x releases.",
+          "libraries": [
+            "prosemirror-model@1.x",
+            "prosemirror-state@1.x",
+            "prosemirror-view@1.41.8",
+            "prosemirror-transform@1.x",
+            "prosemirror-commands@1.x",
+            "prosemirror-keymap@1.x",
+            "prosemirror-history@1.x",
+            "prosemirror-schema-basic@1.x",
+            "prosemirror-schema-list@1.x",
+            "prosemirror-tables@1.x",
+            "lexical@0.45.0 (require-able alternative)",
+            "@tiptap/core@3.24.0 (ESM/bundler-oriented; not for no-bundler)",
+            "quill@2.0.3 (ESM-only package: use UMD dist/quill.js via <script>, NOT require)"
+          ],
+          "pitfalls": [
+            "Quill 2.0.3 cannot be require()'d (ERR_REQUIRE_ESM confirmed empirically) — if you insist on Quill, drop the UMD build in via a <script> tag and use the global, do not require() it. Also Quill has no native tables in 2.0 and its Delta model is lossy vs Word.",
+            "document.execCommand is deprecated and non-deterministic across selections/browsers; do not build the editor on it. If you go raw-contenteditable, implement formatting via Range/Selection + your own command + undo stack, not execCommand.",
+            "TipTap is technically ProseMirror under the hood and @tiptap/core@3.24.0 / @tiptap/pm resolve CJS, but TipTap's idiomatic usage (extensions, @tiptap/react|vue) assumes a build step; using it without a bundler fights the framework. If you want ProseMirror, use ProseMirror directly.",
+            "ProseMirror in the renderer: bare require('prosemirror-view') resolves from node_modules only because nodeIntegration gives the renderer Node's resolver — this works, but each prosemirror-* is a separate package (no single bundle), so you require ~9 packages individually.",
+            "Lexical's public node/transform APIs are explicitly unstable across 0.x; pin the exact version (0.45.0) and don't expect API stability.",
+            "Whatever you pick, the editor model is NOT the page-layout model — see pagination topic; the editor produces a single logical flow, pagination is a separate rendering concern."
+          ]
+        },
+        {
+          "topic": "WYSIWYG pagination: discrete fixed-size pages (US Letter/A4) with margins from a contenteditable flow",
+          "recommendation": "Do NOT try to make contenteditable itself paginate. Use a two-layer model: (1) a single continuous editable flow (the ProseMirror doc / one contenteditable) as the source of truth; (2) a separate non-editable 'page view' renderer that measures the flow and slices it into fixed-size .page elements (US Letter 8.5x11in = 816x1056px @96dpi; A4 = 794x1123px) with CSS padding for margins, styled with box-shadow on a gray canvas. For the one-session build, implement measurement-based pagination: render content into a hidden page-height box, walk block children, and emit a page break (move to next .page) when accumulated height exceeds the content box height. Drive print/export off CSS @page + page-break-before, not off the on-screen slicing.",
+          "rationale": "Confirmed by the discuss.prosemirror 'Paginated Editing' thread and multiple write-ups (Wax/Hacker News, TOAST UI) that true in-place pagination of contenteditable is effectively a 'near impossible' DOM problem and is why Google Docs/Zoho render their own layout out of the browser's control. The DOM gives you no layout state (you cannot ask 'where does line 3 end' without expensive Range.getBoundingClientRect measurements), and CSS page-break-* is a print-time construct, not an interactive one. The pragmatic, achievable-in-one-session approach is the measure-and-slice page view: fixed pixel page dimensions + getBoundingClientRect height accumulation per block to decide breaks. This is the approach paginated-ProseMirror plugins and 'A4 contenteditable' demos converge on.",
+          "libraries": [
+            "No mature drop-in npm lib is reliable here — hand-roll it.",
+            "Reference approaches: prosemirror-pagination-style community plugins (treat as reference, not dependency)",
+            "CSS only: @page { size: Letter; margin: 1in } + .page { width:816px; min-height:1056px; padding:96px } for the 1in-margin US Letter case"
+          ],
+          "pitfalls": [
+            "Editing inside sliced pages breaks the editor: keep ONE editable flow as source of truth and re-paginate into read-only page DOM, or accept jank. Trying to make each .page independently contenteditable creates cursor-jump and selection-across-pages nightmares.",
+            "Splitting a block (paragraph/table row) across a page boundary mid-element is the genuinely hard part — naive block-level slicing leaves big gaps at page bottoms. Word splits lines within a paragraph; replicating that needs line-box measurement, which is slow and fiddly.",
+            "px<->inch is dpi-dependent. Use 96px/in for screen, but the printed PDF uses real inches via @page — keep the two coordinate systems separate and don't expect pixel-perfect parity between screen pagination and printed pagination.",
+            "Re-pagination on every keystroke is expensive (forced layout/reflow from getBoundingClientRect). Debounce, and paginate incrementally from the changed block forward.",
+            "Tables, images, and headers/footers each need special break handling; for a one-session build, scope to paragraph/heading/list flow first.",
+            "On-screen page breaks will NOT match print breaks unless you drive both from the same CSS; prefer letting Chromium do print pagination via @page for the actual PDF rather than reusing your screen slices."
+          ]
+        },
+        {
+          "topic": ".docx round-trip: import (docx->HTML) and export (HTML->docx)",
+          "recommendation": "Import: mammoth@1.12.0 (require('mammoth').convertToHtml) — confirmed require()-able CJS. Export: pick by need. For an HTML-in/docx-out pipeline that matches your contenteditable content with the least code, use html-to-docx@1.8.0 (TurboDocx fork; require() returns a function — confirmed). For maximum fidelity/control of the output document, use docx@9.7.1 (require('docx') OK via dist/index.umd.cjs) and build the document programmatically from your model. Avoid html-docx-js for cross-app compatibility. Treat .docx round-trip as lossy by design and do not expect byte-perfect fidelity.",
+          "rationale": "Versions confirmed against npm registry and require() confirmed in a clean CJS sandbox: mammoth 1.12.0 (lib/index.js CJS, BSD-2), html-to-docx 1.8.0 (UMD main, require => function, MIT), docx 9.7.1 (UMD cjs main + actively maintained, MIT). mammoth is the de-facto docx->HTML importer; it intentionally targets semantic HTML driven by Word styles, which pairs well with a ProseMirror schema. html-to-docx is explicitly an html-docx-js successor that fixes the altchunks compatibility problem (html-docx-js wraps HTML in an altChunk that Google Docs/LibreOffice render poorly), so it's the better HTML->docx converter. docx is the gold standard when you control the model and want real Word constructs (sections, styles, headers/footers, page size/margins, tables) rather than HTML-guessed output.",
+          "libraries": [
+            "mammoth@1.12.0 (import docx->HTML; require OK)",
+            "html-to-docx@1.8.0 (export HTML->docx; require OK; TurboDocx fork)",
+            "docx@9.7.1 (export model->docx, highest fidelity; require OK via UMD cjs)",
+            "html-docx-js@0.3.1 (avoid: altChunks => poor LibreOffice/Google Docs compatibility)"
+          ],
+          "pitfalls": [
+            "Round-trip is fundamentally lossy: docx and HTML have mismatched models. mammoth's own docs say complex docs won't convert perfectly and it works best when the source uses Word styles semantically.",
+            "mammoth does NO sanitization of source docx — dangerous with untrusted files; fine for a single-user trusted local app but never on untrusted input.",
+            "mammoth output is an HTML fragment (no <meta charset>), so non-ASCII can render wrong if you drop it into a file without forcing UTF-8.",
+            "mammoth's document-transform API is explicitly unstable across versions — pin 1.12.0.",
+            "mammoth drops/approximates tables, embedded media, columns, text boxes, and exact spacing; you lose layout, keep structure.",
+            "html-to-docx maps a constrained subset of CSS — complex CSS (flex/grid, absolute positioning, custom fonts) won't translate; style with simple block HTML + inline-ish CSS it understands.",
+            "html-docx-js uses Word's altChunks feature: Word opens it but Google Docs/LibreOffice render it badly — this is the specific reason to prefer html-to-docx.",
+            "For best fidelity, don't HTML-convert at all on export: serialize your editor model straight into docx@9.7.1 constructs (Paragraph/TextRun/Table/SectionProperties with pageSize+margins).",
+            "html-to-docx 1.8.0 has a long-stale changelog history; validate output in real Word/LibreOffice before shipping."
+          ]
+        },
+        {
+          "topic": "Print to physical printer / PDF in Electron",
+          "recommendation": "Use webContents.printToPDF(options) for 'Save as PDF' and webContents.print(options, cb) for physical printing. For correct US Letter/A4 page geometry, set pageSize ('Letter'/'A4' or an object with width/height in MICRONS), margins (the modern object form {top,bottom,left,right} in inches, or the legacy marginsType), printBackground:true (so page shadows/fills/colors appear), and landscape as needed. Add displayHeaderFooter + headerTemplate/footerTemplate for page numbers (use the .pageNumber/.totalPages/.title/.date/.url injected classes). Print from a hidden/offscreen BrowserWindow that loads a print-specific stylesheet with @page rules, rather than printing the on-screen paginated editor.",
+          "rationale": "Confirmed against current Electron webContents docs/issues: printToPDF accepts pageSize (named or microns), landscape, margins, printBackground, pageRanges ('1-5, 8, 11-13'), displayHeaderFooter, headerTemplate, footerTemplate (with class hooks date/title/url/pageNumber/totalPages). printToPDF returns a Promise<Buffer> in modern Electron. Driving print off a dedicated print stylesheet + @page lets Chromium's print engine handle pagination correctly, which is far more reliable than reusing the screen-sliced pages.",
+          "libraries": [
+            "Electron built-in: webContents.printToPDF(options) -> Promise<Buffer>",
+            "Electron built-in: webContents.print(options, callback)",
+            "Use latest Electron stable (Electron 3x line, e.g. 35/36+ in 2025/2026); printToPDF header/footer support is in current versions"
+          ],
+          "pitfalls": [
+            "landscape is IGNORED if the page uses a CSS @page rule — let @page own size/orientation OR use the option, not both conflictingly.",
+            "printBackground defaults to false: without it, page backgrounds/box-shadows/fills won't print, so the PDF won't match the editor.",
+            "headerTemplate/footerTemplate are finicky: they render at a tiny default font, need explicit inline font-size, and the document body margins must leave room or header/footer overlap content — a long-standing source of bugs.",
+            "Custom pageSize is in microns (1 inch = 25400 microns), NOT pixels — a frequent mistake that yields wrong-sized pages.",
+            "Print the actual document at print DPI via @page, not your 96dpi screen slices; screen pagination and print pagination can differ in line/page breaks.",
+            "marginsType is the older API (0 default / 1 none / 2 minimum); the object margins form is clearer — pick one and be consistent.",
+            "webContents.print silent printing/printer selection options vary; if you need a specific printer or silent print, pass deviceName/silent and test on the target OS."
+          ]
+        },
+        {
+          "topic": "Electron security posture for a local, trusted, single-user app",
+          "recommendation": "Recognize the explicit tradeoff: the OFFICIALLY recommended secure baseline is contextIsolation:true, nodeIntegration:false, sandbox:true, with Node access only via a preload script using contextBridge.exposeInMainWorld. For your stated one-session constraint (nodeIntegration + bare require() of CJS npm packages in the renderer), you are deliberately running the INSECURE-by-Electron's-standards config. That is defensible ONLY because: single user, no remote content, only local packaged files loaded, no untrusted input rendered. If you accept that scope, ship nodeIntegration:true + contextIsolation:false to get require() in the renderer for the fast build. The moment the app loads any remote URL, opens untrusted .docx-derived HTML without sanitization, or gains multi-user/network features, migrate to the secure baseline (preload + contextBridge) and move docx/mammoth/file IO into the main process behind IPC.",
+          "rationale": "Confirmed from Electron's official security tutorial and the long-running defaults discussion (issue #23506): contextIsolation has been on by default since Electron 12 and is recommended for all apps; true isolation requires contextIsolation:true alongside nodeIntegration:false; the canonical pattern exposes only audited functions via contextBridge. The risk that nodeIntegration:true mitigates against is remote/untrusted content escalating to full Node/OS access — a threat that essentially doesn't exist for a single-user app that only ever loads its own bundled local HTML and never renders untrusted markup. So the tradeoff is real and the relaxed posture is justifiable within that narrow envelope, with a clear migration trigger.",
+          "libraries": [
+            "Electron contextBridge + ipcMain/ipcRenderer (the secure path, if/when you migrate)",
+            "No third-party security lib required; rely on Electron BrowserWindow webPreferences"
+          ],
+          "pitfalls": [
+            "nodeIntegration:true + contextIsolation:false means ANY script the renderer executes has full Node/OS access — one injected/untrusted string of HTML (e.g. from an imported .docx via mammoth, which does NO sanitization) becomes RCE. This is the single biggest risk and directly intersects the docx-import topic.",
+            "If you ever render imported/Word HTML, sanitize it (e.g. DOMPurify) regardless of posture — mammoth explicitly does not sanitize.",
+            "Don't half-migrate: contextIsolation:true with nodeIntegration:true is a known foot-gun; pick a coherent posture.",
+            "Set webPreferences explicitly — defaults changed across Electron majors (contextIsolation default true since 12, sandbox default true since 20), so relying on defaults gives different behavior per Electron version.",
+            "If you relax security for the build, isolate it: never set this window to load external URLs, set a strict CSP, and keep navigation locked to local files (will-navigate / setWindowOpenHandler).",
+            "Plan the IPC seam now even if you ship the relaxed config: keep file open/save, docx import (mammoth) and export (docx/html-to-docx) in functions you can later move to the main process behind contextBridge with minimal refactor."
+          ]
+        }
+      ]
+    }
+  }
+}

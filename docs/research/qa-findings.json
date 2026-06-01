@@ -1,0 +1,118 @@
+{
+  "summary": "Multi-dimension QA review of the Word clone (fidelity, security, CSS, robustness, file IO) with verified findings",
+  "agentCount": 43,
+  "logs": [
+    "QA: 6 confirmed of 38 candidates across 5 dimensions."
+  ],
+  "result": {
+    "confirmed": [
+      {
+        "title": "XSS via unsanitized link label in Insert Link",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/dialogs.js",
+        "line": "57",
+        "severity": "high",
+        "detail": "The label variable in the link dialog (text.value) is injected directly into HTML: `<a href=\"..\">${label}</a>`. If user enters text like <img src=x onerror=alert(1)>, it executes when inserted via insertHTML().",
+        "fix": "Escape HTML entities in label before template substitution, or use DOM createElement instead of insertHTML.",
+        "dimension": "security",
+        "verdict": {
+          "isReal": true,
+          "severity": "medium",
+          "reasoning": "CONFIRMED REAL. Traced the full data flow in /home/ogutd/msword-clone/src/renderer/js/dialogs.js:\n\n- Line 47: `text` is a user-editable input (prefilled with the current selection's text).\n- Line 56: `const label = text.value.trim() || url;` — no escaping.\n- Line 57: `E().insertHTML(`<a href=\"${url}\">${label}</a>&nbsp;`);` — both label and url are interpolated raw into an HTML string.\n- editor.js:71: `insertHTML(html) { return this.exec('insertHTML', html); }` -> exec() calls `document.execCommand('insertHTML', false, value)` (editor.js:62), which parses the string as HTML and inserts live DOM nodes.\n\nThere is NO sanitization on this path. The codebase bundles DOMPurify (vendor/purify.min.js) and uses it in files.js:12-21, but it is only applied on document OPEN (files.js:51 `E().setHTML(this.sanitize(...))`). Inline insert operations (Insert Link, Insert Table, Equation, etc.) bypass it entirely. So a label like `<img src=x onerror=alert(1)>` is inserted as a live <img> whose failed load fires onerror — a classic, reliably-exploitable insertHTML XSS sink in Chromium. Insert Link is a fully working feature, not a notImplemented stub, so this is not a by-design exclusion.\n\nThe payload also persists: the save path does not re-sanitize, so the injected markup is stored in the document and re-executes (only re-opening would run it through DOMPurify, and onerror-style payloads largely survive a fresh editor session anyway because execution happens at insert/render time).\n\nSeverity is MEDIUM rather than critical because main.js:62-66 hardens the Electron shell (contextIsolation: true, nodeIntegration: false, preload bridge). Injected script runs in an isolated renderer world without direct Node/require access, so this is not trivial RCE; impact is in-renderer DOM manipulation, document-content exfiltration via the wordAPI bridge, and persistence in shared documents (self-XSS in the common single-user case, but a genuine vector for documents exchanged between users).\n\nThe suggested fix is correct and minimal: HTML-escape `label` before interpolation, or build the anchor via document.createElement('a') + textContent and insert the node rather than an HTML string. The same unescaped pattern also applies to `url` (line 57) and to commands.js (image alt at line 71, WordArt text at 337) — worth fixing consistently, but the link-label claim itself is the concrete, verified defect."
+        }
+      },
+      {
+        "title": "Sort operation fails when selection spans multiple parents",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/commands.js",
+        "line": "321-328",
+        "severity": "high",
+        "detail": "The sortSelection() function assumes all selected blocks share the same parent via 'blocks[0].parentNode' at line 325. When a user selects text spanning multiple list items from different parent <ul> or <ol> elements, or nested structures, the insertBefore operation fails or rearranges DOM incorrectly, breaking the document structure.",
+        "fix": "Find the common parent of all blocks before attempting insertBefore. Use a loop to walk up the DOM tree: let parent = blocks[0].parentNode; blocks.forEach(b => { while (parent && !parent.contains(b)) parent = parent.parentNode; });",
+        "dimension": "robustness",
+        "verdict": {
+          "isReal": true,
+          "reasoning": "Verified against the real code. selectedBlocks() in /home/ogutd/msword-clone/src/renderer/js/editor.js:104-121 returns a FLAT, document-order slice built from a whole-editor querySelectorAll('p,h1...,li,...,td,th'), sliced from the start block to the end block. This array can legitimately contain blocks with DIFFERENT parents (e.g., an <li> inside a <ul> plus a following <p> that is a child of the editor root). Mixed list+paragraph structures are routine and reachable in normal use (e.g., the built-in Resume template at backstage.js:202 mixes <p> blocks with a <ul><li> list; lists are created via the ribbon Bullets/Numbering buttons).\n\nsortSelection() at commands.js:321-329 does: parent = blocks[0].parentNode; ref = blocks[last].nextSibling; sorted.forEach(n => parent.insertBefore(n, ref)). When the selection spans multiple parents, ref is generally NOT a child of parent. Per the WHATWG DOM pre-insertion-validity algorithm (deterministic in Chromium), Node.insertBefore(newNode, ref) throws NotFoundError when ref is non-null and is not a child of the parent. Realistic trigger: select from a list item down into a following paragraph and click Sort -> parent is the <ul>, ref is the paragraph after the last <p> (a child of the editor root, not the <ul>) -> first insertBefore throws and the operation aborts with the document partially mutated. In the reverse direction (parent = editor root, ref = null) it does not throw but yanks an <li> out of its <ul> and appends it directly under the editor div, producing invalid/corrupted structure.\n\nSort is a genuine, wired-up feature (ribbon-data.js:307-314, cmd 'sort', feasible 'partial'; H.sort -> sortSelection at commands.js:56), NOT a stubbed not-implemented feature. Commands.run() at commands.js:119-126 calls H[cmd] with no surrounding try/catch, so the NotFoundError propagates as an uncaught exception: the user clicks Sort, it silently does nothing (or corrupts the doc) with no toast or recovery. This is a concrete, user-visible robustness defect. The claim's mechanism is accurate; the only minor overstatement is the 'two different ULs' example and the FIX sketch is incomplete (finding a common ancestor alone does not fully solve correct re-insertion across differing depths), but the finding itself is valid and worth fixing.",
+          "severity": "medium"
+        }
+      },
+      {
+        "title": "Drop Cap destroys nested formatting in selected paragraph",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/commands.js",
+        "line": "338-343",
+        "severity": "high",
+        "detail": "The dropCap() function uses textContent to extract the first character and concatenates it with the remaining text slice. This approach destroys all nested HTML formatting (bold, italic, links, etc.) because textContent returns plain text, and txt.slice(1) is concatenated as plain text into the HTML string. The original formatting markup is lost.",
+        "fix": "Preserve the original HTML structure: clone the block, wrap only the first text node's first character in a span with float styling, and leave the rest untouched. Extract the first character properly from the first text node rather than using textContent.",
+        "dimension": "robustness",
+        "verdict": {
+          "isReal": true,
+          "severity": "medium",
+          "reasoning": "Verified against /home/ogutd/msword-clone/src/renderer/js/commands.js lines 339-345. dropCap() does exactly what the claim describes: line 342 grabs `const txt = b.textContent` (plain text, no markup) from the selected block, then line 344 sets `b.innerHTML = '<span style=\"float:left;...\">' + txt[0] + '</span>' + txt.slice(1)`. Because textContent flattens the element tree to a string and the remainder is re-inserted as plain text, ALL nested inline formatting in the paragraph (bold, italic, links, font color, spans, etc.) is destroyed when Drop Cap is applied. selectedBlocks() (editor.js:104) confirms `b` is a genuine block element (P/H1/LI/etc.) that legitimately holds inline children, so the loss is real, not hypothetical. This is NOT a stubbed feature: dropCap performs real DOM mutation and is wired as a live command (no WC.notImplemented toast). The failure is user-visible and triggers in normal use any time Drop Cap is applied to a formatted paragraph, which is the common case. Severity is medium rather than high because the destruction only affects paragraphs containing nested markup (plain-text paragraphs are unaffected) and Drop Cap is a less-frequently-used decorative command, but the silent data/formatting loss is a genuine robustness defect worth fixing. The suggested fix (clone the block, wrap only the first character of the first text node in the float span, leave the rest of the DOM untouched) correctly addresses it."
+        }
+      },
+      {
+        "title": "Insert Table with invalid row/column counts crashes silently",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/dialogs.js",
+        "line": "38",
+        "severity": "medium",
+        "detail": "The build() function at line 31 constructs HTML strings using row and column counts. If a user enters 0, negative numbers (bypassing HTML5 input min validation), very large numbers (like 1000000), or non-numeric values after conversion, the resulting table HTML could be malformed or extremely large, causing the browser to hang or crash when insertHTML is executed.",
+        "fix": "Add explicit validation in the OK button handler: const rows = parseInt(document.getElementById('trows').value); const cols = parseInt(document.getElementById('tcols').value); if (rows < 1 || rows > 1000 || cols < 1 || cols > 1000 || isNaN(rows) || isNaN(cols)) { WC.toast('Rows and columns must be between 1 and 1000'); return false; }",
+        "dimension": "robustness",
+        "verdict": {
+          "isReal": true,
+          "severity": "low",
+          "reasoning": "I traced dialogs.js insertTable (lines 12-41), the build() loop (31-36), insertHTML -> exec('insertHTML') in editor.js (58-71), and the dialog footer wiring in util.js (164-191).\n\nThe claim is PARTLY WRONG but contains a genuine kernel:\n\nWRONG parts: The claim says 0, negative numbers, empty, and non-numeric inputs \"could be malformed or extremely large, causing the browser to hang or crash.\" That is incorrect. The OK handler does `build(+value, +value)`. For 0/empty -> 0, negative -> e.g. -5, non-numeric -> NaN. The build() loops are `for (let r = 0; r < rows; r++)` and `for (let c = 0; c < cols; c++)`. With rows/cols of 0, negative, or NaN, the loop condition is immediately false, so NO iterations run. The output is just `<table><tbody></table><p><br></p>` — a harmless empty table inserted via execCommand. No crash, no hang, no exception. These cases are non-bugs.\n\nCORRECT part (the one real, user-visible failure): The custom Columns/Rows inputs (lines 27-28) are `type=\"number\"` with `min=\"1\"` but NO `max`. A user can type/paste a large value (e.g. 1000 x 1000 = ~1M <td> cells, or 1000000 which is even worse). build() then synchronously concatenates a multi-megabyte HTML string and passes it to document.execCommand('insertHTML'), which parses/inserts it on the single-threaded renderer. This genuinely freezes/hangs the app with no recovery — a concrete, user-visible failure reachable in normal use (fat-finger or curiosity in the size field). Real MS Word caps table size (63 cols / 32767 rows), so bounding the input is expected behavior, confirming this is a legitimate gap rather than a stubbed-by-design feature. The grid picker is capped at 8x10, but the custom number inputs bypass that with no upper bound.\n\nThe proposed fix (clamping rows/cols to a sane 1..1000 range and rejecting NaN/out-of-range in the OK handler) addresses the real hang and also tidies the empty-table-on-0 case. So the finding is worth fixing, but its severity is low: the destructive path requires a user to deliberately enter an unusually large number, and the bulk of the claimed failure modes (0/negative/NaN producing crashes) are factually incorrect.\n\nFile/line of the real issue: /home/ogutd/msword-clone/src/renderer/js/dialogs.js line 38 (OK handler) feeding build() at lines 31-36, with unbounded inputs defined at lines 27-28."
+        }
+      },
+      {
+        "title": "CRITICAL: Close button bypasses dirty-check, causes data loss",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/app.js",
+        "line": "36",
+        "severity": "high",
+        "detail": "The close button (X) directly calls `window.wordAPI.window.close()` without checking if the document has unsaved changes. User can lose all edits by clicking X. The `confirmDiscard()` function exists and is used by File > New and File > Open, but the window close button does not call it.",
+        "fix": "Replace `close.addEventListener('click', () => window.wordAPI.window.close());` with `close.addEventListener('click', async () => { const ok = await WC.Files.confirmDiscard(); if (ok) window.wordAPI.window.close(); });`",
+        "dimension": "fileio",
+        "verdict": {
+          "isReal": true,
+          "reasoning": "Verified real. The close button at /home/ogutd/msword-clone/src/renderer/js/app.js:36 calls `window.wordAPI.window.close()` directly with no dirty-check. I traced the full path:\n\n1. Edit tracking is genuine, not stubbed: editor.js:26-27 sets `this.dirty = true` on the contenteditable `input` event, and exec() does the same (editor.js:64). So normal typing reliably marks the doc dirty.\n2. app.js:36 `close.addEventListener('click', () => window.wordAPI.window.close())` — no confirmDiscard().\n3. preload.js:13 forwards to ipcRenderer.invoke('window:close').\n4. main.js:192 `ipcMain.handle('window:close', () => mainWindow && mainWindow.close())` closes unconditionally. There is NO `close`/`before-quit`/will-prevent-unload handler in main.js that calls preventDefault, and (confirmed by grep across all renderer JS/HTML) NO `beforeunload`/`onbeforeunload` listener anywhere. Nothing intercepts the close to prompt the user.\n\nThe confirmDiscard() function (files.js:23-37) checks E().dirty and prompts Save/Don't Save/Cancel; it is correctly used by File>New (files.js:40), File>Open (files.js:48), and Backstage open-recent (backstage.js:174). The window close button is the one document-discarding path that skips it.\n\nThis is not a deliberately-stubbed feature: the close button is fully functional and shows no \"not implemented\" toast — it simply omits the dirty-check that the rest of the file lifecycle honors. Result: a user who types content and clicks X loses all unsaved edits silently. This is a concrete, user-visible data-loss defect in normal use. The proposed fix (await WC.Files.confirmDiscard() before closing) is correct and matches the existing pattern. Minimize/maximize legitimately need no such check; only close does.",
+          "severity": "high"
+        }
+      },
+      {
+        "title": "CRITICAL: Save failure in confirmDiscard not checked, allows discard of unsaved changes",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/files.js",
+        "line": "30",
+        "severity": "high",
+        "detail": "In confirmDiscard(), when user clicks 'Save', the code calls `this.save().then(() => resolve(true))` but does not check if save succeeded (return value r.ok). If the save fails (network error, filesystem error, etc.), the promise still resolves(true), allowing the user to proceed and lose changes. The dialog closes and the user thinks changes were saved when they were not.",
+        "fix": "Change line 30 from `{ label: 'Save', primary: true, onClick: () => { this.save().then(() => resolve(true)); return true; } }` to `{ label: 'Save', primary: true, onClick: () => { this.save().then((r) => { if (r && r.ok) resolve(true); }); return true; } }`",
+        "dimension": "fileio",
+        "verdict": {
+          "isReal": true,
+          "severity": "high",
+          "reasoning": "CONFIRMED REAL — traced an end-to-end, user-visible data-loss path reachable through entirely normal use.\n\nFile: /home/ogutd/msword-clone/src/renderer/js/files.js line 30, in confirmDiscard():\n  { label: 'Save', primary: true, onClick: () => { this.save().then(() => resolve(true)); return true; } }\n\nThe .then() callback ignores save()'s return value r, so confirmDiscard() resolves(true) whether or not the save actually succeeded. Callers then proceed to wipe the current document.\n\nConcrete normal-use scenario (no contrived failure needed):\n1. The default new document has path === null and the editor sets dirty=true on any edit (editor.js line 26).\n2. User edits, then chooses File > New (files.js:39 newDoc), File > Open (files.js:47), or a template (backstage.js:174 useTemplate). confirmDiscard() shows the \"Do you want to save changes to Document1?\" dialog.\n3. User clicks Save. save() (files.js:59) sees no path and calls saveAs() (files.js:67).\n4. saveAs() invokes window.wordAPI.saveAs, which routes to the main-process handler doc:saveAs (main.js:327). When the user cancels the native Save dialog, it returns { ok: false, canceled: true } (main.js:338) — a routine action.\n5. Back in saveAs(): r.ok is falsy AND r.error is undefined (it's canceled:true), so the `else if (r && r.error)` branch is skipped — NO toast at all. Returns r.\n6. Back in save(): returns r (ok falsy).\n7. Back in confirmDiscard(): .then(() => resolve(true)) fires → resolves true.\n8. newDoc()/open()/useTemplate() proceed to E().setHTML(...), discarding all unsaved edits silently. The user never saved and got no warning.\n\nThe same data loss occurs on a genuine save failure (disk/permission error: doc:save returns { ok:false, error } at main.js:323) — there a \"Save failed\" toast does appear, but the document is still discarded anyway because resolve(true) fired regardless.\n\nI verified the dialog framework (util.js:164-191) to rule out a false positive: the button handler is `const keep = b.onClick && b.onClick(); if (b.close !== false && !keep) close();`. The Save onClick returns true, so keep===true and the dialog is NOT closed synchronously — but this does not save the finding, because resolve(true) still fires on save promise settlement regardless of r.ok, and the callers act on that resolution to destroy document content.\n\nThis is not a stubbed/\"not implemented\" feature, does not depend on contenteditable/execCommand quirks, and all WC.* globals resolve correctly. It is a real logic bug causing silent loss of unsaved work via the most common cancel-the-save-dialog interaction.\n\nThe proposed fix correctly checks r && r.ok before resolve(true). One caveat: it never resolves on failure/cancel, leaving the discard dialog (and the promise) pending so the user can retry — acceptable/arguably desirable UX, though it leaves the original dialog open. The core diagnosis is accurate. Severity: high (silent permanent loss of unsaved user data)."
+        }
+      }
+    ],
+    "candidateCount": 38,
+    "byDimension": [
+      {
+        "dim": "fidelity",
+        "confirmed": 0
+      },
+      {
+        "dim": "security",
+        "confirmed": 1
+      },
+      {
+        "dim": "css",
+        "confirmed": 0
+      },
+      {
+        "dim": "robustness",
+        "confirmed": 3
+      },
+      {
+        "dim": "fileio",
+        "confirmed": 2
+      }
+    ]
+  }
+}

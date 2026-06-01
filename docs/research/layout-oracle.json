@@ -1,0 +1,6 @@
+{ "_source": "MS Word COM oracle (layout_probe.ps1)",
+  "pageSizesPx96": { "Letter": "816x1056", "Legal": "816x1344", "A4": "793x1123", "A5": "560x793", "A3": "1123x1587" },
+  "lineNumbering": { "scriptable": true, "restartModes": "Continuous, RestartEachPage, RestartEachSection", "countBy": 1 },
+  "hyphenation": { "scriptable": true, "auto": true, "hyphenateCaps": true },
+  "columns": { "scriptable": true, "example": "SetCount(2)=2" },
+  "paragraph": { "leftIndentPt": 36, "rightIndentPt": 18, "spaceBeforePt": 6, "spaceAfterPt": 12, "note": "indent in points (36pt=0.5in); spacing in points" } }

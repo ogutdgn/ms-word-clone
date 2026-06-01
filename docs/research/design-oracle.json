@@ -1,0 +1,8 @@
+{
+  "_source": "Live MS Word COM oracle (design_probe.ps1), build 16.0.19929",
+  "theme": { "majorFont": "Aptos Display", "minorFont": "Aptos" },
+  "themeColors": { "text1": "#000000", "bg1": "#FFFFFF", "text2": "#0E2841", "bg2": "#E8E8E8", "accent1": "#156082", "accent2": "#E97132", "accent3": "#196B24", "accent4": "#0F9ED5", "accent5": "#A02B93", "accent6": "#4EA72E", "hyperlink": "#467886", "followedHyperlink": "#96607D" },
+  "pageBorders": { "scriptable": true, "enabled": true, "outsideStyle": "single(1)" },
+  "pageColor": { "scriptable": true, "example": "#CCFFFF set + read back, Background.Fill" },
+  "watermark": { "comScriptable": false, "note": "AddTextEffect anchored to header threw 0x800A16DA; Word watermark is a building-block. Implement as a visual diagonal semi-transparent overlay." }
+}

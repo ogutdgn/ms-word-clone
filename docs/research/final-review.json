@@ -1,0 +1,77 @@
+{
+  "summary": "Adversarial correctness review of all newly-added tab modules, with verified findings",
+  "agentCount": 16,
+  "logs": [
+    "5 confirmed of 11 candidates."
+  ],
+  "result": {
+    "confirmed": [
+      {
+        "title": "Bottom-right position mapping is incorrect in Arrange.position()",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/layout-tools.js",
+        "line": "82",
+        "severity": "high",
+        "detail": "The 'br' (bottom-right) preset in the position map is defined as [null, null, '8px', '8px'], which maps to [top, right, bottom, left]. This places the element at bottom-left (bottom + left) instead of bottom-right (bottom + right). The map should be [null, '8px', '8px', null] to correctly position elements at bottom-right.",
+        "fix": "Change line 82: br: [null, null, '8px', '8px'] to br: [null, '8px', '8px', null]",
+        "verdict": {
+          "reasoning": "Confirmed real by reading the actual file and tracing the full call chain.\n\nIn /home/ogutd/msword-clone/src/renderer/js/layout-tools.js line 82, the position map defines: br: [null, null, '8px', '8px']. Line 83 destructures every entry as `const [t, r, b, l] = map[preset]`, i.e. [top, right, bottom, left]. So br resolves to bottom:8px; left:8px — which is bottom-LEFT. It is byte-for-byte identical to the bl (bottom-left) entry. Other right-anchored presets confirm the intended pattern: tr = ['8px','8px',null,null] and mr = ['50%','8px',null,null] both set right (index 1) and leave left null. The correct br value is [null, '8px', '8px', null] (right:8px; bottom:8px), exactly as the claimed fix states.\n\nThe path is reachable in normal use, not a stub: ribbon-data.js:1463 defines the Layout > Arrange 'Position' dropdown (cmd: position); commands.js:341 builds a flyout with an explicit 'Bottom Right' item whose onClick calls WC.Layout.position('br'); commands.js:553 dispatches 'position' to the handler. position() actually applies styles (o.style.bottom, o.style.left) — it is not a documented stub. The 'feasible: partial' tag refers to overall Word parity, not to this code being unimplemented.\n\nUser-visible failure: selecting an image and choosing Position > Bottom Right places it at the bottom-left corner of the page, identical to Bottom Left, instead of bottom-right.",
+          "isReal": true,
+          "severity": "low"
+        }
+      },
+      {
+        "title": "XSS vulnerability in bibliography HTML generation",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/references-tools.js",
+        "line": "131-142",
+        "severity": "high",
+        "detail": "The bibEntry() method (lines 131-137) constructs HTML with unescaped template literals using user-controlled source data (s.author, s.year, s.title, s.publisher). This HTML is then directly assigned via p.innerHTML on line 142 without escaping. If a source has malicious data like author='<img src=x onerror=alert(1)>', the script will execute.",
+        "fix": "Use WC.escapeHtml() on each user-controlled variable in bibEntry(), similar to how insertCitation() does it on line 130. For example: return `${WC.escapeHtml(A)}. (${WC.escapeHtml(Y)}). <i>${WC.escapeHtml(T)}</i>. ${WC.escapeHtml(P)}.`",
+        "verdict": {
+          "isReal": true,
+          "reasoning": "Verified the full chain in the real files. bibEntry() (references-tools.js:131-137) interpolates s.author/year/title/publisher into template literals with NO escaping, and insertBibliography() line 142 assigns the result via `p.innerHTML = this.bibEntry(s)` — a genuine HTML-injection sink. The source data is user-controlled free-text: D.addSource (dialogs.js:516-528) uses plain `<input type=\"text\">` for author/title/year/publisher and stores the raw values via Ref.addSource (line 123) with no sanitization. WC.escapeHtml (util.js:36-40) exists and correctly escapes & < > \\\" ', and its doc comment explicitly states it is for safe interpolation into innerHTML/insertHTML. The sibling method insertCitation (line 130) already calls WC.escapeHtml on the exact same s.author field, proving escaping is the established convention and was simply omitted in bibEntry. Concrete repro: enter author = `<img src=x onerror=alert(1)>` in the Create Source dialog, then References > Bibliography > Insert — the onerror handler executes (this is an Electron renderer, so arbitrary script execution is especially dangerous). The claim's facts, file/line references, and proposed fix (wrap A/Y/T/P in WC.escapeHtml) are all accurate. This is not a documented stub. Caveat: the primary trigger is the user typing the payload into their own fields (self-XSS), though it is also reachable via imported/pasted source data; that lowers but does not eliminate impact, hence medium severity.",
+          "severity": "medium"
+        }
+      },
+      {
+        "title": "updateAny() creates duplicate indices instead of updating",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/references-tools.js",
+        "line": "148",
+        "severity": "high",
+        "detail": "When an index list exists, updateAny() calls this.insertIndex() which creates a NEW index and appends it to the document. This results in a duplicate index rather than updating the existing one. The method should either update the existing index in-place (like updateTOC() does on lines 39-44) or be changed to not call insertIndex() at all.",
+        "fix": "Either create an updateIndex() method that updates the existing .wc-index-list in-place (mirroring updateTOC's pattern), or remove the index update from updateAny() since there's no update method for indices.",
+        "verdict": {
+          "reasoning": "The claim is real and verifiable against the actual code.\n\nCode facts (references-tools.js):\n- updateAny() line 148: `if (E().node.querySelector('.wc-index-list')) this.insertIndex();` — when an index already exists, it calls insertIndex().\n- insertIndex() lines 110-120: builds a brand-new `el('div', { class: 'wc-index-list wc-toc' ... })` and inserts it via `sel.getRangeAt(0).insertNode(wrap)` (or appends to the document). It never queries for or removes the existing `.wc-index-list` and never calls `.remove()`. Verified programmatically: insertIndex contains no removal logic.\n- Contrast with updateTOC() lines 39-44, which finds the existing `.wc-toc` and does `toc.querySelectorAll('.wc-toc-row').forEach(r => r.remove())` before re-adding rows — a genuine in-place update. Verified programmatically (updateTOC calls .remove(); insertIndex does not).\n\nSo calling insertIndex() with an index already present appends a SECOND `.wc-index-list`, producing a duplicate rather than updating the existing one. Exactly as claimed.\n\nReachability / user-visible path (confirmed not dead code):\n1. Most direct: the Index group \"Update Index\" ribbon button (ribbon-data.js:1821-1827) is bound to cmd \"updateIndex\", and commands.js:362 `H.updateIndex = () => WC.Ref.insertIndex();` calls insertIndex() directly. A user who inserts an index, edits the document, then clicks \"Update Index\" gets a duplicate index appended every click. (Note: this is an even more direct repro than the claim's path, and it does not even go through updateAny.)\n2. The claim's stated path is also real: updateAny() (commands.js:353 `H.updateTable = () => WC.Ref.updateAny()`) is bound to cmd \"updateTable\", present in the TOC, Captions, and Table-of-Authorities ribbon groups. If a document contains both a TOC/ToF and an index, clicking any \"Update Table\" button updates the TOC in place but DUPLICATES the index via insertIndex().\n\nThis is normal use, not a documented stub. The duplication is a concrete, observable, repeatable defect. The proposed fix (add an updateIndex() that rebuilds the existing `.wc-index-list` in place mirroring updateTOC, and route both updateAny and the H.updateIndex handler through it) is appropriate.\n\nMinor correction to the claim's framing: it pins the only trigger on updateAny()/the missing update method, but the simplest reproduction is the \"Update Index\" button itself, which already maps to insertIndex(). The underlying bug — no in-place index update exists, so updates create duplicates — is correct.",
+          "isReal": true,
+          "severity": "medium"
+        }
+      },
+      {
+        "title": "HTML Injection via unescaped user data in merge field rendering",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/mailings-tools.js",
+        "line": "68-70, and root cause in 62-66",
+        "severity": "HIGH",
+        "detail": "The fill() and composite() functions do not escape HTML-special characters in user data from recipients before inserting them into the document via outerHTML. When a user enters data containing '<', '>', '&', or HTML entities (like &nbsp;) in a recipient field, these characters are interpreted as actual HTML markup instead of plain text. The composite() function returns raw user data and formatted HTML, which is then set via m.outerHTML = ... causing unescaped content to be interpreted as HTML. All recipient fields (Title, FirstName, LastName, CompanyName, Address1, City, State, ZIP, Email, and custom fields) are vulnerable when used in merge fields, especially in composite fields like __AddressBlock__ and __GreetingLine__.",
+        "fix": "Escape HTML entities in user data before using it as the replacement content. Replace the composite() function to use WC.escapeHtml() on all user data values before concatenating them, and modify the fill() function to use textContent assignment instead of outerHTML, or properly escape the composite() output before setting outerHTML.",
+        "verdict": {
+          "isReal": true,
+          "severity": "low",
+          "reasoning": "VERIFIED REAL (but lower severity than the \"HTML Injection/XSS\" framing suggests).\n\nMechanism confirmed by reading the file (/home/ogutd/msword-clone/src/renderer/js/mailings-tools.js):\n- composite() (lines 62-66) returns raw recipient data: line 65 `return rec[field] != null ? rec[field] : ''`, and the __AddressBlock__ branch (line 63) raw-concatenates rec.Title/FirstName/LastName/CompanyName/Address1/City/State/ZIP into an HTML string joined with '<br>'. No escaping.\n- fill() (lines 67-71) sets `m.outerHTML = this.composite(...)` (line 69), so that raw string is parsed as HTML into the document.\n- Recipient values are genuine user free-text: typeNewList() reads them from <input type=\"text\"> per field (line 28, `inp.value` → row[f]). previewResults()/go()/finishMerge() route fill() output to E().setHTML(), which does a raw `this.node.innerHTML = html` with NO sanitization (editor.js:384).\n\nInconsistency confirms it's a real oversight, not intentional: the SAME file escapes user text everywhere else — insertField (line 57), envelopes (line 105), labels (line 113) all wrap values in WC.escapeHtml() (defined util.js:36). The composite/fill path is the lone exception.\n\nConcrete user-visible failure in the normal feature workflow: a user typing a legitimate value containing &, <, or > into a recipient field (e.g. CompanyName \"Johnson & Johnson <Holdings>\") and clicking Preview Results or Finish & Merge gets that markup parsed as HTML — corrupting the live preview and the merged output document (the document is the actual deliverable: printed/saved/merged per-recipient). Entities like &nbsp; are also mis-interpreted. That is a reproducible correctness defect.\n\nSeverity downgraded to low after threat-model check: the renderer runs nodeIntegration:false, contextIsolation:true (main.js:75-77), and CSP `script-src 'self'` with no 'unsafe-inline' and img-src limited to self/data/blob (index.html:5). So injected inline event handlers (onerror=) are CSP-blocked, there is no Node/require access, and no easy external exfiltration — the realistic impact is document/preview corruption and incorrect rendering of legitimate data, not RCE or practical script-based XSS. Data is also same-user local input, not untrusted remote input.\n\nFix as described is essentially correct: escape each recipient value in composite() before concatenation (keeping the literal <br> separators), e.g. apply WC.escapeHtml() to rec[field] and to each part of the AddressBlock/GreetingLine assembly. Note: a blanket textContent swap in fill() would break the intended <br> line breaks in AddressBlock, so the escaping should happen inside composite() with separators left as literal HTML."
+        }
+      },
+      {
+        "title": "fitZoom function ignores page count parameter",
+        "file": "/home/ogutd/msword-clone/src/renderer/js/commands.js",
+        "line": "140-141, 864",
+        "severity": "MEDIUM",
+        "detail": "H.onePage calls fitZoom(1) and H.multiplePages calls fitZoom(2), but the fitZoom() function definition doesn't accept or use parameters. The intended behavior appears to be fitting 1 page vs 2 pages in view, but the parameter is ignored, making both calls identical in behavior.",
+        "fix": "Add parameter to fitZoom function: `function fitZoom(pages) { ... }` and use it to determine the target page count for zoom calculation.",
+        "verdict": {
+          "isReal": true,
+          "severity": "low",
+          "reasoning": "Verified against the real files. In /home/ogutd/msword-clone/src/renderer/js/commands.js, line 140 is `H.onePage = () => E().setZoom(fitZoom(1));` and line 141 is `H.multiplePages = () => E().setZoom(fitZoom(2));`. The function is defined on line 864 as `function fitZoom() { const a = document.getElementById('canvas'); return Math.max(0.2, (a.clientHeight - 40) / E().pageH); }` — it declares NO parameter, so the `1` and `2` arguments are silently discarded by JS. It always returns the zoom that fits exactly one page to the canvas height. A grep confirms this is the only fitZoom definition (no overload taking a page count). Downstream, setZoom(z) in editor.js:356 just applies a single scalar transform with no page-count logic, so nothing compensates. Result: clicking View > Multiple Pages yields the identical zoom as View > One Page — the Multiple Pages command does not actually show multiple pages. This is a concrete, user-visible functional defect, not a documented stub (the codebase marks real stubs explicitly via WC.notImplemented and toast messages elsewhere; this is not one). Severity is low because it only affects a view/zoom convenience feature — no crash, no data loss. The proposed fix direction (give fitZoom a `pages` parameter and divide the fitted height by the page count, e.g. `(clientHeight - 40) / (E().pageH * pages)`) is appropriate."
+        }
+      }
+    ],
+    "candidateCount": 11
+  }
+}
