@@ -63,7 +63,7 @@
     insertMergeFieldMenu(node) {
       WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fields')); if (!this.fields.length) fly.appendChild(WC.flyItem('(no fields — select recipients first)', {})); this.fields.forEach((f) => fly.appendChild(WC.flyItem(f, { onClick: () => this.insertField(f, '«' + f + '»') }))); });
     },
-    insertField(field, label) { E().focus(); E().restoreRange(); E().insertNodeHTML('<span class="wc-mergefield" data-field="' + WC.escapeHtml(field) + '">' + WC.escapeHtml(label || ('«' + field + '»')) + '</span>&#8203;'); },
+    insertField(field, label, data) { let attrs = ''; if (data) Object.keys(data).forEach((k) => { if (data[k] != null) attrs += ' data-' + k + '="' + WC.escapeHtml(String(data[k])) + '"'; }); E().focus(); E().restoreRange(); E().insertNodeHTML('<span class="wc-mergefield" data-field="' + WC.escapeHtml(field) + '"' + attrs + '>' + WC.escapeHtml(label || ('«' + field + '»')) + '</span>&#8203;'); },
     addressBlock() {
       const fmt = el('select', {}, ['Mr. Joshua Randall Jr.', 'Joshua Randall', 'Joshua', 'Mr. Randall'].map((o) => el('option', { text: o })));
       const company = el('input', { type: 'checkbox', checked: 'checked' });
@@ -106,22 +106,35 @@
         el('div', { style: { marginTop: '8px', fontWeight: '600' }, text: 'Preview' }), preview,
       ]);
       WC.dialog({ title: 'Insert Greeting Line', width: '480px', body, footer: [
-        { label: 'OK', primary: true, onClick: () => this.insertField('__GreetingLine__', '«GreetingLine»') },
+        { label: 'OK', primary: true, onClick: () => this.insertField('__GreetingLine__', '«GreetingLine»', { greet: greet.value, punct: punct.value }) },
         { label: 'Cancel' },
       ] });
     },
     highlightMergeFields() { E().node.classList.toggle('show-mergefields'); },
 
-    composite(field, rec) {
-      const esc = WC.escapeHtml; // recipient data is user-supplied → escape before it reaches innerHTML
-      if (field === '__AddressBlock__') { return [[rec.Title, rec.FirstName, rec.LastName].filter(Boolean).join(' '), rec.CompanyName, rec.Address1, [rec.City, rec.State].filter(Boolean).join(', ') + ' ' + (rec.ZIP || '')].filter((s) => s && s.trim()).map(esc).join('<br>'); }
-      if (field === '__GreetingLine__') { return esc('Dear ' + [rec.Title, rec.LastName].filter(Boolean).join(' ') + ','); }
+    // Resolve a Word standard field name (e.g. "First Name") to the recipient's
+    // actual column: Match Fields map first, then exact name, then squashed-name
+    // match (FirstName ~ First Name) so blocks work even without Match Fields.
+    _val(rec, std) {
+      const m = this.matchMap || {}; const col = m[std];
+      if (col && col !== '(not matched)' && rec[col] != null) return rec[col];
+      if (rec[std] != null) return rec[std];
+      const sq = std.toLowerCase().replace(/[^a-z]/g, '');
+      const keys = Object.keys(rec);
+      let k = keys.find((kk) => kk.toLowerCase().replace(/[^a-z]/g, '') === sq); // exact squashed
+      if (!k) k = keys.find((kk) => { const ks = kk.toLowerCase().replace(/[^a-z]/g, ''); return ks && (ks.indexOf(sq) >= 0 || sq.indexOf(ks) >= 0); }); // contains (Company~CompanyName, ZIP Code~ZIP)
+      return k ? rec[k] : '';
+    },
+    composite(field, rec, opts) {
+      const esc = WC.escapeHtml; const v = (std) => this._val(rec, std);
+      if (field === '__AddressBlock__') { return [[v('Title'), v('First Name'), v('Last Name')].filter(Boolean).join(' '), v('Company'), v('Address 1'), [v('City'), v('State')].filter(Boolean).join(', ') + ' ' + (v('ZIP Code') || '')].filter((s) => s && s.trim()).map(esc).join('<br>'); }
+      if (field === '__GreetingLine__') { const greet = (opts && opts.greet) || 'Dear'; const punct = (opts && opts.punct) || ','; const g = greet === '(none)' ? '' : greet + ' '; const p = punct === '(none)' ? '' : punct; return esc(g + [v('Title'), v('Last Name')].filter(Boolean).join(' ') + p); }
       if (field === '__NextRecord__') { return ''; }
       return rec[field] != null ? esc(rec[field]) : '';
     },
     fill(rec) {
       const div = document.createElement('div'); div.innerHTML = this.template;
-      div.querySelectorAll('.wc-mergefield').forEach((m) => { m.outerHTML = this.composite(m.dataset.field, rec || {}); });
+      div.querySelectorAll('.wc-mergefield').forEach((m) => { m.outerHTML = this.composite(m.dataset.field, rec || {}, { greet: m.dataset.greet, punct: m.dataset.punct }); });
       return div.innerHTML;
     },
     previewResults(on) {

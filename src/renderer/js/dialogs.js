@@ -174,13 +174,13 @@
       if (all) {
         findState.hits.forEach((h) => h.replaceWith(document.createTextNode(val)));
         const count = findState.hits.length; findState.hits = []; findState.idx = -1;
-        E().node.normalize(); E().dirty = true; E().updateStatus();
+        E().node.normalize(); E().dirty = true; E().repaginate(); E().updateStatus();
         counter.textContent = `Replaced ${count}`;
         setTimeout(doFind, 50);
       } else {
         const cur = findState.hits[findState.idx]; if (!cur) return;
         cur.replaceWith(document.createTextNode(val));
-        findState.hits.splice(findState.idx, 1); E().node.normalize(); E().dirty = true;
+        findState.hits.splice(findState.idx, 1); E().node.normalize(); E().dirty = true; E().repaginate();
         if (findState.idx >= findState.hits.length) findState.idx = 0;
         mark(); counter.textContent = findState.hits.length ? `${findState.idx + 1} of ${findState.hits.length}` : 'Replaced';
       }

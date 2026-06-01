@@ -9,6 +9,11 @@
   function up(node, tag) { let n = node && node.nodeType === 3 ? node.parentNode : node; while (n && n !== E().node && n.tagName !== tag) n = n.parentNode; return n && n.tagName === tag ? n : null; }
   function caretCell() { const sel = window.getSelection(); if (!sel.rangeCount) return null; return up(sel.anchorNode, 'TD') || up(sel.anchorNode, 'TH'); }
   function colIndex(cell) { const row = cell.parentNode; return Array.prototype.indexOf.call(row.children, cell); }
+  // Colspan-aware grid helpers: map a row to its visual columns so column ops are
+  // correct even when cells are merged (colspan > 1).
+  function visualCols(row) { const map = []; let v = 0; Array.from(row.children).forEach((c) => { const sp = parseInt(c.getAttribute('colspan') || '1', 10); for (let i = 0; i < sp; i++) map[v++] = { cell: c, isStart: i === 0 }; }); return map; }
+  function visualColOf(cell) { let v = 0, n = cell.previousElementSibling; while (n) { v += parseInt(n.getAttribute('colspan') || '1', 10); n = n.previousElementSibling; } return v; }
+  function totalCols(table) { const r = table.querySelector('tr'); return r ? visualCols(r).length : 0; }
   function tableOf(cell) { return up(cell, 'TABLE'); }
   function rowsOf(table) { return Array.from(table.querySelectorAll('tr')); }
 
@@ -33,15 +38,26 @@
     },
     insertColumn(dir, cell) {
       cell = cell || caretCell(); if (!cell) return;
-      const idx = colIndex(cell); const table = tableOf(cell);
-      rowsOf(table).forEach((row) => { const ref = row.children[idx]; const nc = makeCell(); if (dir === 'left') row.insertBefore(nc, ref); else row.insertBefore(nc, ref ? ref.nextSibling : null); });
+      const table = tableOf(cell);
+      const vcol = visualColOf(cell);
+      const at = dir === 'left' ? vcol : vcol + parseInt(cell.getAttribute('colspan') || '1', 10);
+      rowsOf(table).forEach((row) => {
+        const map = visualCols(row); const hit = map[at];
+        if (hit && !hit.isStart) { hit.cell.setAttribute('colspan', parseInt(hit.cell.getAttribute('colspan') || '1', 10) + 1); } // insertion falls inside a merged cell -> widen it
+        else row.insertBefore(makeCell(), hit ? hit.cell : null);
+      });
       done();
     },
     deleteColumn(cell) {
       cell = cell || caretCell(); if (!cell) return;
-      const idx = colIndex(cell); const table = tableOf(cell);
-      if (table.querySelector('tr').children.length <= 1) return this.deleteTable(cell);
-      rowsOf(table).forEach((row) => { if (row.children[idx]) row.children[idx].remove(); });
+      const table = tableOf(cell);
+      if (totalCols(table) <= 1) return this.deleteTable(cell);
+      const vcol = visualColOf(cell);
+      rowsOf(table).forEach((row) => {
+        const hit = visualCols(row)[vcol]; if (!hit) return;
+        const sp = parseInt(hit.cell.getAttribute('colspan') || '1', 10);
+        if (sp > 1) hit.cell.setAttribute('colspan', sp - 1); else hit.cell.remove();
+      });
       done();
     },
     deleteTable(cell) { cell = cell || caretCell(); const t = cell ? tableOf(cell) : this.currentTable(); if (t) { t.remove(); done(); } },
@@ -52,8 +68,10 @@
     },
     splitCell(cell) {
       cell = cell || caretCell(); if (!cell) return; const span = parseInt(cell.getAttribute('colspan') || '1', 10);
-      if (span > 1) { cell.setAttribute('colspan', span - 1); cell.parentNode.insertBefore(makeCell(), cell.nextSibling); }
-      else this.insertColumn('right', cell);
+      // Split only THIS cell within its own row (a merged cell un-merges by one;
+      // a normal cell becomes two) — never add a whole column to every row.
+      if (span > 1) cell.setAttribute('colspan', span - 1);
+      cell.parentNode.insertBefore(makeCell(), cell.nextSibling);
       done();
     },
 

@@ -13,7 +13,7 @@
     sources: [],
 
     // ---- Table of Contents ----
-    headings() { return Array.from(E().node.querySelectorAll('h1, h2, h3')).filter((h) => !h.closest('.wc-toc')); },
+    headings() { return Array.from(E().node.querySelectorAll('h1, h2, h3')).filter((h) => !h.closest('.wc-toc, .wc-bibliography, .wc-notes, .wc-index-list, .cover-page')); },
     insertTOC(manual, opts) {
       opts = opts || {};
       const showPages = opts.showPageNumbers !== false;
@@ -108,16 +108,19 @@
     },
 
     // ---- Captions + Table of Figures ----
+    renumberCaptions(label) { Array.from(E().node.querySelectorAll('.wc-caption[data-label="' + label + '"]')).forEach((c, i) => { const b = c.querySelector('b'); if (b) b.textContent = label + ' ' + (i + 1); }); },
     insertCaption(label) {
       label = label || 'Figure';
-      const n = E().node.querySelectorAll('.wc-caption[data-label="' + label + '"]').length + 1;
-      const cap = el('p', { class: 'wc-caption', dataset: { label } }, [el('b', { text: label + ' ' + n }), document.createTextNode(': caption text')]);
+      const cap = el('p', { class: 'wc-caption', dataset: { label } }, [el('b', { text: label + ' ?' }), document.createTextNode(': caption text')]);
       const b = E().selectedBlocks()[0];
       if (b) b.after(cap); else E().insertHTML(cap.outerHTML);
-      E().dirty = true; E().repaginate(); WC.toast(label + ' ' + n + ' caption inserted.');
+      this.renumberCaptions(label); // number by DOCUMENT position, not insertion count
+      E().dirty = true; E().repaginate(); WC.toast(label + ' caption inserted.');
     },
     insertTableOfFigures(label) {
       label = label || 'Figure';
+      // Replace any existing Table of <label>s in place (no duplicate stacking).
+      E().node.querySelectorAll('.wc-tof').forEach((t) => { const ti = t.querySelector('.wc-toc-title'); if (ti && ti.textContent === 'Table of ' + label + 's') t.remove(); });
       const caps = Array.from(E().node.querySelectorAll('.wc-caption[data-label="' + label + '"]'));
       const wrap = el('div', { class: 'wc-tof wc-toc', contenteditable: 'false' });
       wrap.appendChild(el('div', { class: 'wc-toc-title', text: 'Table of ' + label + 's' }));
@@ -149,21 +152,23 @@
     },
 
     // ---- Citations & Bibliography ----
-    addSource(s) { this.sources.push(s); WC.toast('Source added: ' + s.author); },
+    addSource(s) { if (!s._sid) s._sid = 'src' + (this._sidSeq = (this._sidSeq || 0) + 1); this.sources.push(s); WC.toast('Source added: ' + s.author); },
+    // For IEEE the bibliography is in citation/source order and numbered, so [n]
+    // matches the list. Other styles are alphabetized by author.
+    _orderedSources() { return this.citationStyle === 'IEEE' ? this.sources.slice() : this.sources.slice().sort((a, b) => (a.author || '').localeCompare(b.author || '')); },
     inText(s) {
       const a = (s.author || '').split(/\s|,/)[0] || s.author;
       if (this.citationStyle === 'MLA') return '(' + a + ' ' + (s.pages || '') + ')';
       if (this.citationStyle === 'IEEE') return '[' + (this.sources.indexOf(s) + 1) + ']';
       return '(' + a + ', ' + (s.year || 'n.d.') + ')'; // APA / Chicago / Harvard
     },
-    insertCitation(s) { const idx = this.sources.indexOf(s); E().focus(); E().restoreRange(); E().insertHTML('<span class="wc-citation" data-src="' + WC.escapeHtml(s.author) + '" data-src-idx="' + idx + '">' + WC.escapeHtml(this.inText(s)) + '</span> '); },
+    insertCitation(s) { if (!s._sid) s._sid = 'src' + (this._sidSeq = (this._sidSeq || 0) + 1); E().focus(); E().restoreRange(); E().insertHTML('<span class="wc-citation" data-src="' + WC.escapeHtml(s.author) + '" data-src-id="' + s._sid + '">' + WC.escapeHtml(this.inText(s)) + '</span> '); },
     // Re-render every in-text citation and bibliography entry after a style change.
     restyle() {
       E().node.querySelectorAll('.wc-citation').forEach((c) => {
-        let s = null;
-        const idx = parseInt(c.dataset.srcIdx, 10);
-        if (!isNaN(idx) && this.sources[idx]) s = this.sources[idx];
-        else s = this.sources.find((x) => x.author === c.dataset.src);
+        // Resolve by STABLE source id first (index shifts when a source is deleted).
+        let s = c.dataset.srcId && this.sources.find((x) => x._sid === c.dataset.srcId);
+        if (!s) s = this.sources.find((x) => x.author === c.dataset.src);
         if (s) c.textContent = this.inText(s);
       });
       const bib = E().node.querySelector('.wc-bibliography');
@@ -173,20 +178,21 @@
     _rebuildBib(wrap, title) {
       wrap.innerHTML = '';
       wrap.appendChild(el('h1', { text: title }));
-      this.sources.slice().sort((a, b) => (a.author || '').localeCompare(b.author || '')).forEach((s) => { const p = el('p', { class: 'wc-bib-entry', style: { textIndent: '-24px', paddingLeft: '24px' } }); p.innerHTML = this.bibEntry(s); wrap.appendChild(p); });
+      this._orderedSources().forEach((s, i) => { const p = el('p', { class: 'wc-bib-entry', style: { textIndent: '-24px', paddingLeft: '24px' } }); p.innerHTML = this.bibEntry(s, i + 1); wrap.appendChild(p); });
     },
-    bibEntry(s) {
+    bibEntry(s, num) {
       const A = WC.escapeHtml(s.author || 'Unknown'); const Y = WC.escapeHtml(s.year || 'n.d.'); const T = WC.escapeHtml(s.title || 'Untitled'); const P = WC.escapeHtml(s.publisher || '');
       if (this.citationStyle === 'MLA') return `${A}. <i>${T}</i>. ${P}, ${Y}.`;
-      if (this.citationStyle === 'IEEE') return `${A}, "${T}," ${P}, ${Y}.`;
+      if (this.citationStyle === 'IEEE') return `[${num || 1}] ${A}, "${T}," ${P}, ${Y}.`;
       if (this.citationStyle === 'Chicago') return `${A}. <i>${T}</i>. ${P}, ${Y}.`;
       return `${A}. (${Y}). <i>${T}</i>. ${P}.`; // APA
     },
     insertBibliography(title) {
+      E().node.querySelectorAll('.wc-bibliography').forEach((b) => b.remove()); // no duplicate stacking
       const wrap = el('div', { class: 'wc-bibliography', contenteditable: 'false' });
       wrap.appendChild(el('h1', { text: title || 'Bibliography' }));
       if (!this.sources.length) wrap.appendChild(el('p', { style: { color: '#888' }, text: 'No sources. Add sources via Insert Citation → Add New Source.' }));
-      this.sources.slice().sort((a, b) => (a.author || '').localeCompare(b.author || '')).forEach((s) => { const p = el('p', { class: 'wc-bib-entry', style: { textIndent: '-24px', paddingLeft: '24px' } }); p.innerHTML = this.bibEntry(s); wrap.appendChild(p); });
+      this._orderedSources().forEach((s, i) => { const p = el('p', { class: 'wc-bib-entry', style: { textIndent: '-24px', paddingLeft: '24px' } }); p.innerHTML = this.bibEntry(s, i + 1); wrap.appendChild(p); });
       E().focus(); E().restoreRange(); const sel = window.getSelection(); if (sel.rangeCount) sel.getRangeAt(0).insertNode(wrap); else E().node.appendChild(wrap);
       E().dirty = true; E().repaginate(); WC.toast(title + ' inserted (' + this.citationStyle + ').');
     },
@@ -234,7 +240,20 @@
     },
 
     // ---- Update Table (context: TOC / ToF / Index) ----
-    updateAny() { if (E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)')) this.updateTOC(); if (E().node.querySelector('.wc-tof')) WC.toast('Tables updated.'); if (E().node.querySelector('.wc-index-list')) this.insertIndex(); if (E().node.querySelector('.wc-toa')) this.insertTableOfAuthorities(); },
+    updateAny() {
+      if (E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)')) this.updateTOC();
+      // Rebuild each Table of Figures in place from the current captions/pages.
+      E().node.querySelectorAll('.wc-tof').forEach((tof) => {
+        const ti = tof.querySelector('.wc-toc-title'); const label = ti ? ti.textContent.replace(/^Table of /, '').replace(/s$/, '') : 'Figure';
+        Array.from(tof.children).forEach((ch) => { if (!ch.classList || !ch.classList.contains('wc-toc-title')) ch.remove(); });
+        const caps = Array.from(E().node.querySelectorAll('.wc-caption[data-label="' + label + '"]'));
+        caps.forEach((c) => { if (!c.id) c.id = nid('cap'); const row = el('div', { class: 'wc-toc-row' }); const link = el('a', { href: '#' + c.id, class: 'wc-toc-link', text: c.textContent }); link.addEventListener('click', (e) => { e.preventDefault(); c.scrollIntoView({ block: 'start' }); }); row.appendChild(link); row.appendChild(el('span', { class: 'wc-toc-leader' })); row.appendChild(el('span', { class: 'wc-toc-pg', text: String(E().pageOfElement(c)) })); tof.appendChild(row); });
+        if (!caps.length) tof.appendChild(el('div', { style: { color: '#888' }, text: 'No captions yet.' }));
+      });
+      if (E().node.querySelector('.wc-index-list')) this.insertIndex();
+      if (E().node.querySelector('.wc-toa')) this.insertTableOfAuthorities();
+      WC.toast('Tables updated.');
+    },
   };
   function toRoman(n) { const m = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]; let s = ''; for (const [v, sym] of m) while (n >= v) { s += sym; n -= v; } return s || 'i'; }
   WC.Ref = Ref;
