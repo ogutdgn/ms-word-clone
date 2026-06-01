@@ -60,6 +60,8 @@
       if (!mod) return;
       const shift = e.shiftKey;
       const map = () => {
+        if (k === 'z' && !shift) return () => E().undo();
+        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => E().redo();
         if (k === 's' && !shift) return () => WC.Files.save();
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
         if (k === 'enter' && !shift) return () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' });
