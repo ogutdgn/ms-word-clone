@@ -15,8 +15,16 @@ bugs** (22 high, 30 medium, 3 low).
   - PR #4 `feat/undo-history` — real snapshot-based undo/redo (covers direct-DOM edits).
   - PR #5 `feat/comments-docx` — comments exported as native Word comments
     (validated against real Word via COM).
-- 🔄 **MEDIUM / LOW in progress** (round 3) — see lists below.
-- Suite at this point: **245 functional + 17 docx**, all passing.
+- ✅ **~20 of 33 MEDIUM/LOW fixed** (PRs #6–#7): tables (split/column/list),
+  references (TOC/captions/ToF/IEEE/stable-ids/no-dup), mailings (Match Fields,
+  greeting/address choices), page color vs watermark, zoom, Go-To, thesaurus,
+  rotate/flip, lasso-delete, bookmark dedupe, Replace repaginate.
+- ⏸️ **Remaining MEDIUM/LOW deferred** (harder/architectural or low value): Preview
+  Results edit-discard, positioned-object per-page anchor, Align-center 50% edge,
+  applyInlineStyle empty-span nesting, Track-Changes paste, Comments-pane stale
+  cards, print stylesheet, oversized-image pagination, eraser point/segment modes,
+  + 2 low cosmetic items.
+- Suite now: **257 functional + 17 docx**, all passing.
 
 See `docs/PROGRESS.md` for the running log.
 
