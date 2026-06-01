@@ -323,7 +323,7 @@
       // ink overlay (.ink-layer) and the layout spacers — none of those define the
       // page's content height (the ink layer is absolutely positioned and its
       // offsetTop is NaN, which previously broke the single-page fast path).
-      const isContent = (n) => n && n.nodeType === 1 && n.tagName !== 'svg' && !(n.classList && (n.classList.contains('wc-header') || n.classList.contains('wc-footer') || n.classList.contains('wc-page-border') || n.classList.contains('ink-layer') || n.classList.contains('wc-page-gap') || n.classList.contains('manual-break') || n.classList.contains('wc-gap-band')));
+      const isContent = (n) => n && n.nodeType === 1 && n.tagName !== 'svg' && !(n.classList && (n.classList.contains('wc-header') || n.classList.contains('wc-footer') || n.classList.contains('wc-page-border') || n.classList.contains('ink-layer') || n.classList.contains('line-gutter') || n.classList.contains('wc-page-gap') || n.classList.contains('manual-break') || n.classList.contains('wc-gap-band')));
 
       // Fast path: a single page in print view with nothing to lay out. Do NOT
       // normalize() or save/restore the caret here — that would yank the caret
@@ -449,6 +449,7 @@
       this._pageCount = count;
       if (window.WC.HeaderFooter) window.WC.HeaderFooter.refresh();
       if (window.WC.Insert && window.WC.Insert.refreshFields) window.WC.Insert.refreshFields();
+      if (window.WC.Layout && WC.Layout.lineMode && WC.Layout.lineMode !== 'none') WC.Layout.renderLineNumbers();
       this._setCaretCharOffset(caretOff);
       return count;
     },

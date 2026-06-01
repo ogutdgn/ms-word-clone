@@ -21,17 +21,19 @@
       if (this.lineMode === 'none') { if (g) g.remove(); return; }
       if (!g) { g = el('div', { class: 'line-gutter', contenteditable: 'false' }); E().node.appendChild(g); }
       g.innerHTML = '';
-      const lh = parseFloat(getComputedStyle(E().node).lineHeight) || 18;
-      const margin = parseFloat(getComputedStyle(E().node).paddingTop) || 96;
+      const ed = E().node;
+      const lh = parseFloat(getComputedStyle(ed).lineHeight) || 18;
+      const margin = parseFloat(getComputedStyle(ed).paddingTop) || 96;
       const pageH = E().pageH;
-      const total = E().node.scrollHeight - margin * 2;
-      const lines = Math.max(1, Math.floor(total / lh));
+      // Real content height = bottom of the last text block. NOT scrollHeight, which
+      // #editor's one-page min-height inflates (that numbered the whole blank page).
+      let contentBottom = margin;
+      ed.querySelectorAll(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > li, :scope > ul, :scope > ol, :scope > blockquote, :scope > table').forEach((b) => { const bot = b.offsetTop + b.offsetHeight; if (bot > contentBottom) contentBottom = bot; });
+      const lines = Math.max(1, Math.round((contentBottom - margin) / lh));
+      const perPage = Math.max(1, Math.floor((pageH - margin * 2) / lh));
       for (let i = 0; i < lines; i++) {
-        const y = margin + i * lh;
-        let num = i + 1;
-        if (this.lineMode === 'page') num = (Math.floor(y / pageH) === Math.floor((y - i * lh) / pageH)) ? num : num; // continuous fallback
-        if (this.lineMode === 'page') num = (i % Math.floor((pageH - margin) / lh)) + 1;
-        g.appendChild(el('div', { class: 'ln', style: { top: y + 'px' }, text: String(num) }));
+        const num = this.lineMode === 'page' ? (i % perPage) + 1 : i + 1;
+        g.appendChild(el('div', { class: 'ln', style: { top: (margin + i * lh) + 'px' }, text: String(num) }));
       }
     },
 

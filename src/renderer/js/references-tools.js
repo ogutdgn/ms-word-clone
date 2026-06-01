@@ -60,7 +60,13 @@
       const a = el('a', { href: '#', text: '1' }); marker.appendChild(a);
       const sel = window.getSelection(); if (sel.rangeCount) sel.getRangeAt(0).insertNode(marker);
       const note = el('div', { class: 'wc-note' }, [el('span', { class: 'wc-note-num', text: '1. ' }), el('span', { contenteditable: 'true', text: 'Type the ' + kind + ' here.' })]);
-      container.appendChild(note);
+      // Insert the note at the marker's DOCUMENT-ORDER position among same-kind
+      // markers — not always at the end — so marker N maps to note N even when a
+      // note is inserted ahead of existing ones.
+      const refs = Array.from(E().node.querySelectorAll('.wc-noteref[data-kind="' + kind + '"]'));
+      const idx = refs.indexOf(marker);
+      const notes = Array.from(container.querySelectorAll('.wc-note'));
+      if (idx >= 0 && idx < notes.length) container.insertBefore(note, notes[idx]); else container.appendChild(note);
       this.renumberNotes();
       note.querySelector('[contenteditable]').focus();
       E().dirty = true; E().repaginate();
