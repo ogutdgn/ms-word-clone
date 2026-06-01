@@ -338,7 +338,9 @@ async function saveToPath(filePath, html, format) {
   } else if (ext === 'html' || ext === 'htm') {
     const full = `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${path.basename(filePath)}</title></head>\n<body>${html}</body></html>`;
     await fsp.writeFile(filePath, full, 'utf8');
-  } else if (ext === 'txt') {
+  } else if (ext === 'txt' || ext === 'text' || ext === 'md' || ext === 'rtf') {
+    // openPath() labels .txt/.md/.rtf as format 'text'; accept that (and the bare
+    // extensions) so a file opened from plain text can be saved without throwing.
     const text = html.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n').replace(/<br\s*\/?>(?=)/gi, '\n').replace(/<[^>]+>/g, '');
     await fsp.writeFile(filePath, decodeEntities(text), 'utf8');
   } else {

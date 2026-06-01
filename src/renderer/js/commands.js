@@ -869,8 +869,8 @@
       // Review tab
       if (cmd === 'translate' || cmd === 'language' || cmd === 'showMarkup' || cmd === 'compare') return H[cmd](control, node);
       if (cmd === 'trackChanges') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem((WC.Review.trackOn ? '✓ ' : '') + 'Track Changes', { onClick: () => WC.Review.setTrackChanges() })); fly.appendChild(WC.flyItem('Lock Tracking…', { onClick: () => WC.toast('Lock Tracking needs a password — not implemented.') })); });
-      if (cmd === 'accept') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Accept and Move to Next', { onClick: () => WC.Review.acceptOne() })); fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.acceptNode(n); E().repaginate(); } } })); fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => WC.Review.acceptAll() })); });
-      if (cmd === 'reject') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reject and Move to Next', { onClick: () => WC.Review.rejectOne() })); fly.appendChild(WC.flyItem('Reject This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.rejectNode(n); E().repaginate(); } } })); fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => WC.Review.rejectAll() })); });
+      if (cmd === 'accept') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Accept and Move to Next', { onClick: () => WC.Review.acceptOne() })); fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.acceptNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } })); fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => WC.Review.acceptAll() })); });
+      if (cmd === 'reject') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reject and Move to Next', { onClick: () => WC.Review.rejectOne() })); fly.appendChild(WC.flyItem('Reject This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.rejectNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } })); fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => WC.Review.rejectAll() })); });
       if (cmd === 'delete') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Delete', { onClick: () => WC.Review.deleteComment() })); fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => WC.Review.deleteAllComments() })); });
       if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reviewing Pane Vertical', { onClick: () => WC.Review.reviewingPane() })); fly.appendChild(WC.flyItem('Reviewing Pane Horizontal', { onClick: () => WC.Review.reviewingPane() })); });
       if (cmd === 'checkAccessibility') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Check Accessibility', { onClick: () => WC.Review.checkAccessibility() })); });
@@ -1029,14 +1029,29 @@
   }
   function changeCase(mode) {
     const sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
-    const text = sel.toString();
-    let out = text;
-    if (mode === 'lower') out = text.toLowerCase();
-    else if (mode === 'upper') out = text.toUpperCase();
-    else if (mode === 'caps') out = text.replace(/\b\w/g, (m) => m.toUpperCase());
-    else if (mode === 'sentence') out = text.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase());
-    else if (mode === 'toggle') out = text.replace(/./g, (ch) => ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase());
-    E().exec('insertText', out);
+    const range = sel.getRangeAt(0);
+    const xform = (t) => {
+      if (mode === 'lower') return t.toLowerCase();
+      if (mode === 'upper') return t.toUpperCase();
+      if (mode === 'caps') return t.replace(/\b\w/g, (m) => m.toUpperCase());
+      if (mode === 'sentence') return t.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase());
+      if (mode === 'toggle') return t.replace(/./g, (ch) => ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase());
+      return t;
+    };
+    // Transform the TEXT NODES inside the selection in place — never round-trip
+    // through execCommand('insertText'), which injects literal newlines for a
+    // multi-paragraph selection and strips run formatting. Case maps are
+    // length-preserving, so the selection range stays valid.
+    const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, { acceptNode: (n) => range.intersectsNode(n) ? 1 : 3 });
+    const nodes = []; let n; while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach((node) => {
+      const v = node.nodeValue;
+      let s = 0, e = v.length;
+      if (node === range.startContainer) s = range.startOffset;
+      if (node === range.endContainer) e = range.endOffset;
+      node.nodeValue = v.slice(0, s) + xform(v.slice(s, e)) + v.slice(e);
+    });
+    E().dirty = true; E().updateStatus(); E().emit();
   }
 
   function lineSpacingMenu(node) {

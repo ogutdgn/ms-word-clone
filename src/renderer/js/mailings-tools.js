@@ -166,7 +166,7 @@
       const buildHTML = () => { const m = product.value.match(/(\d+)×(\d+)/); const cols = +m[1], rows = +m[2]; let html = '<table class="wc-labels no-border" style="width:100%">'; for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td style="height:48px;font-size:9pt;border:1px dashed #ccc;padding:4px">' + WC.escapeHtml(text.value).replace(/\n/g, '<br>') + '</td>'; html += '</tr>'; } html += '</table>'; return { html, cols, rows }; };
       WC.dialog({ title: 'Envelopes and Labels — Labels', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Product:' }), product]), el('div', { text: 'Address:' }), text, el('div', { class: 'row', style: { marginTop: '6px' } }, [el('label', {}, [fullPage, el('span', { text: ' Full page of the same label' })])])]), footer: [
         { label: 'New Document', primary: true, onClick: async () => { const { html, cols, rows } = buildHTML(); const ok = await WC.Files.newDocWith(html, 'Labels'); if (ok) WC.toast('Labels sheet created in a new document (' + cols + '×' + rows + ').'); } },
-        { label: 'Print', onClick: () => { const { html } = buildHTML(); E().node.insertAdjacentHTML('beforeend', html); E().repaginate(); WC.Files.print(); } },
+        { label: 'Print', onClick: async () => { const { html } = buildHTML(); const snap = E().getHTML(); E().node.insertAdjacentHTML('beforeend', html); E().repaginate(); try { await WC.Files.print(); } finally { E().setHTML(snap); } } },
         { label: 'Cancel' },
       ] });
     },
@@ -190,8 +190,10 @@
     updateLabels() {
       // Propagate the first label cell's merge fields to every other cell, with a
       // «Next Record» field at the start of each subsequent cell (Word behavior).
-      const table = E().node.querySelector('table.wc-labels') || E().node.querySelector('table');
-      if (!table) { WC.toast('No label table found. Create labels first (Mailings → Labels).'); return; }
+      // Only ever touch a real labels table — never fall back to the first table,
+      // which would clobber an ordinary user table.
+      const table = E().node.querySelector('table.wc-labels');
+      if (!table) { WC.toast('No label sheet found. Create one first (Mailings → Labels → New Document).'); return; }
       const cells = Array.from(table.querySelectorAll('td'));
       if (cells.length < 2) { WC.toast('Need a label grid to update.'); return; }
       const first = cells[0].innerHTML;

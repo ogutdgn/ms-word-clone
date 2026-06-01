@@ -188,8 +188,18 @@
           if (!parentList.children.length) parentList.remove();
           last = li;
         } else {
-          // already top level -> turn into a paragraph
-          this.exec('outdent');
+          // already top level -> convert the <li> into a real <p> (execCommand
+          // 'outdent' leaves a bare span/<br> and splits the list invalidly).
+          const p = document.createElement('p');
+          while (li.firstChild) p.appendChild(li.firstChild);
+          if (!p.firstChild) p.appendChild(document.createElement('br'));
+          const after = []; let sib = li.nextElementSibling;
+          while (sib) { after.push(sib); sib = sib.nextElementSibling; }
+          parentList.parentNode.insertBefore(p, parentList.nextSibling);
+          if (after.length) { const rest = document.createElement(parentList.tagName); after.forEach((it) => rest.appendChild(it)); p.parentNode.insertBefore(rest, p.nextSibling); }
+          li.remove();
+          if (!parentList.children.length) parentList.remove();
+          last = p;
         }
       });
       if (last && this.node.contains(last)) this.caretInto(last); else this.saveRange();
