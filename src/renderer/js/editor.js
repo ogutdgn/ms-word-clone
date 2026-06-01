@@ -413,7 +413,11 @@
 
         const sp = el('span', { class: 'wc-page-gap', contenteditable: 'false' });
         sp.style.height = '0px';
-        if (straddle) {
+        if (straddle && (straddle.tagName === 'TABLE' || straddle.tagName === 'IMG')) {
+          // Never inject a gap inside a table cell (it tears the cell) or an image:
+          // push the whole block to the next page instead.
+          node.insertBefore(sp, straddle);
+        } else if (straddle) {
           // Binary-search the last character whose line still fits on this page,
           // then insert the spacer before the first overflowing line.
           const txt = straddle.textContent;

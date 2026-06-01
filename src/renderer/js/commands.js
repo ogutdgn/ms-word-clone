@@ -964,11 +964,21 @@
       const s = window.getSelection();
       if (!painter || !s || s.isCollapsed) return;
       const st = painter.inline;
-      const span = el('span');
-      Object.assign(span.style, { fontFamily: st.fontFamily, fontSize: st.fontSize, fontWeight: st.fontWeight, fontStyle: st.fontStyle, color: st.color, textDecorationLine: st.textDecorationLine, textDecorationStyle: st.textDecorationStyle, letterSpacing: st.letterSpacing, verticalAlign: st.verticalAlign });
-      if (st.backgroundColor) span.style.backgroundColor = st.backgroundColor;
+      const makeSpan = () => { const span = el('span'); Object.assign(span.style, { fontFamily: st.fontFamily, fontSize: st.fontSize, fontWeight: st.fontWeight, fontStyle: st.fontStyle, color: st.color, textDecorationLine: st.textDecorationLine, textDecorationStyle: st.textDecorationStyle, letterSpacing: st.letterSpacing, verticalAlign: st.verticalAlign }); if (st.backgroundColor) span.style.backgroundColor = st.backgroundColor; return span; };
+      // Wrap each selected TEXT NODE's portion in its own inline span. Wrapping the
+      // whole multi-block range in ONE span would put a <span> around <p> blocks
+      // and corrupt the document — apply per block instead, like Word.
       const range = s.getRangeAt(0);
-      try { range.surroundContents(span); } catch (e) { span.appendChild(range.extractContents()); range.insertNode(span); }
+      const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, { acceptNode: (nn) => range.intersectsNode(nn) ? 1 : 3 });
+      const nodes = []; let node; while ((node = walker.nextNode())) nodes.push(node);
+      nodes.forEach((tn) => {
+        let start = 0, end = tn.nodeValue.length;
+        if (tn === range.startContainer) start = range.startOffset;
+        if (tn === range.endContainer) end = range.endOffset;
+        if (start >= end || !tn.nodeValue.slice(start, end).trim()) return;
+        const r = document.createRange(); r.setStart(tn, start); r.setEnd(tn, end);
+        try { r.surroundContents(makeSpan()); } catch (e) { const sp2 = makeSpan(); sp2.appendChild(r.extractContents()); r.insertNode(sp2); }
+      });
       E().dirty = true; E().repaginate(); E().updateStatus();
       if (!painter.sticky) disarmPainter();
     };
