@@ -65,8 +65,15 @@
     rows.forEach((cells) => { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td>' + WC.escapeHtml(cells[c] || '') + '</td>'; html += '</tr>'; });
     html += '</tbody></table>';
     const wrap = document.createElement('div'); wrap.innerHTML = html;
-    blocks[0].parentNode.insertBefore(wrap.firstChild, blocks[0]);
+    const table = wrap.firstChild;
+    const first = blocks[0];
+    const list = first.closest && first.closest('ul, ol');
+    // A <table> can't live inside a <ul>/<ol>; if the selection is list items,
+    // place the table after the list (and drop the list if it ends up empty).
+    if (list && blocks.every((b) => b.tagName === 'LI')) { list.parentNode.insertBefore(table, list.nextSibling); }
+    else { first.parentNode.insertBefore(table, first); }
     blocks.forEach((b) => b.remove());
+    if (list && !list.querySelector('li')) list.remove();
     E().dirty = true; E().repaginate(); E().updateStatus();
   };
   Insert.tableMenu = function (node) {
