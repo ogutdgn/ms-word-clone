@@ -60,6 +60,24 @@
   [['real header part with text', headerHasText], ['real footer part with text', footerHasText], ['nested-table inner text kept (not dropped)', innerKept]]
     .forEach(([k, v]) => { console.log('   ', v ? 'PASS' : 'FAIL', k); v ? pass++ : fail++; });
 
+  // 4) comments -> real OOXML comments part (bug #18), validated against real Word COM
+  console.log('4) comment injection...');
+  const { injectComments } = require('../src/main/docx-utils');
+  const cbody = '<p>Hello @@WCMTS0@@commented phrase@@WCMTE0@@ world.</p>';
+  let cbuf = await htmlToDocx(wrap(cbody), null, { font: 'Aptos', fontSize: 24, margins: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720, gutter: 0 } });
+  cbuf = await injectComments(JSZip, cbuf, [{ id: 0, author: 'Word User', text: 'A comment & <ok>' }]);
+  const czip = await JSZip.loadAsync(cbuf);
+  const cdoc = await czip.file('word/document.xml').async('string');
+  const cxml = czip.file('word/comments.xml') ? await czip.file('word/comments.xml').async('string') : '';
+  const cct = await czip.file('[Content_Types].xml').async('string');
+  const crels = await czip.file('word/_rels/document.xml.rels').async('string');
+  [['comments.xml part exists', !!czip.file('word/comments.xml')],
+   ['commentRangeStart/Reference in document', /commentRangeStart w:id="0"/.test(cdoc) && /commentReference w:id="0"/.test(cdoc)],
+   ['no leftover sentinel', !/@@WCMT/.test(cdoc) && !/="undefined"/.test(cdoc)],
+   ['content-type + rels registered', /word\/comments\.xml/.test(cct) && /relationships\/comments/.test(crels)],
+   ['comment text escaped in comments.xml', /A comment &amp; &lt;ok&gt;/.test(cxml)]]
+    .forEach(([k, v]) => { console.log('   ', v ? 'PASS' : 'FAIL', k); v ? pass++ : fail++; });
+
   console.log(`RESULT: ${pass} pass / ${fail} fail`);
   // show a snippet
   console.log('--- mammoth html (first 400 chars) ---');

@@ -584,7 +584,14 @@
       let header = '', footer = '';
       const h = clone.querySelector('.wc-header'); if (h) { header = h.innerHTML; h.remove(); }
       const f = clone.querySelector('.wc-footer'); if (f) { footer = f.innerHTML; f.remove(); }
-      return { html: clone.innerHTML.replace(/​/g, ''), header, footer };
+      // Collect comments and replace each anchor with sentinel-wrapped text so the
+      // docx exporter can turn them into real Word comments (html-to-docx can't).
+      const comments = [];
+      clone.querySelectorAll('.wc-comment-anchor, [data-comment]').forEach((a, i) => {
+        comments.push({ id: i, author: 'Word User', text: a.dataset.comment || '' });
+        a.replaceWith(document.createTextNode('@@WCMTS' + i + '@@' + (a.textContent || '') + '@@WCMTE' + i + '@@'));
+      });
+      return { html: clone.innerHTML.replace(/​/g, ''), header, footer, comments };
     },
     setHTML(html) {
       this.node.innerHTML = html && html.trim() ? html : '<p><br></p>';
