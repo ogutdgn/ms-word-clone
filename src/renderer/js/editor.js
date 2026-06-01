@@ -188,8 +188,18 @@
           if (!parentList.children.length) parentList.remove();
           last = li;
         } else {
-          // already top level -> turn into a paragraph
-          this.exec('outdent');
+          // already top level -> convert the <li> into a real <p> (execCommand
+          // 'outdent' leaves a bare span/<br> and splits the list invalidly).
+          const p = document.createElement('p');
+          while (li.firstChild) p.appendChild(li.firstChild);
+          if (!p.firstChild) p.appendChild(document.createElement('br'));
+          const after = []; let sib = li.nextElementSibling;
+          while (sib) { after.push(sib); sib = sib.nextElementSibling; }
+          parentList.parentNode.insertBefore(p, parentList.nextSibling);
+          if (after.length) { const rest = document.createElement(parentList.tagName); after.forEach((it) => rest.appendChild(it)); p.parentNode.insertBefore(rest, p.nextSibling); }
+          li.remove();
+          if (!parentList.children.length) parentList.remove();
+          last = p;
         }
       });
       if (last && this.node.contains(last)) this.caretInto(last); else this.saveRange();
@@ -403,7 +413,11 @@
 
         const sp = el('span', { class: 'wc-page-gap', contenteditable: 'false' });
         sp.style.height = '0px';
-        if (straddle) {
+        if (straddle && (straddle.tagName === 'TABLE' || straddle.tagName === 'IMG')) {
+          // Never inject a gap inside a table cell (it tears the cell) or an image:
+          // push the whole block to the next page instead.
+          node.insertBefore(sp, straddle);
+        } else if (straddle) {
           // Binary-search the last character whose line still fits on this page,
           // then insert the spacer before the first overflowing line.
           const txt = straddle.textContent;

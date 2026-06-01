@@ -31,8 +31,14 @@
     });
   };
   Insert.insertCover = function (t) {
+    // Word replaces an existing cover page; it never stacks two. Strip the old
+    // one (and its trailing page break) before inserting the new one.
+    const old = E().node.querySelector('.cover-page');
+    if (old) { const brk = old.nextElementSibling; old.remove(); if (brk && brk.classList && brk.classList.contains('manual-break')) brk.remove(); }
     const sel = window.getSelection(); const r = document.createRange(); r.setStart(E().node, 0); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); E().saveRange();
-    E().insertHTML(t.build());
+    // insertNodeHTML (not insertHTML): execCommand strips the .cover-page class, which
+    // then breaks both replace-on-insert and Remove Cover Page.
+    E().insertNodeHTML(t.build());
     WC.toast('Cover page “' + t.name + '” inserted — click the [fields] to edit.');
   };
   Insert.removeCover = function () {

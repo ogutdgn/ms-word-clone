@@ -37,13 +37,22 @@
     async useExistingList() {
       const r = await window.wordAPI.open();
       if (!r || !r.ok) return;
-      // parse CSV-ish from the imported text (strip html)
-      const text = (r.html || '').replace(/<[^>]+>/g, '\n').replace(/&[^;]+;/g, ' ');
-      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      if (lines.length < 2) { WC.toast('No tabular data found. Use a CSV with a header row.'); return; }
-      const delim = lines[0].includes('\t') ? '\t' : ',';
-      this.fields = lines[0].split(delim).map((s) => s.trim());
-      this.recipients = lines.slice(1).map((l) => { const cells = l.split(delim); const o = {}; this.fields.forEach((f, i) => o[f] = (cells[i] || '').trim()); return o; });
+      let rows;
+      if (r.csv != null) {
+        rows = parseCSV(r.csv);                     // real .csv/.tsv: RFC-4180 parse the raw text
+      } else {
+        // opened via another route (e.g. .txt): decode entities via the DOM, never strip them
+        const tmp = document.createElement('div'); tmp.innerHTML = r.html || '';
+        const text = (tmp.textContent || '');
+        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        const delim = (lines[0] || '').includes('\t') ? '\t' : ',';
+        rows = lines.map((l) => l.split(delim));
+      }
+      if (!rows || rows.length < 2) { WC.toast('No tabular data found. Use a CSV with a header row.'); return; }
+      this.fields = rows[0].map((s) => s.trim());
+      this.recipients = rows.slice(1)
+        .map((cells) => { const o = {}; this.fields.forEach((f, i) => o[f] = (cells[i] != null ? String(cells[i]).trim() : '')); return o; })
+        .filter((o) => Object.values(o).some((v) => v));
       WC.toast('Imported ' + this.recipients.length + ' recipients (' + this.fields.length + ' fields).');
     },
     editRecipientList() {
@@ -142,12 +151,13 @@
       if (!this.recipients.length) { WC.toast('No recipients. Select recipients first.'); return; }
       if (mode === 'print') { WC.toast('Merged ' + this.recipients.length + ' records — sending to Print.'); WC.Files.print(); return; }
       if (mode === 'email') { WC.toast('Sending email requires a mail backend — not implemented.', 'See docs/NOT_IMPLEMENTED.md'); return; }
-      // Edit Individual Documents: one filled copy per recipient, page-break between
+      // Edit Individual Documents: one filled copy per recipient, page-break between,
+      // opened in a NEW document so the merge template is not overwritten in place.
       const old = this.template; this.template = tmpl;
-      const merged = this.recipients.map((r) => this.fill(r)).join('<div class="manual-break" style="break-after:page;page-break-after:always;border-top:1px dashed #b9b9b9"></div>');
+      const merged = this.recipients.map((r) => this.fill(r)).join('<div class="manual-break" contenteditable="false" style="break-after:page;page-break-after:always"></div>');
       this.template = old; this.previewOn = false;
-      E().setHTML(merged);
-      WC.toast('Merged to a new document: ' + this.recipients.length + ' records.');
+      const n = this.recipients.length;
+      return WC.Files.newDocWith(merged, 'Letters').then((ok) => { if (ok) WC.toast('Merged to a new document: ' + n + ' records.'); return ok; });
     },
 
     envelopes() {
@@ -166,7 +176,7 @@
       const buildHTML = () => { const m = product.value.match(/(\d+)×(\d+)/); const cols = +m[1], rows = +m[2]; let html = '<table class="wc-labels no-border" style="width:100%">'; for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td style="height:48px;font-size:9pt;border:1px dashed #ccc;padding:4px">' + WC.escapeHtml(text.value).replace(/\n/g, '<br>') + '</td>'; html += '</tr>'; } html += '</table>'; return { html, cols, rows }; };
       WC.dialog({ title: 'Envelopes and Labels — Labels', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Product:' }), product]), el('div', { text: 'Address:' }), text, el('div', { class: 'row', style: { marginTop: '6px' } }, [el('label', {}, [fullPage, el('span', { text: ' Full page of the same label' })])])]), footer: [
         { label: 'New Document', primary: true, onClick: async () => { const { html, cols, rows } = buildHTML(); const ok = await WC.Files.newDocWith(html, 'Labels'); if (ok) WC.toast('Labels sheet created in a new document (' + cols + '×' + rows + ').'); } },
-        { label: 'Print', onClick: () => { const { html } = buildHTML(); E().node.insertAdjacentHTML('beforeend', html); E().repaginate(); WC.Files.print(); } },
+        { label: 'Print', onClick: async () => { const { html } = buildHTML(); const snap = E().getHTML(); E().node.insertAdjacentHTML('beforeend', html); E().repaginate(); try { await WC.Files.print(); } finally { E().setHTML(snap); } } },
         { label: 'Cancel' },
       ] });
     },
@@ -190,8 +200,10 @@
     updateLabels() {
       // Propagate the first label cell's merge fields to every other cell, with a
       // «Next Record» field at the start of each subsequent cell (Word behavior).
-      const table = E().node.querySelector('table.wc-labels') || E().node.querySelector('table');
-      if (!table) { WC.toast('No label table found. Create labels first (Mailings → Labels).'); return; }
+      // Only ever touch a real labels table — never fall back to the first table,
+      // which would clobber an ordinary user table.
+      const table = E().node.querySelector('table.wc-labels');
+      if (!table) { WC.toast('No label sheet found. Create one first (Mailings → Labels → New Document).'); return; }
       const cells = Array.from(table.querySelectorAll('td'));
       if (cells.length < 2) { WC.toast('Need a label grid to update.'); return; }
       const first = cells[0].innerHTML;
@@ -201,5 +213,25 @@
     },
   };
   function blank(fields) { const o = {}; fields.forEach((f) => o[f] = ''); return o; }
+  // RFC-4180-aware CSV/TSV parser: handles quoted fields with embedded
+  // delimiters, quotes ("" escape), and newlines. Returns an array of rows.
+  function parseCSV(text) {
+    const delim = (text.indexOf('\t') >= 0 && text.indexOf(',') < 0) ? '\t' : ',';
+    const rows = []; let row = [], field = '', inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+        else field += c;
+      } else if (c === '"') { inQ = true; }
+      else if (c === delim) { row.push(field); field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += c;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter((r) => r.some((c) => c.trim()));
+  }
+  Mail._parseCSV = parseCSV; // exposed for tests
   WC.Mail = Mail;
 })();

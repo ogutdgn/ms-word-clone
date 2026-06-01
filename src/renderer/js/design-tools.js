@@ -80,8 +80,14 @@
       const r = root().style;
       const set = (k, v) => { if (v) r.setProperty(k, v); else r.removeProperty(k); };
       set('--doc-heading-font', s.headingFont); set('--doc-font', s.bodyFont);
-      set('--heading-color', s.headingColor); set('--word-blue', s.wordBlue);
-      if (s.accents && WC.setThemeColors) WC.setThemeColors(s.accents);
+      set('--heading-color', s.headingColor);
+      // Always restore the accent state, INCLUDING the "no accents captured" case.
+      // If we skip it when s.accents is null, a previewed accent leaves --word-blue
+      // and WC._themeAccents stuck, which then poisons the next snapshot.
+      if (WC.setThemeColors) {
+        if (s.accents) WC.setThemeColors(s.accents);
+        else { WC._themeAccents = null; set('--word-blue', s.wordBlue); }
+      } else { set('--word-blue', s.wordBlue); }
       E().node.className = s.edClass;
       if (s.paraStyles) { const ps = E().node.querySelectorAll('p, li'); ps.forEach((p, i) => { const v = s.paraStyles[i]; if (v == null) return; if (v) p.setAttribute('style', v); else p.removeAttribute('style'); }); }
     },

@@ -29,22 +29,39 @@
       if (!this.trackOn) return;
       const t = e.inputType;
       if (t === 'insertText' && e.data != null) { e.preventDefault(); this.insertTracked(e.data); }
-      else if (t === 'deleteContentBackward') { e.preventDefault(); this.deleteTracked(-1); }
-      else if (t === 'deleteContentForward') { e.preventDefault(); this.deleteTracked(1); }
-      else if (t === 'insertFromPaste') { /* allow; marked on next edit */ }
+      else if (t === 'insertParagraph' || t === 'insertLineBreak') { /* structural break — no content is lost; Word marks the para mark, which we approximate by allowing it */ }
+      else if (t === 'insertFromPaste') { /* content allowed; marked on next edit */ }
+      else if (/^delete/.test(t)) {
+        // Cut, Ctrl+Backspace/Delete (word), line deletes, and plain backspace/
+        // delete must ALL be recorded as tracked deletions — never silently lost.
+        e.preventDefault();
+        const dir = /Forward/.test(t) ? 1 : -1;
+        const gran = /Word/.test(t) ? 'word' : (/Line/.test(t) ? 'lineboundary' : 'character');
+        this.deleteTracked(dir, gran);
+      }
     },
     insertTracked(text) {
       const sel = window.getSelection(); if (!sel.rangeCount) return;
-      const range = sel.getRangeAt(0); range.deleteContents();
+      let range = sel.getRangeAt(0);
+      if (!range.collapsed) {
+        // Typing over a selection = delete-then-insert: record the replaced text
+        // as a tracked <del> instead of destroying it, then insert after it.
+        const frag = range.extractContents();
+        const del = el('del', { class: 'wc-del', dataset: { author: this.author } });
+        del.appendChild(frag); range.insertNode(del);
+        const r = document.createRange(); r.setStartAfter(del); r.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r); range = r;
+      }
       const anchor = range.startContainer; const elt = anchor.nodeType === 3 ? anchor.parentNode : anchor;
       const ownIns = elt.closest && elt.closest('ins.wc-ins');
       if (ownIns) { const tn = document.createTextNode(text); range.insertNode(tn); place(tn, tn.length); }
       else { const ins = el('ins', { class: 'wc-ins', dataset: { author: this.author } }); ins.textContent = text; range.insertNode(ins); place(ins.firstChild, text.length); }
       after();
     },
-    deleteTracked(dir) {
+    deleteTracked(dir, gran) {
+      gran = gran || 'character';
       const sel = window.getSelection(); if (!sel.rangeCount) return;
-      if (sel.isCollapsed) { try { sel.modify('extend', dir < 0 ? 'backward' : 'forward', 'character'); } catch (e) {} }
+      if (sel.isCollapsed) { try { sel.modify('extend', dir < 0 ? 'backward' : 'forward', gran); } catch (e) {} }
       if (sel.isCollapsed) return;
       const range = sel.getRangeAt(0);
       const c = range.commonAncestorContainer; const ce = c.nodeType === 3 ? c.parentNode : c;
@@ -61,8 +78,10 @@
     acceptOne() { const n = this.currentRevision(); if (n) { this.acceptNode(n); after(); this.nextChange(); } else this.acceptAll(); },
     rejectOne() { const n = this.currentRevision(); if (n) { this.rejectNode(n); after(); this.nextChange(); } else this.rejectAll(); },
     currentRevision() { const sel = window.getSelection(); if (sel.rangeCount) { let n = sel.anchorNode; n = n && n.nodeType === 3 ? n.parentNode : n; const rev = n && n.closest && n.closest('ins.wc-ins, del.wc-del'); if (rev) return rev; } return this.revisions()[0]; },
-    nextChange() { const revs = this.revisions(); if (revs.length) { revs[0].scrollIntoView({ block: 'center' }); const r = document.createRange(); r.selectNode(revs[0]); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } else WC.toast('No more changes.'); },
-    prevChange() { const revs = this.revisions(); if (revs.length) revs[revs.length - 1].scrollIntoView({ block: 'center' }); },
+    _selectRev(rev) { rev.scrollIntoView({ block: 'center' }); const r = document.createRange(); r.selectNodeContents(rev); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); },
+    _revAt() { const sel = window.getSelection(); let n = sel.rangeCount ? sel.anchorNode : null; n = n && n.nodeType === 3 ? n.parentNode : n; return n && n.closest && n.closest('ins.wc-ins, del.wc-del'); },
+    nextChange() { const revs = this.revisions(); if (!revs.length) { WC.toast('No tracked changes.'); return; } const cur = this._revAt(); const i = cur ? revs.indexOf(cur) : -1; this._selectRev(revs[(i + 1) % revs.length]); },
+    prevChange() { const revs = this.revisions(); if (!revs.length) { WC.toast('No tracked changes.'); return; } const cur = this._revAt(); const i = cur ? revs.indexOf(cur) : 0; this._selectRev(revs[(i - 1 + revs.length) % revs.length]); },
     setDisplayMode(mode) { this.displayMode = mode; E().node.classList.remove('review-all', 'review-simple', 'review-none', 'review-original'); E().node.classList.add('review-' + mode); WC.toast('Display for Review: ' + mode); },
 
     // ---- Reviewing Pane ----
