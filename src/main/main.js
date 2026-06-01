@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu, desktopCapturer, scree
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const docxUtils = require('./docx-utils');
 
 // Lazy-required heavy libs (loaded on first use to keep startup fast)
 let mammoth = null;
@@ -321,9 +322,9 @@ ipcMain.handle('doc:open', async (_evt, presetPath) => {
 // ---------------------------------------------------------------------------
 // IPC: save document
 // ---------------------------------------------------------------------------
-async function writeDocx(filePath, html, options, header, footer) {
+async function writeDocx(filePath, html, options, header, footer, comments) {
   if (!htmlToDocx) htmlToDocx = require('html-to-docx');
-  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${flattenNestedTables(html)}</body></html>`;
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${docxUtils.flattenNestedTables(html)}</body></html>`;
   const hasHeader = !!(header && header.trim());
   const hasFooter = !!(footer && footer.trim());
   const docxOpts = Object.assign({
@@ -340,29 +341,20 @@ async function writeDocx(filePath, html, options, header, footer) {
   // header/footer go to real Word header/footer parts — never demoted to body text.
   const headerHtml = hasHeader ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${header}</body></html>` : null;
   const footerHtml = hasFooter ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${footer}</body></html>` : null;
-  const buffer = await htmlToDocx(fullHtml, headerHtml, docxOpts, footerHtml);
+  let buffer = await htmlToDocx(fullHtml, headerHtml, docxOpts, footerHtml);
+  if (comments && comments.length) {
+    try { buffer = await docxUtils.injectComments(require('jszip'), buffer, comments); }
+    catch (e) { if (isDev) console.error('comment injection failed (saving without native comments):', e); }
+  }
   await fsp.writeFile(filePath, buffer);
 }
 
 // html-to-docx silently drops a <table> nested inside a <td> (deleting the cell's
 // text too). Flatten any inner table to <br>-joined cell text so nothing is lost.
-function flattenNestedTables(html) {
-  if (!/<table/i.test(html) || !/<\/table>/i.test(html)) return html;
-  let prev;
-  do {
-    prev = html;
-    html = html.replace(/(<td\b[^>]*>)([\s\S]*?)<table\b[^>]*>([\s\S]*?)<\/table>([\s\S]*?)(<\/td>)/gi, (m, tdOpen, before, inner, after, tdClose) => {
-      const text = inner.replace(/<\/(tr|td|th|p|div)>/gi, ' ').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-      return tdOpen + before + (text ? '<br>' + text : '') + after + tdClose;
-    });
-  } while (html !== prev);
-  return html;
-}
-
-async function saveToPath(filePath, html, format, header, footer) {
+async function saveToPath(filePath, html, format, header, footer, comments) {
   const ext = (format || path.extname(filePath).replace('.', '')).toLowerCase();
   if (ext === 'docx') {
-    await writeDocx(filePath, html, null, header, footer);
+    await writeDocx(filePath, html, null, header, footer, comments);
   } else if (ext === 'html' || ext === 'htm') {
     const full = `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${path.basename(filePath)}</title></head>\n<body>${html}</body></html>`;
     await fsp.writeFile(filePath, full, 'utf8');
@@ -381,17 +373,17 @@ function decodeEntities(s) {
   return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
-ipcMain.handle('doc:save', async (_evt, { filePath, html, format, header, footer }) => {
+ipcMain.handle('doc:save', async (_evt, { filePath, html, format, header, footer, comments }) => {
   try {
     if (!filePath) return { ok: false, error: 'No path' };
-    await saveToPath(filePath, html, format, header, footer);
+    await saveToPath(filePath, html, format, header, footer, comments);
     return { ok: true, path: filePath, name: path.basename(filePath) };
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
 });
 
-ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer }) => {
+ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer, comments }) => {
   try {
     const res = await dialog.showSaveDialog(mainWindow, {
       title: 'Save As',
@@ -404,7 +396,7 @@ ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer 
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     const ext = path.extname(res.filePath).replace('.', '').toLowerCase() || 'docx';
-    await saveToPath(res.filePath, html, ext, header, footer);
+    await saveToPath(res.filePath, html, ext, header, footer, comments);
     return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: ext };
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
