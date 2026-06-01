@@ -559,6 +559,20 @@
       clone.querySelectorAll('.manual-break').forEach((b) => { b.style.height = ''; });
       return clone.innerHTML.replace(/​/g, '');
     },
+    // Save payload for .docx export: body HTML WITHOUT the header/footer regions or
+    // UI-only overlays, plus the header/footer HTML separately so the exporter can
+    // write them as real Word header/footer parts (not demoted to body text).
+    getSavePayload() {
+      const clone = this.node.cloneNode(true);
+      clone.querySelectorAll('.pagebreak-guide,.wc-page-gap,.wc-gap-band,.find-hit,.line-gutter,.ink-layer').forEach((n) => {
+        if (n.classList.contains('find-hit')) { n.replaceWith(...n.childNodes); } else n.remove();
+      });
+      clone.querySelectorAll('.manual-break').forEach((b) => { b.style.height = ''; });
+      let header = '', footer = '';
+      const h = clone.querySelector('.wc-header'); if (h) { header = h.innerHTML; h.remove(); }
+      const f = clone.querySelector('.wc-footer'); if (f) { footer = f.innerHTML; f.remove(); }
+      return { html: clone.innerHTML.replace(/​/g, ''), header, footer };
+    },
     setHTML(html) {
       this.node.innerHTML = html && html.trim() ? html : '<p><br></p>';
       this.dirty = false;

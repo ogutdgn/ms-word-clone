@@ -73,14 +73,16 @@
 
     async save() {
       if (!this.path) return this.saveAs();
-      const r = await window.wordAPI.save({ filePath: this.path, html: E().getHTML(), format: this.format });
+      const p = E().getSavePayload();
+      const r = await window.wordAPI.save({ filePath: this.path, html: p.html, header: p.header, footer: p.footer, format: this.format });
       if (r && r.ok) { E().dirty = false; this.updateTitle(); WC.toast('Saved ' + r.name); }
       else WC.toast('Save failed', r && r.error);
       return r;
     },
 
     async saveAs() {
-      const r = await window.wordAPI.saveAs({ html: E().getHTML(), suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
+      const p = E().getSavePayload();
+      const r = await window.wordAPI.saveAs({ html: p.html, header: p.header, footer: p.footer, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
       if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = r.format; E().dirty = false; this.updateTitle(); WC.toast('Saved ' + r.name); }
       else if (r && r.error) WC.toast('Save failed', r.error);
       return r;

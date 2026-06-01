@@ -43,6 +43,23 @@
   };
   let pass = 0, fail = 0;
   for (const [k,v] of Object.entries(checks)) { console.log('   ', v ? 'PASS' : 'FAIL', k); v ? pass++ : fail++; }
+
+  // 3) header/footer go to real Word parts (bug #17) + nested tables are not dropped (bug #6)
+  console.log('3) header/footer parts + nested-table flatten...');
+  const flatten = (html) => { let prev; do { prev = html; html = html.replace(/(<td\b[^>]*>)([\s\S]*?)<table\b[^>]*>([\s\S]*?)<\/table>([\s\S]*?)(<\/td>)/gi, (m, o, b, inner, a, c) => { const txt = inner.replace(/<\/(tr|td|th|p|div)>/gi, ' ').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(); return o + b + (txt ? '<br>' + txt : '') + a + c; }); } while (html !== prev); return html; };
+  const wrap = (s) => `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${s}</body></html>`;
+  const nestedBody = '<table><tbody><tr><td>OUTER <table><tbody><tr><td>INNERCELL</td></tr></tbody></table></td></tr></tbody></table>';
+  const hfBuf = await htmlToDocx(wrap(flatten(nestedBody)), wrap('<p>MYHEADER</p>'), { header: true, footer: true, font: 'Aptos', fontSize: 24, margins: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720, gutter: 0 } }, wrap('<p>MYFOOTER</p>'));
+  const hfZip = await JSZip.loadAsync(hfBuf);
+  const hfNames = Object.keys(hfZip.files);
+  const headerPart = hfNames.find((n) => /word\/header\d*\.xml/.test(n));
+  const footerPart = hfNames.find((n) => /word\/footer\d*\.xml/.test(n));
+  const headerHasText = headerPart && /MYHEADER/.test(await hfZip.file(headerPart).async('string'));
+  const footerHasText = footerPart && /MYFOOTER/.test(await hfZip.file(footerPart).async('string'));
+  const innerKept = /INNERCELL/.test(await hfZip.file('word/document.xml').async('string'));
+  [['real header part with text', headerHasText], ['real footer part with text', footerHasText], ['nested-table inner text kept (not dropped)', innerKept]]
+    .forEach(([k, v]) => { console.log('   ', v ? 'PASS' : 'FAIL', k); v ? pass++ : fail++; });
+
   console.log(`RESULT: ${pass} pass / ${fail} fail`);
   // show a snippet
   console.log('--- mammoth html (first 400 chars) ---');
