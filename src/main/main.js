@@ -267,6 +267,13 @@ async function openPath(filePath) {
     await pushRecentFile(filePath);
     return { ok: true, html, path: filePath, name: path.basename(filePath), format: 'html' };
   }
+  if (ext === '.csv' || ext === '.tsv') {
+    // Data source (mail merge): return the RAW text so the renderer can parse it
+    // RFC-4180-aware. Do NOT round-trip through HTML — that corrupts & < > etc.
+    const csv = await fsp.readFile(filePath, 'utf8');
+    await pushRecentFile(filePath);
+    return { ok: true, csv, path: filePath, name: path.basename(filePath), format: 'csv' };
+  }
   if (ext === '.txt' || ext === '.md' || ext === '.rtf') {
     let text = await fsp.readFile(filePath, 'utf8');
     if (ext === '.rtf') {
@@ -298,6 +305,7 @@ ipcMain.handle('doc:open', async (_evt, presetPath) => {
           { name: 'Word Documents', extensions: ['docx'] },
           { name: 'Web Page', extensions: ['html', 'htm'] },
           { name: 'Text/Rich Text', extensions: ['txt', 'rtf', 'md'] },
+          { name: 'Data Source (CSV/TSV)', extensions: ['csv', 'tsv'] },
           { name: 'All Files', extensions: ['*'] },
         ],
       });
