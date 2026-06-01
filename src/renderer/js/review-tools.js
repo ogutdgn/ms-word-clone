@@ -131,6 +131,19 @@
       let s = off, e = off; while (s > 0 && /\w/.test(text[s - 1])) s--; while (e < text.length && /\w/.test(text[e])) e++;
       return text.slice(s, e).trim();
     },
+    // Select the whole word at the caret so a thesaurus pick REPLACES it instead of
+    // being inserted into the middle of the word.
+    _selectWordAtCaret() {
+      const sel = window.getSelection(); if (!sel.rangeCount) return false;
+      if (!sel.isCollapsed) return true; // a real selection -> replace it as-is
+      let n = sel.anchorNode; if (!n || n.nodeType !== 3) return false;
+      const text = n.nodeValue, off = sel.anchorOffset;
+      let s = off, e = off; while (s > 0 && /\w/.test(text[s - 1])) s--; while (e < text.length && /\w/.test(text[e])) e++;
+      if (s === e) return false;
+      const r = document.createRange(); r.setStart(n, s); r.setEnd(n, e);
+      sel.removeAllRanges(); sel.addRange(r); E().saveRange();
+      return true;
+    },
     thesaurus() {
       const sel = window.getSelection(); const word = ((sel && sel.toString().trim()) || this.wordAtCaret() || '').trim();
       if (!word) {
@@ -144,7 +157,7 @@
       word = (word || '').trim(); if (!word) return;
       const syns = this.THES[word.toLowerCase()];
       const body = el('div', { class: 'tp-body' });
-      if (syns) syns.forEach((s) => { const row = el('div', { class: 'tp-result', text: s, style: { cursor: 'pointer' } }); row.addEventListener('click', () => { E().focus(); E().restoreRange(); E().exec('insertText', s); }); body.appendChild(row); });
+      if (syns) syns.forEach((s) => { const row = el('div', { class: 'tp-result', text: s, style: { cursor: 'pointer' } }); row.addEventListener('click', () => { E().focus(); E().restoreRange(); this._selectWordAtCaret(); E().exec('insertText', s); }); body.appendChild(row); });
       else body.appendChild(el('div', { style: { color: '#888', padding: '10px' }, text: 'No synonyms for “' + word + '” in the built-in thesaurus.' }));
       let pane = document.getElementById('thes-pane'); if (pane) pane.remove();
       pane = el('div', { class: 'taskpane right', id: 'thes-pane' }); pane.appendChild(el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Thesaurus: ' + word }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })])); pane.appendChild(body);
