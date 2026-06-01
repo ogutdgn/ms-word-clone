@@ -25,6 +25,16 @@
 
       const onChange = () => { this.dirty = true; this.repaginate(); this.updateStatus(); this.emit(); };
       this.node.addEventListener('input', WC.debounce(onChange, 80));
+      // Real undo/redo history — replaces the native execCommand stack, which
+      // ignores our direct-DOM operations. A MutationObserver captures EVERY
+      // change (typing, execCommand, and direct DOM edits) uniformly.
+      this._historyDebounced = WC.debounce(() => this.recordHistory(), 450);
+      this._histObserver = new MutationObserver(() => { if (!this._restoringHistory) this._historyDebounced(); });
+      this._histObserver.observe(this.node, { childList: true, subtree: true, characterData: true, attributes: true });
+      this.node.addEventListener('beforeinput', (e) => {
+        if (e.inputType === 'historyUndo') { e.preventDefault(); this.undo(); }
+        else if (e.inputType === 'historyRedo') { e.preventDefault(); this.redo(); }
+      });
       this.node.addEventListener('keyup', () => { this.saveRange(); this.emit(); this.updateStatus(); });
       this.node.addEventListener('mouseup', () => { this.saveRange(); this.emit(); this.updateStatus(); });
       this.node.addEventListener('focus', () => this.saveRange());
@@ -52,6 +62,7 @@
       if (!this.node.innerHTML.trim()) this.node.innerHTML = '<p><br></p>';
       this.repaginate();
       this.updateStatus();
+      this.recordHistory(); // seed undo history with the initial state
     },
 
     onStateChange(fn) { this.listeners.push(fn); },
@@ -73,6 +84,8 @@
 
     // Run an execCommand against the document, keeping editor focus/selection.
     exec(cmd, value) {
+      if (cmd === 'undo') return this.undo();
+      if (cmd === 'redo') return this.redo();
       this.node.focus();
       this.restoreRange();
       let ok = false;
@@ -585,8 +598,51 @@
       if (window.WC.Draw) window.WC.Draw.onDocLoad();
       if (window.WC.Comments) window.WC.Comments.rebuild();
       this.emit();
+      // Opening/creating a document clears the undo history (Word behaviour).
+      this._history = [this._histSnapshot()]; this._histPtr = 0;
     },
     isEmpty() { return !this.node.innerText.trim(); },
+
+    // ---- Undo / redo history (snapshot-based) ----
+    _histSnapshot() { return { html: this.getHTML(), caret: this._caretCharOffset() }; },
+    recordHistory() {
+      if (this._restoringHistory) return;
+      if (!this._history) { this._history = [this._histSnapshot()]; this._histPtr = 0; return; }
+      const snap = this._histSnapshot();
+      if (this._history[this._histPtr] && this._history[this._histPtr].html === snap.html) return; // no real change
+      this._history = this._history.slice(0, this._histPtr + 1);
+      this._history.push(snap);
+      if (this._history.length > 200) this._history.shift();   // cap memory
+      this._histPtr = this._history.length - 1;
+    },
+    undo() {
+      if (!this._history || this._histPtr <= 0) return false;
+      if (this._historyDebounced && this._historyDebounced.flush) this._historyDebounced.flush();
+      this.recordHistory();                                    // capture the latest in-flight edit
+      if (this._histPtr <= 0) return false;
+      this._histPtr--;
+      this._restoreHistory(this._history[this._histPtr]);
+      return true;
+    },
+    redo() {
+      if (!this._history || this._histPtr >= this._history.length - 1) return false;
+      this._histPtr++;
+      this._restoreHistory(this._history[this._histPtr]);
+      return true;
+    },
+    _restoreHistory(snap) {
+      this._restoringHistory = true;
+      try {
+        this.node.innerHTML = snap.html && snap.html.trim() ? snap.html : '<p><br></p>';
+        this.dirty = true;
+        this.repaginate();
+        this._setCaretCharOffset(snap.caret);
+        this.updateStatus();
+        if (window.WC.Draw) window.WC.Draw.onDocLoad();
+        if (window.WC.Comments) window.WC.Comments.rebuild();
+        this.emit();
+      } finally { this._restoringHistory = false; }
+    },
   };
 
   WC.Editor = Editor;
