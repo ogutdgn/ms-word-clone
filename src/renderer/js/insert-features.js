@@ -306,7 +306,7 @@
     }
     renderList();
     WC.dialog({ title: 'Bookmark', width: '380px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '60px' } }), name]), listBox]), footer: [
-      { label: 'Add', primary: true, onClick: () => { const n = name.value.trim().replace(/\s+/g, '_'); if (!n) return; E().focus(); E().restoreRange(); const sel = window.getSelection(); const span = el('span', { dataset: { bookmark: n }, id: 'bm_' + n }); if (sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); try { r.surroundContents(span); } catch (e) { span.appendChild(r.extractContents()); r.insertNode(span); } } else { span.appendChild(document.createTextNode('​')); if (sel.rangeCount) sel.getRangeAt(0).insertNode(span); else E().node.appendChild(span); } E().dirty = true; WC.toast('Bookmark “' + n + '” added.'); } },
+      { label: 'Add', primary: true, onClick: () => { const n = name.value.trim().replace(/\s+/g, '_'); if (!n) return; E().focus(); E().restoreRange(); const sel = window.getSelection(); const dup = E().node.querySelector('[data-bookmark="' + n + '"]'); if (dup) dup.replaceWith(...dup.childNodes); /* move, don't duplicate the id */ const span = el('span', { dataset: { bookmark: n }, id: 'bm_' + n }); if (sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); try { r.surroundContents(span); } catch (e) { span.appendChild(r.extractContents()); r.insertNode(span); } } else { span.appendChild(document.createTextNode('​')); if (sel.rangeCount) sel.getRangeAt(0).insertNode(span); else E().node.appendChild(span); } E().dirty = true; WC.toast('Bookmark “' + n + '” added.'); } },
       { label: 'Close' },
     ] });
   };

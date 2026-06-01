@@ -75,7 +75,7 @@
     bind() {
       if (this._bound) return;
       this._down = (e) => this.onDown(e); this._move = (e) => this.onMove(e); this._up = (e) => this.onUp(e);
-      this._key = (e) => { if ((e.key === 'Delete' || e.key === 'Backspace') && this.tool === 'select') { e.preventDefault(); this.deleteSelected(); } };
+      this._key = (e) => { if ((e.key === 'Delete' || e.key === 'Backspace') && this.layer && this.layer.querySelector('.ink-stroke.sel')) { e.preventDefault(); this.deleteSelected(); } };
       this.layer.addEventListener('pointerdown', this._down);
       window.addEventListener('pointermove', this._move);
       window.addEventListener('pointerup', this._up);
