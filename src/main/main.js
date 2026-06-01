@@ -321,13 +321,15 @@ ipcMain.handle('doc:open', async (_evt, presetPath) => {
 // ---------------------------------------------------------------------------
 // IPC: save document
 // ---------------------------------------------------------------------------
-async function writeDocx(filePath, html, options) {
+async function writeDocx(filePath, html, options, header, footer) {
   if (!htmlToDocx) htmlToDocx = require('html-to-docx');
-  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${flattenNestedTables(html)}</body></html>`;
+  const hasHeader = !!(header && header.trim());
+  const hasFooter = !!(footer && footer.trim());
   const docxOpts = Object.assign({
     table: { row: { cantSplit: true } },
-    footer: false,
-    header: false,
+    footer: hasFooter,
+    header: hasHeader,
     pageNumber: false,
     font: 'Aptos',
     fontSize: 24, // half-points => 12pt (matches real Word default)
@@ -335,14 +337,32 @@ async function writeDocx(filePath, html, options) {
     // as "undefined", which makes real Word reject the file (w:header="undefined").
     margins: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720, gutter: 0 },
   }, options || {});
-  const buffer = await htmlToDocx(fullHtml, null, docxOpts);
+  // header/footer go to real Word header/footer parts — never demoted to body text.
+  const headerHtml = hasHeader ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${header}</body></html>` : null;
+  const footerHtml = hasFooter ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${footer}</body></html>` : null;
+  const buffer = await htmlToDocx(fullHtml, headerHtml, docxOpts, footerHtml);
   await fsp.writeFile(filePath, buffer);
 }
 
-async function saveToPath(filePath, html, format) {
+// html-to-docx silently drops a <table> nested inside a <td> (deleting the cell's
+// text too). Flatten any inner table to <br>-joined cell text so nothing is lost.
+function flattenNestedTables(html) {
+  if (!/<table/i.test(html) || !/<\/table>/i.test(html)) return html;
+  let prev;
+  do {
+    prev = html;
+    html = html.replace(/(<td\b[^>]*>)([\s\S]*?)<table\b[^>]*>([\s\S]*?)<\/table>([\s\S]*?)(<\/td>)/gi, (m, tdOpen, before, inner, after, tdClose) => {
+      const text = inner.replace(/<\/(tr|td|th|p|div)>/gi, ' ').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      return tdOpen + before + (text ? '<br>' + text : '') + after + tdClose;
+    });
+  } while (html !== prev);
+  return html;
+}
+
+async function saveToPath(filePath, html, format, header, footer) {
   const ext = (format || path.extname(filePath).replace('.', '')).toLowerCase();
   if (ext === 'docx') {
-    await writeDocx(filePath, html);
+    await writeDocx(filePath, html, null, header, footer);
   } else if (ext === 'html' || ext === 'htm') {
     const full = `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${path.basename(filePath)}</title></head>\n<body>${html}</body></html>`;
     await fsp.writeFile(filePath, full, 'utf8');
@@ -361,17 +381,17 @@ function decodeEntities(s) {
   return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
-ipcMain.handle('doc:save', async (_evt, { filePath, html, format }) => {
+ipcMain.handle('doc:save', async (_evt, { filePath, html, format, header, footer }) => {
   try {
     if (!filePath) return { ok: false, error: 'No path' };
-    await saveToPath(filePath, html, format);
+    await saveToPath(filePath, html, format, header, footer);
     return { ok: true, path: filePath, name: path.basename(filePath) };
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
 });
 
-ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName }) => {
+ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer }) => {
   try {
     const res = await dialog.showSaveDialog(mainWindow, {
       title: 'Save As',
@@ -384,7 +404,7 @@ ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName }) => {
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     const ext = path.extname(res.filePath).replace('.', '').toLowerCase() || 'docx';
-    await saveToPath(res.filePath, html, ext);
+    await saveToPath(res.filePath, html, ext, header, footer);
     return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: ext };
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };

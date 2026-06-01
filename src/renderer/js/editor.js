@@ -323,7 +323,7 @@
       // ink overlay (.ink-layer) and the layout spacers — none of those define the
       // page's content height (the ink layer is absolutely positioned and its
       // offsetTop is NaN, which previously broke the single-page fast path).
-      const isContent = (n) => n && n.nodeType === 1 && n.tagName !== 'svg' && !(n.classList && (n.classList.contains('wc-header') || n.classList.contains('wc-footer') || n.classList.contains('wc-page-border') || n.classList.contains('ink-layer') || n.classList.contains('wc-page-gap') || n.classList.contains('manual-break') || n.classList.contains('wc-gap-band')));
+      const isContent = (n) => n && n.nodeType === 1 && n.tagName !== 'svg' && !(n.classList && (n.classList.contains('wc-header') || n.classList.contains('wc-footer') || n.classList.contains('wc-page-border') || n.classList.contains('ink-layer') || n.classList.contains('line-gutter') || n.classList.contains('wc-page-gap') || n.classList.contains('manual-break') || n.classList.contains('wc-gap-band')));
 
       // Fast path: a single page in print view with nothing to lay out. Do NOT
       // normalize() or save/restore the caret here — that would yank the caret
@@ -449,6 +449,7 @@
       this._pageCount = count;
       if (window.WC.HeaderFooter) window.WC.HeaderFooter.refresh();
       if (window.WC.Insert && window.WC.Insert.refreshFields) window.WC.Insert.refreshFields();
+      if (window.WC.Layout && WC.Layout.lineMode && WC.Layout.lineMode !== 'none') WC.Layout.renderLineNumbers();
       this._setCaretCharOffset(caretOff);
       return count;
     },
@@ -557,6 +558,20 @@
       // it is recomputed on load; break-after:page still drives PDF pagination.
       clone.querySelectorAll('.manual-break').forEach((b) => { b.style.height = ''; });
       return clone.innerHTML.replace(/​/g, '');
+    },
+    // Save payload for .docx export: body HTML WITHOUT the header/footer regions or
+    // UI-only overlays, plus the header/footer HTML separately so the exporter can
+    // write them as real Word header/footer parts (not demoted to body text).
+    getSavePayload() {
+      const clone = this.node.cloneNode(true);
+      clone.querySelectorAll('.pagebreak-guide,.wc-page-gap,.wc-gap-band,.find-hit,.line-gutter,.ink-layer').forEach((n) => {
+        if (n.classList.contains('find-hit')) { n.replaceWith(...n.childNodes); } else n.remove();
+      });
+      clone.querySelectorAll('.manual-break').forEach((b) => { b.style.height = ''; });
+      let header = '', footer = '';
+      const h = clone.querySelector('.wc-header'); if (h) { header = h.innerHTML; h.remove(); }
+      const f = clone.querySelector('.wc-footer'); if (f) { footer = f.innerHTML; f.remove(); }
+      return { html: clone.innerHTML.replace(/​/g, ''), header, footer };
     },
     setHTML(html) {
       this.node.innerHTML = html && html.trim() ? html : '<p><br></p>';
