@@ -1021,13 +1021,13 @@
     if (kind === 'fore') { lastFontColor = color; E().exec('foreColor', color); WC.Ribbon.setColorBar('fontColor', color); }
     else if (kind === 'hilite') { lastHighlight = color; E().exec('hiliteColor', color) || E().exec('backColor', color); WC.Ribbon.setColorBar('textHighlightColor', color); }
     else if (kind === 'shade') { if (color && color !== 'transparent') lastShade = color; E().applyBlockStyle('backgroundColor', color || 'transparent'); WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color); }
-    else if (kind === 'page') { E().node.style.background = color; }
+    else if (kind === 'page') { E().node.style.backgroundColor = color; } // not `background` — that wipes a watermark's background-image
   }
 
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.background = '#ffffff'; return; }
+        if (color === null) { if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
@@ -1139,7 +1139,7 @@
   function goToDialog() {
     const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter page number' });
     WC.dialog({ title: 'Go To', width: '380px', body: el('div', {}, [el('div', { text: 'Go to page:' }), input]), footer: [
-      { label: 'Go To', primary: true, onClick: () => { const p = parseInt(input.value, 10); if (p > 0) { const top = (p - 1) * E().pageH * E().zoom; document.getElementById('canvas').scrollTop = top; } } },
+      { label: 'Go To', primary: true, onClick: () => { const p = parseInt(input.value, 10); if (p > 0) { const top = (p - 1) * E().pageMetrics().pitch * E().zoom; document.getElementById('canvas').scrollTop = top; } } },
       { label: 'Close' },
     ] });
     setTimeout(() => input.focus(), 30);
@@ -1322,7 +1322,7 @@
     ] });
   }
   function fitZoom(pages) { pages = pages || 1; const a = document.getElementById('canvas'); return Math.max(0.2, (a.clientHeight - 40) / (E().pageH * pages)); }
-  function fitWidthZoom() { const a = document.getElementById('canvas'); return Math.max(0.2, (a.clientWidth - 40) / 816); }
+  function fitWidthZoom() { const a = document.getElementById('canvas'); const pw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-w')) || 816; return Math.max(0.2, (a.clientWidth - 40) / pw); }
   function markChecked(node) { if (node) node.classList.toggle('toggled'); }
 
   // ---- Review: read aloud via Web Speech, spell check ----

@@ -1,6 +1,24 @@
-# Bug-Bust Findings (round 1)
+# Bug-Bust Findings
 
-Auto-collected from a 12-area find→adversarial-verify workflow. **55 confirmed real bugs** (22 high, 30 medium, 3 low). Checked off as fixed.
+Auto-collected from a 12-area find→adversarial-verify workflow. **55 confirmed real
+bugs** (22 high, 30 medium, 3 low).
+
+## Status
+
+- ✅ **All HIGH-severity bugs fixed** — data loss + document corruption. Shipped in:
+  - PR #2 `fix/bug-bust-high` — save-as-text, Change Case, cover-page, label-table,
+    Labels→Print, Accept/Reject dirty, theme-hover accent, Shift+Tab list,
+    Track-Changes Cut/word-delete/replace, CSV import (RFC-4180), merge→new-doc,
+    table page-split, Format Painter.
+  - PR #3 `fix/bug-bust-high-2` — footnote/endnote ordering, content-aware line
+    numbers, .docx header/footer parts, nested-table flatten.
+  - PR #4 `feat/undo-history` — real snapshot-based undo/redo (covers direct-DOM edits).
+  - PR #5 `feat/comments-docx` — comments exported as native Word comments
+    (validated against real Word via COM).
+- 🔄 **MEDIUM / LOW in progress** (round 3) — see lists below.
+- Suite at this point: **245 functional + 17 docx**, all passing.
+
+See `docs/PROGRESS.md` for the running log.
 
 ## HIGH
 

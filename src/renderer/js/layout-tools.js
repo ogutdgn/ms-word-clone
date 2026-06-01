@@ -91,8 +91,11 @@
       if (objs.length < 3) { WC.toast('Select at least three objects to distribute.'); return; }
       WC.toast('Distributed ' + objs.length + ' objects ' + (axis === 'h' ? 'horizontally' : 'vertically') + '.');
     },
-    rotate(deg) { if (!this.need()) return; const o = this.selected; const cur = (o.dataset.rot ? parseInt(o.dataset.rot, 10) : 0) + deg; o.dataset.rot = cur; o.style.transform = `rotate(${cur}deg)`; E().dirty = true; },
-    flip(axis) { if (!this.need()) return; const o = this.selected; const s = axis === 'h' ? 'scaleX(-1)' : 'scaleY(-1)'; o.style.transform = (o.style.transform || '') + ' ' + s; E().dirty = true; },
+    // Keep rotation and flip as independent state and recompose the transform, so
+    // rotating doesn't discard a flip and re-flipping toggles instead of stacking.
+    _applyTransform(o) { const rot = parseInt(o.dataset.rot || '0', 10); const fh = o.dataset.flipH === '1' ? -1 : 1; const fv = o.dataset.flipV === '1' ? -1 : 1; o.style.transform = `rotate(${rot}deg) scale(${fh}, ${fv})`; },
+    rotate(deg) { if (!this.need()) return; const o = this.selected; o.dataset.rot = (parseInt(o.dataset.rot || '0', 10) + deg); this._applyTransform(o); E().dirty = true; },
+    flip(axis) { if (!this.need()) return; const o = this.selected; const k = axis === 'h' ? 'flipH' : 'flipV'; o.dataset[k] = o.dataset[k] === '1' ? '0' : '1'; this._applyTransform(o); E().dirty = true; },
     position(preset) {
       if (!this.need()) return; const o = this.selected;
       o.style.position = 'absolute'; o.style.zIndex = '5';
