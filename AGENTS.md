@@ -5,6 +5,16 @@ whose UI, behaviour, and on-screen outcomes match real MS Word as closely as
 possible. This file orients any AI agent (or human) working in the repo. Read it
 first, then dive into the linked `docs/`.
 
+> ⚠️ **Project direction (as of 2026-06):** the app is being repurposed into a
+> **computer-use-agent (CUA) reinforcement-learning / eval environment** (logger +
+> verifier + MCP), and the document core is moving from DOM-as-model to a
+> **ProseMirror model forked from SuperDoc**. **Locked decisions:**
+> [docs/decisions/](docs/decisions/) (ADR-0001…0005 + `OPEN_DECISIONS.md`). **Target
+> architecture & tech stack:** [docs/architecture/](docs/architecture/). **Research:**
+> [docs/research/](docs/research/). This happens on the `research-architecture` branch,
+> gated on a de-risking spike — **not yet built**. Everything below describes the
+> **current/legacy** app, still the source of truth until the migration lands.
+
 ## What this is
 
 - **Goal:** clone MS Word's desktop UI and functionality — ribbon, features, and

@@ -7,6 +7,17 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > map, run/test commands, conventions, and critical gotchas). The deep references
 > live in [`docs/`](docs/). This file is the quick, Claude-specific entry point.
 
+> ⚠️ **Project direction (as of 2026-06):** this app is being repurposed into a
+> **computer-use-agent (CUA) reinforcement-learning / eval environment** (logger +
+> verifier + MCP), and the document core is moving from DOM-as-model to a
+> **ProseMirror model forked from SuperDoc**. The **locked architectural decisions**
+> live in **[docs/decisions/](docs/decisions/)** (ADR-0001…0005 + `OPEN_DECISIONS.md`);
+> the **target architecture/tech-stack** in **[docs/architecture/](docs/architecture/)**;
+> the **research** in **[docs/research/](docs/research/)**. This work happens on the
+> `research-architecture` branch and is gated on a de-risking spike — it is **not yet
+> built**. The sections below describe the **current/legacy** app, which is still the
+> source of truth until the migration lands.
+
 ## TL;DR
 
 - **Stack:** Electron 31 shell; renderer is vanilla JS with **no bundler** —
