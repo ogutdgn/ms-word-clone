@@ -7,14 +7,15 @@ description: Use when starting or ending a work session in ms-word-clone, after 
 
 ## Overview
 `docs/plan/` is the project's living memory across sessions. Three files, three roles. The
-core rule: **`last-point.md` must always match reality** — renew it at the end of every session
-and whenever state changes, so the next session resumes without guessing.
+core rule: **append a dated entry to `last-point.md` every session** (newest first, never
+overwrite) and **tick the dated Daily work log in `execution-map.md`**, so the accumulated
+history shows progression and the next session resumes without guessing.
 
-| File | Holds | Changes |
-|------|-------|---------|
-| `docs/plan/plan.md` | goal, locked architecture, dev process, phase roadmap | **rarely** (only when strategy changes) |
-| `docs/plan/execution-map.md` | session playbook + the **CURRENT PHASE** + next actions | **when the phase advances** |
-| `docs/plan/last-point.md` | exact "resume here" snapshot | **every session / every state change** |
+| File | Holds | Each session |
+|------|-------|--------------|
+| `docs/plan/plan.md` | goal, locked architecture, dev process, phase roadmap | **rarely** — only when the strategy changes |
+| `docs/plan/execution-map.md` | session playbook + **CURRENT PHASE** + the dated **Daily work log** | **tick the Daily work log**; update CURRENT PHASE when the phase advances |
+| `docs/plan/last-point.md` | **dated state checkpoints (append-only, newest first)** | **append a new dated entry** (never overwrite) |
 
 ## When to use
 - **Session START:** read `last-point.md` → `execution-map.md` → `plan.md` to orient (do this
@@ -22,11 +23,13 @@ and whenever state changes, so the next session resumes without guessing.
 - **Session END, phase/branch change, or after finishing a subsystem:** update the docs (below).
 
 ## How to renew (the procedure)
-1. **`last-point.md` — ALWAYS.** Set `Last updated` to today's real date, `Branch` to the
-   current branch, and `Current phase`. Rewrite `Done` / `Next` / `Open` / `Blockers` to match
-   what is actually true right now. Be concrete (file paths, branch names, test status).
-2. **`execution-map.md` — IF the phase advanced.** Update the `CURRENT PHASE` section and its
-   concrete next actions to the new phase.
+1. **`last-point.md` — ALWAYS append a new dated entry at the TOP.** A `## <YYYY-MM-DD>` block
+   with: **Branch**, **Phase**, a short **State summary**, **Done this session**, **Next**,
+   **Blockers/notes**. **Never overwrite older entries** — the accumulated history is the point.
+   Use today's real date; be concrete (file paths, branch names, test status).
+2. **`execution-map.md` — ALWAYS tick the Daily work log.** Mark completed items `- [x]` (start a
+   new `### <YYYY-MM-DD>` block if it's a new day; carry unfinished items forward). **AND** if the
+   phase advanced, update the `CURRENT PHASE` section + its next-action checkboxes.
 3. **`plan.md` — ONLY if the strategy/roadmap itself changed** (e.g. a phase was added/reordered,
    a process rule changed). Transient state never goes here.
 4. **Consistency check:** the phase named in `last-point.md`, `execution-map.md`, and `plan.md`
@@ -41,7 +44,9 @@ and whenever state changes, so the next session resumes without guessing.
 - "What did we decide and why?" → `docs/decisions/` (ADRs), not these files.
 
 ## Common mistakes
-- **Ending a session without updating `last-point.md`** → the next session is lost. Always renew it.
+- **Overwriting `last-point.md`** instead of appending a dated entry → you lose the progression.
+  Always add a new `## <date>` block at the top and leave older ones intact.
+- **Ending a session without updating the docs** → the next session is lost. Always append + tick.
 - **Putting transient state in `plan.md`** → it belongs in `last-point.md`; `plan.md` is stable.
 - **Letting the three docs disagree on the current phase** → run the consistency check.
 - **Restating ADR content here** → link to `docs/decisions/` instead; keep one source of truth.

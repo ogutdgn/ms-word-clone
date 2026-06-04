@@ -1,39 +1,40 @@
-# Last Point — current state
+# Last Point — dated state checkpoints
 
-> The exact "resume here" snapshot. **Updated every session** via the `plan-tracking` skill.
+> A running log of "where we are" at the end of each session/day. **Append a NEW dated entry at
+> the TOP each time — never overwrite older entries.** The accumulated history shows our
+> progression. Renewed via the `plan-tracking` skill. Big picture: [plan.md](plan.md) · session
+> playbook + daily work log: [execution-map.md](execution-map.md).
 
-- **Last updated:** 2026-06-03
-- **Branch:** `research-architecture` (4 commits ahead of `main`; nothing pushed yet → see note)
-- **Current phase:** **Phase 0 complete → Phase 1 (Scaffold) is next.**
-- **Mode:** end of the decision + de-risk session.
+---
 
-## Done
-- **Architecture decided + de-risked.** Locked ADR-0001…0005 (CUA pivot · ProseMirror model ·
-  **fork SuperDoc's schema + converter + extensions** · lists = paragraph+`numId` · `.docx`
-  via the fork). License + effort were dropped as criteria; decided on architecture/fidelity/
-  UI-control.
-- **De-risking spike GREEN** (`docs/research/2026-06-03-spike-superdoc-fork.md`): headless
-  `superdoc@1.38.0` round-trips real `.docx` with **no Vue**; model renders to clean DOM via
-  `toDOM` (55/56 nodes) + loads into a fresh independent `EditorState`; closure 185 pkg/148 MB.
-  Resolved "how much to fork" → schema + converter + PM extensions, minus Vue/painter, telemetry
-  stripped.
-- **Documentation in place:** `docs/decisions/` (ADRs + `OPEN_DECISIONS.md`),
-  `docs/architecture/` (target arch + tech stack), `docs/research/` (deep-dive + spike),
-  `docs/plan/` (this system). CLAUDE.md / AGENTS.md carry the project-direction banner + links.
-- Upstream repos cloned to `opensource-solutions/` (gitignored); spike prototype in `spike/`
-  (gitignored).
+## 2026-06-04
+- **Branch:** `main` (the `research-architecture` line was merged via PR #8). Today's doc work
+  is on `docs/dated-plan-logs`.
+- **Phase:** Phase 0 complete → **Phase 1 (Scaffold) is next** — not started.
+- **State summary:** all decision/research/plan docs are now on `main`. Architecture is locked
+  (ADR-0001…0005) and de-risked (spike GREEN). No build work has started.
+- **Done this session:**
+  - Made "**never do code work on `main`** — create + checkout a feature branch first" an
+    explicit rule in `plan.md` + `execution-map.md`.
+  - Restructured `last-point.md` and `execution-map.md` into **dated logs** (append-only history
+    + a daily work-log with checkboxes); updated the `plan-tracking` skill to match.
+- **Next:** Phase 1 — scaffold electron-vite + TS, vendor the SuperDoc fork, mount the model in
+  our own `EditorView` (see [execution-map.md](execution-map.md) → CURRENT PHASE).
+- **Blockers/notes:** none. ⚠️ A docs commit (`a7cb0a8`) landed on `main` by mistake before the
+  branching rule was internalized; from here, all feature/doc work goes on a branch.
 
-## Next (Phase 1 — Scaffold)
-See [execution-map.md](execution-map.md) → "CURRENT PHASE". In short: electron-vite + TS; vendor
-the SuperDoc fork (strip Vue/painter/telemetry); mount the model in our own `EditorView` and type
-into it (closes the spike's Q1 last mile); keep the Word UI visible.
+---
 
-## Open / not yet decided
-The subsystem decisions are intentionally deferred (decide branch-by-branch): pagination engine,
-agent transport, logger contract, verifier language, determinism, task framework, repo/merge.
-Recommendations + edge cases are in [../decisions/OPEN_DECISIONS.md](../decisions/OPEN_DECISIONS.md).
-
-## Blockers / notes
-- None blocking. Decision: keep building on the `research-architecture` line; spin a feature
-  branch per subsystem; merge to `main` at a stable milestone.
-- This branch was pushed to `origin` at the end of the 2026-06-03 session.
+## 2026-06-03
+- **Branch:** `research-architecture` (later merged to `main` via PR #8).
+- **Phase:** Phase 0 complete → Phase 1 next.
+- **Done this session:**
+  - Locked **ADR-0001…0005** (CUA pivot · ProseMirror model · fork SuperDoc's schema + converter
+    + extensions · lists = paragraph+`numId` · `.docx` via the fork).
+  - **De-risk spike GREEN** (`docs/research/2026-06-03-spike-superdoc-fork.md`): headless `.docx`
+    round-trip with **no Vue**; model renders to clean DOM; dependency closure 185 pkg / 148 MB.
+  - Created `docs/decisions/` (ADRs + `OPEN_DECISIONS.md`), `docs/architecture/`,
+    `docs/research/`, `docs/plan/`, the `plan-tracking` skill; CLAUDE.md/AGENTS.md banners;
+    pushed the `research-architecture` branch.
+- **Next:** Phase 1 scaffold.
+- **Blockers/notes:** none.
