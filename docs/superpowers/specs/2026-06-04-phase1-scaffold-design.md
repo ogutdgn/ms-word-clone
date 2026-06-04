@@ -117,6 +117,13 @@ fixture.docx (bytes — loaded without widening the bridge; see §7.7)
 
 > All items below were confirmed against the actual files (`index.html`, `main.js`, `package.json`, `spike/`) and current electron-vite/Vite docs.
 
+> **⚠ Planning corrections — the implementation plan (`docs/superpowers/plans/2026-06-04-phase1-scaffold.md`) is authoritative where it differs.** A plan-stage pass verified §7 against the *published* `superdoc@1.38.0` bundle and corrected:
+> - **§7.2 ESM path:** it's `./main.ts` (relative; electron-vite's renderer root *is* `src/renderer`), not `/src/renderer/main.ts`.
+> - **§7.5 CSP:** relax in dev via a **dev-only Vite `transformIndexHtml` plugin** (swap the meta), NOT `onHeadersReceived` — a strict meta + relaxed header *intersect* and would still block HMR. Prod keeps the strict meta verbatim.
+> - **§7.6 PM pins:** use the spike's resolved versions — model **1.25.7**, state 1.4.4, view **1.41.8**, transform **1.12.0** (do not hard-pin keymap/commands/etc.; override only on a detected duplicate).
+> - **§7.7 schema/plugins:** `Schema` and `ExtensionService` are **not exported** from the published bundle. Stage B (npm-pin) gets the schema from `editor.schema` on a headless Editor and types via `baseKeymap`; the standalone `createSchemaByExtensions` + the SuperDoc editing plugins (Tab/indent) are rebuilt in **Stage C against the vendored source** (with a documented fallback of letting the vendored Editor own the view). `loadXmlData` is a published **5-tuple** `[docx, media, mediaFiles, fonts, decrypted]`.
+> - **§7.1:** there is no `src/renderer/assets/` — move only `js/`, `vendor/`, `styles/`. The fixture is **base64-inlined** (file:// blocks `fetch`).
+
 **7.1 Legacy scripts → `public/`.** Move the 24 assets into `src/renderer/public/` preserving subpaths (`public/vendor/purify.min.js`, `public/js/*.js`). Vite copies `public/` verbatim and never parses them, so `window.WC` is unchanged. **Do not** leave relative non-module `<script src>` in the Vite root — that triggers Vite issue #12921 and the files may not reach `dist`. This is the single way coexistence fails.
 
 **7.2 `index.html`.** Keep the DOM + 6 CSS links. Replace the 24 relative script tags with **root-absolute** paths, *same order*, then the ESM entry **last**:
