@@ -1,0 +1,22 @@
+.super-editor .sd-editor-auto-page-number,
+.super-editor .sd-editor-auto-total-pages {
+  transition: all 250ms ease;
+  border-bottom: 1px solid #9a9a9a;
+  cursor: not-allowed;
+}
+
+.super-editor .sd-editor-auto-page-number:hover,
+.super-editor .sd-editor-auto-total-pages:hover {
+  border-bottom-color: #4f4f4f;
+}
+
+.super-editor .sd-editor-auto-page-number-content {
+  pointer-events: none;
+}
+
+.super-editor .ProseMirror.view-mode {
+  .sd-editor-auto-page-number,
+  .sd-editor-auto-total-pages {
+    border: none;
+  }
+}
