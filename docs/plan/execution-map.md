@@ -12,8 +12,15 @@
 4. Read the **ADR(s)** relevant to the current phase in [../decisions/](../decisions/), and
    the matching item in [../decisions/OPEN_DECISIONS.md](../decisions/OPEN_DECISIONS.md).
 
+> ⚠️ **Branching rule — never do code work on `main`.** Before writing or committing any code,
+> **create and checkout a fresh feature branch** off the integration line
+> (`research-architecture`), e.g. `feature/logger`. Confirm first with
+> `git branch --show-current`. `main` receives **only reviewed merges at stable milestones**.
+> (Docs-only updates may commit to the integration line directly.)
+
 ## How to execute ANY phase/subsystem (the loop)
-1. **Branch** off the integration line (e.g. `feature/<subsystem>`).
+1. **Create + checkout a feature branch** off the integration line (e.g. `feature/<subsystem>`) —
+   do **NOT** work on `main`. Verify with `git branch --show-current` before any edit.
 2. **Confirm the decision:** read its `OPEN_DECISIONS.md` recommendation + edge cases; confirm
    or adjust against the *real* code; if it changes a locked choice, add a superseding ADR.
 3. **Build** it (strangler-fig — behind the existing ribbon; never break the Word UI).

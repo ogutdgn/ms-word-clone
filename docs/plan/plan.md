@@ -35,10 +35,12 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
 - **Decisions are append-only ADRs.** To change a locked decision, add a superseding ADR.
 
 ## Branching model
-- `main` — stable; merge only at coherent milestones.
-- `research-architecture` — the decision/integration line (current).
-- One **feature branch per phase/subsystem** off the integration line (e.g.
-  `build/phase-1-scaffold`, `feature/logger`, `feature/verifier`, `feature/mcp`).
+- **Never do code work on `main`.** Always **create + checkout a feature branch first**
+  (verify with `git branch --show-current` before editing).
+- `main` — stable; receives **only reviewed merges at coherent milestones**.
+- `research-architecture` — the decision/integration line (current); feature branches start here.
+- One **feature branch per phase/subsystem** (e.g. `build/phase-1-scaffold`, `feature/logger`,
+  `feature/verifier`, `feature/mcp`) → PR → integration line → `main` at a milestone.
 
 ## Phase roadmap
 (Order may adjust; logger/verifier/MCP can follow once the editing core is real.)
