@@ -15,7 +15,12 @@ Stand up `electron-vite`+TS; vendor SuperDoc's schema+converter; then prove:
 3. bounded headless dependency-closure for import+export; round-trip 5–10 real `.docx` and
    diff vs the macOS Word oracle.
 **Outcome gates everything.** Green → migrate. Red → fall back to minimal bare-PM + narrowed
-import (ADR-0003 fallback). **Status: agreed, not yet run.**
+import (ADR-0003 fallback). **Status: ✅ RUN GREEN (2026-06-03)** — headless import/export
+round-trips real `.docx` with no Vue mount; model renders to clean DOM + loads into a fresh
+`EditorState`; closure 185 pkg / 148 MB. See
+[spike results](../research/2026-06-03-spike-superdoc-fork.md). Remaining last mile:
+interactive `EditorView` mount in a real browser. `electron-vite`+TS scaffolding was NOT part
+of this spike (run via a standalone Node project) — still to do for the real migration.
 
 ## B. Build tooling & shell
 - **B1 — Bundler + language.** ⭐ `electron-vite` + **TypeScript** (forced the moment we import
@@ -33,8 +38,9 @@ import (ADR-0003 fallback). **Status: agreed, not yet run.**
   heavier `private` packages). ⚠️ pagination determinism hinges on **font metrics** (pin fonts;
   Canvas metrics ≠ Word's embedded-font metrics → glyph-level page breaks won't be byte-identical
   to real Word). **Status: open — reconsider (a) vs (b) given the fork.**
-- **C2 — How much of SuperDoc to fork** (just schema+converter wrapped in our thin PM setup, vs
-  their whole `Editor` class minus UI). **Status: open — resolve in the spike.**
+- **C2 — How much of SuperDoc to fork.** ✅ **Resolved by the spike:** fork **schema +
+  converter + their ProseMirror extensions** (the editing-behavior layer — commands/plugins/
+  keymaps, not Vue), drop the Vue UI + `DomPainter`, strip telemetry. **Status: decided.**
 
 ## D. How the agent drives the environment
 - **D1 — Action transport.** Options: **Playwright-over-HTTP** (figma's pattern: serve the

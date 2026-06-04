@@ -1,6 +1,9 @@
 # ADR-0003 — Fork SuperDoc's schema + converter as the document core
 
-- **Status:** Locked — pending the de-risking spike
+- **Status:** Locked — **spike GREEN (2026-06-03)** → see
+  [spike results](../research/2026-06-03-spike-superdoc-fork.md). Headless import/export
+  round-trips real `.docx` with **no Vue mount**; the model renders to clean DOM via the
+  schema's `toDOM` and loads into a fresh independent `EditorState`.
 - **Date:** 2026-06-03
 - **Refines:** ADR-0002 (which PM schema to use). **Supersedes** the earlier "bare
   ProseMirror with a hand-built minimal schema" lean.
@@ -87,8 +90,11 @@ SuperDoc already models lists as paragraph+`numId` (satisfies ADR-0004) and is b
 - **Fallback (if the spike fails):** revert toward Path 1 — a minimal bare-PM core — and
   *narrow the `.docx` import ambition* (accept that faithful import of arbitrary complex docs
   isn't realistic from scratch); export still via `dolanmiu/docx`.
-- A new sub-decision (resolved in the spike, not now): **how much to fork** — just
-  schema+converter wrapped in our thin PM setup, vs their whole `Editor` class minus the UI.
+- Sub-decision **resolved by the spike**: fork **schema + converter + their ProseMirror
+  extensions** (the editing-behavior layer — commands/plugins/keymaps, *not* Vue), and drop
+  the Vue UI + `DomPainter`. Editing behaviors (list Tab/indent, input rules) live in the
+  extensions, so taking them is what makes our own `EditorView` fully editable. Also strip
+  **telemetry** (on by default) for the offline/deterministic env.
 
 ## Related
 - Research: [`../research/opensource-deepdive/02-superdoc.md`](../research/opensource-deepdive/02-superdoc.md),

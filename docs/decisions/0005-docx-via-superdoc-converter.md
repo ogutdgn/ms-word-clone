@@ -1,6 +1,8 @@
 # ADR-0005 — `.docx` import + export via SuperDoc's bidirectional converter
 
-- **Status:** Locked — pending the de-risking spike
+- **Status:** Locked — **spike GREEN (2026-06-03)** → see
+  [spike results](../research/2026-06-03-spike-superdoc-fork.md). `Editor.loadXmlData()` +
+  `editor.exportDocx()` round-trip real `.docx` headless; structure stable across 3 fixtures.
 - **Date:** 2026-06-03
 
 ## Context

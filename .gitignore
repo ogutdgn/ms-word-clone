@@ -8,5 +8,8 @@ npm-debug.log*
 # Cloned upstream repos used only as local research reference (not part of the app)
 opensource-solutions/
 
+# Throwaway de-risking spike (prototype only; findings captured in docs/)
+spike/
+
 # Local scheduler lock
 .claude/scheduled_tasks.lock
