@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && cp src/main/docx-utils.js out/main/docx-utils.js",
     "preview": "electron-vite preview",
     "start": "electron-vite dev"
   },
