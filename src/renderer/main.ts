@@ -1,19 +1,22 @@
 // Path B: construct the VENDORED SuperDoc Editor, which owns the ProseMirror view.
-// The Editor (with `element` + a real DOM) auto-mounts in its constructor and exposes
-// a plain PM EditorView at `editor.view`. We seed it with the fixture .docx via the
-// static loadXmlData helper. Telemetry is routed to a no-op (see _vendor common barrel),
-// so no network traffic occurs (the smoke gates on window.__NET_LOG being empty).
+// Phase 2: the PM core is the ACTIVE editor by default (spec D1); --legacy boots
+// the classic app. The WC.PM bridge (src/renderer/bridge/) is the only code that
+// talks to the engine.
 import { Editor } from '@core/Editor.js'
 import { getStarterExtensions } from '@extensions/index.js'
 import { TextSelection } from '@/pm'
 import { fixtureArrayBuffer } from '@/core/fixture'
+import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
 
 const w = window as any
 w.__PM_TextSelection = TextSelection
 
+// SYNCHRONOUS (before the async mount): mode flag + page flip + D6 stub.
+preinstallBridge()
+
 const host = document.getElementById('pages') || document.body
 const mountEl = document.createElement('div')
-mountEl.id = 'pm-editor' // styled by the globally-loaded editor.css (looks like Word)
+mountEl.id = 'pm-editor' // page look: vendored print-layout inline styles + editor.css pm-active rules
 host.appendChild(mountEl)
 
 ;(async () => {
@@ -21,10 +24,8 @@ host.appendChild(mountEl)
     // loadXmlData returns [docx, media, mediaFiles, fonts, decrypted]; seed content + media + fonts.
     const [docx, , mediaFiles, fonts] = await (Editor as any).loadXmlData(fixtureArrayBuffer())
 
-    // Real DOM + `element` provided + not headless => the constructor mounts the view itself.
-    // In legacy (content-seeded) mode the Editor does NOT auto-load starter extensions
-    // (that fallback only runs in deferDocumentLoad mode), so we must pass them — without
-    // them the schema has no 'doc' top node.
+    // Legacy (content-seeded) mode does NOT auto-load starter extensions — pass them
+    // explicitly or the schema has no 'doc' top node.
     const editor = new (Editor as any)({
       element: mountEl,
       mode: 'docx',
@@ -46,9 +47,14 @@ host.appendChild(mountEl)
       ;(w.WC.pm ??= {}).lastTxn = Date.now()
     })
 
-    w.__WC_READY = true // LAST statement after mount — the smoke test gates on this
+    installBridge(editor)
+    w.WC.PM.setClean?.() // load-time transactions must never count as user edits
+
+    w.__WC_READY = true // LAST statement after mount — the probe suites gate on this
   } catch (e: any) {
     w.__WC_ERROR = (e && (e.stack || e.message)) || String(e)
     console.error('[main] editor init failed:', e)
+    failBridge(e)
+    w.__WC_READY = true // suites still gate on readiness; [0a] tests then fail loudly
   }
 })()
