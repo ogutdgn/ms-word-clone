@@ -1,5 +1,5 @@
-// @ts-expect-error - preset-geometry package may not have type definitions
-import { getPresetShapeSvg } from '@superdoc/preset-geometry';
+// Stubbed: @superdoc/preset-geometry (geometry package skipped in this fork build).
+const getPresetShapeSvg = () => '';
 import { inchesToPixels } from '@converter/helpers.js';
 import { OOXML_Z_INDEX_BASE } from '@extensions/shared/constants.js';
 import {

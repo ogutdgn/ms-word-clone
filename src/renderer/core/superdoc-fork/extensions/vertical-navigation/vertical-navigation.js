@@ -1,6 +1,8 @@
 import { Extension } from '@core/Extension.js';
 import { Plugin, PluginKey, TextSelection, NodeSelection } from 'prosemirror-state';
-import { DOM_CLASS_NAMES } from '@superdoc/dom-contract';
+// Stubbed: @superdoc/dom-contract (layout-engine package skipped in this fork build).
+// Only PAGE/LINE/FRAGMENT are referenced here; inline the upstream values.
+const DOM_CLASS_NAMES = { PAGE: 'superdoc-page', LINE: 'superdoc-line', FRAGMENT: 'superdoc-fragment' };
 import { CellSelection } from 'prosemirror-tables';
 
 export const VerticalNavigationPluginKey = new PluginKey('verticalNavigation');

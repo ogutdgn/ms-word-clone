@@ -1,6 +1,7 @@
 import { Decoration } from 'prosemirror-view';
 import { calculateTabWidth } from '@superdoc/contracts';
-import { twipsToPixels } from '@superdoc/word-layout';
+// Stubbed: @superdoc/word-layout (geometry package skipped in this fork build).
+const twipsToPixels = (t) => (t * 96) / 1440;
 import {
   defaultLineLength,
   defaultTabDistance,
