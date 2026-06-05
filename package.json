@@ -35,10 +35,11 @@
     "rehype-remark": "^10.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
-    "superdoc": "^1.38.0",
     "tippy.js": "^6.3.7",
     "unified": "^11.0.5",
     "utif2": "^4.1.0",
+    "uuid": "^14.0.0",
+    "vue": "^3.5.35",
     "xml-js": "^1.6.11",
     "y-prosemirror": "^1.3.7"
   },
