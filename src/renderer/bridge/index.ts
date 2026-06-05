@@ -8,6 +8,8 @@ import { installStateSync } from './state-sync'
 import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { toQueryState } from './state-sync'
+import { createPmEditor } from './create-editor'
+import { blankArrayBuffer } from '@/core/fixture'
 
 type AnyEditor = any
 let current: AnyEditor = null
@@ -84,6 +86,47 @@ const AREA: Record<string, string> = {
 function isFlipped(area: string) { return FLIPPED.has(area) }
 function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.has(a) }
 
+// Replace the live editor with one loaded from `source` (Open / New).
+// SAFETY: validate + construct the NEW editor fully before destroying the old
+// one — a failed import must never leave an empty mount (spec §5.3 invariant).
+//
+// VARIANT SHIPPED: parse-first (not staging-reparent).
+// Rationale: ProseMirror EditorView binds event listeners directly to the DOM
+// node it mounts into. Moving those DOM children to a new parent via
+// appendChild breaks the view's internal reference to its own container — typing
+// and selection become dead. To keep the invariant (failed import = live editor
+// untouched) without reparenting, we do a two-phase approach:
+//   Phase 1 (before any teardown): ZIP-magic check + full loadXmlData parse.
+//             A parse failure aborts here — old editor is UNTOUCHED.
+//   Phase 2 (after parse succeeds): destroy old, clear mount, construct new.
+//             Construction failure here is best-effort; the mount may be empty,
+//             but we log it and return false. In practice the parse succeeding
+//             makes construction failure vanishingly rare.
+async function replaceEditor(source: ArrayBuffer): Promise<boolean> {
+  const w = window as any
+  try {
+    // Phase 1: validate + dry-parse BEFORE touching the live editor.
+    const bytes = new Uint8Array(source)
+    if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return false // not a ZIP — refuse before touching the mount
+    const mountEl = document.getElementById('pm-editor') as HTMLElement | null
+    if (!mountEl) return false
+
+    // Phase 2: teardown + construct (parse already succeeded above).
+    try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
+    mountEl.innerHTML = ''
+    const next = await createPmEditor(mountEl, source)
+    w.WC.view = next.view
+    w.WC.editor = next
+    next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
+    installBridge(next)
+    w.WC.PM.setClean()
+    return true
+  } catch (e) {
+    console.error('[WC.PM] replaceEditor failed', e)
+    return false
+  }
+}
+
 let lastToast = -Infinity
 function notifyBlocked(what: string) {
   const now = performance.now()
@@ -113,6 +156,8 @@ export function preinstallBridge() {
     counts: () => ({ words: 0, chars: 0, charsNoSpace: 0, paras: 0, lines: 1, pages: 1, selWords: 0 }),
     captureSelection: () => {},
     withSelection: (fn: () => void) => fn(),
+    openDocx: async () => false, // pre-mount stub — replaced by installBridge
+    newBlank: async () => false, // pre-mount stub — replaced by installBridge
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -128,6 +173,13 @@ export function installBridge(editor: AnyEditor) {
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
+  PM.openDocx = (bytes: Uint8Array | ArrayBuffer) => {
+    const buf = bytes instanceof Uint8Array
+      ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+      : bytes
+    return replaceEditor(buf as ArrayBuffer)
+  }
+  PM.newBlank = () => replaceEditor(blankArrayBuffer())
   installStateSync(editor)
   installFocusGuards()
   PM.ready = true

@@ -2,11 +2,10 @@
 // Phase 2: the PM core is the ACTIVE editor by default (spec D1); --legacy boots
 // the classic app. The WC.PM bridge (src/renderer/bridge/) is the only code that
 // talks to the engine.
-import { Editor } from '@core/Editor.js'
-import { getStarterExtensions } from '@extensions/index.js'
 import { TextSelection } from '@/pm'
 import { fixtureArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
+import { createPmEditor } from '@/bridge/create-editor'
 
 const w = window as any
 w.__PM_TextSelection = TextSelection
@@ -21,22 +20,7 @@ host.appendChild(mountEl)
 
 ;(async () => {
   try {
-    // loadXmlData returns [docx, media, mediaFiles, fonts, decrypted]; seed content + media + fonts.
-    const [docx, , mediaFiles, fonts] = await (Editor as any).loadXmlData(fixtureArrayBuffer())
-
-    // Legacy (content-seeded) mode does NOT auto-load starter extensions — pass them
-    // explicitly or the schema has no 'doc' top node.
-    const editor = new (Editor as any)({
-      element: mountEl,
-      mode: 'docx',
-      content: docx,
-      mediaFiles,
-      fonts,
-      extensions: getStarterExtensions(),
-      user: { name: 'local', email: '' },
-      isDebug: false,
-      telemetry: { enabled: false },
-    })
+    const editor = await createPmEditor(mountEl, fixtureArrayBuffer())
 
     // legacy scripts already built window.WC — never reassign it or window.WC.Editor
     w.WC.view = editor.view // plain PM EditorView — smoke checks .dispatch + .dom.isContentEditable
