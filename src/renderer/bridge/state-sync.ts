@@ -12,7 +12,7 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     subscript: false, superscript: false,
     justifyLeft: false, justifyCenter: false, justifyRight: false, justifyFull: false,
     insertUnorderedList: false, insertOrderedList: false,
-    fontName: '', fontSize: '', block: '',
+    fontName: '', fontSize: '', block: '', // populated when the styles area flips (slice 3)
     computedFontFamily: '', computedFontSizePt: null, // Font-dialog aliases (dialogs.js:347-349)
   }
   let entries: Array<{ name: string; attrs: any }> = []
@@ -35,6 +35,9 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
         break
     }
   }
+  // Head-paragraph only — getNodeAttributes returns the selection-start paragraph;
+  // no cross-paragraph intersection (matches legacy caret-based queryCommandState).
+  // Revisit if a later slice needs Word's mixed-alignment (all-buttons-off) behavior.
   // Alignment + list state live on the paragraph node, not in the mark entries
   // (spec §7.5: paragraphProperties.justification, NOT a flat textAlign).
   const para = (editor.getAttributes('paragraph') || {}) as any
@@ -48,13 +51,16 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
   const listRendering = para?.listRendering
   if (listRendering) {
     if (listRendering.numberingType === 'bullet') st.insertUnorderedList = true
-    else st.insertOrderedList = true // decimal, lowerLetter, upperRoman, etc.
+    else if (listRendering.numberingType) st.insertOrderedList = true // decimal, lowerLetter, upperRoman…; undefined = custom marker, no toggle
   }
   st.computedFontFamily = st.fontName
-  st.computedFontSizePt = parseFloat(st.fontSize) || null
+  const sizeNum = parseFloat(st.fontSize)
+  st.computedFontSizePt = isNaN(sizeNum) ? null : sizeNum
   return st
 }
 
+// Assumes the caller destroys the previous editor (listeners die with it) before
+// re-running on a new instance — see installBridge's re-entrancy note.
 export function installStateSync(editor: AnyEditor) {
   const w = window as any
   let scheduled = false
