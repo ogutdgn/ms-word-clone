@@ -20,7 +20,8 @@ export function installIo(editor: AnyEditor) {
     const words = (text.match(/\S+/g) || []).length
     const chars = text.replace(/\n/g, '').length
     const charsNoSpace = text.replace(/\s/g, '').length
-    const paras = dom ? dom.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li').length : 0
+    // PM engine does not inject ZWS — no strip needed (cf. legacy editor.js counts)
+    const paras = dom ? dom.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote').length : 0
     const lines = (text.match(/\n/g) || []).length + 1
     const pages = 1 // continuous flow until Phase 7 (spec §7.8)
     const sel = editor.state.selection

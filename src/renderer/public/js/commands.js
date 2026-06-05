@@ -688,7 +688,9 @@
     let ov = document.getElementById('immersive'); if (ov) { ov.remove(); return; }
     let size = 20;
     const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
-    const content = el('div', { class: 'ir-content' }); content.innerHTML = docHtml; content.style.fontSize = size + 'px';
+    const content = el('div', { class: 'ir-content' }); content.innerHTML = docHtml;
+    content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
+    content.style.fontSize = size + 'px';
     const setSize = (d) => { size = Math.max(12, Math.min(40, size + d)); content.style.fontSize = size + 'px'; };
     const bg = (c) => { ov.style.background = c; content.style.background = c; };
     const bar = el('div', { class: 'ir-bar' }, [
@@ -715,6 +717,7 @@
     const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
     const content = el('div', { class: 'rm-content' });
     content.innerHTML = docHtml;
+    content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
     const colsWrap = el('div', { class: 'rm-cols' }, [content]);
     const prev = el('button', { class: 'rm-arrow rm-prev', title: 'Previous screen', text: '‹' });
     const next = el('button', { class: 'rm-arrow rm-next', title: 'Next screen', text: '›' });
@@ -739,7 +742,7 @@
   function propertiesDialog() {
     const pmMode = WC.PM && WC.PM.active;
     const c = pmMode ? WC.PM.counts()
-                     : Object.assign(E().counts(), { pages: E().pageCount(), paras: E().node.querySelectorAll('p,h1,h2,h3,h4,li,blockquote').length, lines: (E().node.innerText.match(/\n/g) || []).length + 1, charsNoSpace: E().node.innerText.replace(/\s/g, '').length });
+                     : Object.assign(E().counts(), { pages: E().pageCount(), paras: E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length, lines: (E().node.innerText.match(/\n/g) || []).length + 1, charsNoSpace: E().node.innerText.replace(/\s/g, '').length });
     const f = WC.Files;
     const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', c.paras], ['Pages', c.pages], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });

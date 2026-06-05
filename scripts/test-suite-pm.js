@@ -70,7 +70,7 @@
   await t('[0a] dirty flag tracks PM edits', async () => {
     const d0 = PM().isDirty();
     v().dispatch(v().state.tr.insertText('x', 1));
-    await sleep(60);
+    for (let i = 0; i < 20 && !(PM().isDirty() && document.title.startsWith('•')); i++) await sleep(50);
     return d0 === false && PM().isDirty() === true && document.title.startsWith('•');
   });
   await t('[0a] WC.PM.cmd dispatches an engine command', () => {
