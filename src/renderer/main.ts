@@ -38,7 +38,7 @@ host.appendChild(mountEl)
       telemetry: { enabled: false },
     })
 
-    if (!w.WC) w.WC = {} // legacy scripts already built window.WC — never reassign it or window.WC.Editor
+    // legacy scripts already built window.WC — never reassign it or window.WC.Editor
     w.WC.view = editor.view // plain PM EditorView — smoke checks .dispatch + .dom.isContentEditable
     w.WC.editor = editor
 

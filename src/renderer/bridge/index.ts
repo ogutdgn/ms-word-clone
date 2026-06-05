@@ -84,7 +84,7 @@ const AREA: Record<string, string> = {
 function isFlipped(area: string) { return FLIPPED.has(area) }
 function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.has(a) }
 
-let lastToast = 0
+let lastToast = -Infinity
 function notifyBlocked(what: string) {
   const now = performance.now()
   if (now - lastToast < 1500) return // throttle: leaf-closure paths can fire bursts
@@ -117,6 +117,8 @@ export function preinstallBridge() {
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
 
+// Re-entrant by design: replaceEditor (slice 0b) re-runs this on Open/New —
+// closures rebind to the new instance; install* fns must stay idempotent.
 export function installBridge(editor: AnyEditor) {
   const w = window as any
   current = editor
@@ -139,5 +141,7 @@ export function failBridge(err: unknown) {
   document.body.classList.remove('pm-active')
   if (w.WC?.PM) w.WC.PM.active = false
   w.WC?.toast?.('New engine failed to start — using the classic editor', String((err as any)?.message || err))
-  w.WC?.Editor?.focus?.()
+  // May run pre-DOMContentLoaded (sync mount failure): WC.Editor.node is null
+  // until init() — never let the fallback itself throw and kill __WC_READY.
+  try { if (w.WC?.Editor?.node) w.WC.Editor.focus() } catch { /* fallback must never throw */ }
 }
