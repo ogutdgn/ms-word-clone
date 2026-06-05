@@ -788,6 +788,7 @@
     run(control, node) {
       WC.closeFlyouts(); WC.hideTip();
       const cmd = control.cmd;
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(control.cmd)) { WC.PM.notifyBlocked(control.label || control.cmd); return; }
       if (H[cmd]) { H[cmd](control, node); return; }
       // split/dropdown without explicit handler -> open items if present
       if ((control.type === 'split' || control.type === 'dropdown') && control.items) { this.dropdown(control, node); return; }
@@ -796,6 +797,7 @@
 
     dropdown(control, node) {
       WC.closeFlyouts();
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(control.cmd)) { WC.PM.notifyBlocked(control.label || control.cmd); return; }
       const cmd = control.cmd;
       // custom dropdowns
       if (cmd === 'changeCase') return changeCaseMenu(node);
@@ -887,19 +889,25 @@
     },
 
     comboCommit(c, value) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
       if (c.cmd === 'font') setFontName(value);
       else if (c.cmd === 'fontSize') setFontSize(parseFloat(value));
     },
     comboDropdown(c, combo, input) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
       if (c.cmd === 'font') openFontList(combo);
       else if (c.cmd === 'fontSize') openSizeList(combo);
       else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.Review.setDisplayMode(m); input.value = l; } }))); });
     },
 
-    applyStyle(name) { WC.applyNamedStyle(name); },
+    applyStyle(name) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
+      WC.applyNamedStyle(name);
+    },
 
     // Layout Paragraph spinners (indent in inches, spacing in points).
     spinner(cmd, value) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
       if (cmd === 'indentLeft') E().applyBlockStyle('marginLeft', value ? value + 'in' : '');
       else if (cmd === 'indentRight') E().applyBlockStyle('marginRight', value ? value + 'in' : '');
       else if (cmd === 'spacingBefore') E().applyBlockStyle('marginTop', value + 'pt');
@@ -911,6 +919,11 @@
     // like the Font launcher sharing 'font' with the font-name combo).
     launcher(groupId, control, node) {
       WC.closeFlyouts(); WC.hideTip();
+      if (WC.PM && WC.PM.active) {
+        const LAUNCHER_AREA_CMD = { font: 'font', paragraph: 'alignLeft', styles: 'stylesGallery' }; // clipboard pane = app-level, allowed
+        const probe = LAUNCHER_AREA_CMD[groupId];
+        if (probe && WC.PM.isBlocked(probe)) { WC.PM.notifyBlocked(groupId + ' settings'); return; }
+      }
       const map = {
         clipboard: () => (WC.Dialogs.clipboardPane ? WC.Dialogs.clipboardPane() : WC.notImplemented('Clipboard pane')),
         font: () => (WC.Dialogs.fontDialog ? WC.Dialogs.fontDialog() : WC.notImplemented('Font dialog')),

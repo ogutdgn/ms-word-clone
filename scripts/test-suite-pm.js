@@ -113,6 +113,17 @@
     return !!r && r.ok === false;
   });
 
+  await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
+    window.WC.Commands.run({ cmd: 'bullets', label: 'Bullets' });
+    return document.querySelectorAll('.flyout').length === 0; // no flyout, no throw
+  });
+  await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
+    window.WC.Commands.dropdown({ cmd: 'bullets', type: 'dropdown' }, document.body);
+    const open = document.querySelectorAll('.flyout').length;
+    window.WC.closeFlyouts();
+    return open === 0;
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
