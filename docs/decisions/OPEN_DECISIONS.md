@@ -121,3 +121,6 @@ of this spike (run via a standalone Node project) — still to do for the real m
   hard constructs (sections/headers/footers/fields/track-changes/comments) → pagination (last) →
   `.docx` round-trip tests → (optional) React chrome. Gate every cut-over on the 228+9 suite.
   **Status: open (draft in `../research/opensource-deepdive/04-migration-and-feature-preservation.md`).**
+  Phase 2 in progress per `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md` —
+  slice 0a (flip + bridge + D6) landed 2026-06-05; hard-constructs wiring (track changes/comments/
+  fields) moved INTO Phase 2 slices 8–9, ahead of the logger.
