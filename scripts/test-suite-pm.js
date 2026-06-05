@@ -148,6 +148,14 @@
     return ok;
   });
 
+  await t('[0a] PK-prefixed junk import leaves the live editor intact', async () => {
+    setDoc('survives pk junk');
+    const junk = new Uint8Array(64); junk[0] = 0x50; junk[1] = 0x4b; junk[2] = 3; junk[3] = 4; // PK magic, garbage body
+    const ok = await PM().openDocx(junk);
+    const mount = document.getElementById('pm-editor');
+    return ok === false && mount.querySelector('.ProseMirror') !== null && /survives pk junk/.test(v().dom.textContent);
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()

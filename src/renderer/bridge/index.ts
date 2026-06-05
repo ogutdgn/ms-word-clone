@@ -8,7 +8,7 @@ import { installStateSync } from './state-sync'
 import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { toQueryState } from './state-sync'
-import { createPmEditor } from './create-editor'
+import { parseDocx, constructPmEditor } from './create-editor'
 import { blankArrayBuffer } from '@/core/fixture'
 
 type AnyEditor = any
@@ -87,34 +87,37 @@ function isFlipped(area: string) { return FLIPPED.has(area) }
 function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
-// SAFETY: validate + construct the NEW editor fully before destroying the old
-// one — a failed import must never leave an empty mount (spec §5.3 invariant).
+// SAFETY: validate + PARSE before any teardown — a corrupt file must leave the
+// live editor untouched (spec §5.3 invariant).
 //
-// VARIANT SHIPPED: parse-first (not staging-reparent).
+// VARIANT SHIPPED: parse-once (not staging-reparent).
 // Rationale: ProseMirror EditorView binds event listeners directly to the DOM
 // node it mounts into. Moving those DOM children to a new parent via
 // appendChild breaks the view's internal reference to its own container — typing
 // and selection become dead. To keep the invariant (failed import = live editor
-// untouched) without reparenting, we do a two-phase approach:
+// untouched) without reparenting, we use a true two-phase approach:
 //   Phase 1 (before any teardown): ZIP-magic check + full loadXmlData parse.
 //             A parse failure aborts here — old editor is UNTOUCHED.
-//   Phase 2 (after parse succeeds): destroy old, clear mount, construct new.
+//   Phase 2 (after parse succeeds): destroy old, clear mount, construct new
+//             from the ALREADY-PARSED data (no re-parse).
 //             Construction failure here is best-effort; the mount may be empty,
-//             but we log it and return false. In practice the parse succeeding
-//             makes construction failure vanishingly rare.
+//             but we log it and return false. In practice parse success makes
+//             construction failure vanishingly rare.
 async function replaceEditor(source: ArrayBuffer): Promise<boolean> {
   const w = window as any
   try {
-    // Phase 1: validate + dry-parse BEFORE touching the live editor.
+    // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
+    // the live editor untouched (spec §5.3 invariant).
     const bytes = new Uint8Array(source)
-    if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return false // not a ZIP — refuse before touching the mount
+    if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return false
     const mountEl = document.getElementById('pm-editor') as HTMLElement | null
     if (!mountEl) return false
-
-    // Phase 2: teardown + construct (parse already succeeded above).
+    const parsed = await parseDocx(source) // throws on corrupt input → caught → false, old editor intact
+    // Phase 2 — teardown + construct from the ALREADY-PARSED data (no re-parse;
+    // residual risk is constructor failure on parsed data — genuinely rare).
     try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
     mountEl.innerHTML = ''
-    const next = await createPmEditor(mountEl, source)
+    const next = constructPmEditor(mountEl, parsed)
     w.WC.view = next.view
     w.WC.editor = next
     next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
