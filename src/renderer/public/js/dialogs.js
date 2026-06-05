@@ -98,6 +98,9 @@
   // ---- Find & Replace pane ----
   let findState = { hits: [], idx: -1 };
   D.findPane = function (replace) {
+    // PM mode: legacy find/replace rewrites #editor text nodes (raw DOM —
+    // bypasses the editor.js chokepoints). Blocked until slice 5 (fork Search ext).
+    if (window.WC.PM && window.WC.PM.active) { window.WC.PM.notifyBlocked('Find & Replace'); return; }
     clearHits();
     let pane = document.getElementById('find-pane');
     if (pane) pane.remove();

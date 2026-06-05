@@ -149,7 +149,7 @@
     if (WC.Review && WC.Review.init) WC.Review.init();
     bindKeys();
     bindMisc();
-    WC.Editor.focus();
+    if (!(WC.PM && WC.PM.active)) WC.Editor.focus(); // PM mode: bridge focuses the PM view post-mount
     // initial state sync
     WC.Editor.emit();
     console.log('WORD_CLONE_READY tabs=' + WC.RIBBON.length);

@@ -14,6 +14,7 @@
   function serializeSel() { const s = window.getSelection(); if (!s.rangeCount || !E().node.contains(s.anchorNode)) return null; const r = s.getRangeAt(0); return { sp: selPath(r.startContainer), so: r.startOffset, ep: selPath(r.endContainer), eo: r.endOffset }; }
   function restoreSel(d) { if (!d) return; try { const r = document.createRange(); r.setStart(nodeAtPath(d.sp), d.so); r.setEnd(nodeAtPath(d.ep), d.eo); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E().saveRange(); } catch (e) { /* selection drifted */ } }
   function stylePreviewEnter(name) {
+    if (window.WC.PM && window.WC.PM.active) return; // PM mode: gallery preview lands in slice 3
     if (!E() || !E().node) return;
     if (!gallerySnap) gallerySnap = { html: E().node.innerHTML, sel: serializeSel(), dirty: E().dirty };
     WC.applyNamedStyle(name);
