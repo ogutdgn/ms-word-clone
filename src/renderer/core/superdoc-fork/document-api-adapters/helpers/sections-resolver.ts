@@ -8,7 +8,11 @@ import type {
   SectionsListResult,
 } from '@superdoc/document-api';
 import { buildDiscoveryItem, buildDiscoveryResult, buildResolvedHandle } from '@superdoc/document-api';
-import { analyzeSectionRanges, type PMNode } from '@core/layout-adapter';
+// Import from the leaf modules directly (not the layout-adapter index) so the heavy
+// layout-engine converters re-exported by index.ts never enter the build graph. The
+// section-range analysis itself is geometry-free (only @superdoc/contracts).
+import { analyzeSectionRanges } from '@core/layout-adapter/sections/analysis.js';
+import type { PMNode } from '@core/layout-adapter/types.js';
 import { SectionType, type SectionRange } from '@core/layout-adapter/sections/types.js';
 import type { Editor } from '../../core/Editor.js';
 import { DocumentApiAdapterError } from '../errors.js';
