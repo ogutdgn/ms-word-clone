@@ -25,7 +25,7 @@
   t('Tab indents a list item (doc mutates)', () => {
     const v = window.WC.view; v.focus();
     let pos = null; v.state.doc.descendants((n, p) => { if (pos === null && n.type.name === 'paragraph' && /numbering|listLevel|numId|list/i.test(JSON.stringify(n.attrs))) pos = p + 1; });
-    if (pos === null) return 'no list paragraph in fixture';
+    if (pos === null) return false; // no list paragraph found ⇒ FAIL (don't silently skip the Tab proof)
     v.dispatch(v.state.tr.setSelection(window.__PM_TextSelection.create(v.state.doc, pos)));
     const before = JSON.stringify(v.state.doc.toJSON());
     const ok = v.someProp('handleKeyDown', (f) => f(v, new KeyboardEvent('keydown', { key: 'Tab' })));
