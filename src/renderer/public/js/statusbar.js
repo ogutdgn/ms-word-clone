@@ -58,6 +58,13 @@
 
     update() {
       if (!this.node) return;
+      if (WC.PM && WC.PM.active && WC.PM.ready) {
+        // Continuous flow until Phase 7 — report honestly (spec §7.8).
+        this.pageEl.textContent = 'Page 1 of 1';
+        const c = WC.PM.counts();
+        this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
+        return;
+      }
       const count = E().pageCount();
       const cur = E().currentPage();
       this.pageEl.textContent = `Page ${cur} of ${count}`;
