@@ -106,6 +106,13 @@
     const tab = document.querySelector('.ribbon-tab[data-tab="insert"]');
     return tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })) === false;
   });
+  await t('[0a] focus guard: scrollbar-gutter mousedown keeps its default', () => {
+    // Synthetic hit beyond the client box (where a scrollbar would live) must NOT
+    // be prevented, or scrollbar dragging dies in flyouts/ribbon-scroll.
+    const rs = document.querySelector('.ribbon-scroll');
+    const r = rs.getBoundingClientRect();
+    return rs.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: r.left + rs.clientWidth + 4, clientY: r.top + 4 })) === true;
+  });
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] PM-mode save is blocked until the bytes path (no legacy serialize)', async () => {
