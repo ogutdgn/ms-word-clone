@@ -18,18 +18,26 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 >   **Target architecture/tech-stack:** [docs/architecture/](docs/architecture/).
 >   **Research (incl. the green de-risk spike):** [docs/research/](docs/research/).
 >
-> Work happens on the `research-architecture` branch; the de-risk spike passed (green) but the
-> migration is **not yet built**. The sections below describe the **current/legacy** app, which
-> is still the source of truth until the migration lands.
+> **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
+> builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
+> ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
+> dep). It runs **alongside** the legacy app — **"two worlds":** the legacy vanilla-JS `window.WC`
+> editor is still the *wired/active* one (and is what the TL;DR below describes); the new core is
+> mounted but not yet wired. **Phase 2** wires the ribbon to the new core and retires the legacy
+> editor. Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 
-- **Stack:** Electron 31 shell; renderer is vanilla JS with **no bundler** —
-  ordered `<script>` tags build a global `window.WC` namespace. Main process owns
-  fs + `.docx` via a `window.wordAPI` `contextBridge` bridge.
-- **Document:** one `#editor` `contenteditable` + a custom command layer over
-  `execCommand`. Pagination fakes page sheets in that single flow — see
-  [docs/PAGINATION.md](docs/PAGINATION.md).
+- **Stack:** Electron 31 shell; renderer built by **electron-vite + TypeScript** (since Phase 1).
+  **Two worlds:** the *legacy* app is still vanilla JS — classic `<script>` tags (now under
+  `src/renderer/public/js/`, served verbatim) build the global `window.WC` namespace — running
+  beside the **new owned ProseMirror core** (TS/ESM: `src/renderer/main.ts` → vendored fork in
+  `src/renderer/core/superdoc-fork/`, single `prosemirror-model` copy, telemetry off). Main
+  process (plain CJS) owns fs + `.docx` via the `window.wordAPI` `contextBridge` bridge.
+- **Document (legacy, still active):** one `#editor` `contenteditable` + a custom command layer
+  over `execCommand`. Pagination fakes page sheets in that single flow — see
+  [docs/PAGINATION.md](docs/PAGINATION.md). *(The new core renders into `#pm-editor`; Phase 2
+  makes it the active page.)*
 - **Ribbon:** data-driven from `WC.RIBBON` (10 tabs / 212 controls) →
   `WC.Ribbon` renders → `WC.Commands` dispatches `H[cmd]`. See
   [docs/RIBBON.md](docs/RIBBON.md).

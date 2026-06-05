@@ -16,40 +16,62 @@ first, then dive into the linked `docs/`.
 >   **Target architecture & tech stack:** [docs/architecture/](docs/architecture/).
 >   **Research (incl. the green de-risk spike):** [docs/research/](docs/research/).
 >
-> This happens on the `research-architecture` branch; the de-risk spike passed (green) but the
-> migration is **not yet built**. Everything below describes the **current/legacy** app, still
-> the source of truth until the migration lands.
+> **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
+> builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
+> ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc`
+> npm dep, telemetry off). It runs **alongside** the legacy app — **"two worlds":** the legacy
+> vanilla-JS `window.WC` editor is still the *wired/active* one (it's what most of this file
+> describes), while the new core is mounted but not yet wired. **Phase 2** wires the ribbon to
+> the new core and retires the legacy editor. Exact state: [docs/plan/](docs/plan/).
 
 ## What this is
 
 - **Goal:** clone MS Word's desktop UI and functionality — ribbon, features, and
   the *visible outcome* of every control — not a generic text editor.
-- **Shell:** Electron 31 + a vanilla-JS renderer. **No bundler** — classic
-  `<script>` tags load modules in order onto a global `window.WC` namespace.
-- **Document model:** one `#editor` `contenteditable` + a custom command layer
-  over `document.execCommand` (with `styleWithCSS`).
+- **Shell:** Electron 31; renderer built by **electron-vite + TypeScript** (since Phase 1).
+  **Two worlds:** the *legacy* app is still vanilla JS — classic `<script>` tags (served verbatim
+  from `src/renderer/public/js/`) load modules in order onto the global `window.WC` namespace —
+  running beside the **new owned ProseMirror core** (TS/ESM under `src/renderer/`).
+- **Document model (legacy, still active):** one `#editor` `contenteditable` + a custom command
+  layer over `document.execCommand` (with `styleWithCSS`). *(New core: a vendored ProseMirror
+  `Editor` rendering into `#pm-editor`; Phase 2 makes it the active page.)*
 - **Files:** the main process does fs + dialogs + `.docx` conversion and exposes
   a narrow `window.wordAPI` bridge via a `contextBridge` preload.
 
 ## Directory map
 
 ```
-src/main/main.js        Electron main: window, IPC, fs, docx import/export, COM-free
+electron.vite.config.ts electron-vite build config: main/preload/renderer; @superdoc/* + @core/@converter
+                        aliases; single-PM `resolve.dedupe`; dev-CSP, .vue-stub, docx-utils-copy plugins
+tsconfig.json           TS config for the renderer module graph (the new core)
+src/main/main.js        Electron main (plain CJS): window, IPC, fs, docx import/export; dev/prod loader split
 src/main/preload.js     contextBridge -> window.wordAPI (the only privileged surface)
-src/renderer/index.html Script load order (the dependency graph) + CSP
-src/renderer/js/        All renderer logic on the global WC namespace:
-  editor.js             WC.Editor: the contenteditable, command layer, PAGINATION
-  ribbon.js             renders WC.RIBBON, wires controls to WC.Commands
-  ribbon-data.js        WC.RIBBON data (generated; do not hand-edit)
-  commands.js           WC.Commands dispatcher + the H[cmd] handler table + menus
-  icons.js / icons-fluent.js   WC.icon() dispatcher + generated Fluent icon set
-  *-features.js / *-tools.js   per-tab feature modules (home, insert, draw, …)
-  comments.js, formatting.js, statusbar.js, dialogs.js, files.js, backstage.js, app.js
-src/renderer/styles/    base.css (page geometry vars), editor.css, ribbon.css, …
-scripts/                test-suite.js (in-renderer QA), test_docx.js, gen-icons.js, gen.js
+
+src/renderer/index.html Loads the legacy classic scripts (build window.WC) FIRST, then the ESM
+                        entry ./main.ts LAST; strict CSP (relaxed only in dev via a Vite plugin)
+src/renderer/main.ts    NEW core entry (TS/ESM): constructs the vendored Editor, mounts #pm-editor,
+                        exposes window.WC.view + window.__WC_READY; logger seam = editor.on('transaction')
+src/renderer/core/      NEW owned ProseMirror core (TypeScript):
+  superdoc-fork/        vendored + stripped SuperDoc engine — schema + super-converter + extensions,
+                        plus _vendor/superdoc/* siblings; telemetry-noop.ts; NOTICE.md (AGPL-3.0)
+  fixture.ts, generated/  base64-inlined .docx fixture (file://-safe; regen via scripts/gen-fixture.js)
+src/renderer/pm/index.ts  single ProseMirror barrel (enforces one PM copy)
+src/renderer/public/    LEGACY app, served VERBATIM by Vite (static, untransformed):
+  js/                   the classic window.WC modules — editor.js (WC.Editor: contenteditable +
+                        command layer + PAGINATION), ribbon.js, ribbon-data.js (generated), commands.js
+                        (WC.Commands + H[cmd] table), icons*.js, *-features.js/*-tools.js, app.js,
+                        00-netlog.js (no-network guard for the smoke test)
+  styles/               base.css (page geometry vars), editor.css, ribbon.css, …
+  vendor/               purify.min.js
+scripts/                test-suite.js (257 in-renderer QA), test_docx.js (17 docx), smoke-pm.js
+                        (9 PM-core smoke), gen-icons.js, gen.js, gen-fixture.js
+out/                    electron-vite build output (gitignored): out/{main,preload,renderer}
 docs/                   the documentation set (below)
 .claude/skills/commit-style/   the commit convention (follow it for every commit)
 ```
+> **Run/test note (post-Phase-1):** the in-renderer harness now needs a build first —
+> `npm run build && npx electron . --probe-out=… --shot-evalfile=scripts/test-suite.js`. `npm run dev`
+> / `npm run build` / `npm run preview` are the electron-vite scripts. See [docs/BUILD_AND_RUN.md](docs/BUILD_AND_RUN.md).
 
 ## Documentation set (`docs/`)
 
