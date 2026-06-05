@@ -54,7 +54,7 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
    behaviour/geometry change. **PID-safe:** kill only the spawned WINWORD PID,
    never the user's window (see AGENTS.md → COM oracle).
 2. **Every fix ships a regression test** in `scripts/test-suite.js`. Re-run the
-   suite (228 tests) + `scripts/test_docx.js` (9 tests) before committing.
+   suite (257 tests) + `scripts/test_docx.js` (17 tests) before committing.
 3. **Commits:** follow `.claude/skills/commit-style/SKILL.md` —
    `type(scope): summary`, a what/why body, explicit `git add <path>`, and **no
    `Co-Authored-By`/AI trailer**. Branch for non-trivial work; PR for
@@ -67,9 +67,12 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 ## Quick commands
 
 ```bash
-npm start                                   # run (WSL: DISPLAY=:0)
+npm start                                   # run the app
 # functional suite (JSON -> --probe-out):
-DISPLAY=:0 npx electron . --probe-out=/tmp/results.json \
+npm run build && npx electron . --probe-out=/tmp/results.json \
   --shot-evalfile=scripts/test-suite.js --shot-delay=800
-node scripts/test_docx.js                   # docx round-trip
+node scripts/test_docx.js                   # docx round-trip (17 pass / 0 fail)
+# ProseMirror smoke test (9 assertions):
+npm run build && npx electron . --probe-out=/tmp/smoke.json \
+  --shot-evalfile=scripts/smoke-pm.js
 ```

@@ -161,7 +161,7 @@ that returns a value (an object is fine), and collect it via `--probe-out`:
 
 ```bash
 # Run the in-app functional battery; write {summary, results[]} to JSON
-electron . \
+npm run build && npx electron . \
   --no-sandbox --disable-gpu \
   --shot-evalfile=scripts/test-suite.js \
   --probe-out=/tmp/results.json
@@ -174,7 +174,7 @@ invocation:
 
 ```js
 /* In-renderer functional test battery. Run via:
-   electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+   npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
    Returns JSON {summary, results[]} as the executeJavaScript result. */
 ```
 
@@ -182,7 +182,7 @@ You can combine a probe with a screenshot to get both a result file and a pictur
 final state:
 
 ```bash
-electron . --no-sandbox --disable-gpu \
+npm run build && npx electron . --no-sandbox --disable-gpu \
   --shot-evalfile=scripts/test-suite.js \
   --probe-out=/tmp/results.json \
   --shot=/tmp/after.png
@@ -191,7 +191,7 @@ electron . --no-sandbox --disable-gpu \
 A quick one-liner probe (no file) reads live editor state:
 
 ```bash
-electron . --no-sandbox --disable-gpu \
+npm run build && npx electron . --no-sandbox --disable-gpu \
   --shot-eval="JSON.stringify(window.WC.Editor.queryState())" \
   --probe-out=/tmp/state.json
 ```
@@ -204,7 +204,7 @@ electron . --no-sandbox --disable-gpu \
 HTML → DOCX (html-to-docx) → HTML (mammoth), with an **OOXML regression guard**.
 
 ```bash
-node scripts/test_docx.js          # currently 9/9 content checks pass
+node scripts/test_docx.js          # currently 17/17 content checks pass
 ```
 
 It uses the exact same complete `margins` object the app uses in `writeDocx`
@@ -320,7 +320,7 @@ npm start -- --win=1280x800 --start-maximized
 
 # Screenshot / probe (one-shot, auto-quits)
 npm start -- --shot=/tmp/word.png
-electron . --shot-evalfile=scripts/test-suite.js --probe-out=/tmp/results.json
+npm run build && npx electron . --shot-evalfile=scripts/test-suite.js --probe-out=/tmp/results.json
 
 # File-pipeline tests (plain Node, no Electron)
 node scripts/test_docx.js                   # HTML->DOCX->HTML round trip + OOXML guard

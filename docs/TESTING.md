@@ -7,8 +7,8 @@ against a live Chromium DOM, and (where ground truth matters) is checked against
 
 There are three layers:
 
-1. **In-renderer functional harness** — `scripts/test-suite.js` (228 tests). Runs the real command dispatcher and asserts on the resulting DOM/state.
-2. **`.docx` round-trip suite** — `scripts/test_docx.js` (9 content checks + 2 OOXML regression guards). Pure Node, no Electron.
+1. **In-renderer functional harness** — `scripts/test-suite.js` (257 tests). Runs the real command dispatcher and asserts on the resulting DOM/state.
+2. **`.docx` round-trip suite** — `scripts/test_docx.js` (17 content checks + 2 OOXML regression guards). Pure Node, no Electron.
 3. **Real-Word COM oracle differential tests** — `*_probe.ps1` / `oracle.ps1` scripts that drive the user's installed Word and emit ground-truth JSON under `docs/research/`.
 
 ---
@@ -90,12 +90,12 @@ return JSON.stringify({ summary: { total: results.length, pass, fail }, results 
 **Run command:**
 
 ```bash
-electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
 # in headless / CI environments add the usual Electron flags:
-npm start -- --no-sandbox --disable-gpu --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+npm run build && npx electron . --no-sandbox --disable-gpu --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
 ```
 
-The app launches, runs all 228 tests in the renderer, writes
+The app launches, runs all 257 tests in the renderer, writes
 `/tmp/results.json`, prints `PROBE_SAVED /tmp/results.json` to stdout, and
 `app.quit()`s. (If the eval throws before returning, you get `PROBE_FAIL` on
 stderr and no file.)
@@ -106,7 +106,7 @@ The output file is `{ summary, results[] }`:
 
 ```json
 {
-  "summary": { "total": 228, "pass": 228, "fail": 0 },
+  "summary": { "total": 257, "pass": 257, "fail": 0 },
   "results": [
     { "name": "Bold applies to selection", "pass": true, "detail": "" },
     { "name": "Find highlights all matches", "pass": true, "detail": "3 hits" },
@@ -134,7 +134,7 @@ usually means the asserted DOM/state condition was not met.
 The suite is grouped by tab / concern with banner comments
 (`// ================= HOME TAB feature tests =================`). Tests are
 also self-labelling via a bracket prefix in their name, which makes filtering
-trivial. Current counts (228 total):
+trivial. Current counts (257 total):
 
 | Prefix / group | ~Count | Covers |
 |---|---|---|
@@ -178,7 +178,7 @@ OOXML is openable by **real** Microsoft Word.
 **Run command:**
 
 ```bash
-node scripts/test_docx.js     # currently 9/9 content checks pass
+node scripts/test_docx.js     # currently 17/17 content checks pass
 ```
 
 What it does:
@@ -201,7 +201,7 @@ What it does:
    made `html-to-docx` emit `w:header="undefined"`, which mammoth and
    LibreOffice silently tolerated but real Word **refused to open** (see
    `docs/VALIDATION_home_insert.md`).
-3. **DOCX → HTML** via `mammoth`, then 9 content checks (title, bold, italic,
+3. **DOCX → HTML** via `mammoth`, then 17 content checks (title, bold, italic,
    heading, bullet, number, table cell `R1C1`, `<table>` tag, coloured
    paragraph).
 
@@ -211,7 +211,7 @@ What it does:
    OOXML guard: no "undefined" = PASS, integer pgMar = PASS
     PASS Round Trip Test
     ...
-RESULT: 9 pass / 0 fail
+RESULT: 17 pass / 0 fail
 ```
 
 Exit code is **non-zero** if the OOXML guard fails (`process.exit(1)`) or any
@@ -297,13 +297,16 @@ jq '.results[] | select(.name | startswith("[fix]"))' /tmp/results.json
 ## Quick reference
 
 ```bash
-# Functional harness (228 tests) → /tmp/results.json {summary,results[]}
-electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+# Functional harness (257 tests) → /tmp/results.json {summary,results[]}
+npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
 jq .summary /tmp/results.json
 jq '.results[] | select(.pass==false)' /tmp/results.json   # show failures
 
 # .docx round-trip + OOXML guards (read the RESULT: line; exit≠0 on guard fail)
 node scripts/test_docx.js
+
+# ProseMirror smoke test (9 assertions) → /tmp/smoke.json
+npm run build && npx electron . --probe-out=/tmp/smoke.json --shot-evalfile=scripts/smoke-pm.js
 
 # Real-Word oracles: captured under docs/research/*-oracle.json + real-word-groundtruth.json
 #   (drive scripts live from C:\Users\Public\wcprobe\ on a Windows box with Word installed)
