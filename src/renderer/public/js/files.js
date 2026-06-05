@@ -72,6 +72,10 @@
     },
 
     async save() {
+      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
+      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
+      // file with the blank legacy doc otherwise).
+      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
       if (!this.path) return this.saveAs();
       const p = E().getSavePayload();
       const r = await window.wordAPI.save({ filePath: this.path, html: p.html, header: p.header, footer: p.footer, comments: p.comments, format: this.format });
@@ -81,6 +85,10 @@
     },
 
     async saveAs() {
+      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
+      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
+      // file with the blank legacy doc otherwise).
+      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
       const p = E().getSavePayload();
       const r = await window.wordAPI.saveAs({ html: p.html, header: p.header, footer: p.footer, comments: p.comments, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
       if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = r.format; E().dirty = false; this.updateTitle(); WC.toast('Saved ' + r.name); }

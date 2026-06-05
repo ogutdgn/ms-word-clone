@@ -33,38 +33,38 @@ All hits that write to (or structurally mutate) `E().node` outside the `editor.j
 | commands.js:1320 | `E().node.style.columnCount` + `E().node.style.columnGap` | `blocked-by-flipped-area-slice-1` — columns dialog; style mutation on offscreen `#editor`; slice 1 handles layout in PM view |
 | commands.js:1371 | `E().node.setAttribute('spellcheck', …)` | `harmless-readonly` — spellcheck attribute toggle on hidden legacy node; no content export impact |
 | commands.js:1372 | `WC.toast(…)` only | `harmless-readonly` — pure UI |
-| design-tools.js:91 | `E().node.className = s.edClass` | `blocked-by-flipped-area-slice-2` — StyleSet applier assigns className; legacy node is hidden; slice 2 wires StyleSets to PM |
-| design-tools.js:118 | `E().node.className = E().node.className.replace(…)` | `blocked-by-flipped-area-slice-2` — StyleSet reset; same as above |
-| design-tools.js:120 | `E().node.classList.add(cls)` | `blocked-by-flipped-area-slice-2` — StyleSet class; slice 2 |
+| design-tools.js:91 | `E().node.className = s.edClass` | `blocked-by-flipped-area-slice-10` — StyleSet applier assigns className; legacy node is hidden; slice 10 (themes area) wires StyleSets to PM |
+| design-tools.js:118 | `E().node.className = E().node.className.replace(…)` | `blocked-by-flipped-area-slice-10` — StyleSet reset; same as above |
+| design-tools.js:120 | `E().node.classList.add(cls)` | `blocked-by-flipped-area-slice-10` — StyleSet class; slice 10 |
 | design-tools.js:129 | `E().node.appendChild(box)` (wc-page-border) | `blocked-by-flipped-area-slice-7` — page-border non-printing decoration. In PM mode `#editor` is offscreen; appending a decoration node there is invisible and never exported by PM Save. Slice 7 handles design decorations in the PM layer. |
 | design-tools.js:141-143 | `E().node.style.backgroundImage/Repeat/Position` (watermark) | `blocked-by-flipped-area-slice-7` — watermark background style on hidden node; no PM export impact; slice 7 |
 | design-tools.js:146 | `E().node.style.backgroundImage = ''` (removeWatermark) | `blocked-by-flipped-area-slice-7` — same as above |
 | dialogs.js:180 | `E().node.normalize()` inside findPane replace callback | `chokepoint-covered` — `D.findPane` is blocked at entry by Step 4.4; this line is inside the closure and is therefore unreachable in PM mode |
 | dialogs.js:186 | `E().node.normalize()` inside findPane replace-all callback | `chokepoint-covered` — same; unreachable in PM mode |
-| dialogs.js:194 | `E().node.normalize()` in clearHits | `chokepoint-covered` — clearHits is only called by findPane (guarded) and stylePreviewLeave (see ribbon.js); in PM mode neither reach this |
+| dialogs.js:194 | `E().node.normalize()` in clearHits | `chokepoint-covered` — clearHits's three call sites are all inside findPane's closures (dialogs.js:104/113/140); it is NOT called by stylePreviewLeave. The findPane entry guard (Step 4.4) makes this line unreachable in PM mode. Note: the `pmGuard` 1500ms toast throttle is global across labels — two different blocked features firing within 1.5s will only show the first toast. |
 | dialogs.js:486 | `E().node.getAttribute('spellcheck')` (read) | `harmless-readonly` — read-only; proofing preferences dialog |
 | dialogs.js:511 | `E().node.setAttribute('spellcheck', …)` | `harmless-readonly` — spellcheck attribute on hidden legacy node; no PM export impact |
 | draw-tools.js:37 | `E().node.appendChild(layer)` — ink canvas | `blocked-by-flipped-area-slice-10` — draw/ink layer DOM injection. Slice 10 moves ink to the PM viewport. In PM mode `#editor` is offscreen so the canvas renders nowhere and is never exported by Save. |
 | draw-tools.js:56 | `E().node.setAttribute('contenteditable', …)` | `blocked-by-flipped-area-slice-10` — draw mode disables typing in legacy `#editor`; in PM mode `#editor` is already non-interactive (offscreen); slice 10 |
 | formatting.js:8 | `E().node.focus(); E().restoreRange()` | `chokepoint-covered` — formatting.js routes all mutations through `E().exec`/`E().applyInlineStyle`/`E().applyBlockStyle`; those are guarded. The focus+restoreRange call is pre-guard; it does not mutate content. (In PM mode `#editor` is `display:none`-equivalent — focus call silently fails.) |
 | formatting.js:45 | `E().node.focus(); E().restoreRange()` | `chokepoint-covered` — same as formatting.js:8; all downstream calls go through guarded chokepoints |
-| header-footer.js:14 | `E().node.insertBefore(h, …)` — wc-header | `blocked-by-flipped-area-slice-3` — H/F panel appends wc-header/wc-footer to `#editor`. Slice 3 wires the PM header/footer extension. In PM mode legacy `#editor` is offscreen so the node is never visible or exported by PM Save. |
-| header-footer.js:19 | `E().node.appendChild(f)` — wc-footer | `blocked-by-flipped-area-slice-3` — same as above |
+| header-footer.js:14 | `E().node.insertBefore(h, …)` — wc-header | `blocked-by-flipped-area` — pagination-gated, Phase 7 (header-footer area). H/F panel appends wc-header/wc-footer to `#editor`. In PM mode legacy `#editor` is offscreen so the node is never visible or exported by PM Save. |
+| header-footer.js:19 | `E().node.appendChild(f)` — wc-footer | `blocked-by-flipped-area` — pagination-gated, Phase 7 (header-footer area); same as above |
 | header-footer.js:31 | `E().node.focus()` in exitMode | `harmless-readonly` — focus call; no content mutation; silently fails when offscreen |
 | home-features.js:78 | `E().node.focus()` + `E().restoreRange()` then `E().insertHTML(…)` | `chokepoint-covered` — insertHTML routes through `E().exec` which is guarded; focus+restoreRange do not mutate content |
 | home-features.js:126 | `E().node.insertBefore(marker, …)` — wc-sensitivity | `blocked-by-flipped-area-slice-6` — sensitivity marker injected as a hidden `<p>` in the legacy editor. Slice 6 handles sensitivity labels in the PM layer. In PM mode the node is offscreen and not exported by PM Save. |
-| layout-tools.js:22 | `E().node.appendChild(g)` — line-gutter | `blocked-by-flipped-area-slice-2` — line-numbers gutter decoration; appended to hidden `#editor` in PM mode; never exported; slice 2 |
-| layout-tools.js:44-45 | `E().node.style.hyphens`/`webkitHyphens` + `setAttribute('lang', …)` | `blocked-by-flipped-area-slice-2` — hyphenation style on legacy node; slice 2 wires to PM |
+| layout-tools.js:22 | `E().node.appendChild(g)` — line-gutter | `blocked-by-flipped-area` — pagination-gated, Phase 7 (layout-page area). Line-numbers gutter decoration; appended to hidden `#editor` in PM mode; never exported. |
+| layout-tools.js:44-45 | `E().node.style.hyphens`/`webkitHyphens` + `setAttribute('lang', …)` | `blocked-by-flipped-area` — pagination-gated, Phase 7 (layout-page area). Hyphenation style on legacy node; Phase 7 wires to PM. |
 | layout-tools.js:51 | `E().node.addEventListener('click', …)` | `harmless-readonly` — click listener registration for line-number gutter; no content mutation |
 | mailings-tools.js:113 | `E().node.classList.toggle('show-mergefields')` | `harmless-readonly` — display-only toggle; no content/export impact |
-| mailings-tools.js:180 | `E().node.insertAdjacentHTML('afterbegin', env)` — envelope | `blocked-by-flipped-area-slice-9` — envelope HTML injected at top of legacy `#editor`. In PM mode `#editor` is offscreen; PM Save ignores it. Slice 9 wires mailings to PM. |
-| mailings-tools.js:192 | `E().node.insertAdjacentHTML('beforeend', html)` — print labels | `blocked-by-flipped-area-slice-9` — print-label preview injected into legacy `#editor` before printing; reverted by `E().setHTML(snap)` (itself guarded). Slice 9. |
-| references-tools.js:38 | `E().node.insertBefore(wrap, …)` — TOC | `blocked-by-flipped-area-slice-6` — TOC block inserted into legacy `#editor`. In PM mode offscreen; not exported by PM Save. Slice 6 wires references to PM. |
-| references-tools.js:76 | `E().node.appendChild(c)` — footnote/endnote container | `blocked-by-flipped-area-slice-6` — same as above |
-| references-tools.js:129 | `sel.getRangeAt(0).insertNode(wrap)` / `E().node.appendChild(wrap)` — footnote ref | `blocked-by-flipped-area-slice-6` — direct range insert into legacy `#editor`; selection lives in `#pm-editor` in PM mode so `sel.rangeCount` will be 0 and the else branch targets the offscreen `#editor` appendChild. Slice 6. |
-| references-tools.js:150 | same pattern — endnote ref | `blocked-by-flipped-area-slice-6` — same as above |
-| references-tools.js:196 | same pattern — citation | `blocked-by-flipped-area-slice-6` — same as above |
-| references-tools.js:238 | same pattern — index entry | `blocked-by-flipped-area-slice-6` — same as above |
+| mailings-tools.js:180 | `E().node.insertAdjacentHTML('afterbegin', env)` — envelope | `blocked-by-flipped-area-slice-10` — envelope HTML injected at top of legacy `#editor`. In PM mode `#editor` is offscreen; PM Save ignores it. Slice 10 wires mailings to PM. |
+| mailings-tools.js:192 | `E().node.insertAdjacentHTML('beforeend', html)` — print labels | `blocked-by-flipped-area-slice-10` — print-label preview injected into legacy `#editor` before printing; reverted by `E().setHTML(snap)` (itself guarded). Slice 10. |
+| references-tools.js:38 | `E().node.insertBefore(wrap, …)` — TOC | `blocked-by-flipped-area-slice-9` — TOC block inserted into legacy `#editor`. In PM mode offscreen; not exported by PM Save. Slice 9 wires references to PM. |
+| references-tools.js:76 | `E().node.appendChild(c)` — footnote/endnote container | `blocked-by-flipped-area-slice-9` — same as above |
+| references-tools.js:129 | `sel.getRangeAt(0).insertNode(wrap)` / `E().node.appendChild(wrap)` — footnote ref | `blocked-by-flipped-area-slice-9` — direct range insert into legacy `#editor`; selection lives in `#pm-editor` in PM mode so `sel.rangeCount` will be 0 and the else branch targets the offscreen `#editor` appendChild. Slice 9. |
+| references-tools.js:150 | same pattern — endnote ref | `blocked-by-flipped-area-slice-9` — same as above |
+| references-tools.js:196 | same pattern — citation | `blocked-by-flipped-area-slice-9` — same as above |
+| references-tools.js:238 | same pattern — index entry | `blocked-by-flipped-area-slice-9` — same as above |
 | review-tools.js:18 | `E().node.addEventListener('beforeinput', …)` | `harmless-readonly` — event-handler binding; no content mutation; runs at init time before PM is active |
 | review-tools.js:76 | `E().node.normalize()` after acceptAll | `blocked-by-flipped-area-slice-8` — track-changes accept/reject normalizes text nodes in legacy `#editor`. In PM mode `#editor` is offscreen; normalize on hidden node has no PM export impact. Slice 8 wires accept/reject to PM. |
 | review-tools.js:77 | `E().node.normalize()` after rejectAll | `blocked-by-flipped-area-slice-8` — same as above |
@@ -76,7 +76,7 @@ All hits that write to (or structurally mutate) `E().node` outside the `editor.j
 
 ## Summary
 
-- **Chokepoint-covered:** 9 hits (exec/insertNodeHTML/applyInlineStyle(s)/applyBlockStyle/list ops/setHTML/undo/redo all guarded in editor.js; plus the find-pane raw-DOM code unreachable via Step 4.4; gallery preview unreachable via Step 4.3).
-- **Harmless-readonly:** 20 hits — CSS display toggles, event-handler binding/cleanup, read-only attribute access, cursor style on hidden node.
-- **Blocked-by-flipped-area-slice-N:** 28 hits across slices 1–10 — these write to `#editor` but in PM mode the node is offscreen and PM Save does not read from it, so they cannot corrupt the exported document. Each slice's task will wire the equivalent operation to the PM layer.
-- **Total hits audited:** 57
+- **Chokepoint-covered:** 8 hits (exec/insertNodeHTML/applyInlineStyle(s)/applyBlockStyle/list ops/setHTML/undo/redo all guarded in editor.js; plus the find-pane raw-DOM code unreachable via Step 4.4; gallery preview unreachable via Step 4.3).
+- **Harmless-readonly:** 22 hits — CSS display toggles, event-handler binding/cleanup, read-only attribute access, cursor style on hidden node.
+- **Blocked-by-flipped-area:** 32 hits — these write to `#editor` but in PM mode the node is offscreen and PM Save does not read from it, so they cannot corrupt the exported document. Slice tags: 1 (character/proofing), 2 (paragraph/lists), 4 (clipboard), 6 (insert-basics/sensitivity), 7 (page-border/watermark), 8 (review/track-changes), 9 (references/TOC/footnotes/citations), 10 (mail-merge/draw/themes/StyleSets); header-footer and layout-page (line-numbers, hyphenation, columns) are pagination-gated, Phase 7.
+- **Total hits audited:** 62

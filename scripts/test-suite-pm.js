@@ -108,6 +108,10 @@
   });
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
+  await t('[0a] PM-mode save is blocked until the bytes path (no legacy serialize)', async () => {
+    const r = await window.WC.Files.save();
+    return !!r && r.ok === false;
+  });
 
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
