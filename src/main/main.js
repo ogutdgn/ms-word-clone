@@ -415,6 +415,57 @@ ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer,
 });
 
 // ---------------------------------------------------------------------------
+// IPC: Phase 2 bytes channels — the PM core produces/consumes whole .docx
+// bytes in the renderer (fork converter); main is a dumb byte writer/reader.
+// ---------------------------------------------------------------------------
+ipcMain.handle('doc:saveBytes', async (_evt, { filePath, bytes }) => {
+  try {
+    if (!filePath) return { ok: false, error: 'No path' };
+    const buf = Buffer.from(bytes);
+    if (!buf.length) return { ok: false, error: 'Empty document data (export failed?)' }; // never truncate a real file
+    await fsp.writeFile(filePath, buf);
+    await pushRecentFile(filePath);
+    return { ok: true, path: filePath, name: path.basename(filePath) };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+ipcMain.handle('doc:saveAsBytes', async (_evt, { bytes, suggestedName }) => {
+  try {
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save As',
+      defaultPath: suggestedName || 'Document1.docx',
+      // docx-only: the PM bytes ARE a docx zip — offering .html/.txt here would
+      // write zip bytes into a text file (spec §5.3).
+      filters: [{ name: 'Word Document', extensions: ['docx'] }],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    const buf = Buffer.from(bytes);
+    if (!buf.length) return { ok: false, error: 'Empty document data (export failed?)' };
+    await fsp.writeFile(res.filePath, buf);
+    await pushRecentFile(res.filePath);
+    return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: 'docx' };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+ipcMain.handle('doc:openBytes', async (_evt, presetPath) => {
+  try {
+    let filePath = presetPath;
+    if (!filePath) {
+      const res = await dialog.showOpenDialog(mainWindow, {
+        title: 'Open',
+        properties: ['openFile'],
+        filters: [{ name: 'Word Documents', extensions: ['docx'] }], // PM core opens .docx; other formats return in slice 7
+      });
+      if (res.canceled || !res.filePaths[0]) return { ok: false, canceled: true };
+      filePath = res.filePaths[0];
+    }
+    const buf = await fsp.readFile(filePath);
+    await pushRecentFile(filePath);
+    return { ok: true, path: filePath, name: path.basename(filePath), bytes: buf };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+// ---------------------------------------------------------------------------
 // IPC: export PDF + print
 // ---------------------------------------------------------------------------
 ipcMain.handle('doc:exportPdf', async (_evt, { suggestedName }) => {
