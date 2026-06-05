@@ -417,3 +417,7 @@ body.pm-active #pm-editor {
   box-shadow: 0 1px 4px var(--page-shadow);
 }
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
+
+/* PM-mode visibility twins for show-marks / show-grid */
+body.pm-active #pm-editor.show-marks p::after { content: '¶'; color: #2b8aef; margin-left: 2px; }
+body.pm-active #pm-editor.show-grid { background-image: linear-gradient(#e9eef5 1px, transparent 1px), linear-gradient(90deg, #e9eef5 1px, transparent 1px); background-size: 24px 24px; }

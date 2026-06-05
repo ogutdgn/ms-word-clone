@@ -55,7 +55,11 @@
     E().selectedBlocks().forEach((b) => { const cur = parseFloat(b.style.marginLeft) || 0; const next = Math.max(0, cur + px); b.style.marginLeft = next ? next + 'px' : ''; });
     E().dirty = true; E().repaginate(); E().updateStatus(); E().emit();
   }
-  H.showHide = (c, node) => { const on = E().node.classList.toggle('show-marks'); if (node) node.classList.toggle('toggled', on); };
+  H.showHide = (c, node) => {
+    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
+    const on = target.classList.toggle('show-marks');
+    if (node) node.classList.toggle('toggled', on);
+  };
   H.sort = () => sortDialog();
   // Shading split button: main face applies the LAST-USED shading color (none on a
   // fresh doc, like Word). The arrow opens the color palette (dropdown -> colorMenu).
@@ -161,7 +165,11 @@
   H.pageWidth = () => E().setZoom(fitWidthZoom());
   H.zoom100 = () => E().setZoom(1);
   H.ruler = (c, node) => { document.getElementById('ruler').classList.toggle('hidden-ruler'); markChecked(node); };
-  H.gridlines = (c, node) => { E().node.classList.toggle('show-grid'); markChecked(node); };
+  H.gridlines = (c, node) => {
+    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
+    target.classList.toggle('show-grid');
+    markChecked(node);
+  };
   H.navigationPane = (c, node) => WC.Dialogs.navPane();
   H.focus = () => document.getElementById('app').classList.toggle('focus-mode');
 
@@ -679,7 +687,8 @@
   function immersiveReader() {
     let ov = document.getElementById('immersive'); if (ov) { ov.remove(); return; }
     let size = 20;
-    const content = el('div', { class: 'ir-content' }); content.innerHTML = E().getHTML(); content.style.fontSize = size + 'px';
+    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
+    const content = el('div', { class: 'ir-content' }); content.innerHTML = docHtml; content.style.fontSize = size + 'px';
     const setSize = (d) => { size = Math.max(12, Math.min(40, size + d)); content.style.fontSize = size + 'px'; };
     const bg = (c) => { ov.style.background = c; content.style.background = c; };
     const bar = el('div', { class: 'ir-bar' }, [
@@ -703,8 +712,9 @@
       b.addEventListener('click', (ev) => { ev.stopPropagation(); WC.flyout(b, (fly) => items.forEach((it) => fly.appendChild(WC.flyItem(it.label, { onClick: it.onClick })))); });
       return b;
     };
+    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
     const content = el('div', { class: 'rm-content' });
-    content.innerHTML = E().getHTML();
+    content.innerHTML = docHtml;
     const colsWrap = el('div', { class: 'rm-cols' }, [content]);
     const prev = el('button', { class: 'rm-arrow rm-prev', title: 'Previous screen', text: '‹' });
     const next = el('button', { class: 'rm-arrow rm-next', title: 'Next screen', text: '›' });
@@ -727,9 +737,11 @@
   }
   WC.closeReadMode = closeReadMode;
   function propertiesDialog() {
-    const c = E().counts(); const f = WC.Files; const text = E().node.innerText;
-    const paras = E().node.querySelectorAll('p,h1,h2,h3,h4,li,blockquote').length;
-    const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', paras], ['Pages', E().pageCount()], ['Lines', (text.match(/\n/g) || []).length + 1]];
+    const pmMode = WC.PM && WC.PM.active;
+    const c = pmMode ? WC.PM.counts()
+                     : Object.assign(E().counts(), { pages: E().pageCount(), paras: E().node.querySelectorAll('p,h1,h2,h3,h4,li,blockquote').length, lines: (E().node.innerText.match(/\n/g) || []).length + 1, charsNoSpace: E().node.innerText.replace(/\s/g, '').length });
+    const f = WC.Files;
+    const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', c.paras], ['Pages', c.pages], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
     rows.forEach(([k, v]) => body.appendChild(el('div', { class: 'row', style: { padding: '5px 0', borderBottom: '1px solid #f0f0f0' } }, [el('span', { style: { width: '160px', color: '#666' }, text: k }), el('b', { text: String(v) })])));
     WC.dialog({ title: 'Properties', width: '380px', body, footer: [{ label: 'Close', primary: true }] });

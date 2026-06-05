@@ -15,14 +15,19 @@ export function installIo(editor: AnyEditor) {
   }
 
   function counts() {
-    const text: string = editor.view?.dom?.innerText || ''
+    const dom = editor.view?.dom as HTMLElement | undefined
+    const text: string = dom?.innerText || ''
     const words = (text.match(/\S+/g) || []).length
     const chars = text.replace(/\n/g, '').length
+    const charsNoSpace = text.replace(/\s/g, '').length
+    const paras = dom ? dom.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li').length : 0
+    const lines = (text.match(/\n/g) || []).length + 1
+    const pages = 1 // continuous flow until Phase 7 (spec §7.8)
     const sel = editor.state.selection
     const selWords = sel.empty
       ? 0
       : ((editor.state.doc.textBetween(sel.from, sel.to, ' ') as string).match(/\S+/g) || []).length
-    return { words, chars, selWords }
+    return { words, chars, charsNoSpace, paras, lines, pages, selWords }
   }
 
   return {

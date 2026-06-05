@@ -110,7 +110,7 @@ export function preinstallBridge() {
     getState: () => null,
     isDirty: () => false,
     setClean: () => {},
-    counts: () => ({ words: 0, chars: 0, selWords: 0 }),
+    counts: () => ({ words: 0, chars: 0, charsNoSpace: 0, paras: 0, lines: 1, pages: 1, selWords: 0 }),
     captureSelection: () => {},
     withSelection: (fn: () => void) => fn(),
   }

@@ -131,6 +131,23 @@
     return open === 0;
   });
 
+  await t('[0a] showHide toggles marks on the PM page', () => {
+    window.WC.Commands.run({ cmd: 'showHide' });
+    const on = document.getElementById('pm-editor').classList.contains('show-marks');
+    window.WC.Commands.run({ cmd: 'showHide' });
+    return on === true && !document.getElementById('pm-editor').classList.contains('show-marks');
+  });
+  await t('[0a] wordCount dialog reads the PM doc (words AND pages row)', () => {
+    setDoc('alpha beta gamma');
+    window.WC.Dialogs.wordCount();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    // assert a previously-wrong row too: Pages must be the PM-honest 1, and the
+    // dialog must not report the hidden legacy doc's counts.
+    const ok = !!dlg && /3/.test(dlg.textContent) && /Pages[^0-9]*1(?!\d)/i.test(dlg.textContent);
+    if (dlg) dlg.querySelector('.dlg-footer .btn').click();
+    return ok;
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
