@@ -29,32 +29,41 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 1: Scaffold the new core — BUILD COMPLETE (Stages A–C); Stage D = integrate
-**Goal:** a minimal editable ProseMirror document — forked from SuperDoc — rendering in our own
-DOM with our CSS, inside Electron (closes the spike's Q1 "last mile"). **Achieved** on
-`build/phase-1-scaffold`: all gates green (smoke 9/9, functional 257/257, docx 17/17), engine
-vendored + owned, no `superdoc` npm dep.
+## CURRENT PHASE → Phase 2: Editing core behind the existing ribbon (strangler-fig)
+> **Phase 1 (Scaffold) is COMPLETE** — see the 2026-06-05 entry in [last-point.md](last-point.md).
+> The owned ProseMirror engine mounts/renders/edits a real `.docx` on `build/phase-1-scaffold`
+> (all gates green: smoke 9/9, functional 257/257, docx 17/17; single PM copy; telemetry off; no
+> `superdoc` npm dep). Branch **pushed**; integration (merge/PR) is the user's pending choice.
 
-**Actions (done this session):**
-- [x] **electron-vite + TypeScript** for the renderer (hardened main/preload preserved; legacy
-  app served static from `public/` for "two worlds" coexistence).
-- [x] **Vendor + own the SuperDoc fork** (Option B): schema + `super-converter` +
-  `getStarterExtensions()` + 5 sibling `@superdoc/*` packages, as **editable source**; Vue UI +
-  telemetry stripped (telemetry → no-op); npm dep removed; single PM copy held.
-- [x] Mount the model + **type into it** (lists, **Tab/indent**) — via **Path B** (the vendored
-  `Editor` owns a plain PM view; logger seam = `editor.on('transaction')`).
-- [x] Ribbon/chrome still visible (unwired) — UI still looks like Word.
-- [x] Smoke test (`scripts/smoke-pm.js`); checkpoint via `plan-tracking`.
-- [ ] **Stage D:** final review → `finishing-a-development-branch` (PR/merge) + docs follow-up.
+**Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
+feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
+worlds"; the new `#pm-editor` becomes THE page). Strangler-fig: flip one feature at a time, never
+big-bang; gate on the 257/17 suites + per-feature Word fidelity.
 
-**Next phase → Phase 2:** wire ribbon commands → PM transactions (strangler-fig, on a new branch).
+**First actions (next session):**
+- [ ] **Integrate Phase 1 first** (merge/PR to the integration line), then cut
+  `feature/phase-2-editing-core` off it (never work on `main`).
+- [ ] Run Phase 2 through its own cycle: **`brainstorming` → `writing-plans` → subagent execution**
+  (same as Phase 1).
+- [ ] Decide the **command→transaction bridge**: map `WC.Commands` dispatch onto the vendored
+  Editor's command/keymap API; make `#pm-editor` the visible page and hide/retire legacy `#editor`.
+- [ ] **Per feature flipped:** validate behavior + UI vs real Word (macOS AppleScript oracle); keep
+  257/17 green; add a regression test.
+- [ ] Wire **`.docx` SAVE/export** on the new engine (deferred from Phase 1) when a feature needs it.
 
-**Watch-outs realized:** telemetry stripped (no-op + no-network smoke assertion); the published
-bundle does NOT export `Schema`/`ExtensionService` (schema comes from a constructed `Editor`);
-editing behaviors live in the **extensions** (Tab/indent free via Path B); single
-`prosemirror-model` copy enforced via `resolve.dedupe`.
+**Watch-outs:** no pagination yet (Phase 7 — continuous flow is expected, not a regression);
+list-marker/spacing fidelity is per-feature polish; keep the headless Editor reachable for export;
+hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-05
+- [x] Phase 1 **Stage D** — final review = READY TO INTEGRATE; hardened the smoke Tab test (`8de524e`).
+- [x] Docs follow-up: harness now needs `npm run build` first; counts 257/17 (`e5db257`).
+- [x] Fixed `npm run dev` crash (`Cannot find module './docx-utils'`) — copy via electron-vite `closeBundle` plugin, dev+build, cross-platform (`93e5006`).
+- [x] Infra + visual sanity pass: dev/build/built-launch all run; chrome = faithful Word; new core renders the imported `.docx` (lists/numbering) on a Letter page.
+- [x] Plan-doc checkpoints; **Phase 1 COMPLETE**; branch `build/phase-1-scaffold` pushed for integration.
+- [ ] **Phase 2** — start next session (integrate Phase 1, then strangler-fig: ribbon commands → PM transactions).
 
 ### 2026-06-04
 - [x] Merged `research-architecture` → `main` (PR #8).

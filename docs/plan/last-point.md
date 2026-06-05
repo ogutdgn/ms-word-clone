@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-06-05 — Phase 1 COMPLETE; Phase 2 next
+- **Branch:** `build/phase-1-scaffold` (pushed to `origin`; 18 commits ahead of `main`). Integration
+  (merge/PR) is the user's pending choice; **Phase 2 starts on a fresh branch off the integration line.**
+- **Phase:** **Phase 1 (Scaffold) DONE → Phase 2 (Editing core behind the ribbon) is next.**
+- **State summary:** the owned ProseMirror engine mounts/renders/edits a real `.docx`; all gates green
+  (smoke 9/9, functional 257/257, docx 17/17), single PM copy, telemetry off, no `superdoc` npm dep.
+  Infra + visual sanity pass passed: `npm run dev` / `build` / built-launch all run; chrome is faithful
+  Word; the new core renders the imported list on a Letter page (screenshots reviewed).
+- **Done since the 2026-06-04 entry:**
+  - Final review = **READY TO INTEGRATE** (spec §8 DoD fully covered); hardened the smoke Tab test (`8de524e`).
+  - Docs follow-up: harness now needs `npm run build` first; counts 257/17 (`e5db257`).
+  - **Fixed the `npm run dev` crash** (`Cannot find module './docx-utils'`): the A3 build-script `cp`
+    didn't run under `electron-vite dev`; moved it to a `closeBundle` plugin (dev+build, cross-platform) (`93e5006`).
+  - Plan-doc checkpoints (`4abe94b` + this entry); branch pushed.
+- **Next (Phase 2, new session — WE ARE GOOD TO START):** integrate Phase 1 → cut
+  `feature/phase-2-editing-core` → brainstorm → spec → plan → build: wire `WC.RIBBON` commands → PM
+  transactions (strangler-fig), make `#pm-editor` the visible page (retire legacy `#editor`), wire
+  `.docx` save/export on the new engine, per-feature Word fidelity vs the AppleScript oracle.
+- **Blockers/notes:** none. **FYI** the GitHub repo was renamed — local `origin` still says
+  `ogutdgn/ms-word-clone` (GitHub redirects; update the remote URL to the new name when convenient).
+  Tech-debt carried from Phase 1: renderer bundle ~7.4 MB; `presentation-editor`+`layout-adapter`
+  vendored (more than the painter-free ideal); list-marker fidelity polish.
+
+---
+
 ## 2026-06-04 — Phase 1 build (Stages A–C)
 - **Branch:** `build/phase-1-scaffold` (off `main`; not pushed yet).
 - **Phase:** **Phase 1 (Scaffold) — Stages A, B, C DONE; only Stage D (final review + integrate) remains.**
