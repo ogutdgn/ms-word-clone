@@ -29,23 +29,30 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 1: Scaffold the new core
-**Goal:** a minimal editable ProseMirror document — forked from SuperDoc — rendering in **our
-own** `EditorView` with our CSS, inside Electron (this also closes the spike's Q1 "last mile").
+## CURRENT PHASE → Phase 1: Scaffold the new core — BUILD COMPLETE (Stages A–C); Stage D = integrate
+**Goal:** a minimal editable ProseMirror document — forked from SuperDoc — rendering in our own
+DOM with our CSS, inside Electron (closes the spike's Q1 "last mile"). **Achieved** on
+`build/phase-1-scaffold`: all gates green (smoke 9/9, functional 257/257, docx 17/17), engine
+vendored + owned, no `superdoc` npm dep.
 
-**Next actions (check off as done):**
-- [ ] Introduce **electron-vite + TypeScript** for the renderer (keep the hardened main/preload
-  posture); replaces the no-bundler `<script>` setup.
-- [ ] **Vendor the SuperDoc fork:** schema + `super-converter` + `getStarterExtensions()`; **strip**
-  the Vue UI, `DomPainter`, and **telemetry**; pin the version.
-- [ ] Mount the imported model in a plain ProseMirror `EditorView`; style with our CSS; **type
-  into it** to confirm editing (lists, Tab/indent).
-- [ ] Keep the existing ribbon/chrome visible (not yet wired) — UI must still look like Word.
-- [ ] Smoke test; checkpoint via `plan-tracking`; open a PR.
+**Actions (done this session):**
+- [x] **electron-vite + TypeScript** for the renderer (hardened main/preload preserved; legacy
+  app served static from `public/` for "two worlds" coexistence).
+- [x] **Vendor + own the SuperDoc fork** (Option B): schema + `super-converter` +
+  `getStarterExtensions()` + 5 sibling `@superdoc/*` packages, as **editable source**; Vue UI +
+  telemetry stripped (telemetry → no-op); npm dep removed; single PM copy held.
+- [x] Mount the model + **type into it** (lists, **Tab/indent**) — via **Path B** (the vendored
+  `Editor` owns a plain PM view; logger seam = `editor.on('transaction')`).
+- [x] Ribbon/chrome still visible (unwired) — UI still looks like Word.
+- [x] Smoke test (`scripts/smoke-pm.js`); checkpoint via `plan-tracking`.
+- [ ] **Stage D:** final review → `finishing-a-development-branch` (PR/merge) + docs follow-up.
 
-**Watch-outs (from the spike):** strip telemetry; the bundle reads `localStorage` at import
-(native in Electron renderer); use the supported headless API `new Editor({ document })`; editing
-behaviors come from the **extensions** — include them.
+**Next phase → Phase 2:** wire ribbon commands → PM transactions (strangler-fig, on a new branch).
+
+**Watch-outs realized:** telemetry stripped (no-op + no-network smoke assertion); the published
+bundle does NOT export `Schema`/`ExtensionService` (schema comes from a constructed `Editor`);
+editing behaviors live in the **extensions** (Tab/indent free via Path B); single
+`prosemirror-model` copy enforced via `resolve.dedupe`.
 
 ## Daily work log (newest first — check off what got done)
 
@@ -53,7 +60,11 @@ behaviors come from the **extensions** — include them.
 - [x] Merged `research-architecture` → `main` (PR #8).
 - [x] Made "never work on `main` — branch first" an explicit rule (plan.md + execution-map.md).
 - [x] Restructured last-point.md + execution-map.md into dated logs; updated the `plan-tracking` skill.
-- [ ] Phase 1 scaffold — not started (carries to next session).
+- [x] Wrote + committed the Phase 1 spec + implementation plan (`docs/superpowers/`), hardened by 4 workflows.
+- [x] Phase 1 **Stage A** — electron-vite + TS build chain; legacy app static under `public/`; gates green.
+- [x] Phase 1 **Stage B** — npm-pin + PM single-copy; headless import + fixture; mounted our EditorView; smoke 8/8.
+- [x] Phase 1 **Stage C / Option B** — vendored + own the SuperDoc engine (editable source, no npm dep, telemetry no-op, Path B view, Tab/indent); smoke 9/9, functional 257, docx 17.
+- [ ] Phase 1 **Stage D** — final review + integrate (PR/merge) + docs follow-up (carries to next session if not finished today).
 
 ### 2026-06-03
 - [x] Locked ADR-0001…0005; de-risk spike GREEN.
