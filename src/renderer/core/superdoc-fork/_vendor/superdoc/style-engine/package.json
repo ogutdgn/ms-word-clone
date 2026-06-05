@@ -1,0 +1,30 @@
+{
+  "name": "@superdoc/style-engine",
+  "version": "0.1.0",
+  "description": "OOXML style resolution engine - produces ComputedStyle objects for layout engines",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./ooxml": {
+      "source": "./src/ooxml/index.ts",
+      "default": "./src/ooxml/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@superdoc/contracts": "workspace:*",
+    "@superdoc/font-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

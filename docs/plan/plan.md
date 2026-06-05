@@ -48,8 +48,8 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
 | Phase | What | Status |
 |------|------|--------|
 | **0** | Research + architecture decisions (ADR-0001…0005) + de-risk spike | ✅ done |
-| **1** | Scaffold: electron-vite + TS; vendor the SuperDoc fork (strip Vue/painter/telemetry); mount the model in our own `EditorView` (closes Q1 last mile) | next |
-| **2** | Editing core behind the existing ribbon (strangler-fig): commands → PM transactions | |
+| **1** | Scaffold: electron-vite + TS; vendor the SuperDoc fork (strip Vue/painter/telemetry); mount the model in our own `EditorView` (closes Q1 last mile) | ✅ done (engine owned, gates green; branch pushed) |
+| **2** | Editing core behind the existing ribbon (strangler-fig): commands → PM transactions | **next** |
 | **3** | **Logger** (branch) — `dispatchTransaction` tap + raw capture + outcome serialize + firewall | |
 | **4** | **Verifier** (branch) — headless predicates + reward + QA harness + oracle gold | |
 | **5** | **MCP server** (branch) — tools/resources, transports, episodes; + pixel RPC | |

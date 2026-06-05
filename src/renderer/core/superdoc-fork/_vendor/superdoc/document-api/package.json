@@ -1,0 +1,30 @@
+{
+  "name": "@superdoc/document-api",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The SuperDoc document API",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "source": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./scripts/lib/contract-snapshot.ts": {
+      "types": "./scripts/lib/contract-snapshot.ts",
+      "source": "./scripts/lib/contract-snapshot.ts",
+      "default": "./scripts/lib/contract-snapshot.ts"
+    },
+    "./types": {
+      "types": "./src/types/index.ts",
+      "source": "./src/types/index.ts",
+      "default": "./src/types/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "files": [
+    "src"
+  ]
+}

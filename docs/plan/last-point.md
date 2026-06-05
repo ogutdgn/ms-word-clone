@@ -7,6 +7,64 @@
 
 ---
 
+## 2026-06-05 — Phase 1 COMPLETE; Phase 2 next
+- **Branch:** `build/phase-1-scaffold` (pushed to `origin`; 18 commits ahead of `main`). Integration
+  (merge/PR) is the user's pending choice; **Phase 2 starts on a fresh branch off the integration line.**
+- **Phase:** **Phase 1 (Scaffold) DONE → Phase 2 (Editing core behind the ribbon) is next.**
+- **State summary:** the owned ProseMirror engine mounts/renders/edits a real `.docx`; all gates green
+  (smoke 9/9, functional 257/257, docx 17/17), single PM copy, telemetry off, no `superdoc` npm dep.
+  Infra + visual sanity pass passed: `npm run dev` / `build` / built-launch all run; chrome is faithful
+  Word; the new core renders the imported list on a Letter page (screenshots reviewed).
+- **Done since the 2026-06-04 entry:**
+  - Final review = **READY TO INTEGRATE** (spec §8 DoD fully covered); hardened the smoke Tab test (`8de524e`).
+  - Docs follow-up: harness now needs `npm run build` first; counts 257/17 (`e5db257`).
+  - **Fixed the `npm run dev` crash** (`Cannot find module './docx-utils'`): the A3 build-script `cp`
+    didn't run under `electron-vite dev`; moved it to a `closeBundle` plugin (dev+build, cross-platform) (`93e5006`).
+  - Plan-doc checkpoints (`4abe94b` + this entry); branch pushed.
+- **Next (Phase 2, new session — WE ARE GOOD TO START):** integrate Phase 1 → cut
+  `feature/phase-2-editing-core` → brainstorm → spec → plan → build: wire `WC.RIBBON` commands → PM
+  transactions (strangler-fig), make `#pm-editor` the visible page (retire legacy `#editor`), wire
+  `.docx` save/export on the new engine, per-feature Word fidelity vs the AppleScript oracle.
+- **Blockers/notes:** none. **FYI** the GitHub repo was renamed — local `origin` still says
+  `ogutdgn/ms-word-clone` (GitHub redirects; update the remote URL to the new name when convenient).
+  Tech-debt carried from Phase 1: renderer bundle ~7.4 MB; `presentation-editor`+`layout-adapter`
+  vendored (more than the painter-free ideal); list-marker fidelity polish.
+
+---
+
+## 2026-06-04 — Phase 1 build (Stages A–C)
+- **Branch:** `build/phase-1-scaffold` (off `main`; not pushed yet).
+- **Phase:** **Phase 1 (Scaffold) — Stages A, B, C DONE; only Stage D (final review + integrate) remains.**
+- **State summary:** electron-vite + TypeScript renderer is live; the **SuperDoc engine is vendored
+  as editable source** (`src/renderer/core/superdoc-fork/` incl. `_vendor/superdoc/` siblings) —
+  **no `superdoc` npm dependency**, telemetry routed to a no-op, single `prosemirror-model@1.25.7`.
+  The new ProseMirror core mounts a real `.docx`, renders with our schema, is typeable, and
+  list **Tab/indent works**. Legacy Word app + chrome intact. **All gates green: smoke 9/9,
+  functional 257/257, docx 17/17.**
+- **Done this session:**
+  - **Spec + plan** written/committed under `docs/superpowers/` (hardened by 4 analysis/critique
+    workflows: context, design-verify, spec-critique, plan-critique).
+  - **Stage A** — electron-vite + TS build chain; legacy renderer served static from `public/`;
+    main dev/prod loader split + preload path; dev-only CSP via a Vite `transformIndexHtml`
+    (a strict meta + relaxed header would intersect). (`e8c6276`, `0c9e904`, `d14ebd8`, `0250262`)
+  - **Stage B** — npm-pin superdoc@1.38.0 + PM single-copy + barrel; headless `.docx` import +
+    base64 fixture; mounted our own `EditorView` + smoke 8/8. (`2120739`, `b348425`, `3e1980b`)
+  - **Stage C / Option B (own the engine)** — vendored 5 sibling `@superdoc/*` packages +
+    `presentation-editor`/`layout-adapter`; stubbed 3 geometry pkgs at leaf sites; Vite
+    aliases/dedupe/`define`; telemetry no-op; rewired to **Path B** (vendored `Editor` owns the
+    PM view, `editor.on('transaction')` logger seam → Tab/indent for free); removed the npm dep;
+    AGPL `NOTICE.md`. (`8f58e3d`, `38d1d51`, `707649a`, `3587598`)
+- **Next:** Stage D — final review + `finishing-a-development-branch` (PR/merge decision) +
+  docs follow-up (CLAUDE.md/BUILD_AND_RUN.md/TESTING.md: harness now needs `npm run build` first;
+  real counts 257/17). Then **Phase 2** (wire ribbon commands → PM transactions).
+- **Blockers/notes:** none. **Decisions this session:** ownership = **full editable source vendor
+  within Phase 1** (Option B, per user); the view uses **Path B** (vendored Editor owns the view)
+  — a refinement of spec §D5 ("our own thin wrapper"), plan-authorized, no ADR change (ADR-0002…0005
+  still hold). **Tech-debt:** renderer bundle ~7.4 MB; `presentation-editor`+`layout-adapter`
+  vendored (more than the painter-free ideal — trim in a later pass).
+
+---
+
 ## 2026-06-04
 - **Branch:** `main` (the `research-architecture` line was merged via PR #8). Today's doc work
   is on `docs/dated-plan-logs`.

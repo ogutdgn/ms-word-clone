@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const docxUtils = require('./docx-utils');
+const { is } = require('@electron-toolkit/utils');
 
 // Lazy-required heavy libs (loaded on first use to keep startup fast)
 let mammoth = null;
@@ -94,7 +95,7 @@ function createWindow() {
     title: 'Word',
     icon: path.join(__dirname, '..', 'renderer', 'assets', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -112,7 +113,11 @@ function createWindow() {
   mainWindow.webContents.session.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture' || perm === 'microphone'));
   mainWindow.webContents.session.setPermissionCheckHandler(() => true);
 
-  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  }
 
   mainWindow.once('ready-to-show', () => {
     const winArg = process.argv.find((a) => a.startsWith('--win='));

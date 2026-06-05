@@ -29,31 +29,51 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 1: Scaffold the new core
-**Goal:** a minimal editable ProseMirror document — forked from SuperDoc — rendering in **our
-own** `EditorView` with our CSS, inside Electron (this also closes the spike's Q1 "last mile").
+## CURRENT PHASE → Phase 2: Editing core behind the existing ribbon (strangler-fig)
+> **Phase 1 (Scaffold) is COMPLETE** — see the 2026-06-05 entry in [last-point.md](last-point.md).
+> The owned ProseMirror engine mounts/renders/edits a real `.docx` on `build/phase-1-scaffold`
+> (all gates green: smoke 9/9, functional 257/257, docx 17/17; single PM copy; telemetry off; no
+> `superdoc` npm dep). Branch **pushed**; integration (merge/PR) is the user's pending choice.
 
-**Next actions (check off as done):**
-- [ ] Introduce **electron-vite + TypeScript** for the renderer (keep the hardened main/preload
-  posture); replaces the no-bundler `<script>` setup.
-- [ ] **Vendor the SuperDoc fork:** schema + `super-converter` + `getStarterExtensions()`; **strip**
-  the Vue UI, `DomPainter`, and **telemetry**; pin the version.
-- [ ] Mount the imported model in a plain ProseMirror `EditorView`; style with our CSS; **type
-  into it** to confirm editing (lists, Tab/indent).
-- [ ] Keep the existing ribbon/chrome visible (not yet wired) — UI must still look like Word.
-- [ ] Smoke test; checkpoint via `plan-tracking`; open a PR.
+**Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
+feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
+worlds"; the new `#pm-editor` becomes THE page). Strangler-fig: flip one feature at a time, never
+big-bang; gate on the 257/17 suites + per-feature Word fidelity.
 
-**Watch-outs (from the spike):** strip telemetry; the bundle reads `localStorage` at import
-(native in Electron renderer); use the supported headless API `new Editor({ document })`; editing
-behaviors come from the **extensions** — include them.
+**First actions (next session):**
+- [ ] **Integrate Phase 1 first** (merge/PR to the integration line), then cut
+  `feature/phase-2-editing-core` off it (never work on `main`).
+- [ ] Run Phase 2 through its own cycle: **`brainstorming` → `writing-plans` → subagent execution**
+  (same as Phase 1).
+- [ ] Decide the **command→transaction bridge**: map `WC.Commands` dispatch onto the vendored
+  Editor's command/keymap API; make `#pm-editor` the visible page and hide/retire legacy `#editor`.
+- [ ] **Per feature flipped:** validate behavior + UI vs real Word (macOS AppleScript oracle); keep
+  257/17 green; add a regression test.
+- [ ] Wire **`.docx` SAVE/export** on the new engine (deferred from Phase 1) when a feature needs it.
+
+**Watch-outs:** no pagination yet (Phase 7 — continuous flow is expected, not a regression);
+list-marker/spacing fidelity is per-feature polish; keep the headless Editor reachable for export;
+hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-05
+- [x] Phase 1 **Stage D** — final review = READY TO INTEGRATE; hardened the smoke Tab test (`8de524e`).
+- [x] Docs follow-up: harness now needs `npm run build` first; counts 257/17 (`e5db257`).
+- [x] Fixed `npm run dev` crash (`Cannot find module './docx-utils'`) — copy via electron-vite `closeBundle` plugin, dev+build, cross-platform (`93e5006`).
+- [x] Infra + visual sanity pass: dev/build/built-launch all run; chrome = faithful Word; new core renders the imported `.docx` (lists/numbering) on a Letter page.
+- [x] Plan-doc checkpoints; **Phase 1 COMPLETE**; branch `build/phase-1-scaffold` pushed for integration.
+- [ ] **Phase 2** — start next session (integrate Phase 1, then strangler-fig: ribbon commands → PM transactions).
 
 ### 2026-06-04
 - [x] Merged `research-architecture` → `main` (PR #8).
 - [x] Made "never work on `main` — branch first" an explicit rule (plan.md + execution-map.md).
 - [x] Restructured last-point.md + execution-map.md into dated logs; updated the `plan-tracking` skill.
-- [ ] Phase 1 scaffold — not started (carries to next session).
+- [x] Wrote + committed the Phase 1 spec + implementation plan (`docs/superpowers/`), hardened by 4 workflows.
+- [x] Phase 1 **Stage A** — electron-vite + TS build chain; legacy app static under `public/`; gates green.
+- [x] Phase 1 **Stage B** — npm-pin + PM single-copy; headless import + fixture; mounted our EditorView; smoke 8/8.
+- [x] Phase 1 **Stage C / Option B** — vendored + own the SuperDoc engine (editable source, no npm dep, telemetry no-op, Path B view, Tab/indent); smoke 9/9, functional 257, docx 17.
+- [ ] Phase 1 **Stage D** — final review + integrate (PR/merge) + docs follow-up (carries to next session if not finished today).
 
 ### 2026-06-03
 - [x] Locked ADR-0001…0005; de-risk spike GREEN.
