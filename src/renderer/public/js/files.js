@@ -9,6 +9,11 @@
 
     init() { this.updateTitle(); },
 
+    // Phase 2 (spec §5.1 io.ts): single mode-aware dirty accessor. Writers:
+    // legacy sets E().dirty; PM mode tracks engine 'update' events in the bridge.
+    isDirty() { return (WC.PM && WC.PM.active) ? WC.PM.isDirty() : E().dirty; },
+    setClean() { if (WC.PM && WC.PM.active) WC.PM.setClean(); else { E().dirty = false; } },
+
     sanitize(html) {
       if (window.DOMPurify) {
         return window.DOMPurify.sanitize(html, {
@@ -21,7 +26,7 @@
     },
 
     async confirmDiscard() {
-      if (!E().dirty) return true;
+      if (!this.isDirty()) return true;
       return new Promise((resolve) => {
         const dlg = WC.dialog({
           title: 'Microsoft Word', width: '420px',
@@ -108,7 +113,7 @@
     },
 
     updateTitle() {
-      const dirty = E().dirty ? '• ' : '';
+      const dirty = this.isDirty() ? '• ' : '';
       const t = `${dirty}${this.name.replace(/\.[^.]+$/, '')} - Word`;
       const node = document.querySelector('.title-center');
       if (node) node.textContent = t;
