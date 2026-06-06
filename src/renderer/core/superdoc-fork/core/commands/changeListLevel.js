@@ -103,6 +103,22 @@ export const changeListLevel = (delta, editor, tr) => {
 };
 
 /**
+ * Command-shaped wrapper: change the list level by an arbitrary delta in ONE
+ * call/transaction. Chaining repeated ±1 increase/decreaseListIndent steps does NOT
+ * work — changeListLevel reads editor.state (not the chain's shared tr), so every
+ * chained step re-computes from the same stale level.
+ * @example editor.commands.changeListLevelBy(2)  // ilvl 0 → 2
+ */
+export const changeListLevelBy =
+  (delta) =>
+  ({ editor, tr, dispatch }) => {
+    if (!delta) return true;
+    const ok = changeListLevel(delta, editor, tr);
+    if (ok && dispatch) dispatch(tr);
+    return ok;
+  };
+
+/**
  * Apply new numbering metadata to a paragraph node and refresh related layout attributes.
  *
  * @param {{ numId: number, ilvl: number } | null} newNumberingProperties The numbering properties to set, or null to clear them.

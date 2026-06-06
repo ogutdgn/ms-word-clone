@@ -41,6 +41,12 @@ The following upstream packages are included in this directory tree:
   app already binds Word's real Ctrl+L/E/R/J in its document-level keydown map
   (app.js), and Ctrl+Shift+L's PM list wiring lands with the slice-2 area flip
   (slice 2, 2026-06-06).
+- **`applyListDefinition` command added:** mints a list definition with explicit
+  per-level `w:numFmt`/`w:lvlText` overrides and assigns it to the selection — powers
+  the Word-style multilevel-list gallery and custom bullet glyphs (slice 2, 2026-06-06).
+- **`changeListLevelBy` command added:** command-shaped wrapper applying an arbitrary
+  list-level delta in one transaction (chained ±1 steps re-read stale editor.state and
+  land one level short) — powers the Change List Level menu (slice 2, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
