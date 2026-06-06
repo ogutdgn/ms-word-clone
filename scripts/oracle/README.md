@@ -19,9 +19,21 @@ No npm dependencies. No build step.
 # Read paragraph formatting from a .docx file
 node scripts/oracle/word-oracle.js read-props <abs-path.docx> [--out report.json]
 
+# Read WORD-level formatting (1-based paraIdx; wordIdx optional — omit for all words)
+node scripts/oracle/word-oracle.js read-word-props <abs-path.docx> <paraIdx> [wordIdx] [--out report.json]
+
 # Save-as roundtrip (open in Word, save to new path)
 node scripts/oracle/word-oracle.js roundtrip <abs-in.docx> <abs-out.docx>
 ```
+
+### Why `read-word-props` exists — paragraph reads report "mixed" formatting
+
+Word's per-paragraph properties collapse to **mixed** when runs differ inside the
+paragraph: `bold`/`italic` come back `false`, `fontName` comes back `""`, and
+`font size` comes back `missing value` (parsed to `null`). A paragraph with one
+bold word therefore reports `bold:false` at paragraph level. `read-word-props`
+reads `bold of font object of (words i thru i of text object of paragraph p ...)`
+— true run-level granularity for per-feature validation.
 
 `--out` is required to have a path argument; omitting the value is a usage error
 (exit 2).
@@ -90,6 +102,39 @@ poll is relative to the pre-open document count (see PID-safety below).
 | `fontSize`     | number  | Points; locale comma separator normalised via parseFloat     |
 | `alignment`    | string  | "left", "center", "right", "justify", etc. (prefix stripped) |
 
+## JSON shape — `read-word-props`
+
+```json
+{
+  "file": "/abs/path/to/doc.docx",
+  "generatedBy": "word-oracle read-word-props",
+  "paragraph": 1,
+  "words": [
+    {
+      "index": 2,
+      "text": "bold ",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "underlineRaw": "underline none",
+      "fontName": "Aptos",
+      "fontSize": 12
+    }
+  ]
+}
+```
+
+Same field semantics as `read-props`, minus `alignment` (a paragraph property).
+Notes:
+
+- `text` **includes the word's trailing space** — that is how Word's `words`
+  collection slices ranges.
+- The **paragraph mark counts as a trailing empty "word"** (its `text` parses to
+  `""` after the `\r` strip) — a 4-word paragraph reports 5 entries when read
+  without `wordIdx`.
+- Formatting evaluation **ignores trailing whitespace**: a bold word followed by a
+  plain space still reports `bold:true`, not mixed.
+
 ## PID-safety contract
 
 The oracle uses **name-verified, count-relative** PID safety — not ordinal-based:
@@ -154,6 +199,8 @@ the Windows COM object model. All verified against Word for Mac 16.77.1:
 | `format document default` | `format document`                  | `format document` (0x0231000c) is the reliable .docx constant      |
 | `/tmp/out.docx`           | `$HOME/Desktop/out.docx`           | Sandbox constraint — /tmp blocked; raises −1712 timeout            |
 | `font size` decimal sep   | comma on some locales              | "12,0" not "12.0" — use parseFloat after comma→period replacement  |
+| `set wr to words i thru i of tr` | query properties **directly through the specifier** | Assigning a word element range to a variable raises −1728 ("Can't get word 1"); `bold of font object of (words i thru i of text object of paragraph p of d)` works |
+| word slicing              | trailing space included; paragraph mark is a trailing empty "word" | `content of (words 2 thru 2 ...)` → `"bold "`; formatting evaluation ignores trailing whitespace (bold word + plain space → `bold:true`, not mixed) |
 
 ## Per-feature validation protocol
 

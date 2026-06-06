@@ -5,6 +5,7 @@
 
    Usage:
      node scripts/oracle/word-oracle.js read-props <abs path .docx> [--out report.json]
+     node scripts/oracle/word-oracle.js read-word-props <abs path .docx> <paraIdx> [wordIdx] [--out report.json]
      node scripts/oracle/word-oracle.js roundtrip  <abs in.docx> <abs out.docx>
 
    PID-safety contract (name-verified, not ordinal):
@@ -52,7 +53,15 @@
       the NEW name (the basename of outPath).
   12. `format document` (WdSaveFormat 0x0231000c) is the correct .docx constant.
   13. Font size uses a comma decimal separator on some locales ("12,0") — convert
-      with parseFloat after replacing comma with period. */
+      with parseFloat after replacing comma with period.
+  14. Word element ranges (`words i thru i of <text range>`) CANNOT be assigned to
+      a variable — `set wr to words i thru i of tr` raises -1728 ("Can't get word
+      1"). Query properties DIRECTLY through the full specifier instead:
+      `bold of font object of (words i thru i of text object of paragraph p of d)`.
+  15. `content of (words i thru i ...)` includes the word's trailing space, and the
+      paragraph mark counts as a trailing "word" (content "\r"). Range formatting
+      evaluation ignores trailing whitespace — a bold word + plain trailing space
+      still reports bold=true (NOT "mixed"/missing value). */
 'use strict';
 const { execFileSync } = require('node:child_process');
 const os = require('node:os');
@@ -144,6 +153,55 @@ end tell`;
   });
 }
 
+/**
+ * Word-level formatting read — needed because Word reports per-PARAGRAPH props as
+ * "mixed" (bold=false, empty fontName, missing-value fontSize) when a paragraph
+ * mixes runs. paraIdx is 1-based; wordIdx is 1-based and optional (omitted = all
+ * words of the paragraph, including the trailing paragraph-mark "word").
+ *
+ * Dictionary quirk #14: word element ranges cannot be `set` to a variable — every
+ * property is queried directly through the full specifier.
+ */
+function readWordProps(docxPath, paraIdx, wordIdx) {
+  const basename = openDoc(docxPath);
+  const p = Number(paraIdx);
+  const range = wordIdx
+    ? `set firstW to ${Number(wordIdx)}\n    set lastW to ${Number(wordIdx)}`
+    : `set firstW to 1\n    set lastW to (count of words of text object of paragraph ${p} of d)`;
+  const spec = (prop) =>
+    `(${prop} of font object of (words i thru i of text object of paragraph ${p} of d))`;
+  const script = `
+tell application "Microsoft Word"
+  set out to ""
+  try
+    set d to document "${esc(basename)}"
+    ${range}
+    repeat with i from firstW to lastW
+      set out to out & i & tab & (content of (words i thru i of text object of paragraph ${p} of d)) & tab & ${spec('bold')} & tab & ${spec('italic')} & tab & ${spec('underline')} & tab & ${spec('name')} & tab & ${spec('font size')} & linefeed
+    end repeat
+  on error errMsg
+    close document "${esc(basename)}" saving no
+    error errMsg
+  end try
+  close document "${esc(basename)}" saving no
+  return out
+end tell`;
+  const raw = osa(script);
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [index, text, bold, italic, underline, fontName, fontSize] = line.split('\t');
+    return {
+      index: Number(index),
+      text: (text || '').replace(/\r$/, ''),
+      bold: bold === 'true',
+      italic: italic === 'true',
+      underline: underline !== 'underline none' && underline !== 'false',
+      underlineRaw: underline,
+      fontName,
+      fontSize: parseFloat((fontSize || '0').replace(',', '.')),
+    };
+  });
+}
+
 function roundtrip(inPath, outPath) {
   // Validate output path is inside the user's home directory (Word for Mac sandbox:
   // save as to /tmp silently shows a sheet dialog and blocks indefinitely, or raises
@@ -184,21 +242,31 @@ tell application "Microsoft Word"
 end tell`);
 }
 
-const [, , cmd, a, b] = process.argv;
-if (cmd === 'read-props' && a) {
-  const outFlag = process.argv.indexOf('--out');
-  if (outFlag > -1 && !process.argv[outFlag + 1]) {
-    console.error('usage error: --out requires a path argument');
-    process.exit(2);
-  }
-  const report = { file: a, generatedBy: 'word-oracle read-props', paragraphs: readProps(path.resolve(a)) };
+const [, , cmd, a, b, c] = process.argv;
+const outFlag = process.argv.indexOf('--out');
+if (outFlag > -1 && !process.argv[outFlag + 1]) {
+  console.error('usage error: --out requires a path argument');
+  process.exit(2);
+}
+function emit(report) {
   const json = JSON.stringify(report, null, 2);
   if (outFlag > -1) fs.writeFileSync(process.argv[outFlag + 1], json);
   console.log(json);
+}
+if (cmd === 'read-props' && a) {
+  emit({ file: a, generatedBy: 'word-oracle read-props', paragraphs: readProps(path.resolve(a)) });
+} else if (cmd === 'read-word-props' && a && b && Number(b) > 0) {
+  const wordIdx = c && !c.startsWith('--') ? c : null;
+  emit({
+    file: a,
+    generatedBy: 'word-oracle read-word-props',
+    paragraph: Number(b),
+    words: readWordProps(path.resolve(a), b, wordIdx),
+  });
 } else if (cmd === 'roundtrip' && a && b) {
   roundtrip(path.resolve(a), path.resolve(b));
   console.log('ROUNDTRIP_OK ' + b);
 } else {
-  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>');
+  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | roundtrip <in.docx> <out.docx>');
   process.exit(2);
 }
