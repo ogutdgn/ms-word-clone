@@ -5,7 +5,10 @@
   const results = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const t = async (name, fn) => {
-    try { const r = await fn(); results.push({ name, pass: r !== false, detail: typeof r === 'string' ? r : '' }); }
+    // Convention: string return = FAILURE with detail (every `return '...'` in this
+    // suite is a failure path). The old `r !== false` counted those strings green —
+    // the slice-1 negation test exposed that hole.
+    try { const r = await fn(); results.push({ name, pass: r !== false && typeof r !== 'string', detail: typeof r === 'string' ? r : '' }); }
     catch (e) { results.push({ name, pass: false, detail: 'ERR: ' + ((e && e.message) || e) }); }
   };
   for (let i = 0; i < 200 && !window.__WC_READY; i++) await sleep(50);
@@ -259,6 +262,20 @@
     await sleep(80);
     // Assert the guard stood down: doc content unchanged (no double- or single-fire from app.js).
     return v().state.doc.content.size === sizeBefore && /double fire probe/.test(v().dom.textContent);
+  });
+
+  await t('[1] imported negation run reports bold=false (converter attrs)', async () => {
+    // Fixture authored by REAL Word 16.77.1 (spec §7.5): Normal style is bold;
+    // the middle word carries an explicit <w:b w:val="0"/> negation run. The
+    // style-cascade import path emits BOOLEAN value attrs ({value:false}), not
+    // the '0' string — state-sync must read both as OFF. Inlined via gen-fixture
+    // (window.__WC_FIXTURE_NEGATION) so the built app needs no repo path.
+    const ok = await PM().openDocx(window.__WC_FIXTURE_NEGATION());
+    if (!ok) return 'import failed';
+    selectText('UNBOLD'); await sleep(150);
+    if (PM().getState().bold !== false) return 'UNBOLD reported bold';
+    selectText('BOLDED'); await sleep(150);
+    return PM().getState().bold === true; // style-inherited bold must still read ON
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
