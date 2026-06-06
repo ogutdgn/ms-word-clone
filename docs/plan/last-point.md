@@ -10,7 +10,7 @@
 ## 2026-06-06 — Phase 2 slice 2 BUILT (paragraph + lists on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-2-paragraph` (directly off `main` post PR #15 — no stacked
-  PRs; PR pending).
+  PRs; **PR #17** open).
 - **Phase:** **Phase 2 — Editing core behind the ribbon; slice 2 DONE → slice 3 (styles) next.**
 - **State summary:** areas **`paragraph` + `lists` FLIPPED** (registry `bridge/index.ts:23`):
   align ×4, list-aware indent (level in lists / 36pt text-indent outside), Layout spinners
@@ -63,6 +63,26 @@
   brainstorm → write-plan → execute.
 - **Blockers/notes:** none for the PR. Word left running (never quit) but wedged for NEW opens —
   user relaunch recovers it.
+
+---
+
+## 2026-06-05 — Phase 2 slices 0a–1 INTEGRATED to `main`
+
+- **Branch:** `main` (all Phase 2 work merged; feature branches deleted local+remote).
+- **Phase:** **Phase 2 — slices 0a/0b/0c/1 DONE and on `main` → slice 2 (paragraph + lists) next.**
+- **State summary:** the PR stack (#11–#14) was merged, but the stacked PRs cascaded into their
+  base branches instead of `main` (classic stacked-merge gotcha — only #11 landed). Fixed via a
+  catch-up branch from the complete tip → **PR #15**, merged. `main` verified complete (slice-1
+  tip is an ancestor; oracle/fixtures/bridge files all present) and gates re-run **on `main`**:
+  PM 43/43, legacy 257/257 (smoke 9/9 ×2 + docx 17/17 ran green on the identical tree pre-merge).
+- **Done:** PR #15 (cascade fix); branch cleanup (`feature/phase-2-editing-core`, `-slice-0b`,
+  `-slice-0c`, `-slice-1-character`, `merge/phase-2-slices-0b-1` deleted local + remote).
+- **Next:** **slice 2 — paragraph + lists**, branched **directly off `main`** (no stacking —
+  cut each slice branch off `main` and merge before starting the next, avoiding the cascade).
+  Cycle: brainstorm-lite (confirm area inventory against real code) → write plan → red tests →
+  flip → oracle validation → PR.
+- **Blockers/notes:** none. The 14-slice ladder + carve-outs live in the spec §9; per-slice
+  fidelity gaps recorded in the slice-1 entry below.
 
 ---
 

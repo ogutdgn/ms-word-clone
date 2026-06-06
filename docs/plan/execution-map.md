@@ -35,15 +35,17 @@
 > (all gates green: smoke 9/9, functional 257/257, docx 17/17; single PM copy; telemetry off; no
 > `superdoc` npm dep). Branch **pushed**; merged to `main` via PR #10.
 >
-> **Slice 0a is DONE** (`feature/phase-2-editing-core`, PR pending): `#pm-editor` is now the visible
+> **Slice 0a is DONE** (merged to `main` via PRs #11/#15): `#pm-editor` is now the visible
 > editor behind the `WC.PM` bridge; `--legacy` restores the full legacy app; D6 two-layer guards live;
 > ribbon state-sync from engine events; dirty/statusbar/visible-page re-pointed. Gates: 257/21/9×2/17.
 >
-> **Slices 0b, 0c and 1 are DONE** (see Daily work log + last-point.md): file-IO bytes layer,
-> the macOS Word oracle harness, and the **character-formatting flip** (area `character` on the
-> PM engine, oracle-validated both ways vs Word 16.77.1).
+> **Slices 0b, 0c and 1 are DONE and INTEGRATED** (all on `main` via PRs #11–#15; the stacked
+> PRs #12–#14 cascaded into their bases, #15 was the catch-up — see last-point.md): file-IO
+> bytes layer, the macOS Word oracle harness, and the **character-formatting flip** (area
+> `character` on the PM engine, oracle-validated both ways vs Word 16.77.1). Gates re-verified
+> on `main`: PM 43/43, 257, 9/9 × 2, 17.
 >
-> **Slice 2 is DONE** (`feature/phase-2-slice-2-paragraph`, PR pending): areas **`paragraph` +
+> **Slice 2 is DONE** (`feature/phase-2-slice-2-paragraph`, PR #17): areas **`paragraph` +
 > `lists` FLIPPED** — align/indent/spinners/line-spacing/shading/borders/sort, glyph-honoring
 > list libraries, Word-native multilevel, Paragraph dialog, Word shortcuts; the slice-1
 > hanging-indent gap closed (fork CSS shipped); new `read-para-props` oracle verb (quirks
