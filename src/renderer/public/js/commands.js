@@ -1143,9 +1143,14 @@
       else { E().exec('hiliteColor', color) || E().exec('backColor', color); }
       WC.Ribbon.setColorBar('textHighlightColor', color);
     } else if (kind === 'shade') {
-      if (pm) { pm.notifyBlocked('Shading'); return; } // paragraph area — slice 2
       if (color && color !== 'transparent') lastShade = color;
-      E().applyBlockStyle('backgroundColor', color || 'transparent');
+      const pm = PMA();
+      if (pm) {
+        if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+        else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
+      } else {
+        E().applyBlockStyle('backgroundColor', color || 'transparent');
+      }
       WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
     } else if (kind === 'page') {
       if (pm) { pm.notifyBlocked('Page Color'); return; } // design area — slice 10
@@ -1156,7 +1161,7 @@
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
+        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
@@ -1236,6 +1241,22 @@
   }
   function applyBorder(edge) {
     if (edge && edge !== 'none' && edge !== 'all' && edge !== 'outside') lastBorderEdge = edge;
+    const pm = PMA();
+    if (pm) {
+      if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
+      // Word's default paragraph border: single, 0.5pt (size is in EIGHTH-points: 4),
+      // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
+      // for single paragraphs (no inside-border concept yet; recorded deferral).
+      const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
+      const attrs = pm.getEditor().getAttributes('paragraph') || {};
+      const pp = attrs.paragraphProperties || {};
+      const cur = pp.borders || {};
+      const borders = (edge === 'all' || edge === 'outside')
+        ? { top: { val: 'single', size: 4, color: 'auto', space: 1 }, bottom: { val: 'single', size: 4, color: 'auto', space: 1 }, left: { val: 'single', size: 4, color: 'auto', space: 1 }, right: { val: 'single', size: 4, color: 'auto', space: 1 } }
+        : Object.assign({}, cur, { [edge]: { val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space } }); // Word ACCUMULATES single edges
+      pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
+      return;
+    }
     const b = '1px solid #000';
     E().selectedBlocks().forEach((el2) => {
       if (edge === 'none') { el2.style.border = ''; el2.style.borderTop = el2.style.borderBottom = el2.style.borderLeft = el2.style.borderRight = ''; }
@@ -1307,8 +1328,13 @@
     setTimeout(() => input.focus(), 30);
   }
   function sortDialog() {
-    const all = E().selectedBlocks();
-    if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
+    const pmOpen = PMA();
+    if (!pmOpen) {
+      const all = E().selectedBlocks();
+      if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
+    } else {
+      pmOpen.captureSelection(); // the dialog steals focus; restore before sorting
+    }
     const type = el('select', {}, ['Text', 'Number', 'Date'].map((t) => el('option', { text: t })));
     const dir = el('select', {}, ['Ascending', 'Descending'].map((t) => el('option', { text: t })));
     const hdr = el('input', { type: 'checkbox' });
@@ -1318,7 +1344,12 @@
       el('div', { class: 'row' }, [el('label', {}, [hdr, el('span', { text: ' My list has a header row' })])]),
     ]);
     WC.dialog({ title: 'Sort Text', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => sortSelection({ ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked }) },
+      { label: 'OK', primary: true, onClick: () => {
+        const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
+        const pm = PMA();
+        if (pm) { let ok = false; pm.withSelection(() => { ok = pm.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.'); }
+        else sortSelection(opts);
+      } },
       { label: 'Cancel' },
     ] });
   }

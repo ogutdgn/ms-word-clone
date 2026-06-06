@@ -72,5 +72,38 @@ export function installCommands(editor: AnyEditor) {
     return true
   }
 
-  return { cmd, chain, captureSelection, withSelection, changeCase }
+  // Paragraph sort as ONE PM transaction (no engine command — legacy sortDialog
+  // reordered DOM siblings). Restricted to contiguous siblings of the first selected
+  // paragraph's parent, mirroring legacy sortSelection's same-parent guard.
+  function sortParagraphs(opts: { ascending?: boolean; numeric?: boolean; header?: boolean } = {}): boolean {
+    const { state } = editor
+    const { from, to } = state.selection
+    const paras: Array<{ node: any; pos: number }> = []
+    state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+      if (node.type.name === 'paragraph') { paras.push({ node, pos }); return false }
+      return true
+    })
+    if (paras.length < 2) return false
+    const parent0 = state.doc.resolve(paras[0].pos).parent
+    const blocks = paras.filter((p) => state.doc.resolve(p.pos).parent === parent0)
+    if (blocks.length < 2) return false
+    // Contiguity guard: replaceWith below rebuilds [start,end) — bail if other nodes interleave.
+    const start = blocks[0].pos
+    const end = blocks[blocks.length - 1].pos + blocks[blocks.length - 1].node.nodeSize
+    if (blocks.reduce((s, b) => s + b.node.nodeSize, 0) !== end - start) return false
+    const head = opts.header ? blocks.slice(0, 1) : []
+    const toSort = opts.header ? blocks.slice(1) : blocks
+    const cmp = (a: any, b: any) => {
+      let r: number
+      if (opts.numeric) r = (parseFloat(a.node.textContent) || 0) - (parseFloat(b.node.textContent) || 0)
+      else r = a.node.textContent.localeCompare(b.node.textContent, undefined, { numeric: true, sensitivity: 'base' })
+      return opts.ascending === false ? -r : r
+    }
+    const sorted = head.concat(toSort.slice().sort(cmp))
+    editor.view?.dispatch(state.tr.replaceWith(start, end, sorted.map((p: any) => p.node)))
+    editor.view?.focus()
+    return true
+  }
+
+  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs }
 }
