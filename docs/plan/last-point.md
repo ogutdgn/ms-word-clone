@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-05 — Phase 2 slice 1 BUILT (character formatting on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-1-character` (stacked on `feature/phase-2-slice-0c`; PR up).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 1 DONE → slice 2 (paragraph + lists) next.**
+- **State summary:** ALL character-formatting entry points now run on the PM engine (area
+  `character` FLIPPED): bold/italic/underline/strike/sub/sup, font/size combos (comboCommit),
+  grow/shrink, color/highlight, clearFormatting, changeCase, Font dialog (one chained PM
+  transaction = one undo step), QAT undo/redo (engine history, Word-like greying), in-view
+  keyboard shortcuts stand down to the engine. **Oracle validation (spec §8.3) run both ways
+  vs Word for Mac 16.77.1 — all PASS:** leg A clone→Word (bold/italic/Georgia-20pt read back
+  per-run via the new `read-word-props` oracle verb), leg B Word→clone (Word-authored bold word
+  imports with run-level truth), leg C negation-run fixture (`tests/fixtures/negation-run.docx`,
+  REAL-Word-authored `w:b w:val="0"`, checked in + inlined via gen-fixture). Leg C caught and
+  fixed a REAL bug: style-cascade imports emit BOOLEAN negation attrs (`{value:false}`) which
+  state-sync read as bold ON (`a.value !== '0'`); plus a PM-suite harness hole (string returns
+  = failure paths counted green). Evidence: `docs/superpowers/plans/notes/2026-06-05-slice1-*`.
+  Gates: **PM 43/43**, legacy 257/257, smoke 9/9 × 2, docx 17/17.
+- **Done this session** (validation + wrap-up, commit SHAs; slice build commits were
+  `8e4e9c1` red tests, `9f03481` character+history flip, `9dc452f` guards, `3a16cdb` Font
+  dialog one-transaction, `8888ad7` history keys/QAT greying):
+  - `8e521b5` — word-oracle `read-word-props` verb (word-granularity reads; 2 new dictionary quirks: never `set` a word element range to a variable; trailing-space/paragraph-mark word slicing).
+  - `30dc4ea` — fix: Word negation runs read as bold ON in PM ribbon state (markOn() mirrors fork renderDOM semantics) + negation-run fixture + suite test + harness string-return tightening.
+  - `7fb31e9` — oracle validation notes (3 JSON verdicts) + PM-mode UI screenshot.
+- **KNOWN FIDELITY GAPS (recorded, deferred):**
+  - (a) mixed-size grow-font flattens the selection to one size — real Word steps per-run.
+  - (b) Font dialog on a mixed-underline selection strips underline (legacy-parity; real Word shows an indeterminate state).
+  - (c) toggled-off vertAlign leaves a residual all-null `textStyle` mark (cosmetic; no render/export effect).
+  - (d) UI shot: list markers render inline without hanging-indent metrics (slice 2 territory); no pagination (Phase 7, expected).
+- **Next:** slice 2 — **paragraph + lists** (align ×4, indent, spacing, line-spacing, shading/borders, show-marks; toggleBullet/OrderedList, multilevel, list indent) per the NEXT plan to be written (brainstorm → write-plan → execute).
+- **Blockers/notes:** none. Word left clean after every oracle leg (document count at baseline 0; never quit).
+
+---
+
 ## 2026-06-05 — Phase 2 slice 0c BUILT (macOS Word oracle harness)
 
 - **Branch:** `feature/phase-2-slice-0c` (stacked on `feature/phase-2-slice-0b`; PR pending).
