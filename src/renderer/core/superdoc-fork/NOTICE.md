@@ -38,7 +38,9 @@ The following upstream packages are included in this directory tree:
   imported/serialized w:shd but never painted it (slice 2, 2026-06-06).
 - **SuperDoc align keymap removed:** `Mod-Shift-L/E/R/J` shortcuts deleted from the
   TextAlign extension — they shadow Word's Ctrl+Shift+L (List Bullet) semantics; the
-  app binds Word's real Ctrl+L/E/R/J at the document level (slice 2, 2026-06-06).
+  app already binds Word's real Ctrl+L/E/R/J in its document-level keydown map
+  (app.js), and Ctrl+Shift+L's PM list wiring lands with the slice-2 area flip
+  (slice 2, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

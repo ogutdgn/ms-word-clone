@@ -293,6 +293,8 @@ export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, next
 
   // Paragraph shading (w:shd → shd-translator key 'shading': { val, color, fill, ... }).
   // Word's ribbon shading writes val="clear" + fill=<hex>; fill="auto" means none.
+  // themeFill-only shading (no literal fill) silently falls through — theme colour
+  // resolution is not implemented here (matches encodeCSSFromRPr's run-level shading).
   if (shading && shading.fill && String(shading.fill).toLowerCase() !== 'auto') {
     css['background-color'] = `#${String(shading.fill).replace(/^#/, '')}`;
   }
