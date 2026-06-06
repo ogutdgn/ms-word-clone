@@ -7,6 +7,23 @@
 
 ---
 
+## 2026-06-06 — Phase 2 slice 2 INTEGRATED to `main`
+
+- **Branch:** `main` (PR #17 merged — one conflict round in the plan docs vs PR #16's
+  checkpoint, resolved in `fdef0e3`; `feature/phase-2-slice-2-paragraph` deleted local+remote).
+- **Phase:** **Phase 2 — slices 0a–2 DONE and on `main` → slice 3 (styles) next.**
+- **State summary:** gates re-verified **on `main` post-merge**: PM 76/76, legacy 257/257.
+  CLAUDE.md/AGENTS.md banners advanced to slices-0a–2/slice-3-next (this entry's PR).
+- **Next:** **slice 3 — styles** in a FRESH session (orient at docs/plan/ → brainstorm-lite →
+  write-plan → execute; branch `feature/phase-2-slice-3-styles` directly off `main`). Before or
+  alongside: the ~5-min oracle follow-up (two pending Word reads) after a Word relaunch —
+  commands in `notes/2026-06-06-slice2-oracleA-lists.json` → `followUp`. Slice-3 revisit list:
+  Change-List-Level resolved-ilvl deviation; vendored `resolvedPropertiesCache` tableStyleId/
+  TableInfo mismatch (both recorded in the slice-2 BUILT entry below).
+- **Blockers/notes:** none.
+
+---
+
 ## 2026-06-06 — Phase 2 slice 2 BUILT (paragraph + lists on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-2-paragraph` (directly off `main` post PR #15 — no stacked
