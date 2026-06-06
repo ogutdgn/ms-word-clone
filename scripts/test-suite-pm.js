@@ -421,6 +421,7 @@
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body);
     const noColor = Array.from(document.querySelectorAll('.flyout .color-row'))
       .find((r) => /No Color/.test(r.textContent));
+    if (!noColor) return 'No Color row not found in shading flyout';
     noColor.click(); await sleep(50);
     return paraAttrs('shade').paragraphProperties?.shading == null;
   });
