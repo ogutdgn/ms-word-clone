@@ -1144,7 +1144,6 @@
       WC.Ribbon.setColorBar('textHighlightColor', color);
     } else if (kind === 'shade') {
       if (color && color !== 'transparent') lastShade = color;
-      const pm = PMA();
       if (pm) {
         if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
         else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
@@ -1248,12 +1247,15 @@
       // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
       // for single paragraphs (no inside-border concept yet; recorded deferral).
       const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
+      const defCopy = () => ({ val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space });
+      // getAttributes reads ONE paragraph (selection head) — multi-paragraph selections
+      // seed single-edge accumulation from that paragraph only (recorded simplification).
       const attrs = pm.getEditor().getAttributes('paragraph') || {};
       const pp = attrs.paragraphProperties || {};
       const cur = pp.borders || {};
       const borders = (edge === 'all' || edge === 'outside')
-        ? { top: { val: 'single', size: 4, color: 'auto', space: 1 }, bottom: { val: 'single', size: 4, color: 'auto', space: 1 }, left: { val: 'single', size: 4, color: 'auto', space: 1 }, right: { val: 'single', size: 4, color: 'auto', space: 1 } }
-        : Object.assign({}, cur, { [edge]: { val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space } }); // Word ACCUMULATES single edges
+        ? { top: defCopy(), bottom: defCopy(), left: defCopy(), right: defCopy() }
+        : Object.assign({}, cur, { [edge]: defCopy() }); // Word ACCUMULATES single edges
       pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
       return;
     }
@@ -1345,6 +1347,8 @@
     ]);
     WC.dialog({ title: 'Sort Text', width: '440px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
+        // 'Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral;
+        // real Word does true date parsing.
         const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
         const pm = PMA();
         if (pm) { let ok = false; pm.withSelection(() => { ok = pm.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.'); }
