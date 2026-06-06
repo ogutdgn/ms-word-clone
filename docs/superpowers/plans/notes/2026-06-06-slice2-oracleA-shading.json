@@ -1,0 +1,32 @@
+{
+  "leg": "A — shading + borders fidelity (spec §8.3, slice 2; roundtrip variant)",
+  "date": "2026-06-06",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-2-paragraph",
+  "plannedMethod": "Word re-save (oracle roundtrip verb) of the Task-12 fixture /tmp/wc-s2-roundtrip.docx (copied to tests/fixtures/.oracle-rt-in.docx because roundtrip SAVES and /tmp is sandbox-blocked for save-as), then clone reimport of WORD's output asserting shading fill FFFF00 + borders.bottom survive.",
+  "whatActuallyHappened": "The roundtrip could not run this session: Word's document-open machinery degraded to fully non-functional partway through the run (the full Task-12 fixture, a fresh-named copy, AND a list-free derivative all timed out at 540 s opens; diagnosis in 2026-06-06-slice2-verdicts.json -> sessionFindings). Word's authoring + save-as path kept working, so the validation was inverted: shading + bottom border were authored in REAL Word via the object model and the clone imported WORD's native output.",
+  "wordAuthoredLeg": {
+    "method": "make new document; set background pattern color index of (shading of text object of paragraph 1) to yellow; set line style of (get border (text object of paragraph 2) which border border bottom) to line style single; save as ... tests/fixtures/oracle-word-shading.docx; close by name-verified ordinal; count 0 before/after.",
+    "wordNativeXml": {
+      "shading": "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FFFF00\"/>",
+      "border": "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"1\" w:color=\"auto\"/></w:pBdr>"
+    },
+    "cloneExportXml_task12Fixture": {
+      "shading": "<w:shd w:color=\"auto\" w:fill=\"FFFF00\" w:val=\"clear\" />",
+      "border": "<w:pBdr><w:bottom w:val=\"single\" w:color=\"auto\" w:sz=\"4\" w:space=\"1\" /></w:pBdr>"
+    },
+    "xmlEquivalence": "Attribute-for-attribute IDENTICAL forms in both directions (only serialization order differs). Word's WdColorIndex 'yellow' is FFFF00 — the same hex the clone's shading palette pick stores.",
+    "cloneImportRead": {
+      "shaded paragraph": { "shading": { "color": "auto", "fill": "FFFF00", "val": "clear" }, "paintedBackground": "rgb(255, 255, 0)" },
+      "bordered paragraph": { "borders": { "bottom": { "val": "single", "color": "auto", "size": 4, "space": 1 } }, "paintedBorderBottom": "0.666667px solid rgb(0, 0, 0)" }
+    }
+  },
+  "expected": [
+    { "check": "shading fill FFFF00 survives a Word-native cycle", "expected": "clone model shading.fill 'FFFF00' + painted background after importing WORD's file", "actual": "shading {val clear, color auto, fill FFFF00}; painted rgb(255,255,0)", "verdict": "PASS (Word-authored -> clone import; the clone's own export uses the identical w:shd form Word writes)" },
+    { "check": "borders.bottom survives a Word-native cycle", "expected": "clone model borders.bottom {val single} + painted border-bottom after importing WORD's file", "actual": "borders.bottom {val single, size 4, space 1, color auto}; painted border-bottom", "verdict": "PASS (Word-authored -> clone import; identical w:pBdr form both directions; size 4 eighth-points and space 1 match the clone's Word-default border constants in commands.js applyBorder)" },
+    { "check": "Word RE-SAVE of the clone's file (the literal roundtrip verb)", "expected": "roundtrip .oracle-rt-in.docx -> .oracle-rt-out.docx", "actual": "UNVERIFIED-THIS-SESSION — Word could not open any new file this session (environment; not content-correlated). Re-run after Word relaunch.", "verdict": "UNVERIFIED-THIS-SESSION" }
+  ],
+  "verdict": "PASS on the fidelity question (identical OOXML forms both directions + clone correctly imports Word-native shading/borders), with the literal Word-re-save cycle deferred to a healthy Word session.",
+  "followUp": "After Word relaunch: node scripts/oracle/word-oracle.js roundtrip $(pwd)/tests/fixtures/oracle-rt-in.docx $(pwd)/tests/fixtures/oracle-rt-out.docx (non-dot copies already staged, untracked), then reimport oracle-rt-out.docx in the clone and assert shading/borders.",
+  "pidSafety": "count 0 before/after; only our authored doc was saved/closed (name-verified); Word never quit."
+}

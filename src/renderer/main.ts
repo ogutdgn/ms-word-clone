@@ -6,6 +6,10 @@ import { TextSelection } from '@/pm'
 import { fixtureArrayBuffer, negationArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
 import { createPmEditor } from '@/bridge/create-editor'
+// Fork element styles (markers/tabs): the bridge imports @core/Editor.js directly, so
+// superdoc-fork/index.js → style.css never enters the build. Without the .sd-editor-tab
+// inline-block rule, list-marker separators and typed tabs render zero-width.
+import './core/superdoc-fork/assets/styles/elements/prosemirror.css'
 
 const w = window as any
 w.__PM_TextSelection = TextSelection

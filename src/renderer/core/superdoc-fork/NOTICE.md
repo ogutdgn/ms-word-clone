@@ -33,6 +33,20 @@ The following upstream packages are included in this directory tree:
 - **Geometry helpers stubbed:** browser layout helpers that depend on a full DOM at
   module evaluation time are guarded or replaced with no-op stubs to allow headless
   operation in the Electron renderer.
+- **Paragraph shading rendered:** `encodeCSSFromPPr` (core/super-converter/styles.js)
+  additionally maps `paragraphProperties.shading.fill` → `background-color`; upstream
+  imported/serialized w:shd but never painted it (slice 2, 2026-06-06).
+- **SuperDoc align keymap removed:** `Mod-Shift-L/E/R/J` shortcuts deleted from the
+  TextAlign extension — they shadow Word's Ctrl+Shift+L (List Bullet) semantics; the
+  app already binds Word's real Ctrl+L/E/R/J in its document-level keydown map
+  (app.js), and Ctrl+Shift+L's PM list wiring lands with the slice-2 area flip
+  (slice 2, 2026-06-06).
+- **`applyListDefinition` command added:** mints a list definition with explicit
+  per-level `w:numFmt`/`w:lvlText` overrides and assigns it to the selection — powers
+  the Word-style multilevel-list gallery and custom bullet glyphs (slice 2, 2026-06-06).
+- **`changeListLevelBy` command added:** command-shaped wrapper applying an arbitrary
+  list-level delta in one transaction (chained ±1 steps re-read stale editor.state and
+  land one level short) — powers the Change List Level menu (slice 2, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

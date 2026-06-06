@@ -48,6 +48,8 @@ type CoreCommandNames =
   | 'increaseListIndent'
   | 'decreaseListIndent'
   | 'changeListLevel'
+  | 'changeListLevelBy'
+  | 'applyListDefinition'
   | 'updateNumberingProperties'
   | 'removeNumberingProperties'
   | 'insertListItemAt'

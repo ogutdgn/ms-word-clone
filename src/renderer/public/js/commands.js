@@ -11,6 +11,14 @@
   const PMA = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
 
   const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+  // Layout spinner cmd → [paragraph attr dot-path, UI-unit → twips converter]
+  // (indents arrive in inches ×1440, spacing in points ×20).
+  const PARA_SPIN = {
+    indentLeft: ['paragraphProperties.indent.left', (v) => Math.round(v * 1440)],
+    indentRight: ['paragraphProperties.indent.right', (v) => Math.round(v * 1440)],
+    spacingBefore: ['paragraphProperties.spacing.before', (v) => Math.round(v * 20)],
+    spacingAfter: ['paragraphProperties.spacing.after', (v) => Math.round(v * 20)],
+  };
   const FONTS = ['Calibri', 'Calibri Light', 'Arial', 'Times New Roman', 'Cambria', 'Georgia', 'Verdana', 'Tahoma',
     'Courier New', 'Consolas', 'Comic Sans MS', 'Garamond', 'Trebuchet MS', 'Segoe UI', 'Helvetica', 'Carlito', 'Aptos'];
 
@@ -52,15 +60,30 @@
   H.fontColor = (c, node) => applyColor('fore', lastFontColor);
 
   // ---- Paragraph ----
-  H.alignLeft = () => E().exec('justifyLeft');
-  H.center = () => E().exec('justifyCenter');
-  H.alignRight = () => E().exec('justifyRight');
-  H.justify = () => E().exec('justifyFull');
-  H.bullets = () => E().exec('insertUnorderedList');
-  H.numbering = () => E().exec('insertOrderedList');
+  H.alignLeft = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
+  H.center = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
+  H.alignRight = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
+  // Word stores justify as w:jc="both"; setTextAlign('justify') does that mapping —
+  // never pass 'both' (the alignments whitelist rejects it).
+  H.justify = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
+  H.bullets = () => { const pm = PMA(); pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
+  H.numbering = () => { const pm = PMA(); pm ? pm.cmd('toggleOrderedList') : E().exec('insertOrderedList'); };
   H.decreaseIndent = () => stepIndent(-48);
   H.increaseIndent = () => stepIndent(48);
   function stepIndent(px) {
+    const pm = PMA();
+    if (pm) {
+      // Word behavior: inside a list the ribbon indent buttons change the LIST LEVEL;
+      // otherwise they step the paragraph text indent by 0.5" (engine: 36pt = 720tw).
+      const para = pm.getEditor().getAttributes('paragraph') || {};
+      // NOTE: style-inherited list paragraphs carry no INLINE numberingProperties —
+      // they reach the list branch via listRendering (computed by numberingPlugin).
+      // Both arms are needed; do not simplify to one.
+      const inList = !!(para.paragraphProperties && para.paragraphProperties.numberingProperties) || !!para.listRendering;
+      if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
+      else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
+      return;
+    }
     if (E().currentListItem && E().currentListItem()) { if (px > 0) E().demoteListItem(); else E().promoteListItem(); return; }
     E().selectedBlocks().forEach((b) => { const cur = parseFloat(b.style.marginLeft) || 0; const next = Math.max(0, cur + px); b.style.marginLeft = next ? next + 'px' : ''; });
     E().dirty = true; E().repaginate(); E().updateStatus(); E().emit();
@@ -279,18 +302,54 @@
     });
   }
 
+  // Word-native multilevel patterns: per-level OOXML numFmt + lvlText, applied as a real
+  // numbering definition (applyListDefinition). The legacy CSS-class fake (ml-decimal/
+  // ml-bullet/ml-outline) survives only on the --legacy branch.
+  const mlLevels = (mk) => Array.from({ length: 9 }, (_, i) => mk(i));
+  const compound = (i, suffix) => Array.from({ length: i + 1 }, (_, k) => '%' + (k + 1)).join('.') + suffix;
+  const ML_PATTERNS = {
+    'Decimal (1. 1.1. 1.1.1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: 'decimal', text: compound(i, '.') })) },
+    'Legal (1 1.1 1.1.1)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: 'decimal', text: compound(i, '') })) },
+    'Bullet hierarchy': { listType: 'bulletList', levels: mlLevels((i) => ({ fmt: 'bullet', text: ['•', '◦', '▪'][i % 3] })) },
+    'Outline (1) a) i))': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['decimal', 'lowerLetter', 'lowerRoman'][i % 3], text: '%' + (i + 1) + ')' })) },
+    'Upper Roman (I. A. 1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['upperRoman', 'upperLetter', 'decimal'][i % 3], text: '%' + (i + 1) + '.' })) },
+  };
   function multilevelMenu(node) {
+    // [label, legacyKey] — the PM branch keys ML_PATTERNS by label; legacy uses key.
     const lib = [['Decimal (1. 1.1. 1.1.1.)', 'decimal'], ['Legal (1 1.1 1.1.1)', 'decimal'], ['Bullet hierarchy', 'bullet'], ['Outline (1) a) i))', 'outline'], ['Upper Roman (I. A. 1.)', 'outline']];
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('List Library'));
-      lib.forEach(([label, key]) => fly.appendChild(WC.flyItem(label, { onClick: () => E().applyMultilevelPattern(key) })));
+      lib.forEach(([label, key]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
+        const pm = PMA();
+        if (pm) pm.cmd('applyListDefinition', ML_PATTERNS[label]);
+        else E().applyMultilevelPattern(key);
+      } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Change List Level', { onClick: () => changeListLevelMenu(node) }));
       fly.appendChild(WC.flyItem('Define New Multilevel List…', { onClick: () => WC.notImplemented('Define New Multilevel List dialog') }));
     });
   }
   function changeListLevelMenu(node) {
-    WC.flyout(node, (fly) => { for (let i = 1; i <= 5; i++) fly.appendChild(WC.flyItem('Level ' + i, { onClick: () => E().setListLevel(i) })); });
+    WC.flyout(node, (fly) => {
+      for (let i = 1; i <= 5; i++) fly.appendChild(WC.flyItem('Level ' + i, { onClick: () => {
+        const pm = PMA();
+        if (!pm) { E().setListLevel(i); return; }
+        // ONE full-delta call = one transaction = one undo step (changeListLevelBy).
+        // NEVER chain repeated increase/decreaseListIndent — changeListLevel reads
+        // editor.state, so chained ±1 steps land one short.
+        // DEVIATION (recorded): `cur` is the INLINE ilvl, but the engine applies the
+        // delta to the RESOLVED level — style-inherited list paragraphs (numbering
+        // from a named style, no inline attrs) can land off-target. Revisit with
+        // slice 3 (styles), where resolved style reads land on the bridge.
+        const attrs = pm.getEditor().getAttributes('paragraph');
+        const np = attrs && attrs.paragraphProperties ? attrs.paragraphProperties.numberingProperties : null;
+        const cur = np && np.ilvl != null ? np.ilvl : 0;
+        const delta = (i - 1) - cur;
+        // Non-list paragraph: changeListLevelBy → underlying changeListLevel finds no
+        // list and returns false — silent no-op (Word greys these items instead).
+        if (delta !== 0) pm.cmd('changeListLevelBy', delta);
+      } }));
+    });
   }
 
   function sensitivityMenu(node) {
@@ -930,9 +989,19 @@
       WC.applyNamedStyle(name);
     },
 
-    // Layout Paragraph spinners (indent in inches, spacing in points).
+    // Layout Paragraph spinners (indent in inches, spacing in points; model = twips).
+    // Negative indents are intentional pass-throughs (Word allows them); spacing
+    // can't go negative — the ribbon inputs enforce min:0 (ribbon.js renderSpinner).
     spinner(cmd, value) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
+      const pm = PMA();
+      if (pm && PARA_SPIN[cmd]) {
+        // withSelection: the spinner input took real focus — focus.ts snapshotted the
+        // PM selection on focusin (.rspinner is in its capture list); restore it first.
+        const [path, conv] = PARA_SPIN[cmd];
+        pm.withSelection(() => pm.cmd('updateAttributes', 'paragraph', { [path]: conv(value) }));
+        return;
+      }
       if (cmd === 'indentLeft') E().applyBlockStyle('marginLeft', value ? value + 'in' : '');
       else if (cmd === 'indentRight') E().applyBlockStyle('marginRight', value ? value + 'in' : '');
       else if (cmd === 'spacingBefore') E().applyBlockStyle('marginTop', value + 'pt');
@@ -1078,9 +1147,13 @@
       else { E().exec('hiliteColor', color) || E().exec('backColor', color); }
       WC.Ribbon.setColorBar('textHighlightColor', color);
     } else if (kind === 'shade') {
-      if (pm) { pm.notifyBlocked('Shading'); return; } // paragraph area — slice 2
       if (color && color !== 'transparent') lastShade = color;
-      E().applyBlockStyle('backgroundColor', color || 'transparent');
+      if (pm) {
+        if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+        else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
+      } else {
+        E().applyBlockStyle('backgroundColor', color || 'transparent');
+      }
       WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
     } else if (kind === 'page') {
       if (pm) { pm.notifyBlocked('Page Color'); return; } // design area — slice 10
@@ -1091,7 +1164,7 @@
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
+        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
@@ -1131,12 +1204,33 @@
 
   function lineSpacingMenu(node) {
     const opts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
+    // pm/st snapshot at MENU OPEN drives the dynamic labels; each click re-guards
+    // with a fresh PMA() (pm2) because failBridge can un-flip the mode while the
+    // flyout is open — never act on a stale mode through a captured pm.
+    const pm = PMA();
+    const st = pm ? pm.getState() : null;
     WC.flyout(node, (fly) => {
-      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => E().applyBlockStyle('lineHeight', o) })));
+      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => {
+        const pm2 = PMA();
+        if (pm2) pm2.cmd('setLineHeight', parseFloat(o));
+        else E().applyBlockStyle('lineHeight', o);
+      } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Line Spacing Options…', { onClick: () => WC.Dialogs.paragraph() }));
-      fly.appendChild(WC.flyItem('Add Space Before Paragraph', { onClick: () => E().applyBlockStyle('marginTop', '12pt') }));
-      fly.appendChild(WC.flyItem('Remove Space After Paragraph', { onClick: () => E().applyBlockStyle('marginBottom', '0') }));
+      if (pm) {
+        // Word-fidelity: labels flip with the caret paragraph's current spacing.
+        const hasBefore = !!(st && st.spacingBeforePt > 0);
+        const hasAfter = !!(st && st.spacingAfterPt > 0);
+        fly.appendChild(WC.flyItem(hasBefore ? 'Remove Space Before Paragraph' : 'Add Space Before Paragraph', {
+          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.before': hasBefore ? 0 : 240 }); },
+        }));
+        fly.appendChild(WC.flyItem(hasAfter ? 'Remove Space After Paragraph' : 'Add Space After Paragraph', {
+          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.after': hasAfter ? 0 : 240 }); },
+        }));
+      } else {
+        fly.appendChild(WC.flyItem('Add Space Before Paragraph', { onClick: () => E().applyBlockStyle('marginTop', '12pt') }));
+        fly.appendChild(WC.flyItem('Remove Space After Paragraph', { onClick: () => E().applyBlockStyle('marginBottom', '0') }));
+      }
     });
   }
 
@@ -1150,6 +1244,25 @@
   }
   function applyBorder(edge) {
     if (edge && edge !== 'none' && edge !== 'all' && edge !== 'outside') lastBorderEdge = edge;
+    const pm = PMA();
+    if (pm) {
+      if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
+      // Word's default paragraph border: single, 0.5pt (size is in EIGHTH-points: 4),
+      // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
+      // for single paragraphs (no inside-border concept yet; recorded deferral).
+      const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
+      const defCopy = () => ({ val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space });
+      // getAttributes reads ONE paragraph (selection head) — multi-paragraph selections
+      // seed single-edge accumulation from that paragraph only (recorded simplification).
+      const attrs = pm.getEditor().getAttributes('paragraph') || {};
+      const pp = attrs.paragraphProperties || {};
+      const cur = pp.borders || {};
+      const borders = (edge === 'all' || edge === 'outside')
+        ? { top: defCopy(), bottom: defCopy(), left: defCopy(), right: defCopy() }
+        : Object.assign({}, cur, { [edge]: defCopy() }); // Word ACCUMULATES single edges
+      pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
+      return;
+    }
     const b = '1px solid #000';
     E().selectedBlocks().forEach((el2) => {
       if (edge === 'none') { el2.style.border = ''; el2.style.borderTop = el2.style.borderBottom = el2.style.borderLeft = el2.style.borderRight = ''; }
@@ -1158,6 +1271,10 @@
     });
   }
 
+  // Library glyph → engine style names (toggleOrderedListStyle / toggleBulletListStyle);
+  // glyphs without a canonical style mint a one-level definition via applyListDefinition.
+  const ORDERED_STYLE = { '1.': 'decimal', '1)': 'decimal-paren', 'A.': 'upper-alpha', 'a)': 'lower-alpha-paren', 'i.': 'lower-roman', 'I.': 'upper-roman' };
+  const BULLET_STYLE = { '●': 'disc', '○': 'circle', '■': 'square' };
   function bulletMenu(node, ordered) {
     const bullets = ordered ? ['1.', '1)', 'A.', 'a)', 'i.', 'I.'] : ['●', '○', '■', '◆', '➤', '✓'];
     WC.flyout(node, (fly) => {
@@ -1165,7 +1282,14 @@
       const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px', padding: '6px 10px' } });
       bullets.forEach((b) => {
         const cell = el('div', { text: b, style: { border: '1px solid #ddd', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } });
-        cell.addEventListener('click', () => { WC.closeFlyouts(); E().exec(ordered ? 'insertOrderedList' : 'insertUnorderedList'); });
+        cell.addEventListener('click', () => {
+          WC.closeFlyouts();
+          const pm = PMA();
+          if (!pm) { E().exec(ordered ? 'insertOrderedList' : 'insertUnorderedList'); return; }
+          if (ordered) pm.cmd('toggleOrderedListStyle', ORDERED_STYLE[b]);
+          else if (BULLET_STYLE[b]) pm.cmd('toggleBulletListStyle', BULLET_STYLE[b]);
+          else pm.cmd('applyListDefinition', { listType: 'bulletList', levels: [{ fmt: 'bullet', text: b }] });
+        });
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
@@ -1210,8 +1334,13 @@
     setTimeout(() => input.focus(), 30);
   }
   function sortDialog() {
-    const all = E().selectedBlocks();
-    if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
+    const pmOpen = PMA();
+    if (!pmOpen) {
+      const all = E().selectedBlocks();
+      if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
+    } else {
+      pmOpen.captureSelection(); // the dialog steals focus; restore before sorting
+    }
     const type = el('select', {}, ['Text', 'Number', 'Date'].map((t) => el('option', { text: t })));
     const dir = el('select', {}, ['Ascending', 'Descending'].map((t) => el('option', { text: t })));
     const hdr = el('input', { type: 'checkbox' });
@@ -1221,7 +1350,14 @@
       el('div', { class: 'row' }, [el('label', {}, [hdr, el('span', { text: ' My list has a header row' })])]),
     ]);
     WC.dialog({ title: 'Sort Text', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => sortSelection({ ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked }) },
+      { label: 'OK', primary: true, onClick: () => {
+        // 'Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral;
+        // real Word does true date parsing.
+        const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
+        const pm = PMA();
+        if (pm) { let ok = false; pm.withSelection(() => { ok = pm.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.'); }
+        else sortSelection(opts);
+      } },
       { label: 'Cancel' },
     ] });
   }

@@ -199,7 +199,7 @@ export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, next
   }
 
   let css = {};
-  const { spacing, indent, borders, justification } = paragraphProperties;
+  const { spacing, indent, borders, justification, shading } = paragraphProperties;
   const nextStyleId = nextParagraphProps?.styleId;
 
   if (spacing) {
@@ -289,6 +289,14 @@ export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, next
         css[`padding-bottom`] = `${eighthPointsToPixels(b.space)}px`;
       }
     });
+  }
+
+  // Paragraph shading (w:shd → shd-translator key 'shading': { val, color, fill, ... }).
+  // Word's ribbon shading writes val="clear" + fill=<hex>; fill="auto" means none.
+  // themeFill-only shading (no literal fill) silently falls through — theme colour
+  // resolution is not implemented here (matches encodeCSSFromRPr's run-level shading).
+  if (shading && shading.fill && String(shading.fill).toLowerCase() !== 'auto') {
+    css['background-color'] = `#${String(shading.fill).replace(/^#/, '')}`;
   }
 
   if (justification) {

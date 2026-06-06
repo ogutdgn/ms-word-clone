@@ -1,0 +1,32 @@
+{
+  "leg": "A — clone → Word, paragraph family (spec §8.3 step 1, slice 2)",
+  "date": "2026-06-06",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-2-paragraph",
+  "method": "Clone driven headlessly (--probe-out + --shot-evalfile, sentinel-gated on window.__WC_READY): 4 paragraphs built via the REAL dispatch path — WC.Commands.run({cmd:'center'}) on p1; WC.PM.cmd('setLineHeight', 2) on p2; WC.Commands.spinner('indentLeft', 0.5) on p3; WC.Commands.spinner('spacingBefore', 12) on p4. Exported via WC.PM.exportDocxBytes -> wordAPI.saveBytes to tests/fixtures/.oracle-out-s2-para.docx (untracked). Word read the export through the oracle's read-para-props AppleScript property set (quirks #13-#20 field-for-field mirror); the open used a 540 s AppleEvent timeout and a split open/read/close sequence because this Word session's open path exceeded the CLI's 2-minute default (see sessionWedge). Close by name-verified ordinal; document count 0 before and after.",
+  "cloneModelState": {
+    "p1": { "text": "Centered paragraph", "paragraphProperties": { "justification": "center" } },
+    "p2": { "text": "Double spaced paragraph", "paragraphProperties": { "spacing": { "line": 480, "lineRule": "auto" } } },
+    "p3": { "text": "Left indented paragraph", "paragraphProperties": { "indent": { "left": 720 } } },
+    "p4": { "text": "Space before paragraph", "paragraphProperties": { "spacing": { "before": 240 } } }
+  },
+  "exportedXml": "word/document.xml pPr per paragraph: p1 <w:jc w:val='center'/>; p2 <w:spacing w:line='480' w:lineRule='auto'/>; p3 <w:ind w:left='720'/>; p4 <w:spacing w:before='240'/> — byte-identical FORMS to what Word 16.77.1 itself wrote for the same features in the Leg B authored file (jc center, spacing line=480 lineRule=auto, spacing before=NNN).",
+  "wordRead": {
+    "generatedBy": "read-para-props AppleScript property mirror (split open/read/close, 540s open timeout)",
+    "paragraphs": [
+      { "index": 1, "alignment": "center", "lineSpacingRule": "single", "lineSpacingPt": 12, "spaceBeforePt": 0, "spaceAfterPt": 0, "leftIndentPt": 0, "rightIndentPt": 0, "firstLineIndentPt": 0, "hangingPt": 0, "listType": "no numbering", "listString": "", "text": "Centered paragraph" },
+      { "index": 2, "alignment": "left", "lineSpacingRule": "double", "lineSpacingRuleRaw": "line space double", "lineSpacingPt": 24, "spaceBeforePt": 0, "spaceAfterPt": 0, "leftIndentPt": 0, "rightIndentPt": 0, "firstLineIndentPt": 0, "hangingPt": 0, "listType": "no numbering", "listString": "", "text": "Double spaced paragraph" },
+      { "index": 3, "alignment": "left", "lineSpacingRule": "single", "lineSpacingPt": 12, "spaceBeforePt": 0, "spaceAfterPt": 0, "leftIndentPt": 36, "rightIndentPt": 0, "firstLineIndentPt": 0, "hangingPt": 0, "listType": "no numbering", "listString": "", "text": "Left indented paragraph" },
+      { "index": 4, "alignment": "left", "lineSpacingRule": "single", "lineSpacingPt": 12, "spaceBeforePt": 12, "spaceAfterPt": 0, "leftIndentPt": 0, "rightIndentPt": 0, "firstLineIndentPt": 0, "hangingPt": 0, "listType": "no numbering", "listString": "", "text": "Space before paragraph" }
+    ]
+  },
+  "expected": [
+    { "check": "p1 alignment", "expected": "center", "actual": "center", "verdict": "PASS" },
+    { "check": "p2 line spacing", "expected": "lineSpacingRule 'double' OR lineSpacingPt 24 (12pt font)", "actual": "lineSpacingRule 'double' AND lineSpacingPt 24 — both alternatives satisfied", "verdict": "PASS" },
+    { "check": "p3 left indent", "expected": "leftIndentPt 36 (720 twips = 0.5in)", "actual": "leftIndentPt 36", "verdict": "PASS" },
+    { "check": "p4 space before", "expected": "spaceBeforePt 12 (240 twips)", "actual": "spaceBeforePt 12", "verdict": "PASS" }
+  ],
+  "verdict": "PASS (4/4) — Word 16.77.1 reads back exactly the paragraph formatting the clone exported; clone twips → Word points conversions all exact (720tw=36pt, 240tw=12pt, 480tw line = double = 24pt on 12pt text).",
+  "sessionWedge": "This Word session's document-open machinery answered open AppleEvents in ~2-4 minutes (beyond the 2-minute osascript default), so the stock `node scripts/oracle/word-oracle.js read-para-props` invocation died with -1712 before the document materialized. Validation used the identical property reads under `with timeout of 540 seconds` with the oracle's PID-safety contract (count-relative baseline, name verification, close by name-verified ordinal, never quit). Full diagnosis in 2026-06-06-slice2-verdicts.json -> sessionFindings.",
+  "pidSafety": "document count 0 at baseline, 0 after close; only oracle-tmp-s2-para.docx (a non-dot working copy of .oracle-out-s2-para.docx — dot-prefixed names hang this Word session's file commands) was opened and closed; Word never quit."
+}

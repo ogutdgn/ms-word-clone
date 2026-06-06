@@ -22,6 +22,9 @@ node scripts/oracle/word-oracle.js read-props <abs-path.docx> [--out report.json
 # Read WORD-level formatting (1-based paraIdx; wordIdx optional — omit for all words)
 node scripts/oracle/word-oracle.js read-word-props <abs-path.docx> <paraIdx> [wordIdx] [--out report.json]
 
+# Read paragraph-FORMAT + list formatting (spacing, indents, list type/level/string)
+node scripts/oracle/word-oracle.js read-para-props <abs-path.docx> [--out report.json]
+
 # Save-as roundtrip (open in Word, save to new path)
 node scripts/oracle/word-oracle.js roundtrip <abs-in.docx> <abs-out.docx>
 ```
@@ -135,6 +138,56 @@ Notes:
 - Formatting evaluation **ignores trailing whitespace**: a bold word followed by a
   plain space still reports `bold:true`, not mixed.
 
+## JSON shape — `read-para-props`
+
+```json
+{
+  "file": "/abs/path/to/doc.docx",
+  "generatedBy": "word-oracle read-para-props",
+  "paragraphs": [
+    {
+      "index": 4,
+      "alignment": "left",
+      "lineSpacingRule": "single",
+      "lineSpacingRuleRaw": "line space single",
+      "lineSpacingPt": 12,
+      "spaceBeforePt": 0,
+      "spaceAfterPt": 0,
+      "leftIndentPt": 36,
+      "rightIndentPt": 0,
+      "firstLineIndentPt": -18,
+      "hangingPt": 18,
+      "listType": "bullet",
+      "listTypeRaw": "list bullet",
+      "listLevelNumber": 1,
+      "listString": "",
+      "text": "Bullet item"
+    }
+  ]
+}
+```
+
+| Field                | Type   | Notes                                                                  |
+|----------------------|--------|------------------------------------------------------------------------|
+| `index`              | number | 1-based paragraph index                                                |
+| `alignment`          | string | Same prefix-stripped enum as `read-props`                              |
+| `lineSpacingRule`    | string | Normalized: `single`, `1.5`, `double`, `at least`, `exactly`, `multiple` |
+| `lineSpacingRuleRaw` | string | Raw WdLineSpacing enum, e.g. `"line space1 pt5"` (sic) for 1.5         |
+| `lineSpacingPt`      | number | **Points, not a multiplier** — double spacing on 12pt text reads 24    |
+| `spaceBeforePt`      | number | `space before` in points                                               |
+| `spaceAfterPt`       | number | `space after` in points                                                |
+| `leftIndentPt`       | number | `paragraph format left indent` in points                               |
+| `rightIndentPt`      | number | `paragraph format right indent` in points                              |
+| `firstLineIndentPt`  | number | `first line indent` in points; **negative = hanging indent**           |
+| `hangingPt`          | number | Convenience: `-firstLineIndentPt` when negative, else 0                |
+| `listType`           | string | Normalized (`"list "` prefix stripped): `no numbering`, `bullet`, `simple numbering`, … |
+| `listTypeRaw`        | string | Raw WdListType enum, e.g. `"list bullet"`                              |
+| `listLevelNumber`    | number | 1-based list level — **returns 1 even for non-list paragraphs**; gate on `listType` |
+| `listString`         | string | Default bullet is `""` (Symbol PUA, NOT `"•"`); numbered items e.g. `"1."` |
+| `text`               | string | Paragraph text (emitted LAST on the wire — text may contain tabs)      |
+
+Numeric fields pass through the comma-decimal normalisation (`"18,0"` → `18`).
+
 ## PID-safety contract
 
 The oracle uses **name-verified, count-relative** PID safety — not ordinal-based:
@@ -201,6 +254,15 @@ the Windows COM object model. All verified against Word for Mac 16.77.1:
 | `font size` decimal sep   | comma on some locales              | "12,0" not "12.0" — use parseFloat after comma→period replacement  |
 | `set wr to words i thru i of tr` | query properties **directly through the specifier** | Assigning a word element range to a variable raises −1728 ("Can't get word 1"); `bold of font object of (words i thru i of text object of paragraph p of d)` works |
 | word slicing              | trailing space included; paragraph mark is a trailing empty "word" | `content of (words 2 thru 2 ...)` → `"bold "`; formatting evaluation ignores trailing whitespace (bold word + plain space → `bold:true`, not mixed) |
+| `LeftIndent` / `RightIndent` (COM) | `paragraph format left indent` / `paragraph format right indent` | Verified as the COM-heritage names; `first line indent`, `space before`, `space after` keep plain names. Hanging indent = **negative** `first line indent` |
+| `wdLineSpace1pt5`         | `line space1 pt5`                  | sic — odd token split, defined that way in Word.sdef `WdLineSpacing`; the getter echoes the same string |
+| `LineSpacing` (multiplier?) | points, not a multiplier          | Double spacing on 12pt reads `24,0`; 1.5 reads `18,0` (comma decimal per the font-size row) |
+| `set lf to list format of tr` | **works** (binds to a variable)  | Unlike word element ranges — no −1728; `list type` / `list level number` / `list string` all read through the variable |
+| `ListString` `"•"`        | `""` (Symbol PUA, cp 61623)  | Word's default bullet is the Symbol-font private-use char, invisible in terminals; numbered items read `"1."` |
+| `list level number` of non-list para | returns `1`, not `0`    | Gate on `list type` ≠ `"list no numbering"` before trusting the level |
+| `close d` after `save as d ...` | close by the **new** basename | Even a variable-bound doc reference dangles after `save as` renames the document (−1728) — by-name close with the output basename is the only reliable form |
+| `.dotfile.docx` open/save | **copy to a normal name first** | Dot-prefixed filenames can hang `open file name`/`save as` indefinitely and wedge the session's file commands afterwards (observed 2026-06-06) |
+| long headless sessions    | opens degrade → −1712, then stop | Reads on already-open docs keep working while NEW opens stretch past the 2-min AppleEvent default and eventually never complete; wrap in `with timeout of N seconds`; only a USER relaunch of Word recovers it — never quit Word from a script |
 
 ## Per-feature validation protocol
 

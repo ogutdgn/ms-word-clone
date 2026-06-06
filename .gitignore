@@ -13,3 +13,7 @@ spike/
 
 # Local scheduler lock
 .claude/scheduled_tasks.lock
+
+# Oracle scratch fixtures (clone exports / Word-authored probes; never checked in)
+tests/fixtures/.oracle-*
+tests/fixtures/oracle-*

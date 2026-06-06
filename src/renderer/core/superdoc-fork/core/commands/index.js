@@ -67,6 +67,7 @@ export * from './insertTableAt.js';
 
 // Lists
 export * from './toggleList.js';
+export * from './applyListDefinition.js';
 export * from './increaseListIndent.js';
 export * from './decreaseListIndent.js';
 export * from './changeListLevel.js';

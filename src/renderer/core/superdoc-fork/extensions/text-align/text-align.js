@@ -15,10 +15,6 @@ import { calculateResolvedParagraphProperties } from '../paragraph/resolvedPrope
  * @module TextAlign
  * @sidebarTitle Text Align
  * @snippetPath /snippets/extensions/text-align.mdx
- * @shortcut Mod-Shift-l | setTextAlign('left') | Align text left
- * @shortcut Mod-Shift-e | setTextAlign('center') | Align text center
- * @shortcut Mod-Shift-r | setTextAlign('right') | Align text right
- * @shortcut Mod-Shift-j | setTextAlign('justify') | Justify text
  */
 export const TextAlign = Extension.create({
   name: 'textAlign',
@@ -112,14 +108,6 @@ export const TextAlign = Extension.create({
     };
   },
 
-  addShortcuts() {
-    return {
-      'Mod-Shift-l': () => this.editor.commands.setTextAlign('left'),
-      'Mod-Shift-e': () => this.editor.commands.setTextAlign('center'),
-      'Mod-Shift-r': () => this.editor.commands.setTextAlign('right'),
-      'Mod-Shift-j': () => this.editor.commands.setTextAlign('justify'),
-    };
-  },
 });
 
 function getSelectionParagraphProperties(editor, state) {
