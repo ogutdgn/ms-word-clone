@@ -1,0 +1,76 @@
+{
+  "scope": "Slice-2 (paragraph + lists) behavior verdicts + known deviations + Word-session findings",
+  "date": "2026-06-06",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-2-paragraph",
+  "behaviorVerdicts": [
+    {
+      "id": "a",
+      "behavior": "Fresh default paragraph in Word is Align Left (clone presses Align Left on a fresh paragraph)",
+      "method": "Live object-model read on a freshly made Word document (make new document -> paragraph format of paragraph 1), i.e. the same property set read-para-props uses. A saved-blank-file read-para-props pass was not possible at probe time because this Word session answered document-open AppleEvents in multi-minute time (see sessionFindings); the live read is the same getter against the same engine state.",
+      "wordActual": "alignment 'align paragraph left', line spacing rule 'line space single', lineSpacingPt 12.0, space before 0, space after 0, left indent 0, first line indent 0, list type 'list no numbering' (Document8 probe; closed by name-verified ordinal, count back to 0)",
+      "cloneBehavior": "PM suite test '[2] fresh paragraph shows Align Left pressed (Word default)' — alignLeft toggled on a paragraph with no justification attr",
+      "verdict": "PASS — Word's default paragraph alignment is left; the clone's Align-Left-default ribbon mapping matches."
+    },
+    {
+      "id": "b",
+      "behavior": "Ctrl+Shift+L applies a bullet list (Word: List Bullet style)",
+      "method": "documented-Word-behavior — Ctrl+Shift+L is Word's documented 'Apply the List Bullet style' keyboard shortcut (Microsoft 'Keyboard shortcuts in Word' support article, Apply paragraph styles section). Keyboard shortcuts are not reachable through the AppleScript object model, and GUI/AX scripting is excluded by the oracle's design rules, so this is cited rather than live-verified.",
+      "cloneBehavior": "PM suite test '[2] Ctrl+Shift+L toggles a bullet list (Word: List Bullet)' — keydown ctrl+shift+l yields listRendering.numberingType 'bullet'",
+      "verdict": "DOCUMENTED-WORD-BEHAVIOR (not live-verified; no object-model path to keyboard shortcuts)"
+    },
+    {
+      "id": "c",
+      "behavior": "Increase Indent inside a list raises the list level instead of moving text indent",
+      "method": "documented-Word-behavior — Word's documented Increase Indent behavior on list paragraphs ('Change the indent... When you press Tab or click Increase Indent on a list item, the item demotes a list level'). Ribbon-button behavior is GUI-only; not object-model scriptable; cited rather than live-verified.",
+      "cloneBehavior": "PM suite test '[2] ribbon increaseIndent inside a list raises the level (Word behavior)' — ilvl 0 -> 1 -> 0 round-trip",
+      "verdict": "DOCUMENTED-WORD-BEHAVIOR (not live-verified; no object-model path to ribbon buttons)"
+    }
+  ],
+  "knownDeviations": [
+    {
+      "id": "paragraph-dialog-lineRule-auto",
+      "deviation": "The clone's Paragraph dialog always writes paragraphProperties.spacing.lineRule 'auto' on OK; documents carrying 'exact'/'atLeast' spacing get converted to 'auto' when the dialog is applied. The dialog also leaves the line-spacing select at its default for exact/atLeast values (no multiplier form) rather than showing a converted number.",
+      "site": "src/renderer/public/js/dialogs.js:233 (hardcoded lineRule 'auto' in the OK handler); seed note at dialogs.js:214-215",
+      "status": "recorded limitation — do not fix in slice 2"
+    },
+    {
+      "id": "border-single-edge-seed",
+      "deviation": "Single-edge border accumulation (Word ACCUMULATES edges) seeds from the selection-HEAD paragraph only: getAttributes('paragraph') reads one paragraph, so multi-paragraph selections inherit that paragraph's existing edges when adding a new edge.",
+      "site": "src/renderer/public/js/commands.js applyBorder (comment at ~1252-1254: 'getAttributes reads ONE paragraph (selection head) — multi-paragraph selections seed single-edge accumulation from that paragraph only (recorded simplification)')",
+      "status": "recorded simplification — do not fix in slice 2"
+    },
+    {
+      "id": "sort-date-parsefloat",
+      "deviation": "Sort dialog's 'Date' type maps to the numeric (parseFloat-based) comparator instead of real date parsing.",
+      "site": "src/renderer/public/js/commands.js:1350 (''Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral')",
+      "status": "recorded deferral — do not fix in slice 2"
+    }
+  ],
+  "sessionFindings": [
+    {
+      "id": "word-open-slowness-then-total-wedge",
+      "classification": "oracle-quirk / environment (NOT a clone bug)",
+      "finding": "This Word 16.77.1 session (9h+ uptime, zero windows, backgrounded) answered document-open AppleEvents in ~2-4 minutes — beyond osascript's 2-minute default AppleEvent timeout — so every stock `word-oracle.js` open died with -1712 while Word sometimes completed the open late (one early run left basic-list.docx open; it was identified by name and closed by name-verified ordinal close, never `close every document`). LaunchServices opens (`/usr/bin/open -a`) behaved the same. Workaround that recovered the paragraph leg: wrap the open in `with timeout of 540 seconds` and split open/read/close into separate osascript invocations, keeping the oracle's count-relative + name-verified PID-safety contract (oracle-tmp-s2-para.docx opened in ~3.5 min and read PASS 4/4). LATER the open path degraded to fully non-functional: the lists export (x2), the Task-12 roundtrip fixture, AND a list-free derivative of it all timed out at 540 s with no document materializing. Content correlation RULED OUT: the list-free derivative (boilerplate-only numbering, same as the para export that had opened) also failed, while list-bearing basic-list.docx (present in Word's recents/sandbox-bookmark cache from prior sessions) still opened and read correctly mid-degradation. Verdict: progressive session pathology, not clone-export content.",
+      "oracleCandidate": "quirk #22 candidate for scripts/oracle/README.md: wrap openDoc's open call in `with timeout of N seconds` (N >> 120) or poll-after-timeout instead of treating -1712 as fatal; document that a long-running windowless Word session can stop servicing opens entirely and needs a user relaunch."
+    },
+    {
+      "id": "dotfile-hazard",
+      "classification": "oracle-quirk / environment (NOT a clone bug)",
+      "finding": "Dot-prefixed (hidden) file names hang this Word session's file commands: `insert file` on tests/fixtures/.oracle-out-s2-para.docx hung to AppleEvent timeout, and immediately afterwards Word's Cocoa scripting bridge began logging \"Error while creating a script command: there's no Objective-C class 'TextRange' corresponding to the .sdef-declared type 'text range'\" (unified log, from 05:39:26) — every later command taking a text-range parameter (`insert file`, `create new field`) failed instantly with 'Can't continue' for the rest of the session. Plain-name copies of the same bytes worked (one INSERT-OK before the dotfile attempt). All Word-facing fixtures therefore used non-dot working copies (oracle-tmp-s2-para.docx etc.); the dot-named scratch files remain only as untracked repo artifacts.",
+      "oracleCandidate": "quirk #23 candidate: never hand Word a dot-prefixed path; the oracle could reject such inputs up front."
+    },
+    {
+      "id": "scripting-bridge-progressive-decay",
+      "classification": "oracle-quirk / environment (NOT a clone bug)",
+      "finding": "By the end of the session Word's AE command dispatch had decayed beyond TextRange parameters: `apply bullet default` / `apply number default` / `list indent` answered \"doesn't understand the message\", and property SETS on `list format` (list template, list level number) failed with \"Can't set ...\" — while property READS (paragraph format, list format, content), `make new document`, `set content`, paragraph-format property sets, shading/border property sets, and `save as` kept working to the last command. Authoring legs were therefore unaffected; only file-ingestion and list-mutation surfaces were lost. A Word relaunch (user action — the never-quit rule forbids the oracle doing it) is expected to restore everything.",
+      "oracleCandidate": "session-health probe candidate: a cheap canary (make new document + insert file of a known-good file + close) before a validation run would distinguish healthy from degraded sessions early."
+    },
+    {
+      "id": "close-by-name-context",
+      "classification": "oracle-quirk (already documented as quirk #3)",
+      "finding": "close document \"<name>\" raised -1728 from bare `osascript -e` contexts even with the document open and name-verified; the name-verified ORDINAL close (`if name of document 1 is <ours> then close document 1 saving no`) was reliable everywhere. Extends quirk #3 with a confirmed-safe alternative form."
+    }
+  ],
+  "pidSafety": "count of documents was 0 at session start and confirmed 0 after every oracle interaction (including recovery from the two failure modes above); the only documents ever closed were name-verified as ours; Word was never quit."
+}

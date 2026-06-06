@@ -1,0 +1,55 @@
+{
+  "leg": "B — Word → clone (spec §8.3 step 2, slice 2 paragraph formatting)",
+  "date": "2026-06-06",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-2-paragraph",
+  "method": "Document authored in REAL Word via the AppleScript object model (no GUI scripting): make new document; content of text object set to four paragraphs; alignment of paragraph format of paragraph 1 -> align paragraph center; line spacing rule of paragraph format of paragraph 2 -> line space double; space before of paragraph format of paragraph 3 -> 18 (pt); paragraph 4 untouched (fresh default). save as document <name> file name .../tests/fixtures/oracle-word-authored-s2.docx file format format document (renamed on disk to .oracle-word-authored.docx afterwards; Word never touched the dot-named path — see sessionQuirks). Live read-back of paragraph format from the open document confirmed what Word holds before save. Closed by name-verified ordinal close (by-name close raised -1728 from this osascript context — oracle quirk #3); document count 0 before authoring and 0 after close. Clone import: wordAPI.openBytes -> WC.PM.openDocx -> walk doc.descendants paragraph attrs (headless --probe-out evalfile).",
+  "wordLiveReadBack": {
+    "fields": "index | alignment | lineSpacingRule | lineSpacingPt | spaceBeforePt | spaceAfterPt | text",
+    "rows": [
+      "1 | align paragraph center | line space single | 12.0 | 0.0 | 0.0 | Centered from Word",
+      "2 | align paragraph left | line space double | 24.0 | 0.0 | 0.0 | Double spaced from Word",
+      "3 | align paragraph left | line space single | 12.0 | 18.0 | 0.0 | Space before from Word",
+      "4 | align paragraph left | line space single | 12.0 | 0.0 | 0.0 | Default paragraph from Word"
+    ],
+    "note": "lineSpacingPt is POINTS not a multiplier (oracle quirk #17): double on 12pt Aptos reads 24.0. Comma-decimal locale values (24,0) normalized."
+  },
+  "cloneImportRead": {
+    "method": "window.WC.view.state.doc.descendants -> node.attrs.paragraphProperties per paragraph",
+    "paragraphs": [
+      { "text": "Centered from Word", "paragraphProperties": { "justification": "center" } },
+      { "text": "Double spaced from Word", "paragraphProperties": { "spacing": { "line": 480, "lineRule": "auto" } } },
+      { "text": "Space before from Word", "paragraphProperties": { "spacing": { "before": 360 } } },
+      { "text": "Default paragraph from Word", "paragraphProperties": {} }
+    ]
+  },
+  "checks": [
+    {
+      "check": "p1 centered in Word -> clone justification",
+      "expected": "justification 'center'",
+      "actual": "justification 'center'",
+      "verdict": "PASS"
+    },
+    {
+      "check": "p2 double line spacing in Word -> clone spacing.line + lineRule",
+      "expected": "spacing.line 480 (twips) + lineRule (Word writes w:line=480 w:lineRule=auto for double)",
+      "actual": "spacing.line 480, spacing.lineRule 'auto'",
+      "verdict": "PASS"
+    },
+    {
+      "check": "p3 space before 18pt in Word -> clone spacing.before",
+      "expected": "spacing.before 360 (18pt x 20 twips/pt)",
+      "actual": "spacing.before 360",
+      "verdict": "PASS"
+    },
+    {
+      "check": "p4 untouched Word paragraph -> clone has no stray paragraphProperties",
+      "expected": "empty/default paragraphProperties",
+      "actual": "{} (no justification, spacing, indent, or numbering keys)",
+      "verdict": "PASS"
+    }
+  ],
+  "listCoverageNote": "List authoring via the AppleScript object model was not exercised in this leg: this Word session's file-open machinery was wedged (see sessionQuirks) and 'apply list format' scripting was deliberately not explored on top of an unstable session. List Word-side coverage comes from Leg A (Word read the clone's list fixture through its own .docx import converter and reported list type/level/string) — see 2026-06-06-slice2-oracleA-lists.json.",
+  "pidSafety": "count of documents was 0 at session baseline; the one close-by-name failure (-1728, quirk #3) left our doc open and it was closed via name-verified ordinal close (verified `name of document 1 is <ours>` first); count confirmed 0 after every step; Word never quit.",
+  "sessionQuirks": "See 2026-06-06-slice2-verdicts.json -> sessionFindings for the Word file-open wedge discovered during this run and the dot-prefixed-filename hazard."
+}

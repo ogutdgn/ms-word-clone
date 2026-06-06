@@ -1,0 +1,34 @@
+{
+  "leg": "A — clone → Word, lists family (spec §8.3 step 1, slice 2)",
+  "date": "2026-06-06",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-2-paragraph",
+  "method": "Clone driven headlessly (--probe-out + --shot-evalfile): 5 paragraphs — p1 WC.Commands.run({cmd:'bullets'}); p2 run({cmd:'numbering'}); p3 WC.PM.cmd('toggleBulletListStyle','square'); p4+p5 selected together then WC.PM.cmd('applyListDefinition', <Decimal 1./1.1./1.1.1. pattern from commands.js ML_PATTERNS>), then p5 WC.PM.cmd('increaseListIndent'). Exported via WC.PM.exportDocxBytes -> wordAPI.saveBytes to tests/fixtures/.oracle-out-s2-lists.docx (untracked). The read-back through real Word could NOT be completed this session: the Word process's document-open machinery degraded to fully non-functional partway through the run (every open AppleEvent timed out even at 540 s; full diagnosis in 2026-06-06-slice2-verdicts.json -> sessionFindings). Word-side list evidence below comes from the same Word session reading basic-list.docx (the only file its recents/sandbox cache would still open) — proving the read-para-props verb and giving the real-Word expected property profile for the same numbering structures the fixture uses.",
+  "cloneModelState": {
+    "p1": { "text": "Bullet item one", "numberingProperties": { "numId": 4, "ilvl": 0 }, "listRendering": { "markerText": "•", "numberingType": "bullet" } },
+    "p2": { "text": "Numbered item one", "numberingProperties": { "numId": 5, "ilvl": 0 }, "listRendering": { "markerText": "1.", "numberingType": "decimal" } },
+    "p3": { "text": "Square bullet item", "numberingProperties": { "numId": 6, "ilvl": 0 }, "listRendering": { "markerText": "▪", "numberingType": "bullet" } },
+    "p4": { "text": "Multilevel top item", "numberingProperties": { "numId": 7, "ilvl": 0 }, "listRendering": { "markerText": "1.", "numberingType": "decimal" } },
+    "p5": { "text": "Multilevel nested item", "numberingProperties": { "numId": 7, "ilvl": 1 }, "listRendering": { "markerText": "1.1.", "numberingType": "decimal" } }
+  },
+  "exportedXml": "word/document.xml: each list paragraph carries <w:numPr><w:numId .../><w:ilvl .../></w:numPr> (numIds 4,5,6,7,7; ilvl 1 on p5). word/numbering.xml minted definitions verified structurally complete: every abstractNum has all 9 <w:lvl> levels with start/numFmt/lvlText/lvlJc and the Word hybridMultilevel indent convention <w:ind w:left='720|1440|...' w:hanging='360'/>; numId4 bullet lvlText '•' (Symbol font), numId5 decimal '%1.', numId6 bullet lvlText '▪', numId7 decimal '%1.'/'%1.%2.'. Two cosmetic nits recorded (not blockers): abstractNums minted by applyListDefinition lack <w:nsid> (abs 4 and 6), and the square-bullet lvl 0 carries an empty <w:rPr/> with no bullet font.",
+  "wordBaselineRead_basicList": {
+    "what": "Real-Word read-para-props profile of tests/fixtures/basic-list.docx — the same structures (hybridMultilevel numbering, numPr paragraphs) the fixture uses, read in THIS session with the same verbs",
+    "rows": [
+      "bullet item: listType 'bullet', listLevelNumber 1, listString '-' (that file's lvlText), leftIndentPt 36, firstLineIndentPt -18, hangingPt 18",
+      "nested bullet: listType 'bullet', listLevelNumber 2, listString 'o', leftIndentPt 72, firstLineIndentPt -18",
+      "numbered items: listType 'simple numbering', listLevelNumber 1, listString '1.'/'2.'/'3.', leftIndentPt 36, firstLineIndentPt -18",
+      "nested numbered: listType 'simple numbering', listLevelNumber 2, listString 'a.', leftIndentPt 72"
+    ],
+    "note": "Confirms the oracle reports listLevelNumber 1 vs 2 for top vs nested, negative firstLineIndentPt (hanging) on every list item, and lvlText-derived listString — exactly the expected profile for the slice-2 fixture's identical numbering shapes."
+  },
+  "expected": [
+    { "check": "p1 listType bullet + listString '•' (or Symbol PUA) + hanging metrics", "expected": "listType 'bullet', listString '•'/U+F0B7, listLevelNumber 1, leftIndentPt 36 firstLineIndentPt -18", "actual": "UNVERIFIED-THIS-SESSION (Word could not open ANY new file; see sessionFindings). Clone model + exported XML correct; real-Word profile for identical structures confirmed via basic-list baseline.", "verdict": "UNVERIFIED-THIS-SESSION" },
+    { "check": "p2 listType simple-numbering + listString '1.'", "expected": "listType 'simple numbering', listString '1.'", "actual": "UNVERIFIED-THIS-SESSION; basic-list baseline shows Word reports exactly this for the same structure", "verdict": "UNVERIFIED-THIS-SESSION" },
+    { "check": "p3 square-glyph listString (DISCOVERY: '▪' vs Wingdings PUA)", "expected": "discovery", "actual": "UNRESOLVED DISCOVERY — Word never read the fixture; the clone exports lvlText '▪' (U+25AA) with no bullet font in rPr. To be resolved on a healthy Word session.", "verdict": "UNVERIFIED-THIS-SESSION" },
+    { "check": "p4/p5 multilevel listLevelNumber 1 vs 2 + listString '1.'/'1.1.'", "expected": "level 1 vs 2; '1.' and '1.1.'", "actual": "UNVERIFIED-THIS-SESSION; clone model has ilvl 0/1 on shared numId and renders '1.'/'1.1.'; basic-list baseline confirms Word reports 1 vs 2 for nested items", "verdict": "UNVERIFIED-THIS-SESSION" }
+  ],
+  "verdict": "CLONE-SIDE PASS (model, markers, exported OOXML all exactly as specified; numbering.xml structurally complete and Word-convention-conformant) / WORD READ UNVERIFIED-THIS-SESSION (environment: Word's open machinery died mid-run — NOT correlated with fixture content; a list-free derivative of another clone export also failed to open in the same window, and Word DID open + correctly report the list-bearing basic-list.docx). Re-run `node scripts/oracle/word-oracle.js read-para-props tests/fixtures/.oracle-out-s2-lists.docx` (via a NON-dot copy) after the user relaunches Word.",
+  "followUp": "After Word relaunch: cp tests/fixtures/.oracle-out-s2-lists.docx tests/fixtures/oracle-tmp-s2-lists.docx && node scripts/oracle/word-oracle.js read-para-props $(pwd)/tests/fixtures/oracle-tmp-s2-lists.docx — expect the basic-list-like profile above and record the square-bullet listString discovery.",
+  "pidSafety": "document count 0 before and after every attempt; the timed-out opens never materialized a document (verified by name listing after each); Word never quit."
+}
