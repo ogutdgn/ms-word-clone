@@ -22,6 +22,7 @@ import {
  * @param {Object} options
  * @param {'orderedList'|'bulletList'} options.listType
  * @param {Array<{fmt: string, text: string}>} options.levels  OOXML w:numFmt + w:lvlText per ilvl
+ *   (base templates define 9 levels — entries beyond ilvl 8 are silently skipped)
  * @example
  * editor.commands.applyListDefinition({ listType: 'orderedList', levels: [
  *   { fmt: 'decimal', text: '%1.' }, { fmt: 'decimal', text: '%1.%2.' },

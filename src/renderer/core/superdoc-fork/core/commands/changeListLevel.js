@@ -107,12 +107,13 @@ export const changeListLevel = (delta, editor, tr) => {
  * call/transaction. Chaining repeated ±1 increase/decreaseListIndent steps does NOT
  * work — changeListLevel reads editor.state (not the chain's shared tr), so every
  * chained step re-computes from the same stale level.
+ * @param {number} delta Levels to move (positive = deeper, negative = shallower).
  * @example editor.commands.changeListLevelBy(2)  // ilvl 0 → 2
  */
 export const changeListLevelBy =
   (delta) =>
   ({ editor, tr, dispatch }) => {
-    if (!delta) return true;
+    if (!delta) return false; // zero delta = degenerate call, not a handled interaction
     const ok = changeListLevel(delta, editor, tr);
     if (ok && dispatch) dispatch(tr);
     return ok;
