@@ -6,6 +6,7 @@
    Usage:
      node scripts/oracle/word-oracle.js read-props <abs path .docx> [--out report.json]
      node scripts/oracle/word-oracle.js read-word-props <abs path .docx> <paraIdx> [wordIdx] [--out report.json]
+     node scripts/oracle/word-oracle.js read-para-props <abs path .docx> [--out report.json]
      node scripts/oracle/word-oracle.js roundtrip  <abs in.docx> <abs out.docx>
 
    PID-safety contract (name-verified, not ordinal):
@@ -61,7 +62,40 @@
   15. `content of (words i thru i ...)` includes the word's trailing space, and the
       paragraph mark counts as a trailing "word" (content "\r"). Range formatting
       evaluation ignores trailing whitespace — a bold word + plain trailing space
-      still reports bold=true (NOT "mixed"/missing value). */
+      still reports bold=true (NOT "mixed"/missing value).
+  16. readParaProps puts paragraph TEXT LAST in the tab-joined row: paragraph text
+      may contain literal tabs, which would corrupt the protocol for any later
+      field. The parser re-joins p.slice(12) to recover the text.
+  17. `line spacing` is POINTS, not a multiplier — double spacing on 12pt text
+      reads 24, 1.5 spacing reads 18 (matches the Windows COM oracle precedent
+      `LineSpacing = 24` at docs/VALIDATION_home_insert.md:25). Comma-decimal
+      (quirk #13) applies to all six numeric paragraph-format fields ("18,0").
+      The indent/spacing property names resolved exactly as the COM heritage
+      suggests: `paragraph format left indent`, `paragraph format right indent`,
+      `first line indent`, `space before`, `space after`. Hanging indents are a
+      NEGATIVE `first line indent` (left 36 + first line -18 = 0.5" + 0.25" hang).
+  18. `line spacing rule` returns enum strings "line space single",
+      "line space1 pt5" (sic — the dictionary's odd token split for 1.5, defined
+      that way in Word.sdef's WdLineSpacing and echoed verbatim by the getter),
+      "line space double", "line space at least", "line space exactly",
+      "line space multiple". Normalized via explicit map to
+      single|1.5|double|at least|exactly|multiple.
+  19. `list format` DOES bind to a variable (`set lf to list format of tr`) —
+      unlike word element ranges (quirk #14). `list type` returns enum strings
+      "list no numbering", "list bullet", "list simple numbering" (all verified
+      live); Word.sdef's WdListType also defines "list listnum only",
+      "list outline numbering", "list mixed numbering", "list picture bullet".
+      Normalized by stripping the "list " prefix. `list level number` returns 1
+      (not 0) for paragraphs in NO list — gate on listType !== "no numbering".
+  20. `list string` for Word's DEFAULT bullet is U+F0B7 (Symbol-font private-use
+      area, codepoint 61623) — NOT U+2022 "•" — and renders invisibly in most
+      terminals/JSON viewers. Numbered items return plain text ("1."). Compare
+      bullets against "", or require non-empty listString + listType
+      "bullet".
+  21. After `save as`, even a VARIABLE-bound document reference dangles: with
+      `set d to make new document`, `save as d ...` then `close d` raises -1728
+      because Word renamed the document underneath the binding. Close by the NEW
+      basename instead (extends quirk #11 to authoring scripts). */
 'use strict';
 const { execFileSync } = require('node:child_process');
 const os = require('node:os');
@@ -202,6 +236,70 @@ end tell`;
   });
 }
 
+/**
+ * Paragraph-level format + list read (slice 2). One row per paragraph.
+ * Field order puts TEXT LAST: paragraph text may contain literal tabs, which
+ * would corrupt the tab-joined protocol for any later field (quirk #16).
+ * All property names below are VERIFIED against Word for Mac 16.77.1 (quirks
+ * #17-20): the COM-heritage indent names resolve as-is, `list format` binds to
+ * a variable (unlike word ranges, quirk #14), `line spacing` is points, and the
+ * default bullet's `list string` is U+F0B7 (Symbol PUA), not U+2022.
+ */
+const LINE_SPACING_RULES = {
+  'line space single': 'single',
+  'line space1 pt5': '1.5', // sic — Word.sdef's odd token split (quirk #18)
+  'line space double': 'double',
+  'line space at least': 'at least',
+  'line space exactly': 'exactly',
+  'line space multiple': 'multiple',
+};
+function readParaProps(docxPath) {
+  const basename = openDoc(docxPath);
+  const script = `
+tell application "Microsoft Word"
+  set out to ""
+  try
+    set d to document "${esc(basename)}"
+    repeat with i from 1 to (count of paragraphs of d)
+      set pf to paragraph format of paragraph i of d
+      set tr to text object of paragraph i of d
+      set lf to list format of tr
+      set out to out & i & tab & (alignment of pf) & tab & (line spacing rule of pf) & tab & (line spacing of pf) & tab & (space before of pf) & tab & (space after of pf) & tab & (paragraph format left indent of pf) & tab & (paragraph format right indent of pf) & tab & (first line indent of pf) & tab & (list type of lf) & tab & (list level number of lf) & tab & (list string of lf) & tab & (content of tr) & linefeed
+    end repeat
+  on error errMsg
+    close document "${esc(basename)}" saving no
+    error errMsg
+  end try
+  close document "${esc(basename)}" saving no
+  return out
+end tell`;
+  const raw = osa(script);
+  // Comma-decimal locale (quirk #13) applies to SIX numeric fields here.
+  const num = (s) => { const v = parseFloat((s || '').replace(',', '.')); return isNaN(v) ? null : v; };
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const p = line.split('\t');
+    const firstLine = num(p[8]);
+    return {
+      index: Number(p[0]),
+      alignment: (p[1] || '').replace(/^align paragraph /, ''),
+      lineSpacingRule: LINE_SPACING_RULES[p[2]] || p[2],
+      lineSpacingRuleRaw: p[2],
+      lineSpacingPt: num(p[3]), // POINTS, not a multiplier (2.0 spacing on 12pt = 24) — quirk #17
+      spaceBeforePt: num(p[4]),
+      spaceAfterPt: num(p[5]),
+      leftIndentPt: num(p[6]),
+      rightIndentPt: num(p[7]),
+      firstLineIndentPt: firstLine,
+      hangingPt: firstLine != null && firstLine < 0 ? -firstLine : 0, // Word models hanging as negative first-line
+      listType: (p[9] || '').replace(/^list /, ''), // "no numbering" | "bullet" | "simple numbering" | ... — quirk #19
+      listTypeRaw: p[9],
+      listLevelNumber: num(p[10]), // returns 1 even for non-list paragraphs — gate on listType (quirk #19)
+      listString: p[11], // default bullet is "" (Symbol PUA), numbered items "1." — quirk #20
+      text: p.slice(12).join('\t').replace(/\r$/, ''),
+    };
+  });
+}
+
 function roundtrip(inPath, outPath) {
   // Validate output path is inside the user's home directory (Word for Mac sandbox:
   // save as to /tmp silently shows a sheet dialog and blocks indefinitely, or raises
@@ -263,10 +361,12 @@ if (cmd === 'read-props' && a) {
     paragraph: Number(b),
     words: readWordProps(path.resolve(a), b, wordIdx),
   });
+} else if (cmd === 'read-para-props' && a) {
+  emit({ file: a, generatedBy: 'word-oracle read-para-props', paragraphs: readParaProps(path.resolve(a)) });
 } else if (cmd === 'roundtrip' && a && b) {
   roundtrip(path.resolve(a), path.resolve(b));
   console.log('ROUNDTRIP_OK ' + b);
 } else {
-  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | roundtrip <in.docx> <out.docx>');
+  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>');
   process.exit(2);
 }
