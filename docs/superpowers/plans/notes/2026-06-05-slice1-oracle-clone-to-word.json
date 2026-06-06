@@ -1,0 +1,46 @@
+{
+  "leg": "A — clone → Word (spec §8.3 step 1)",
+  "date": "2026-06-05",
+  "wordVersion": "Word for Mac 16.77.1",
+  "method": "Clone driven headlessly (--shot-eval probe): setDoc('oracle bold italic georgia'), bold on 'bold' via WC.Commands.run, italic on 'italic' via WC.Commands.run, Georgia + 20pt on 'georgia' via WC.Commands.comboCommit; exported via WC.PM.exportDocxBytes -> wordAPI.saveBytes to tests/fixtures/.oracle-out.docx (not checked in); read back through real Word via scripts/oracle/word-oracle.js read-props + read-word-props.",
+  "exportedXmlRuns": "word/document.xml: run 'bold' has <w:b/>; run 'italic' has <w:i/>; run 'georgia' has <w:rFonts w:ascii='Georgia' .../> + <w:sz w:val='40'/> (40 half-points = 20pt); 'oracle ' and inter-word spaces unformatted.",
+  "paragraphLevelRead": {
+    "generatedBy": "word-oracle read-props",
+    "paragraphs": [
+      {
+        "index": 1,
+        "text": "oracle bold italic georgia",
+        "bold": false,
+        "italic": false,
+        "underline": false,
+        "underlineRaw": "underline none",
+        "fontName": "",
+        "fontSize": null,
+        "alignment": "left"
+      }
+    ],
+    "granularityNote": "Per-paragraph reads report MIXED formatting as bold=false / italic=false / fontName='' / fontSize=null (AppleScript missing value -> NaN -> null). A paragraph with one bold word therefore reports bold:false — this is the documented granularity limit, NOT a clone failure. Word-level read below is the real judgment."
+  },
+  "wordLevelRead": {
+    "generatedBy": "word-oracle read-word-props (new verb, paragraph 1, all words)",
+    "words": [
+      { "index": 1, "text": "oracle ", "bold": false, "italic": false, "underline": false, "underlineRaw": "underline none", "fontName": "Aptos", "fontSize": 12 },
+      { "index": 2, "text": "bold ", "bold": true, "italic": false, "underline": false, "underlineRaw": "underline none", "fontName": "Aptos", "fontSize": 12 },
+      { "index": 3, "text": "italic ", "bold": false, "italic": true, "underline": false, "underlineRaw": "underline none", "fontName": "Aptos", "fontSize": 12 },
+      { "index": 4, "text": "georgia", "bold": false, "italic": false, "underline": false, "underlineRaw": "underline none", "fontName": "Georgia", "fontSize": 20 },
+      { "index": 5, "text": "", "bold": false, "italic": false, "underline": false, "underlineRaw": "underline none", "fontName": "Aptos", "fontSize": 12 }
+    ],
+    "note": "Word's words collection includes each word's trailing space and the paragraph mark as a trailing empty 'word' (index 5). Range formatting evaluation ignores trailing whitespace — bold word + plain trailing space still reports bold=true."
+  },
+  "judgment": {
+    "bold on 'bold'": { "expected": true, "wordReported": true, "verdict": "PASS (word-level)" },
+    "italic on 'italic'": { "expected": true, "wordReported": true, "verdict": "PASS (word-level)" },
+    "no bleed onto neighbours": { "expected": "words 1/3/4 not bold; words 1/2/4 not italic", "wordReported": "confirmed — only word 2 bold, only word 3 italic", "verdict": "PASS" },
+    "fontName Georgia on 'georgia'": { "expected": "Georgia", "wordReported": "Georgia", "verdict": "PASS (word-level; paragraph-level reports '' because the paragraph mixes Aptos + Georgia)" },
+    "fontSize 20pt on 'georgia'": { "expected": 20, "wordReported": 20, "verdict": "PASS (raw AppleScript value was '20,0' — comma-locale decimal, quirk #13)" },
+    "default font elsewhere": { "expected": "document default", "wordReported": "Aptos 12 on words 1/2/3/5", "verdict": "PASS — Word resolved the theme default for unformatted runs" },
+    "alignment": { "expected": "left", "wordReported": "left (paragraph-level)", "verdict": "PASS" }
+  },
+  "overall": "PASS — every attribute the clone applied came back from real Word exactly as applied, at run granularity. Paragraph-level 'mixed' returns are a documented oracle granularity limit, handled by the new read-word-props verb (committed separately).",
+  "pidSafety": "Document count was 0 before and after every oracle invocation; only .oracle-out.docx was opened/closed (by name); Word never quit."
+}
