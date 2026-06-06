@@ -48,14 +48,23 @@
 
     async newDoc() {
       if (!(await this.confirmDiscard())) return;
-      E().setHTML('<p><br></p>');
+      if (WC.PM && WC.PM.active) {
+        if (!(await WC.PM.newBlank())) { WC.toast('Could not create document'); return; }
+      } else {
+        E().setHTML('<p><br></p>'); E().dirty = false;
+      }
       this.path = null; this.name = 'Document' + (Math.floor(Math.random() * 8) + 1); this.format = 'docx';
-      E().dirty = false; this.updateTitle();
+      this.updateTitle();
       WC.Backstage.close();
     },
     // Open generated content (mail-merge results, labels, etc.) as a fresh document
     // instead of overwriting the user's current one. Returns false if cancelled.
     async newDocWith(html, baseName) {
+      if (WC.PM && WC.PM.active) {
+        // Mail-merge/labels output is legacy-HTML shaped — its producers flip in slice 10.
+        WC.PM.notifyBlocked('Generated documents (' + (baseName || 'document') + ')');
+        return false;
+      }
       if (!(await this.confirmDiscard())) return false;
       this.path = null; this.name = (baseName || 'Document') + (Math.floor(Math.random() * 8) + 1); this.format = 'docx';
       E().setHTML(html || '<p><br></p>');
@@ -65,6 +74,19 @@
     },
 
     async open(presetPath) {
+      if (WC.PM && WC.PM.active) {
+        if (!(await this.confirmDiscard())) return;
+        const r = await window.wordAPI.openBytes(presetPath);
+        if (!r || !r.ok) { if (r && r.error) WC.toast('Could not open file', r.error); return; }
+        if (!/\.docx$/i.test(r.path)) { WC.toast('Only .docx opens on the new engine for now', 'Use --legacy for html/txt/csv (returns in slice 7)'); return; }
+        const ok = await WC.PM.openDocx(r.bytes);
+        if (!ok) { WC.toast('Could not open file', 'The new engine failed to import it'); return; }
+        // Invariant (spec §5.3): in PM mode `path` only ever points at a file the PM doc represents —
+        // assigned ONLY after openDocx succeeded.
+        this.path = r.path; this.name = r.name || 'Document'; this.format = 'docx';
+        this.updateTitle(); WC.Backstage.close(); WC.toast('Opened ' + this.name);
+        return;
+      }
       if (!presetPath && !(await this.confirmDiscard())) return;
       const r = await window.wordAPI.open(presetPath);
       if (!r || !r.ok) { if (r && r.error) WC.toast('Could not open file', r.error); return; }
@@ -77,10 +99,20 @@
     },
 
     async save() {
-      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
-      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
-      // file with the blank legacy doc otherwise).
-      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
+      if (WC.PM && WC.PM.active) {
+        if (this.format && this.format !== 'docx') {
+          WC.toast('Saving as ' + this.format + ' is not on the new engine yet', 'Use --legacy for html/txt saves (returns in slice 7)');
+          return { ok: false };
+        }
+        if (!this.path) return this.saveAs();
+        try {
+          const bytes = await WC.PM.exportDocxBytes();
+          const r = await window.wordAPI.saveBytes({ filePath: this.path, bytes });
+          if (r && r.ok) { this.setClean(); WC.toast('Saved ' + r.name); }
+          else WC.toast('Save failed', r && r.error);
+          return r;
+        } catch (e) { WC.toast('Save failed', String((e && e.message) || e)); return { ok: false, error: String(e) }; }
+      }
       if (!this.path) return this.saveAs();
       const p = E().getSavePayload();
       const r = await window.wordAPI.save({ filePath: this.path, html: p.html, header: p.header, footer: p.footer, comments: p.comments, format: this.format });
@@ -90,10 +122,15 @@
     },
 
     async saveAs() {
-      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
-      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
-      // file with the blank legacy doc otherwise).
-      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
+      if (WC.PM && WC.PM.active) {
+        try {
+          const bytes = await WC.PM.exportDocxBytes();
+          const r = await window.wordAPI.saveAsBytes({ bytes, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
+          if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = 'docx'; this.setClean(); WC.toast('Saved ' + r.name); }
+          else if (r && r.error) WC.toast('Save failed', r.error);
+          return r;
+        } catch (e) { WC.toast('Save failed', String((e && e.message) || e)); return { ok: false, error: String(e) }; }
+      }
       const p = E().getSavePayload();
       const r = await window.wordAPI.saveAs({ html: p.html, header: p.header, footer: p.footer, comments: p.comments, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
       if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = r.format; E().dirty = false; this.updateTitle(); WC.toast('Saved ' + r.name); }

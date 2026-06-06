@@ -115,9 +115,13 @@
   });
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
-  await t('[0a] PM-mode save is blocked until the bytes path (no legacy serialize)', async () => {
-    const r = await window.WC.Files.save();
-    return !!r && r.ok === false;
+  await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
+    const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;
+    f.format = 'html';
+    const r = await f.save();
+    const blocked = !!r && r.ok === false;
+    f.format = fmt0;
+    return blocked && f.path === p0;
   });
 
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
@@ -154,6 +158,52 @@
     const ok = await PM().openDocx(junk);
     const mount = document.getElementById('pm-editor');
     return ok === false && mount.querySelector('.ProseMirror') !== null && /survives pk junk/.test(v().dom.textContent);
+  });
+
+  // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
+  await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
+    const bytes = await PM().exportDocxBytes();
+    return bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+  });
+  await t('[0b] save/open round-trip through the bytes IPC', async () => {
+    setDoc('roundtrip payload text');
+    const bytes = await PM().exportDocxBytes();
+    const w1 = await window.wordAPI.saveBytes({ filePath: '/tmp/wc-pm-roundtrip.docx', bytes });
+    if (!w1 || !w1.ok) return 'saveBytes: ' + (w1 && w1.error);
+    const r = await window.wordAPI.openBytes('/tmp/wc-pm-roundtrip.docx');
+    if (!r || !r.ok) return 'openBytes: ' + (r && r.error);
+    const ok = await PM().openDocx(r.bytes);
+    return ok === true && /roundtrip payload text/.test(window.WC.view.dom.textContent);
+  });
+  await t('[0b] Files.open with non-docx preset refuses before touching the engine', async () => {
+    const f = window.WC.Files; const p0 = f.path;
+    const before = window.WC.view.state.doc.content.size;
+    const w1 = await window.wordAPI.saveBytes({ filePath: '/tmp/wc-pm-junk.txt', bytes: new Uint8Array([104, 105]) });
+    if (!w1 || !w1.ok) return 'setup failed: ' + (w1 && w1.error);
+    await f.open('/tmp/wc-pm-junk.txt');
+    return f.path === p0 && window.WC.view.state.doc.content.size === before;
+  });
+  await t('[0b] failed import leaves Files.path unchanged', async () => {
+    const f = window.WC.Files; const p0 = f.path;
+    const w1 = await window.wordAPI.saveBytes({ filePath: '/tmp/wc-pm-fakezip.docx', bytes: new Uint8Array([0x50, 0x4b, 3, 4, 9, 9, 9, 9]) });
+    if (!w1 || !w1.ok) return 'setup failed: ' + (w1 && w1.error);
+    await f.open('/tmp/wc-pm-fakezip.docx');
+    return f.path === p0; // openDocx refused the corrupt zip; path must not re-point
+  });
+  await t('[0b] Files.save writes the PM doc to the bound path', async () => {
+    const f = window.WC.Files;
+    setDoc('saved via Files.save');
+    f.path = '/tmp/wc-pm-files-save.docx'; f.name = 'wc-pm-files-save.docx'; f.format = 'docx';
+    const r = await f.save();
+    if (!r || !r.ok) return 'save: ' + (r && r.error);
+    const back = await window.wordAPI.openBytes('/tmp/wc-pm-files-save.docx');
+    const ok = await PM().openDocx(back.bytes);
+    return ok && /saved via Files.save/.test(window.WC.view.dom.textContent) && PM().isDirty() === false;
+  });
+  await t('[0b] New Document loads the blank template + clean state', async () => {
+    const f = window.WC.Files;
+    const ok = await PM().newBlank();
+    return ok === true && PM().isDirty() === false && window.WC.view.state.doc.content.size < 60;
   });
 
   const pass = results.filter((r) => r.pass).length;
