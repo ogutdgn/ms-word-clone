@@ -7,6 +7,61 @@
 
 ---
 
+## 2026-06-06 — Phase 2 slice 2 BUILT (paragraph + lists on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-2-paragraph` (directly off `main` post PR #15 — no stacked
+  PRs; PR pending).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 2 DONE → slice 3 (styles) next.**
+- **State summary:** areas **`paragraph` + `lists` FLIPPED** (registry `bridge/index.ts:23`):
+  align ×4, list-aware indent (level in lists / 36pt text-indent outside), Layout spinners
+  (twips dot-paths + caret readback — new fidelity win), line-spacing menu (dynamic Add/Remove
+  labels — Word behavior), paragraph **shading** (new fork render in `encodeCSSFromPPr` + setter)
+  and **borders** (Word-default 0.5pt box; single edges accumulate), **sort** (one-transaction
+  bridge `sortParagraphs`), bullets/numbering (+libraries now **honor glyphs** via
+  `toggle*ListStyle`/`applyListDefinition`), **Word-native multilevel** patterns (real per-level
+  numbering definitions — the legacy ml-* CSS fake is not ported), Change List Level (new
+  one-transaction fork cmd `changeListLevelBy`), Paragraph dialog (caret seeds + ONE-undo chained
+  apply), Ctrl+L/E/R/J + Ctrl+Shift+L (= List Bullet; fork's colliding Mod-Shift keymap stripped).
+  **The slice-1 hanging-indent gap is CLOSED** — root cause was the fork stylesheet never entering
+  the build; `main.ts` now imports `assets/styles/elements/prosemirror.css` (markers/tabs get real
+  widths; evidence `docs/superpowers/plans/notes/2026-06-06-slice2-css-markers.png`).
+  New oracle verb **`read-para-props`** (paragraph format + list format; quirks #16-23 documented).
+  Gates: **PM 76/76** (43 + 33 new `[2]`), legacy 257/257 frozen, smoke 9/9 ×2, docx 17/17;
+  full slice-2 attr round-trip evidence `notes/2026-06-06-slice2-roundtrip.png`.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-06-phase2-slice-2-paragraph-lists.md`,
+  hardened by a 3-critic adversarial workflow; executed subagent-driven with two-stage review):
+  - `a81508f` plan · `9e6fa78`/`b9958a2` red tests (33 `[2]` + paraAttrs helpers + D6 test repoint)
+  - `aabc710`/`e04bf45` oracle `read-para-props` (live-verified; enums + F0B7 bullet discovery)
+  - `45d5017`/`9bd804b` fork: shading render + SuperDoc align-keymap strip (NOTICE'd)
+  - `5cf1f2d`/`87a16ca` fork: `applyListDefinition` + `changeListLevelBy` commands (NOTICE'd)
+  - `bda0278` fork element CSS into the build (the hanging-indent fix)
+  - `1e64d82`/`78908a7` align/indent/spinners/line-spacing PM branches
+  - `35fd50d`/`ac0ca1c` lists libraries + multilevel menus · `152634b`/`cf98b04` shading/borders/sort
+  - `453a180` state-sync (Align-Left default pressed, resolved fields, spinner readback)
+  - `931a2f0` Paragraph dialog · `8d8e14f` **THE FLIP** (76/76 on first post-flip run, zero triage)
+  - `3e1a186` round-trip evidence · `882ea7e` oracle validation JSONs · `86ada55` quirks #22-23.
+- **Oracle validation (spec §8.3) vs Word 16.77.1:** leg A paragraph family 4/4 PASS (center /
+  double=24pt / 36pt indent / 12pt before); leg B Word→clone 4/4 PASS; shading+borders PASS via
+  Word-authored attribute-identical fixtures; fresh-Word-paragraph Align-Left default PASS
+  (live-read). **Two reads UNVERIFIED-THIS-SESSION** (lists-family Word read; literal roundtrip
+  re-save): the long headless Word session degraded (quirk #23) — follow-up commands are in
+  `notes/2026-06-06-slice2-oracleA-lists.json` (`followUp` fields); needs a USER Word relaunch,
+  ~5 min.
+- **KNOWN DEVIATIONS (recorded):** Paragraph dialog always writes lineRule 'auto' (exact/atLeast
+  converted on OK); border single-edge accumulation seeds from the selection-head paragraph;
+  sort 'Date' stays parseFloat-numeric; mixed-selection alignment still head-paragraph (slice-0a
+  deviation); Borders-and-Shading…/Define-New-Multilevel…/inside borders stay notImplemented.
+- **Tech-debt found:** vendored `resolvedPropertiesCache.js` passes `tableStyleId` (string) where
+  `resolveParagraphProperties` expects a TableInfo object — table-style cascade silently skipped
+  for in-table paragraphs (pre-existing; newly observable via state-sync's resolved fields).
+- **Next:** PR slice 2 → `main`; the 5-min oracle follow-up after Word relaunch; then **slice 3 —
+  styles** (gallery + LinkedStyles/setStyleById/toggleHeading; live-preview semantics on PM) via
+  brainstorm → write-plan → execute.
+- **Blockers/notes:** none for the PR. Word left running (never quit) but wedged for NEW opens —
+  user relaunch recovers it.
+
+---
+
 ## 2026-06-05 — Phase 2 slice 1 BUILT (character formatting on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-1-character` (stacked on `feature/phase-2-slice-0c`; PR up).

@@ -41,8 +41,15 @@
 >
 > **Slices 0b, 0c and 1 are DONE** (see Daily work log + last-point.md): file-IO bytes layer,
 > the macOS Word oracle harness, and the **character-formatting flip** (area `character` on the
-> PM engine, oracle-validated both ways vs Word 16.77.1). Gates: PM 43/43, 257, 9/9 × 2, 17.
-> **Next: slice 2 — paragraph + lists** (plan to be written via brainstorm → write-plan).
+> PM engine, oracle-validated both ways vs Word 16.77.1).
+>
+> **Slice 2 is DONE** (`feature/phase-2-slice-2-paragraph`, PR pending): areas **`paragraph` +
+> `lists` FLIPPED** — align/indent/spinners/line-spacing/shading/borders/sort, glyph-honoring
+> list libraries, Word-native multilevel, Paragraph dialog, Word shortcuts; the slice-1
+> hanging-indent gap closed (fork CSS shipped); new `read-para-props` oracle verb (quirks
+> #16-23). Gates: **PM 76/76**, legacy 257, smoke 9/9 × 2, docx 17. Oracle legs A/B PASS except
+> two reads pending a Word relaunch (see last-point.md).
+> **Next: slice 3 — styles** (plan to be written via brainstorm → write-plan).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -84,7 +91,17 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **Slice 0b** — file-IO bytes layer (PM-mode open/save via the fork's OOXML converter). DONE: bytes IPC channels, parse-once replaceEditor + failBridge recovery + replace mutex, blank fixture, Files.path invariant enforced + tested. Gates: PM 28/28, legacy 257/257, smoke 9/9 × 2, docx 17/17.
 - [x] **Slice 0c** — oracle harness for PM mode. DONE: `scripts/oracle/word-oracle.js` (read-props + roundtrip; object-model only; PID-safe; leak-proof read-props, best-effort roundtrip close). Verified vs Word for Mac 16.77.1; 13+ quirks documented. Commits: `48f55e5`, `cd68993`, `06a10f7`.
 - [x] **Slice 1** — character formatting (bold/italic/underline/strike/sub/sup/font/size/grow-shrink/color/highlight/clearFormatting/changeCase + Font dialog + QAT undo/redo → PM transactions; area `character` FLIPPED). Oracle validation (spec §8.3) both legs + negation-run fixture vs Word 16.77.1 — ALL PASS; caught + fixed a boolean-negation state-sync bug and a PM-harness string-return hole; new `read-word-props` oracle verb. Gates: **PM 43/43**, legacy 257/257, smoke 9/9 × 2, docx 17/17. Branch `feature/phase-2-slice-1-character`, PR stacked on slice 0c.
-- [ ] **Slice 2** — paragraph + lists (align ×4, indent, spacing, line-spacing, shading/borders(para), show-marks; bullet/numbered/multilevel lists) — plan to be written.
+- [x] **Slice 2** — paragraph + lists. DONE 2026-06-06 (`feature/phase-2-slice-2-paragraph`): align ×4, list-aware indent, Layout spinners (+caret readback), line-spacing (+dynamic labels), shading (new fork render), borders, sort, bullets/numbering (+glyph-honoring libraries), Word-native multilevel (`applyListDefinition`/`changeListLevelBy` fork cmds), Paragraph dialog (seeds + one-undo apply), Ctrl+L/E/R/J + Ctrl+Shift+L; hanging-indent gap closed (fork CSS shipped); oracle `read-para-props` verb + validation legs A/B (2 reads pending Word relaunch). Gates: PM 76/76, legacy 257, smoke 9/9 × 2, docx 17. show-marks verified already-done (slice-0a parity).
+
+### 2026-06-06 (Phase 2)
+- [x] Slice-2 **plan** written + critique-hardened + committed (`a81508f`) — `docs/superpowers/plans/2026-06-06-phase2-slice-2-paragraph-lists.md`.
+- [x] Slice-2 **red tests** (33 `[2]` + helpers + D6 repoint) (`9e6fa78`, `b9958a2`).
+- [x] Slice-2 **oracle verb** `read-para-props` + quirks #16-21 (`aabc710`, `e04bf45`).
+- [x] Slice-2 **fork work**: shading render + keymap strip (`45d5017`), `applyListDefinition`+`changeListLevelBy` (`5cf1f2d`), element CSS into the build (`bda0278`).
+- [x] Slice-2 **entry-point rewrites**: para handlers (`1e64d82`), lists menus (`35fd50d`), shading/borders/sort (`152634b`), state-sync (`453a180`), Paragraph dialog (`931a2f0`).
+- [x] Slice-2 **THE FLIP** (`8d8e14f`) — 76/76 first run, zero triage; all five gates green.
+- [x] Slice-2 **evidence**: round-trip (`3e1a186`), oracle legs A/B JSONs (`882ea7e`), quirks #22-23 (`86ada55`).
+- [ ] Slice-2 **PR** → `main`; 5-min oracle follow-up after Word relaunch (commands in the oracleA-lists JSON).
 
 ### 2026-06-05 (Phase 1 wrap-up)
 - [x] Phase 1 **Stage D** — final review = READY TO INTEGRATE; hardened the smoke Tab test (`8de524e`).
