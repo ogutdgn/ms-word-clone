@@ -24,8 +24,8 @@
     qat.appendChild(autosave);
     qat.appendChild(el('span', { class: 'qat-sep' }));
     qat.appendChild(qbtn('save', 'Save (Ctrl+S)', () => WC.Files.save()));
-    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', () => (WC.PM && WC.PM.active) ? WC.PM.cmd('undo') : E().exec('undo')));
-    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', () => (WC.PM && WC.PM.active) ? WC.PM.cmd('redo') : E().exec('redo')));
+    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM.cmd('undo') : E().exec('undo')));
+    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM.cmd('redo') : E().exec('redo')));
     qat.appendChild(qbtn('chevron_down', 'Customize Quick Access Toolbar', () => WC.toast('Customize Quick Access Toolbar is a UI placeholder.')));
     tb.appendChild(qat);
 
@@ -67,8 +67,8 @@
       if (!mod) return;
       const shift = e.shiftKey;
       const map = () => {
-        if (k === 'z' && !shift) return () => { const pm = WC.PM && WC.PM.active ? WC.PM : null; pm ? pm.cmd('undo') : E().undo(); };
-        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => { const pm = WC.PM && WC.PM.active ? WC.PM : null; pm ? pm.cmd('redo') : E().redo(); };
+        if (k === 'z' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('undo') : E().undo(); };
+        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('redo') : E().redo(); };
         if (k === 's' && !shift) return () => WC.Files.save();
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
         if (k === 'enter' && !shift) return pmBlockedOr('insert-basics', () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }));

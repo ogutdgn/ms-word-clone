@@ -67,7 +67,7 @@ export function installCommands(editor: AnyEditor) {
       const next = xform(slice)
       if (next !== slice) tr = tr.insertText(next, tr.mapping.map(s), tr.mapping.map(e))
     })
-    if (tr.docChanged) editor.view.dispatch(tr)
+    if (tr.docChanged) editor.view?.dispatch(tr)
     editor.view?.focus()
     return true
   }

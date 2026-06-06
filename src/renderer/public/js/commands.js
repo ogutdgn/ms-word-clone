@@ -37,13 +37,6 @@
   // No dedicated engine command for vertical alignment, but textStyle carries
   // vertAlign with sub/superscript rendering — drive it via the generic setMark,
   // toggling off when already set and keeping the pair mutually exclusive (Word).
-  const vertAlign = (kind) => {
-    const pm = PMA();
-    if (!pm) { E().exec(kind); return; }
-    const st = pm.getState();
-    const on = kind === 'subscript' ? st.subscript : st.superscript;
-    pm.cmd('setMark', 'textStyle', { vertAlign: on ? null : kind });
-  };
   H.subscript = () => vertAlign('subscript');
   H.superscript = () => vertAlign('superscript');
   H.clearAllFormatting = () => {
@@ -1033,6 +1026,15 @@
     document.addEventListener('keydown', painterEsc);
   }
 
+  // Vertical alignment (sub/superscript) — function decl so H.subscript/H.superscript
+  // can reference it before the declaration site (hoisting).
+  function vertAlign(kind) {
+    const pm = PMA();
+    if (!pm) { E().exec(kind); return; }
+    const st = pm.getState();
+    const on = kind === 'subscript' ? st.subscript : st.superscript;
+    pm.cmd('setMark', 'textStyle', { vertAlign: on ? null : kind });
+  }
   function stepFont(dir) {
     const cur = currentSizePt() || 11;
     let next;
@@ -1082,7 +1084,7 @@
       WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
     } else if (kind === 'page') {
       if (pm) { pm.notifyBlocked('Page Color'); return; } // design area — slice 10
-      E().node.style.backgroundColor = color;
+      E().node.style.backgroundColor = color; // not 'background' — that wipes a watermark's background-image
     }
   }
 
