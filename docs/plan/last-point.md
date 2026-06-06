@@ -50,7 +50,11 @@
 - **KNOWN DEVIATIONS (recorded):** Paragraph dialog always writes lineRule 'auto' (exact/atLeast
   converted on OK); border single-edge accumulation seeds from the selection-head paragraph;
   sort 'Date' stays parseFloat-numeric; mixed-selection alignment still head-paragraph (slice-0a
-  deviation); Borders-and-Shading…/Define-New-Multilevel…/inside borders stay notImplemented.
+  deviation); Borders-and-Shading…/Define-New-Multilevel…/inside borders stay notImplemented;
+  Change-List-Level reads the INLINE ilvl while the engine applies the delta to the RESOLVED
+  level — style-inherited list paragraphs (numbering from a named style, no inline attrs) can
+  land off-target (final-review finding; revisit with slice 3 styles, where resolved style
+  reads land on the bridge anyway).
 - **Tech-debt found:** vendored `resolvedPropertiesCache.js` passes `tableStyleId` (string) where
   `resolveParagraphProperties` expects a TableInfo object — table-style cascade silently skipped
   for in-table paragraphs (pre-existing; newly observable via state-sync's resolved fields).
