@@ -351,8 +351,10 @@
 
   // ---- Font dialog (Ctrl+D / Font group launcher) ----
   D.font = function () {
-    const saved = E().savedRange;
-    const st = E().queryState();
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) pm.captureSelection(); // the dialog steals focus; restore before applying
+    const saved = pm ? null : E().savedRange;
+    const st = pm ? pm.getState() : E().queryState();
     let colorVal = '';
     const mk = (tag, props, ch) => el(tag, props, ch);
     const fam = el('select', { class: 'grow' }, (WC.FONTS || ['Calibri']).map((f) => el('option', { value: f, text: f, selected: (st.computedFontFamily === f ? 'selected' : null) })));
@@ -420,8 +422,28 @@
 
     WC.dialog({ title: 'Font', width: '540px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        E().savedRange = saved; E().applyInlineStyles(buildStyle());
-        if (sup.c.checked) E().exec('superscript'); else if (sub.c.checked) E().exec('subscript');
+        if (pm) {
+          const steps = [['setFontFamily', fam.value], ['setFontSize', (parseFloat(size.value) || 11) + 'pt']];
+          steps.push([/Bold/.test(styleSel.value) ? 'setBold' : 'unsetBold']);
+          steps.push([/Italic/.test(styleSel.value) ? 'setItalic' : 'unsetItalic']);
+          if (colorVal) steps.push(['setColor', colorVal]);
+          if (underline.value !== 'none') {
+            steps.push(['setUnderline']);
+            // 'single' is deliberately absent: setUnderline's default attr IS underlineType:'single' (probe-verified).
+            const UL = { double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' };
+            if (UL[underline.value]) steps.push(['setMark', 'underline', { underlineType: UL[underline.value] }]);
+          } else steps.push(['unsetUnderline']);
+          steps.push([strike.c.checked ? 'setStrike' : 'unsetStrike']);
+          if (sup.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'superscript' }]);
+          else if (sub.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'subscript' }]);
+          pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (matches Word)
+          if (small.c.checked || allc.c.checked || scale.value !== '100' || spacing.value !== 'Normal' || position.value !== 'Normal') {
+            pm.notifyBlocked('Caps and Advanced font effects');
+          }
+        } else {
+          E().savedRange = saved; E().applyInlineStyles(buildStyle());
+          if (sup.c.checked) E().exec('superscript'); else if (sub.c.checked) E().exec('subscript');
+        }
         WC.Ribbon.setComboValue('font', fam.value); WC.Ribbon.setComboValue('fontSize', String(parseFloat(size.value) || 11));
       } },
       { label: 'Cancel' },

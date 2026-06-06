@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('wordAPI', {
   exportPdf: (payload) => ipcRenderer.invoke('doc:exportPdf', payload),
   print: () => ipcRenderer.invoke('doc:print'),
 
+  // Phase 2 bytes channels (PM core: renderer-side .docx converter)
+  saveBytes: (payload) => ipcRenderer.invoke('doc:saveBytes', payload),
+  saveAsBytes: (payload) => ipcRenderer.invoke('doc:saveAsBytes', payload),
+  openBytes: (presetPath) => ipcRenderer.invoke('doc:openBytes', presetPath),
+
   // Recent files
   recent: {
     list: () => ipcRenderer.invoke('recent:list'),

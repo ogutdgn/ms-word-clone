@@ -1,9 +1,22 @@
 import b64 from '@/core/generated/basic-list.docx.b64'
+import { BLANK_DOCX_B64 } from '@/core/generated/blank.docx.b64'
+import { NEGATION_RUN_DOCX_B64 } from '@/core/generated/negation-run.docx.b64'
 
 // Decode WITHOUT Node Buffer/fs (renderer has nodeIntegration:false). Works under file://.
-export function fixtureArrayBuffer(): ArrayBuffer {
-  const bin = atob(b64)
+function b64ToArrayBuffer(s: string): ArrayBuffer {
+  const bin = atob(s)
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
   return bytes.buffer
 }
+
+export function fixtureArrayBuffer(): ArrayBuffer { return b64ToArrayBuffer(b64) }
+
+// Blank document template — used by "New Document" on the PM core.
+// Decodes identically to fixtureArrayBuffer(); kept as a separate export for clarity.
+export function blankArrayBuffer(): ArrayBuffer { return b64ToArrayBuffer(BLANK_DOCX_B64) }
+
+// Negation-run fixture (spec §7.5) — authored by REAL Word for Mac 16.77.1:
+// Normal style bold + explicit <w:b w:val="0"/> on the middle word ("UNBOLD").
+// Exposed as window.__WC_FIXTURE_NEGATION for the PM suite's truthfulness test.
+export function negationArrayBuffer(): ArrayBuffer { return b64ToArrayBuffer(NEGATION_RUN_DOCX_B64) }

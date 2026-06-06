@@ -38,6 +38,11 @@
 > **Slice 0a is DONE** (`feature/phase-2-editing-core`, PR pending): `#pm-editor` is now the visible
 > editor behind the `WC.PM` bridge; `--legacy` restores the full legacy app; D6 two-layer guards live;
 > ribbon state-sync from engine events; dirty/statusbar/visible-page re-pointed. Gates: 257/21/9×2/17.
+>
+> **Slices 0b, 0c and 1 are DONE** (see Daily work log + last-point.md): file-IO bytes layer,
+> the macOS Word oracle harness, and the **character-formatting flip** (area `character` on the
+> PM engine, oracle-validated both ways vs Word 16.77.1). Gates: PM 43/43, 257, 9/9 × 2, 17.
+> **Next: slice 2 — paragraph + lists** (plan to be written via brainstorm → write-plan).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -48,9 +53,10 @@ big-bang; gate on the 257/17 suites + per-feature Word fidelity.
 - [x] **Integrate Phase 1 first** (merged to `main` via PR #10), then cut `feature/phase-2-editing-core`.
 - [x] Run Phase 2 through its own cycle: **`brainstorming` → `writing-plans` → subagent execution**.
 - [x] Decide the **command→transaction bridge**: `WC.PM` bridge (D5) + page flip to `#pm-editor` (D1) — DONE in slice 0a.
-- [ ] **Per feature flipped:** validate behavior + UI vs real Word (macOS AppleScript oracle); keep
-  257/21/17 green; add PM regression tests in `scripts/test-suite-pm.js`.
-- [ ] Wire **`.docx` SAVE/export** on the new engine — slice 0b (file-IO bytes layer).
+- [x] **Per feature flipped:** validate behavior + UI vs real Word (macOS AppleScript oracle); keep
+  the gates green; add PM regression tests in `scripts/test-suite-pm.js`. *(Protocol established +
+  run for slice 1; repeats every slice.)*
+- [x] Wire **`.docx` SAVE/export** on the new engine — slice 0b (file-IO bytes layer). DONE.
 
 **Watch-outs:** no pagination yet (Phase 7 — continuous flow is expected, not a regression);
 list-marker/spacing fidelity is per-feature polish; keep the headless Editor reachable for export;
@@ -75,9 +81,10 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice 0a **dirty re-point** (`e4ea0bf`) — dirty-state readers mode-aware (PM edits trigger save prompts).
 - [x] Slice 0a **visible-page re-points** (`571b1e3`, `e41fb67`) — showHide/readMode/wordCount/properties follow active engine; paragraph-count selectors aligned.
 - [x] **All gates green: legacy 257/257, PM 21/21, smoke 9/9 × 2, docx 17/17.**
-- [ ] **Slice 0b** — file-IO bytes layer (PM-mode open/save via the fork's OOXML converter).
-- [ ] **Slice 0c** — oracle harness for PM mode.
-- [ ] **Slice 1** — character formatting (bold/italic/underline/font/size/color → PM transactions).
+- [x] **Slice 0b** — file-IO bytes layer (PM-mode open/save via the fork's OOXML converter). DONE: bytes IPC channels, parse-once replaceEditor + failBridge recovery + replace mutex, blank fixture, Files.path invariant enforced + tested. Gates: PM 28/28, legacy 257/257, smoke 9/9 × 2, docx 17/17.
+- [x] **Slice 0c** — oracle harness for PM mode. DONE: `scripts/oracle/word-oracle.js` (read-props + roundtrip; object-model only; PID-safe; leak-proof read-props, best-effort roundtrip close). Verified vs Word for Mac 16.77.1; 13+ quirks documented. Commits: `48f55e5`, `cd68993`, `06a10f7`.
+- [x] **Slice 1** — character formatting (bold/italic/underline/strike/sub/sup/font/size/grow-shrink/color/highlight/clearFormatting/changeCase + Font dialog + QAT undo/redo → PM transactions; area `character` FLIPPED). Oracle validation (spec §8.3) both legs + negation-run fixture vs Word 16.77.1 — ALL PASS; caught + fixed a boolean-negation state-sync bug and a PM-harness string-return hole; new `read-word-props` oracle verb. Gates: **PM 43/43**, legacy 257/257, smoke 9/9 × 2, docx 17/17. Branch `feature/phase-2-slice-1-character`, PR stacked on slice 0c.
+- [ ] **Slice 2** — paragraph + lists (align ×4, indent, spacing, line-spacing, shading/borders(para), show-marks; bullet/numbered/multilevel lists) — plan to be written.
 
 ### 2026-06-05 (Phase 1 wrap-up)
 - [x] Phase 1 **Stage D** — final review = READY TO INTEGRATE; hardened the smoke Tab test (`8de524e`).
