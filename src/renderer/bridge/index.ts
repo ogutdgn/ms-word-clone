@@ -13,6 +13,9 @@ import { blankArrayBuffer } from '@/core/fixture'
 
 type AnyEditor = any
 let current: AnyEditor = null
+// Concurrency guard: replaceEditor must not overlap itself (concurrent Open/New
+// clicks must not race — second call is refused while first is in flight).
+let replacing = false
 
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
@@ -98,35 +101,56 @@ function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.ha
 // untouched) without reparenting, we use a true two-phase approach:
 //   Phase 1 (before any teardown): ZIP-magic check + full loadXmlData parse.
 //             A parse failure aborts here — old editor is UNTOUCHED.
+//             Failure class: corrupt/invalid input; live editor remains live.
 //   Phase 2 (after parse succeeds): destroy old, clear mount, construct new
 //             from the ALREADY-PARSED data (no re-parse).
-//             Construction failure here is best-effort; the mount may be empty,
-//             but we log it and return false. In practice parse success makes
-//             construction failure vanishingly rare.
+//             Failure class: constructor error on valid parsed data (rare).
+//             The mount may already be empty at this point; call failBridge to
+//             un-flip to the legacy world + toast, then return false.
 async function replaceEditor(source: ArrayBuffer): Promise<boolean> {
+  // Concurrency guard: refuse a second concurrent call (e.g. double-click Open).
+  if (replacing) return false
+  replacing = true
   const w = window as any
   try {
     // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
     // the live editor untouched (spec §5.3 invariant).
+    // Failure class: corrupt/invalid input → live editor untouched, return false.
     const bytes = new Uint8Array(source)
     if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return false
     const mountEl = document.getElementById('pm-editor') as HTMLElement | null
     if (!mountEl) return false
     const parsed = await parseDocx(source) // throws on corrupt input → caught → false, old editor intact
-    // Phase 2 — teardown + construct from the ALREADY-PARSED data (no re-parse;
-    // residual risk is constructor failure on parsed data — genuinely rare).
-    try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
-    mountEl.innerHTML = ''
-    const next = constructPmEditor(mountEl, parsed)
-    w.WC.view = next.view
-    w.WC.editor = next
-    next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
-    installBridge(next)
-    w.WC.PM.setClean()
-    return true
+    // Phase 2 — teardown + construct from the ALREADY-PARSED data (no re-parse).
+    // Failure class: constructor error on valid parsed data (genuinely rare).
+    // At this point the old editor may have been destroyed and the mount cleared;
+    // call failBridge so the legacy world becomes visible rather than a blank page.
+    try {
+      try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
+      mountEl.innerHTML = ''
+      const next = constructPmEditor(mountEl, parsed)
+      // Transaction-seam attach: references w.WC.pm only — safe before WC.view/WC.editor assignment.
+      next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
+      // installBridge sets current = editor first; assign WC.view/WC.editor AFTER
+      // so current and WC.editor never disagree.
+      installBridge(next)
+      w.WC.view = next.view
+      w.WC.editor = next
+      w.WC.PM.setClean()
+      return true
+    } catch (e) {
+      // Phase-2 failure: mount may be empty, old editor already destroyed.
+      // Recover via failBridge (un-flips to legacy world + toasts).
+      console.error('[WC.PM] replaceEditor phase-2 failed', e)
+      failBridge(e)
+      return false
+    }
   } catch (e) {
-    console.error('[WC.PM] replaceEditor failed', e)
+    // Phase-1 failure: parse/validation error — live editor is untouched.
+    console.error('[WC.PM] replaceEditor phase-1 failed', e)
     return false
+  } finally {
+    replacing = false
   }
 }
 

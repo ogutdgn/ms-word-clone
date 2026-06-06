@@ -2,6 +2,12 @@
 import { Editor } from '@core/Editor.js'
 import { getStarterExtensions } from '@extensions/index.js'
 
+// Real shapes: docx → DocxFileEntry[] | Record<string,unknown> (EditorOptions.content),
+// mediaFiles → Record<string,unknown> (EditorOptions.mediaFiles),
+// fonts → Record<string,unknown> (EditorOptions.fonts).
+// Kept as unknown: @core/types/EditorConfig.js is a vendored .ts file; importing
+// EditorOptions type-only from there requires an extra path alias round-trip that
+// adds no runtime value. See src/renderer/core/superdoc-fork/core/types/EditorConfig.ts.
 export type ParsedDocx = { docx: unknown; mediaFiles: unknown; fonts: unknown }
 
 // Parse only — throws on corrupt input. Callers parse BEFORE tearing anything down.
