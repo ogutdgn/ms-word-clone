@@ -19,10 +19,12 @@ first, then dive into the linked `docs/`.
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc`
-> npm dep, telemetry off). **Phase 2 slices 0a–1 are DONE** (merged to `main` via PRs #11–#15): the PM core
-> (`#pm-editor`) is now the **active visible editor** since slice 0a; the legacy vanilla-JS
-> `window.WC` editor boots only under the `--legacy` flag as a frozen regression target.
-> **Phase 2** continues wiring ribbon commands → PM transactions (slice 2: paragraph + lists).
+> npm dep, telemetry off). **Phase 2 slices 0a–2 are DONE** (merged to `main` via PRs #11–#15
+> and #17): the PM core (`#pm-editor`) is now the **active visible editor** since slice 0a; the
+> legacy vanilla-JS `window.WC` editor boots only under the `--legacy` flag as a frozen
+> regression target. Flipped ribbon areas so far: **character** (slice 1) and **paragraph +
+> lists** (slice 2 — incl. shading/borders, Word-native multilevel, the Paragraph dialog).
+> **Phase 2** continues wiring ribbon commands → PM transactions (slice 3: styles).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## What this is
