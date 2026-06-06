@@ -7,6 +7,25 @@
 
 ---
 
+## 2026-06-05 — Phase 2 slice 0c BUILT (macOS Word oracle harness)
+
+- **Branch:** `feature/phase-2-slice-0c` (stacked on `feature/phase-2-slice-0b`; PR pending).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 0c DONE → slice 1 next.**
+- **State summary:** `scripts/oracle/word-oracle.js` is live — read-props (per-paragraph
+  bold/italic/underline/font/size/alignment via Word's AppleScript object model) + roundtrip
+  (open + save-as). Object-model only; name-verified PID safety; leak-proof read-props,
+  best-effort roundtrip close. Verified live against Word for Mac 16.77.1. 13+ AppleScript
+  dictionary quirks documented in `scripts/oracle/README.md`. Gates unaffected (pure tooling):
+  PM 28/28, legacy 257/257, smoke 9/9 × 2, docx 17/17.
+- **Done this session** (slice 0c tasks with commit SHAs):
+  - `48f55e5` — `scripts/oracle/word-oracle.js`: read-props + roundtrip implementation.
+  - `cd68993` — `scripts/oracle/README.md`: full oracle documentation + 13-entry quirk table.
+  - `06a10f7` — `scripts/oracle/README.md`: roundtrip close is best-effort, not guaranteed (re-review fix).
+- **Next:** slice 1 — character formatting (bold/italic/underline/font/size/color → PM transactions; plan Stage D).
+- **Blockers/notes:** none. Gates unaffected (pure tooling addition).
+
+---
+
 ## 2026-06-05 — Phase 2 slice 0b BUILT (file IO on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-0b` (stacked on `feature/phase-2-editing-core`; PR pending).
