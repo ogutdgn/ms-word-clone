@@ -81,11 +81,11 @@
         if (k === '=' && !shift) return () => E().zoomIn();
         if (k === '-') return () => E().zoomOut();
         if (k === '0') return () => E().zoomReset();
-        if (k === 'l' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyLeft'));
-        if (k === 'e' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyCenter'));
-        if (k === 'r' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyRight'));
-        if (k === 'j' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyFull'));
-        if (k === 'l' && shift) return pmBlockedOr('lists', () => E().exec('insertUnorderedList'));
+        if (k === 'l' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
+        if (k === 'e' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
+        if (k === 'r' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
+        if (k === 'j' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
+        if (k === 'l' && shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
         if (k === 'd' && !shift) return pmBlockedOr('character', () => WC.Dialogs.font());
         if (shift && (k === '.' || k === '>')) return pmBlockedOr('character', () => WC.Commands && incFont(1));
         if (shift && (k === ',' || k === '<')) return pmBlockedOr('character', () => incFont(-1));
