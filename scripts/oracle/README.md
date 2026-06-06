@@ -108,12 +108,18 @@ afterwards (expected — never quit it).
 
 ### Leak-proof close on failure
 
-Both `read-props` and `roundtrip` wrap their AppleScript work in
-`try ... on error errMsg` blocks that always close OUR document before re-raising
-the error.  This ensures the document is closed even if:
+`read-props` wraps its AppleScript work in a `try ... on error errMsg` block that
+**always** closes OUR document before re-raising the error — a true leak-proof
+guarantee for the read path.
 
-- The `save as` call raises AppleEvent timeout −1712 or −1708.
-- Any property access inside the paragraph loop throws.
+`roundtrip` also wraps in a `try ... on error` block and **attempts** to close OUR
+document before re-raising, but the close is **best-effort**: if both the primary
+close-by-output-name and the fallback close-by-input-name miss (e.g. the doc was
+never opened, or Word renamed it to something unexpected — see quirk #3 above), a
+stray document may remain open.  If you suspect a leak after a failed roundtrip, do
+**not** run `tell application "Microsoft Word" to close every document saving no"` —
+that will silently discard any documents the user already had open.  Instead, locate
+the stray window by hand (check the Word Window menu) and close it from the UI.
 
 ## Known limits
 
