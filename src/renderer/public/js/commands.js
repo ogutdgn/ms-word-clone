@@ -52,15 +52,27 @@
   H.fontColor = (c, node) => applyColor('fore', lastFontColor);
 
   // ---- Paragraph ----
-  H.alignLeft = () => E().exec('justifyLeft');
-  H.center = () => E().exec('justifyCenter');
-  H.alignRight = () => E().exec('justifyRight');
-  H.justify = () => E().exec('justifyFull');
-  H.bullets = () => E().exec('insertUnorderedList');
-  H.numbering = () => E().exec('insertOrderedList');
+  H.alignLeft = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
+  H.center = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
+  H.alignRight = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
+  // Word stores justify as w:jc="both"; setTextAlign('justify') does that mapping —
+  // never pass 'both' (the alignments whitelist rejects it).
+  H.justify = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
+  H.bullets = () => { const pm = PMA(); pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
+  H.numbering = () => { const pm = PMA(); pm ? pm.cmd('toggleOrderedList') : E().exec('insertOrderedList'); };
   H.decreaseIndent = () => stepIndent(-48);
   H.increaseIndent = () => stepIndent(48);
   function stepIndent(px) {
+    const pm = PMA();
+    if (pm) {
+      // Word behavior: inside a list the ribbon indent buttons change the LIST LEVEL;
+      // otherwise they step the paragraph text indent by 0.5" (engine: 36pt = 720tw).
+      const para = pm.getEditor().getAttributes('paragraph') || {};
+      const inList = !!(para.paragraphProperties && para.paragraphProperties.numberingProperties) || !!para.listRendering;
+      if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
+      else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
+      return;
+    }
     if (E().currentListItem && E().currentListItem()) { if (px > 0) E().demoteListItem(); else E().promoteListItem(); return; }
     E().selectedBlocks().forEach((b) => { const cur = parseFloat(b.style.marginLeft) || 0; const next = Math.max(0, cur + px); b.style.marginLeft = next ? next + 'px' : ''; });
     E().dirty = true; E().repaginate(); E().updateStatus(); E().emit();
@@ -930,9 +942,23 @@
       WC.applyNamedStyle(name);
     },
 
-    // Layout Paragraph spinners (indent in inches, spacing in points).
+    // Layout Paragraph spinners (indent in inches, spacing in points; model = twips).
     spinner(cmd, value) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
+      const pm = PMA();
+      const PARA_SPIN = {
+        indentLeft: ['paragraphProperties.indent.left', (v) => Math.round(v * 1440)],
+        indentRight: ['paragraphProperties.indent.right', (v) => Math.round(v * 1440)],
+        spacingBefore: ['paragraphProperties.spacing.before', (v) => Math.round(v * 20)],
+        spacingAfter: ['paragraphProperties.spacing.after', (v) => Math.round(v * 20)],
+      };
+      if (pm && PARA_SPIN[cmd]) {
+        // withSelection: the spinner input took real focus — focus.ts snapshotted the
+        // PM selection on focusin (.rspinner is in its capture list); restore it first.
+        const [path, conv] = PARA_SPIN[cmd];
+        pm.withSelection(() => pm.cmd('updateAttributes', 'paragraph', { [path]: conv(value) }));
+        return;
+      }
       if (cmd === 'indentLeft') E().applyBlockStyle('marginLeft', value ? value + 'in' : '');
       else if (cmd === 'indentRight') E().applyBlockStyle('marginRight', value ? value + 'in' : '');
       else if (cmd === 'spacingBefore') E().applyBlockStyle('marginTop', value + 'pt');
@@ -1131,12 +1157,30 @@
 
   function lineSpacingMenu(node) {
     const opts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
+    const pm = PMA();
+    const st = pm ? pm.getState() : null;
     WC.flyout(node, (fly) => {
-      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => E().applyBlockStyle('lineHeight', o) })));
+      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => {
+        const pm2 = PMA();
+        if (pm2) pm2.cmd('setLineHeight', parseFloat(o));
+        else E().applyBlockStyle('lineHeight', o);
+      } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Line Spacing Options…', { onClick: () => WC.Dialogs.paragraph() }));
-      fly.appendChild(WC.flyItem('Add Space Before Paragraph', { onClick: () => E().applyBlockStyle('marginTop', '12pt') }));
-      fly.appendChild(WC.flyItem('Remove Space After Paragraph', { onClick: () => E().applyBlockStyle('marginBottom', '0') }));
+      if (pm) {
+        // Word-fidelity: labels flip with the caret paragraph's current spacing.
+        const hasBefore = !!(st && st.spacingBeforePt > 0);
+        const hasAfter = !!(st && st.spacingAfterPt > 0);
+        fly.appendChild(WC.flyItem(hasBefore ? 'Remove Space Before Paragraph' : 'Add Space Before Paragraph', {
+          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.before': hasBefore ? 0 : 240 }); },
+        }));
+        fly.appendChild(WC.flyItem(hasAfter ? 'Remove Space After Paragraph' : 'Add Space After Paragraph', {
+          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.after': hasAfter ? 0 : 240 }); },
+        }));
+      } else {
+        fly.appendChild(WC.flyItem('Add Space Before Paragraph', { onClick: () => E().applyBlockStyle('marginTop', '12pt') }));
+        fly.appendChild(WC.flyItem('Remove Space After Paragraph', { onClick: () => E().applyBlockStyle('marginBottom', '0') }));
+      }
     });
   }
 
