@@ -78,7 +78,7 @@
         if (!(await this.confirmDiscard())) return;
         const r = await window.wordAPI.openBytes(presetPath);
         if (!r || !r.ok) { if (r && r.error) WC.toast('Could not open file', r.error); return; }
-        if (!/\.docx$/i.test(r.path)) { WC.toast('Only .docx opens on the new engine for now', 'Use --legacy for html/txt/csv (returns in slice 7)'); return; }
+        if (!/\.docx$/i.test(r.path)) { WC.toast("Opening non-docx files isn't on the new engine yet", 'Use --legacy for html/txt/csv (returns in slice 7)'); return; }
         const ok = await WC.PM.openDocx(r.bytes);
         if (!ok) { WC.toast('Could not open file', 'The new engine failed to import it'); return; }
         // Invariant (spec §5.3): in PM mode `path` only ever points at a file the PM doc represents —
@@ -101,7 +101,7 @@
     async save() {
       if (WC.PM && WC.PM.active) {
         if (this.format && this.format !== 'docx') {
-          WC.toast('Saving as ' + this.format + ' is not on the new engine yet', 'Use --legacy for html/txt saves (returns in slice 7)');
+          WC.toast("Saving as " + this.format + " isn't on the new engine yet", 'Use --legacy for html/txt saves (returns in slice 7)');
           return { ok: false };
         }
         if (!this.path) return this.saveAs();
@@ -109,9 +109,9 @@
           const bytes = await WC.PM.exportDocxBytes();
           const r = await window.wordAPI.saveBytes({ filePath: this.path, bytes });
           if (r && r.ok) { this.setClean(); WC.toast('Saved ' + r.name); }
-          else WC.toast('Save failed', r && r.error);
+          else WC.toast('Save failed', r && r.error); // title dot intentionally stays — the doc IS still dirty
           return r;
-        } catch (e) { WC.toast('Save failed', String((e && e.message) || e)); return { ok: false, error: String(e) }; }
+        } catch (e) { const msg = (e && e.message) || String(e); WC.toast('Save failed', msg); return { ok: false, error: msg }; }
       }
       if (!this.path) return this.saveAs();
       const p = E().getSavePayload();
@@ -129,7 +129,7 @@
           if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = 'docx'; this.setClean(); WC.toast('Saved ' + r.name); }
           else if (r && r.error) WC.toast('Save failed', r.error);
           return r;
-        } catch (e) { WC.toast('Save failed', String((e && e.message) || e)); return { ok: false, error: String(e) }; }
+        } catch (e) { const msg = (e && e.message) || String(e); WC.toast('Save failed', msg); return { ok: false, error: msg }; }
       }
       const p = E().getSavePayload();
       const r = await window.wordAPI.saveAs({ html: p.html, header: p.header, footer: p.footer, comments: p.comments, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });

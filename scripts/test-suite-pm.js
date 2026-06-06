@@ -115,15 +115,6 @@
   });
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
-  await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
-    const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;
-    f.format = 'html';
-    const r = await f.save();
-    const blocked = !!r && r.ok === false;
-    f.format = fmt0;
-    return blocked && f.path === p0;
-  });
-
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     window.WC.Commands.run({ cmd: 'bullets', label: 'Bullets' });
     return document.querySelectorAll('.flyout').length === 0; // no flyout, no throw
@@ -161,6 +152,14 @@
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
+  await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
+    const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;
+    f.format = 'html';
+    const r = await f.save();
+    const blocked = !!r && r.ok === false;
+    f.format = fmt0;
+    return blocked && f.path === p0;
+  });
   await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
     const bytes = await PM().exportDocxBytes();
     return bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b;
@@ -196,9 +195,10 @@
     f.path = '/tmp/wc-pm-files-save.docx'; f.name = 'wc-pm-files-save.docx'; f.format = 'docx';
     const r = await f.save();
     if (!r || !r.ok) return 'save: ' + (r && r.error);
+    const cleanAfterSave = PM().isDirty() === false; // must be checked BEFORE reimport (openDocx also setCleans)
     const back = await window.wordAPI.openBytes('/tmp/wc-pm-files-save.docx');
     const ok = await PM().openDocx(back.bytes);
-    return ok && /saved via Files.save/.test(window.WC.view.dom.textContent) && PM().isDirty() === false;
+    return ok && /saved via Files.save/.test(window.WC.view.dom.textContent) && cleanAfterSave;
   });
   await t('[0b] New Document loads the blank template + clean state', async () => {
     const f = window.WC.Files;
