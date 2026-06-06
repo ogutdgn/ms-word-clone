@@ -151,6 +151,96 @@
     return ok === false && mount.querySelector('.ProseMirror') !== null && /survives pk junk/.test(v().dom.textContent);
   });
 
+  // ---------- slice 1: character formatting (drives the REAL dispatch path) ----------
+  const run = (cmd) => window.WC.Commands.run({ cmd });
+  await t('[1] bold via WC.Commands.run lands as a PM mark', async () => {
+    setDoc('charfmt bold target'); selectText('bold');
+    run('bold'); await sleep(50);
+    return markNames('bold').some((m) => m.startsWith('bold:') && !m.includes('"value":"0"'));
+  });
+  await t('[1] bold toggles off', async () => {
+    // requires bold to be ON first (from the previous test) — then toggle off must remove it
+    const wasBold = markNames('bold').some((m) => m.startsWith('bold:') && !m.includes('"value":"0"'));
+    if (!wasBold) return false; // dispatch still blocked: bold was never applied, nothing to toggle
+    selectText('bold'); run('bold'); await sleep(50);
+    return !markNames('bold').some((m) => m.startsWith('bold:') && !m.includes('"value":"0"'));
+  });
+  await t('[1] italic + underline + strikethrough marks', async () => {
+    selectText('charfmt'); run('italic'); run('underline'); run('strikethrough'); await sleep(50);
+    const m = markNames('charfmt').join(' ');
+    return /italic:/.test(m) && /underline:/.test(m) && /strike:/.test(m);
+  });
+  await t('[1] font family via comboCommit', async () => {
+    selectText('target');
+    window.WC.Commands.comboCommit({ cmd: 'font' }, 'Georgia'); await sleep(50);
+    return markNames('target').some((m) => m.includes('Georgia'));
+  });
+  await t('[1] font size via comboCommit (12 -> 20pt)', async () => {
+    selectText('target');
+    window.WC.Commands.comboCommit({ cmd: 'fontSize' }, '20'); await sleep(50);
+    return markNames('target').some((m) => m.includes('20pt'));
+  });
+  await t('[1] grow font steps the size ladder', async () => {
+    selectText('target'); run('increaseFontSize'); await sleep(50);
+    return markNames('target').some((m) => m.includes('22pt')); // 20 -> 22 per SIZES
+  });
+  await t('[1] font color + highlight', async () => {
+    selectText('charfmt');
+    window.WC.Commands.run({ cmd: 'fontColor' }); // applies lastFontColor #FF0000
+    window.WC.Commands.run({ cmd: 'textHighlightColor' }); // lastHighlight #FFFF00
+    await sleep(50);
+    const m = markNames('charfmt').join(' ');
+    return /FF0000|#ff0000|red/i.test(m) && /highlight:/.test(m);
+  });
+  await t('[1] clear formatting strips the marks', async () => {
+    // requires italic+underline+strike to be ON first (from previous test) — clear must remove them all
+    const hadMarks = markNames('charfmt').length > 0;
+    if (!hadMarks) return false; // dispatch still blocked: no marks were applied, nothing to clear
+    selectText('charfmt'); run('clearAllFormatting'); await sleep(50);
+    return markNames('charfmt').length === 0;
+  });
+  await t('[1] changeCase UPPERCASE via PM transaction', async () => {
+    setDoc('case probe text'); selectText('case probe');
+    PM().changeCase('upper'); await sleep(50);
+    return /CASE PROBE text/.test(v().dom.textContent);
+  });
+  await t('[1] QAT undo reverses the last command (engine history)', async () => {
+    setDoc('undo probe'); selectText('undo');
+    run('bold'); await sleep(50);
+    const had = markNames('undo').some((m) => m.startsWith('bold:') && !m.includes('"value":"0"'));
+    document.querySelector('.qat .qat-btn[title^="Undo"]').click(); await sleep(50);
+    return had && !markNames('undo').some((m) => m.startsWith('bold:') && !m.includes('"value":"0"'));
+  });
+  await t('[1] Font dialog OK applies family+size+bold as ONE undo step', async () => {
+    setDoc('dialog probe words'); selectText('dialog probe');
+    window.WC.Dialogs.font();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'dialog did not open';
+    dlg.querySelector('select.grow').value = 'Georgia';
+    dlg.querySelectorAll('select')[1].value = 'Bold';
+    dlg.querySelector('input[type=number]').value = '20';
+    const ok = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim()));
+    ok.click(); await sleep(80);
+    const m1 = markNames('dialog').join(' ');
+    const applied = /Georgia/.test(m1) && /20pt/.test(m1) && /bold:/.test(m1);
+    PM().cmd('undo'); await sleep(50);
+    const m2 = markNames('dialog').join(' ');
+    return applied && !/Georgia/.test(m2) && !/bold:/.test(m2); // one undo removed ALL of it
+  });
+  await t('[1] subscript applies via textStyle vertAlign and toggles off', async () => {
+    setDoc('subsup probe'); selectText('subsup');
+    run('subscript'); await sleep(50);
+    const on = markNames('subsup').some((m) => m.includes('"vertAlign":"subscript"'));
+    run('subscript'); await sleep(50);
+    const off = !markNames('subsup').some((m) => m.includes('"vertAlign":"subscript"'));
+    return on && off;
+  });
+  await t('[1] superscript replaces subscript (mutually exclusive, like Word)', async () => {
+    selectText('subsup'); run('subscript'); run('superscript'); await sleep(50);
+    const m = markNames('subsup').join(' ');
+    return m.includes('"vertAlign":"superscript"') && !m.includes('"vertAlign":"subscript"');
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
     const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;
