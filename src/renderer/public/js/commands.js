@@ -315,6 +315,7 @@
     'Upper Roman (I. A. 1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['upperRoman', 'upperLetter', 'decimal'][i % 3], text: '%' + (i + 1) + '.' })) },
   };
   function multilevelMenu(node) {
+    // [label, legacyKey] — the PM branch keys ML_PATTERNS by label; legacy uses key.
     const lib = [['Decimal (1. 1.1. 1.1.1.)', 'decimal'], ['Legal (1 1.1 1.1.1)', 'decimal'], ['Bullet hierarchy', 'bullet'], ['Outline (1) a) i))', 'outline'], ['Upper Roman (I. A. 1.)', 'outline']];
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('List Library'));
@@ -340,6 +341,8 @@
         const np = attrs && attrs.paragraphProperties ? attrs.paragraphProperties.numberingProperties : null;
         const cur = np && np.ilvl != null ? np.ilvl : 0;
         const delta = (i - 1) - cur;
+        // Non-list paragraph: changeListLevelBy → underlying changeListLevel finds no
+        // list and returns false — silent no-op (Word greys these items instead).
         if (delta !== 0) pm.cmd('changeListLevelBy', delta);
       } }));
     });
@@ -1241,12 +1244,12 @@
     });
   }
 
+  // Library glyph → engine style names (toggleOrderedListStyle / toggleBulletListStyle);
+  // glyphs without a canonical style mint a one-level definition via applyListDefinition.
+  const ORDERED_STYLE = { '1.': 'decimal', '1)': 'decimal-paren', 'A.': 'upper-alpha', 'a)': 'lower-alpha-paren', 'i.': 'lower-roman', 'I.': 'upper-roman' };
+  const BULLET_STYLE = { '●': 'disc', '○': 'circle', '■': 'square' };
   function bulletMenu(node, ordered) {
     const bullets = ordered ? ['1.', '1)', 'A.', 'a)', 'i.', 'I.'] : ['●', '○', '■', '◆', '➤', '✓'];
-    // Engine style names (toggleOrderedListStyle / toggleBulletListStyle); glyphs without
-    // a canonical style mint a one-level definition via applyListDefinition.
-    const ORDERED_STYLE = { '1.': 'decimal', '1)': 'decimal-paren', 'A.': 'upper-alpha', 'a)': 'lower-alpha-paren', 'i.': 'lower-roman', 'I.': 'upper-roman' };
-    const BULLET_STYLE = { '●': 'disc', '○': 'circle', '■': 'square' };
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader(ordered ? 'Numbering Library' : 'Bullet Library'));
       const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px', padding: '6px 10px' } });
