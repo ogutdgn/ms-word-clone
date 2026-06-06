@@ -6,6 +6,9 @@
   const WC = window.WC;
   const el = WC.el;
   const E = () => WC.Editor;
+  // Phase 2: PM bridge accessor — null under --legacy or pre-mount (then the
+  // legacy branch runs; the editor.js pmGuard still backstops mistakes).
+  const PMA = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
 
   const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
   const FONTS = ['Calibri', 'Calibri Light', 'Arial', 'Times New Roman', 'Cambria', 'Georgia', 'Verdana', 'Tahoma',
@@ -27,13 +30,20 @@
   H.formatPainterLock = (c, node) => armPainterFromSelection(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true);
 
   // ---- Font ----
-  H.bold = () => E().exec('bold');
-  H.italic = () => E().exec('italic');
-  H.underline = () => E().exec('underline');
-  H.strikethrough = () => E().exec('strikethrough');
-  H.subscript = () => E().exec('subscript');
-  H.superscript = () => E().exec('superscript');
-  H.clearAllFormatting = () => { E().exec('removeFormat'); E().selectedBlocks().forEach((b) => b.removeAttribute('style')); WC.formatBlock('p'); };
+  H.bold = () => { const pm = PMA(); pm ? pm.cmd('toggleBold') : E().exec('bold'); };
+  H.italic = () => { const pm = PMA(); pm ? pm.cmd('toggleItalic') : E().exec('italic'); };
+  H.underline = () => { const pm = PMA(); pm ? pm.cmd('toggleUnderline') : E().exec('underline'); };
+  H.strikethrough = () => { const pm = PMA(); pm ? pm.cmd('toggleStrike') : E().exec('strikethrough'); };
+  // No dedicated engine command for vertical alignment, but textStyle carries
+  // vertAlign with sub/superscript rendering — drive it via the generic setMark,
+  // toggling off when already set and keeping the pair mutually exclusive (Word).
+  H.subscript = () => vertAlign('subscript');
+  H.superscript = () => vertAlign('superscript');
+  H.clearAllFormatting = () => {
+    const pm = PMA();
+    if (pm) { pm.cmd('clearFormat'); return; }
+    E().exec('removeFormat'); E().selectedBlocks().forEach((b) => b.removeAttribute('style')); WC.formatBlock('p');
+  };
   H.increaseFontSize = () => stepFont(1);
   H.decreaseFontSize = () => stepFont(-1);
   H.font = (c, node) => openFontList(node);
@@ -904,12 +914,12 @@
     },
 
     comboCommit(c, value) {
-      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.label || c.cmd)); return; }
       if (c.cmd === 'font') setFontName(value);
       else if (c.cmd === 'fontSize') setFontSize(parseFloat(value));
     },
     comboDropdown(c, combo, input) {
-      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.label || c.cmd)); return; }
       if (c.cmd === 'font') openFontList(combo);
       else if (c.cmd === 'fontSize') openSizeList(combo);
       else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.Review.setDisplayMode(m); input.value = l; } }))); });
@@ -941,7 +951,7 @@
       }
       const map = {
         clipboard: () => (WC.Dialogs.clipboardPane ? WC.Dialogs.clipboardPane() : WC.notImplemented('Clipboard pane')),
-        font: () => (WC.Dialogs.fontDialog ? WC.Dialogs.fontDialog() : WC.notImplemented('Font dialog')),
+        font: () => (WC.Dialogs.font ? WC.Dialogs.font() : WC.notImplemented('Font dialog')),
         paragraph: () => WC.Dialogs.paragraph(),
         styles: () => WC.Dialogs.stylesPane(),
       };
@@ -1016,20 +1026,25 @@
     document.addEventListener('keydown', painterEsc);
   }
 
+  // Vertical alignment (sub/superscript) — function decl so H.subscript/H.superscript
+  // can reference it before the declaration site (hoisting).
+  function vertAlign(kind) {
+    const pm = PMA();
+    if (!pm) { E().exec(kind); return; }
+    const st = pm.getState();
+    const on = kind === 'subscript' ? st.subscript : st.superscript;
+    pm.cmd('setMark', 'textStyle', { vertAlign: on ? null : kind });
+  }
   function stepFont(dir) {
     const cur = currentSizePt() || 11;
     let next;
-    if (dir > 0) {
-      const bigger = SIZES.find((s) => s > cur);
-      next = bigger != null ? bigger : SIZES[SIZES.length - 1];
-    } else {
-      const smaller = SIZES.filter((s) => s < cur);
-      next = smaller.length ? smaller[smaller.length - 1] : SIZES[0];
-    }
+    if (dir > 0) { const bigger = SIZES.find((s) => s > cur); next = bigger != null ? bigger : SIZES[SIZES.length - 1]; }
+    else { const smaller = SIZES.filter((s) => s < cur); next = smaller.length ? smaller[smaller.length - 1] : SIZES[0]; }
     setFontSize(next);
   }
   function currentSizePt() {
-    // Read the actual selection's font size (the inline run), not the block's.
+    const pm = PMA();
+    if (pm) { const st = pm.getState(); const v = parseFloat(st && st.fontSize); return v || 12; }
     const sel = window.getSelection();
     let n = sel && sel.anchorNode; n = n && n.nodeType === 3 ? n.parentNode : n;
     if (n && n.getBoundingClientRect) { const px = parseFloat(getComputedStyle(n).fontSize); if (px) return Math.round(px / 1.3333 * 10) / 10; }
@@ -1037,25 +1052,46 @@
   }
   function setFontSize(pt) {
     if (!pt) return;
-    E().applyInlineStyle('fontSize', pt + 'pt');
+    const pm = PMA();
+    // withSelection: combo commits arrive with focus in the combo input — the
+    // focusin capture (focus.ts) snapshotted the PM selection; restore it first.
+    if (pm) pm.withSelection(() => pm.cmd('setFontSize', pt + 'pt'));
+    else E().applyInlineStyle('fontSize', pt + 'pt');
     WC.Ribbon.setComboValue('fontSize', String(pt));
   }
   function setFontName(name) {
-    E().exec('fontName', name);
+    const pm = PMA();
+    if (pm) pm.withSelection(() => pm.cmd('setFontFamily', name));
+    else E().exec('fontName', name);
     WC.Ribbon.setComboValue('font', name);
   }
 
   function applyColor(kind, color) {
-    if (kind === 'fore') { lastFontColor = color; E().exec('foreColor', color); WC.Ribbon.setColorBar('fontColor', color); }
-    else if (kind === 'hilite') { lastHighlight = color; E().exec('hiliteColor', color) || E().exec('backColor', color); WC.Ribbon.setColorBar('textHighlightColor', color); }
-    else if (kind === 'shade') { if (color && color !== 'transparent') lastShade = color; E().applyBlockStyle('backgroundColor', color || 'transparent'); WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color); }
-    else if (kind === 'page') { E().node.style.backgroundColor = color; } // not `background` — that wipes a watermark's background-image
+    const pm = PMA();
+    if (kind === 'fore') {
+      lastFontColor = color;
+      pm ? pm.cmd('setColor', color) : E().exec('foreColor', color);
+      WC.Ribbon.setColorBar('fontColor', color);
+    } else if (kind === 'hilite') {
+      lastHighlight = color;
+      if (pm) { color === 'transparent' ? pm.cmd('unsetHighlight') : pm.cmd('setHighlight', color); }
+      else { E().exec('hiliteColor', color) || E().exec('backColor', color); }
+      WC.Ribbon.setColorBar('textHighlightColor', color);
+    } else if (kind === 'shade') {
+      if (pm) { pm.notifyBlocked('Shading'); return; } // paragraph area — slice 2
+      if (color && color !== 'transparent') lastShade = color;
+      E().applyBlockStyle('backgroundColor', color || 'transparent');
+      WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
+    } else if (kind === 'page') {
+      if (pm) { pm.notifyBlocked('Page Color'); return; } // design area — slice 10
+      E().node.style.backgroundColor = color; // not 'background' — that wipes a watermark's background-image
+    }
   }
 
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
+        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
@@ -1066,6 +1102,7 @@
     WC.flyout(node, (fly) => cases.forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => changeCase(mode) }))));
   }
   function changeCase(mode) {
+    const pm = PMA(); if (pm) { pm.changeCase(mode); return; }
     const sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
     const range = sel.getRangeAt(0);
     const xform = (t) => {
@@ -1201,8 +1238,13 @@
 
   function underlineMenu(node) {
     const styles = [['Single', 'solid'], ['Double', 'double'], ['Dotted', 'dotted'], ['Dashed', 'dashed'], ['Wavy', 'wavy']];
+    const UL_TYPE = { solid: 'single', double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' }; // OOXML w:u values
     WC.flyout(node, (fly) => {
-      styles.forEach(([label, s]) => fly.appendChild(WC.flyItem(label, { onClick: () => { E().exec('underline'); E().applyInlineStyle('textDecorationStyle', s); } })));
+      styles.forEach(([label, s]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
+        const pm = PMA();
+        if (pm) { pm.chain([['setUnderline'], ['setMark', 'underline', { underlineType: UL_TYPE[s] }]]); return; }
+        E().exec('underline'); E().applyInlineStyle('textDecorationStyle', s);
+      } })));
     });
   }
 

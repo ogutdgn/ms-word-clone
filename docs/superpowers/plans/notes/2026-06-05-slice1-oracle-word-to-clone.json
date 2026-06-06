@@ -1,0 +1,24 @@
+{
+  "leg": "B — Word → clone (spec §8.3 step 2)",
+  "date": "2026-06-05",
+  "wordVersion": "Word for Mac 16.77.1",
+  "method": "Document authored in REAL Word via osascript object model: make new document; content 'from word bold check'; set bold of font object of (words 3 thru 3 of text object of d) to true; save as ... file format format document into tests/fixtures/.oracle-word-authored.docx (not checked in); closed by post-save name; doc count 0 before and after. Word emitted three runs in document.xml: 'from word ' plain, 'bold ' with <w:b/> (Word folded the trailing space into the bold run), 'check' plain. Clone opened it headlessly: wordAPI.openBytes -> WC.PM.openDocx -> selectText per word -> WC.PM.getState().bold.",
+  "probe": {
+    "ok": true,
+    "docText": "from word bold check",
+    "bold_on_bold": true,
+    "bold_on_from": false,
+    "bold_on_word": false,
+    "bold_on_check": false,
+    "verdict": "PASS"
+  },
+  "judgment": {
+    "bold on word 3 'bold'": { "expected": true, "cloneReported": true, "verdict": "PASS" },
+    "no bold on 'from'": { "expected": false, "cloneReported": false, "verdict": "PASS" },
+    "no bold on 'word '": { "expected": false, "cloneReported": false, "verdict": "PASS" },
+    "no bold on 'check'": { "expected": false, "cloneReported": false, "verdict": "PASS" },
+    "text round-trip": { "expected": "from word bold check", "cloneReported": "from word bold check", "verdict": "PASS" }
+  },
+  "overall": "PASS — a document authored by real Word imports into the PM core with run-level bold intact; getState() reports true only inside the bolded run.",
+  "pidSafety": "make new document path: initialCount=0 recorded before, count returned to 0 after close-by-name; Word never quit."
+}

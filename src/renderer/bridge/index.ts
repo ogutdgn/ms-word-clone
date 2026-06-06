@@ -20,14 +20,16 @@ let replacing = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>([]) // slice 1 makes this ['character', 'history']
+const FLIPPED = new Set<string>(['character', 'history']) // slice 1 (2026-06-05)
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
   subscript: 'character', superscript: 'character', clearAllFormatting: 'character',
   increaseFontSize: 'character', decreaseFontSize: 'character', font: 'character',
   fontSize: 'character', textHighlightColor: 'character', fontColor: 'character',
-  changeCase: 'character', textEffectsAndTypography: 'character',
+  changeCase: 'character',
+  // no engine equivalent — revisit with design (slice 10)
+  textEffectsAndTypography: 'text-effects',
   // clipboard (slice 4)
   cut: 'clipboard', copy: 'clipboard', paste: 'clipboard',
   formatPainter: 'clipboard', formatPainterLock: 'clipboard',

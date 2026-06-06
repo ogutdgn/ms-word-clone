@@ -17,13 +17,18 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
   }
   let entries: Array<{ name: string; attrs: any }> = []
   try { entries = getActiveFormatting(editor) || [] } catch { /* selection the helper can't read */ }
+  // Negation-attr truth (mirrors the fork's renderDOM semantics, e.g. bold.js:41-45):
+  // value == null → mark is ON (in-editor toggles set no value); value === '0' (run-level
+  // OOXML import / cascade-toggle negationAttrs) or BOOLEAN false (style-cascade import —
+  // observed on Word-authored negation runs, see tests/fixtures/negation-run.docx) → OFF.
+  const markOn = (val: any) => val == null || (val !== '0' && !!val)
   for (const e of entries) {
     const a = e.attrs || {}
     switch (e.name) {
-      case 'bold': st.bold = a.value !== '0'; break
-      case 'italic': st.italic = a.value !== '0'; break
-      case 'underline': st.underline = a.underlineType !== 'none' && a.value !== '0'; break
-      case 'strike': st.strikethrough = a.value !== '0'; break
+      case 'bold': st.bold = markOn(a.value); break
+      case 'italic': st.italic = markOn(a.value); break
+      case 'underline': st.underline = a.underlineType !== 'none' && markOn(a.value); break
+      case 'strike': st.strikethrough = markOn(a.value); break
       // fontFamily/fontSize are textStyle-unwrapped entries (text-style.js attrs):
       // attrs shape: { fontFamily: "Aptos, Arial, sans-serif" } / { fontSize: "12pt" }
       case 'fontFamily': st.fontName = String(a.fontFamily || '').split(',')[0].replace(/['"]/g, '').trim(); break
@@ -75,6 +80,12 @@ export function installStateSync(editor: AnyEditor) {
     w.WC?.Ribbon?.setComboValue?.('font', st.fontName || '')
     w.WC?.Ribbon?.setComboValue?.('fontSize', st.fontSize || '')
     w.WC?.StatusBar?.update?.()
+    // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
+    const can = (w.WC?.editor as any)?.can?.()
+    document.querySelectorAll('.qat .qat-btn').forEach((b: any) => {
+      if (/^Undo/.test(b.title)) b.style.opacity = can?.undo?.() ? '' : '0.4'
+      if (/^Redo/.test(b.title)) b.style.opacity = can?.redo?.() ? '' : '0.4'
+    })
   }
   // Coalesce 'transaction' + 'selectionUpdate' (both fire per keystroke) into one
   // rAF tick — mirrors the legacy 80ms debounce intent (editor.js:26-27).

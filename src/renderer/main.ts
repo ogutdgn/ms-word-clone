@@ -3,12 +3,16 @@
 // the classic app. The WC.PM bridge (src/renderer/bridge/) is the only code that
 // talks to the engine.
 import { TextSelection } from '@/pm'
-import { fixtureArrayBuffer } from '@/core/fixture'
+import { fixtureArrayBuffer, negationArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
 import { createPmEditor } from '@/bridge/create-editor'
 
 const w = window as any
 w.__PM_TextSelection = TextSelection
+// Debug global for the PM suite: the Word-authored negation-run fixture (spec §7.5).
+// The suite runs from the BUILT app and has no stable absolute repo path — inlining
+// the fixture (gen-fixture) keeps the test hermetic.
+w.__WC_FIXTURE_NEGATION = negationArrayBuffer
 
 // SYNCHRONOUS (before the async mount): mode flag + page flip + D6 stub.
 preinstallBridge()

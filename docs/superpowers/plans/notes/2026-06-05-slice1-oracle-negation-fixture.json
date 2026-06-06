@@ -1,0 +1,28 @@
+{
+  "leg": "C — negation-run fixture (spec §7.5)",
+  "date": "2026-06-05",
+  "wordVersion": "Word for Mac 16.77.1",
+  "fixture": "tests/fixtures/negation-run.docx (CHECKED IN) + generated module src/renderer/core/generated/negation-run.docx.b64.ts",
+  "authoringAttempts": [
+    {
+      "attempt": 1,
+      "method": "set bold of font object of text object of d to true (whole paragraph), then un-bold words 2 thru 2",
+      "result": "Word RESTRUCTURED the runs instead of emitting a negation: 'BOLDED ' <w:b/>, 'UNBOLD ' no rPr, 'BOLDED' <w:b/>, paragraph-mark rPr <w:b/>. grep for 'w:b w:val=\"0\"' -> 0 hits; 3x 'w:b/>'. NOT a true negation run — discarded.",
+      "honestNote": "Direct character bolding does not produce negation runs in Word 16.77.1 — Word splits runs instead."
+    },
+    {
+      "attempt": 2,
+      "method": "set bold of font object of (get Word style style normal of d) to true (Normal STYLE bold), then un-bold words 2 thru 2",
+      "result": "TRUE negation run: styles.xml Normal has <w:rPr><w:b/></w:rPr>; document.xml UNBOLD run carries <w:b w:val=\"0\"/> (grep: 1 hit), BOLDED runs have no run-level w:b (inherit style bold). This is the checked-in fixture.",
+      "pidSafety": "initial=0 final=0 both attempts; closed by name; Word never quit"
+    }
+  ],
+  "cloneImportFindings": {
+    "marks_on_UNBOLD": "bold:{value:false} (BOOLEAN false — the style-cascade import path) + textStyle (Calibri 12pt from Normal)",
+    "marks_on_BOLDED": "bold:{value:true} (style-inherited bold materialized as a mark)",
+    "bugFoundAndFixed": "toQueryState() in src/renderer/bridge/state-sync.ts only treated the STRING '0' as a negation attr (a.value !== '0'); the boolean false from the style-cascade import read as bold=ON. Fixed with markOn(val) mirroring the fork's renderDOM semantics (null -> ON; '0' or falsy -> OFF) for bold/italic/underline/strike.",
+    "harnessHoleFoundAndFixed": "the PM suite's t() counted string returns (all failure paths) as PASSES — the red negation test was reported green with detail 'UNBOLD reported bold'. t() now fails on string returns."
+  },
+  "suiteTest": "[1] imported negation run reports bold=false (converter attrs) — opens the fixture via window.__WC_FIXTURE_NEGATION() (gen-fixture inlined, hermetic), asserts getState().bold === false at UNBOLD and === true at style-bolded BOLDED. PM suite: 43/43.",
+  "overall": "PASS after fixes — a real-Word negation run round-trips into truthful ribbon state; the oracle leg caught one genuine state-sync bug and one test-harness truthfulness hole."
+}
