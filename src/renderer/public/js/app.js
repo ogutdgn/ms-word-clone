@@ -97,6 +97,10 @@
         if (e.altKey && k === '3') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 3'));
         return null;
       };
+      // PM keymaps own the history keys when focus is in the view — stand down
+      // (the fork handles Mod-Z/Y itself; firing our handler too would double-undo).
+      if (WC.PM && WC.PM.active && window.WC.view && window.WC.view.dom.contains(document.activeElement)
+          && mod && ['z', 'y'].includes(k)) return;
       const action = map();
       if (action) { e.preventDefault(); action(); }
     });

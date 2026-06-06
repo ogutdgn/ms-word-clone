@@ -75,6 +75,12 @@ export function installStateSync(editor: AnyEditor) {
     w.WC?.Ribbon?.setComboValue?.('font', st.fontName || '')
     w.WC?.Ribbon?.setComboValue?.('fontSize', st.fontSize || '')
     w.WC?.StatusBar?.update?.()
+    // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
+    const can = (w.WC?.editor as any)?.can?.()
+    document.querySelectorAll('.qat .qat-btn').forEach((b: any) => {
+      if (/^Undo/.test(b.title)) b.style.opacity = can?.undo?.() ? '' : '0.4'
+      if (/^Redo/.test(b.title)) b.style.opacity = can?.redo?.() ? '' : '0.4'
+    })
   }
   // Coalesce 'transaction' + 'selectionUpdate' (both fire per keystroke) into one
   // rAF tick — mirrors the legacy 80ms debounce intent (editor.js:26-27).

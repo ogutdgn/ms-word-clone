@@ -241,6 +241,26 @@
     return m.includes('"vertAlign":"superscript"') && !m.includes('"vertAlign":"subscript"');
   });
 
+  await t('[1] in-view Mod-Z does not double-fire (engine handles it once)', async () => {
+    setDoc('double fire probe'); selectText('double');
+    run('bold'); await sleep(50);
+    // Capture doc size before: if app.js handler fired it would call pm.cmd('undo')
+    // (an explicit, trusted call), reverting the bold AND potentially the setDoc.
+    // The guard must prevent that; only the PM keymap path (untrusted event, likely
+    // ignored by PM) or nothing should happen.
+    const sizeBefore = v().state.doc.content.size;
+    const textBefore = v().dom.textContent;
+    window.WC.view.focus();
+    // Synthetic (untrusted) keydown on the focused element inside the PM view.
+    // Our app.js guard sees: WC.PM.active && view.dom.contains(activeElement) && mod && k==='z' → return.
+    // So app.js stands down. The PM keymap itself may or may not handle untrusted events.
+    // Either way the doc must NOT change via the app.js path.
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    await sleep(80);
+    // Assert the guard stood down: doc content unchanged (no double- or single-fire from app.js).
+    return v().state.doc.content.size === sizeBefore && /double fire probe/.test(v().dom.textContent);
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
     const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;

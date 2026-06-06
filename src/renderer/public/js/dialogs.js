@@ -429,6 +429,7 @@
           if (colorVal) steps.push(['setColor', colorVal]);
           if (underline.value !== 'none') {
             steps.push(['setUnderline']);
+            // 'single' is deliberately absent: setUnderline's default attr IS underlineType:'single' (probe-verified).
             const UL = { double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' };
             if (UL[underline.value]) steps.push(['setMark', 'underline', { underlineType: UL[underline.value] }]);
           } else steps.push(['unsetUnderline']);
