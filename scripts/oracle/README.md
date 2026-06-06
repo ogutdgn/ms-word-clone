@@ -261,6 +261,8 @@ the Windows COM object model. All verified against Word for Mac 16.77.1:
 | `ListString` `"•"`        | `""` (Symbol PUA, cp 61623)  | Word's default bullet is the Symbol-font private-use char, invisible in terminals; numbered items read `"1."` |
 | `list level number` of non-list para | returns `1`, not `0`    | Gate on `list type` ≠ `"list no numbering"` before trusting the level |
 | `close d` after `save as d ...` | close by the **new** basename | Even a variable-bound doc reference dangles after `save as` renames the document (−1728) — by-name close with the output basename is the only reliable form |
+| `.dotfile.docx` open/save | **copy to a normal name first** | Dot-prefixed filenames can hang `open file name`/`save as` indefinitely and wedge the session's file commands afterwards (observed 2026-06-06) |
+| long headless sessions    | opens degrade → −1712, then stop | Reads on already-open docs keep working while NEW opens stretch past the 2-min AppleEvent default and eventually never complete; wrap in `with timeout of N seconds`; only a USER relaunch of Word recovers it — never quit Word from a script |
 
 ## Per-feature validation protocol
 

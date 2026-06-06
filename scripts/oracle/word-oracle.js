@@ -95,7 +95,17 @@
   21. After `save as`, even a VARIABLE-bound document reference dangles: with
       `set d to make new document`, `save as d ...` then `close d` raises -1728
       because Word renamed the document underneath the binding. Close by the NEW
-      basename instead (extends quirk #11 to authoring scripts). */
+      basename instead (extends quirk #11 to authoring scripts).
+  22. DOT-PREFIXED filenames (".oracle-x.docx") can hang Word's `open file name`
+      and `save as` machinery indefinitely and (observed 2026-06-06) wedge the
+      scripting session's file commands afterwards. Always `cp` a dot-scratch
+      fixture to a normal name before handing it to Word.
+  23. Long-lived headless Word sessions degrade: opens that answered in seconds
+      can stretch to minutes (beyond the AppleEvent 2-minute default → -1712 on
+      every stock run) and eventually stop completing at all, while property
+      reads on ALREADY-open documents keep working. Wrap long operations in
+      `with timeout of N seconds`; if opens stop completing, the only fix is the
+      USER relaunching Word — never quit it from a script. */
 'use strict';
 const { execFileSync } = require('node:child_process');
 const os = require('node:os');
