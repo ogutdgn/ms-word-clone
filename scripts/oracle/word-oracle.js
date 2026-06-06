@@ -282,8 +282,8 @@ end tell`;
     return {
       index: Number(p[0]),
       alignment: (p[1] || '').replace(/^align paragraph /, ''),
-      lineSpacingRule: LINE_SPACING_RULES[p[2]] || p[2],
-      lineSpacingRuleRaw: p[2],
+      lineSpacingRule: LINE_SPACING_RULES[p[2]] || p[2] || '',
+      lineSpacingRuleRaw: p[2] || '',
       lineSpacingPt: num(p[3]), // POINTS, not a multiplier (2.0 spacing on 12pt = 24) — quirk #17
       spaceBeforePt: num(p[4]),
       spaceAfterPt: num(p[5]),
@@ -292,9 +292,9 @@ end tell`;
       firstLineIndentPt: firstLine,
       hangingPt: firstLine != null && firstLine < 0 ? -firstLine : 0, // Word models hanging as negative first-line
       listType: (p[9] || '').replace(/^list /, ''), // "no numbering" | "bullet" | "simple numbering" | ... — quirk #19
-      listTypeRaw: p[9],
+      listTypeRaw: p[9] || '',
       listLevelNumber: num(p[10]), // returns 1 even for non-list paragraphs — gate on listType (quirk #19)
-      listString: p[11], // default bullet is "" (Symbol PUA), numbered items "1." — quirk #20
+      listString: p[11] || '', // default bullet is "" (Symbol PUA), numbered items "1." — quirk #20
       text: p.slice(12).join('\t').replace(/\r$/, ''),
     };
   });
