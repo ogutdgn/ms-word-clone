@@ -9,6 +9,11 @@
 
     init() { this.updateTitle(); },
 
+    // Phase 2 (spec §5.1 io.ts): single mode-aware dirty accessor. Writers:
+    // legacy sets E().dirty; PM mode tracks engine 'update' events in the bridge.
+    isDirty() { return (WC.PM && WC.PM.active) ? WC.PM.isDirty() : E().dirty; },
+    setClean() { if (WC.PM && WC.PM.active) WC.PM.setClean(); else { E().dirty = false; } },
+
     sanitize(html) {
       if (window.DOMPurify) {
         return window.DOMPurify.sanitize(html, {
@@ -21,7 +26,7 @@
     },
 
     async confirmDiscard() {
-      if (!E().dirty) return true;
+      if (!this.isDirty()) return true;
       return new Promise((resolve) => {
         const dlg = WC.dialog({
           title: 'Microsoft Word', width: '420px',
@@ -72,6 +77,10 @@
     },
 
     async save() {
+      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
+      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
+      // file with the blank legacy doc otherwise).
+      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
       if (!this.path) return this.saveAs();
       const p = E().getSavePayload();
       const r = await window.wordAPI.save({ filePath: this.path, html: p.html, header: p.header, footer: p.footer, comments: p.comments, format: this.format });
@@ -81,6 +90,10 @@
     },
 
     async saveAs() {
+      // Slice 0a interim: PM export lands in slice 0b — never serialize the hidden
+      // legacy doc to disk in PM mode (D6: Ctrl+O→Ctrl+S would overwrite the user's
+      // file with the blank legacy doc otherwise).
+      if (WC.PM && WC.PM.active) { WC.PM.notifyBlocked('Save'); return { ok: false }; }
       const p = E().getSavePayload();
       const r = await window.wordAPI.saveAs({ html: p.html, header: p.header, footer: p.footer, comments: p.comments, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
       if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = r.format; E().dirty = false; this.updateTitle(); WC.toast('Saved ' + r.name); }
@@ -100,7 +113,7 @@
     },
 
     updateTitle() {
-      const dirty = E().dirty ? '• ' : '';
+      const dirty = this.isDirty() ? '• ' : '';
       const t = `${dirty}${this.name.replace(/\.[^.]+$/, '')} - Word`;
       const node = document.querySelector('.title-center');
       if (node) node.textContent = t;

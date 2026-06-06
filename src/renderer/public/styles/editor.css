@@ -397,3 +397,27 @@
 
 /* Split view: a divider line across the canvas */
 #app.split-view #canvas { border-top: 3px double var(--word-blue); }
+
+/* ===== Phase 2 two-worlds flip (spec §5.2) — gated under body.pm-active so
+   --legacy renders byte-identically to the classic app. ===== */
+/* Legacy editor: absolute (out of the #pages flex flow — no blank gap) +
+   visibility:hidden (layout boxes preserved for the legacy bootstrap; no paint,
+   no hit-testing). NEVER an off-screen left offset: #pages carries the zoom
+   scale() transform, which scales offsets back into view at low zoom. */
+body.pm-active #editor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+}
+/* The PM page: white sheet + shadow (geometry/margins come from the vendored
+   renderer's print-layout inline styles, derived from the .docx). */
+body.pm-active #pm-editor {
+  background: var(--page);
+  box-shadow: 0 1px 4px var(--page-shadow);
+}
+body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
+
+/* PM-mode visibility twins for show-marks / show-grid */
+body.pm-active #pm-editor.show-marks p::after { content: '¶'; color: #2b8aef; margin-left: 2px; }
+body.pm-active #pm-editor.show-grid { background-image: linear-gradient(#e9eef5 1px, transparent 1px), linear-gradient(90deg, #e9eef5 1px, transparent 1px); background-size: 24px 24px; }

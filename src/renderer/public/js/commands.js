@@ -55,7 +55,11 @@
     E().selectedBlocks().forEach((b) => { const cur = parseFloat(b.style.marginLeft) || 0; const next = Math.max(0, cur + px); b.style.marginLeft = next ? next + 'px' : ''; });
     E().dirty = true; E().repaginate(); E().updateStatus(); E().emit();
   }
-  H.showHide = (c, node) => { const on = E().node.classList.toggle('show-marks'); if (node) node.classList.toggle('toggled', on); };
+  H.showHide = (c, node) => {
+    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
+    const on = target.classList.toggle('show-marks');
+    if (node) node.classList.toggle('toggled', on);
+  };
   H.sort = () => sortDialog();
   // Shading split button: main face applies the LAST-USED shading color (none on a
   // fresh doc, like Word). The arrow opens the color palette (dropdown -> colorMenu).
@@ -161,7 +165,11 @@
   H.pageWidth = () => E().setZoom(fitWidthZoom());
   H.zoom100 = () => E().setZoom(1);
   H.ruler = (c, node) => { document.getElementById('ruler').classList.toggle('hidden-ruler'); markChecked(node); };
-  H.gridlines = (c, node) => { E().node.classList.toggle('show-grid'); markChecked(node); };
+  H.gridlines = (c, node) => {
+    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
+    target.classList.toggle('show-grid');
+    markChecked(node);
+  };
   H.navigationPane = (c, node) => WC.Dialogs.navPane();
   H.focus = () => document.getElementById('app').classList.toggle('focus-mode');
 
@@ -679,7 +687,10 @@
   function immersiveReader() {
     let ov = document.getElementById('immersive'); if (ov) { ov.remove(); return; }
     let size = 20;
-    const content = el('div', { class: 'ir-content' }); content.innerHTML = E().getHTML(); content.style.fontSize = size + 'px';
+    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
+    const content = el('div', { class: 'ir-content' }); content.innerHTML = docHtml;
+    content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
+    content.style.fontSize = size + 'px';
     const setSize = (d) => { size = Math.max(12, Math.min(40, size + d)); content.style.fontSize = size + 'px'; };
     const bg = (c) => { ov.style.background = c; content.style.background = c; };
     const bar = el('div', { class: 'ir-bar' }, [
@@ -703,8 +714,10 @@
       b.addEventListener('click', (ev) => { ev.stopPropagation(); WC.flyout(b, (fly) => items.forEach((it) => fly.appendChild(WC.flyItem(it.label, { onClick: it.onClick })))); });
       return b;
     };
+    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
     const content = el('div', { class: 'rm-content' });
-    content.innerHTML = E().getHTML();
+    content.innerHTML = docHtml;
+    content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
     const colsWrap = el('div', { class: 'rm-cols' }, [content]);
     const prev = el('button', { class: 'rm-arrow rm-prev', title: 'Previous screen', text: '‹' });
     const next = el('button', { class: 'rm-arrow rm-next', title: 'Next screen', text: '›' });
@@ -727,9 +740,11 @@
   }
   WC.closeReadMode = closeReadMode;
   function propertiesDialog() {
-    const c = E().counts(); const f = WC.Files; const text = E().node.innerText;
-    const paras = E().node.querySelectorAll('p,h1,h2,h3,h4,li,blockquote').length;
-    const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', paras], ['Pages', E().pageCount()], ['Lines', (text.match(/\n/g) || []).length + 1]];
+    const pmMode = WC.PM && WC.PM.active;
+    const c = pmMode ? WC.PM.counts()
+                     : Object.assign(E().counts(), { pages: E().pageCount(), paras: E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length, lines: (E().node.innerText.match(/\n/g) || []).length + 1, charsNoSpace: E().node.innerText.replace(/\s/g, '').length });
+    const f = WC.Files;
+    const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', c.paras], ['Pages', c.pages], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
     rows.forEach(([k, v]) => body.appendChild(el('div', { class: 'row', style: { padding: '5px 0', borderBottom: '1px solid #f0f0f0' } }, [el('span', { style: { width: '160px', color: '#666' }, text: k }), el('b', { text: String(v) })])));
     WC.dialog({ title: 'Properties', width: '380px', body, footer: [{ label: 'Close', primary: true }] });
@@ -788,6 +803,7 @@
     run(control, node) {
       WC.closeFlyouts(); WC.hideTip();
       const cmd = control.cmd;
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(control.cmd)) { WC.PM.notifyBlocked(control.label || control.cmd); return; }
       if (H[cmd]) { H[cmd](control, node); return; }
       // split/dropdown without explicit handler -> open items if present
       if ((control.type === 'split' || control.type === 'dropdown') && control.items) { this.dropdown(control, node); return; }
@@ -796,6 +812,7 @@
 
     dropdown(control, node) {
       WC.closeFlyouts();
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(control.cmd)) { WC.PM.notifyBlocked(control.label || control.cmd); return; }
       const cmd = control.cmd;
       // custom dropdowns
       if (cmd === 'changeCase') return changeCaseMenu(node);
@@ -887,19 +904,25 @@
     },
 
     comboCommit(c, value) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
       if (c.cmd === 'font') setFontName(value);
       else if (c.cmd === 'fontSize') setFontSize(parseFloat(value));
     },
     comboDropdown(c, combo, input) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.cmd)); return; }
       if (c.cmd === 'font') openFontList(combo);
       else if (c.cmd === 'fontSize') openSizeList(combo);
       else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.Review.setDisplayMode(m); input.value = l; } }))); });
     },
 
-    applyStyle(name) { WC.applyNamedStyle(name); },
+    applyStyle(name) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
+      WC.applyNamedStyle(name);
+    },
 
     // Layout Paragraph spinners (indent in inches, spacing in points).
     spinner(cmd, value) {
+      if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
       if (cmd === 'indentLeft') E().applyBlockStyle('marginLeft', value ? value + 'in' : '');
       else if (cmd === 'indentRight') E().applyBlockStyle('marginRight', value ? value + 'in' : '');
       else if (cmd === 'spacingBefore') E().applyBlockStyle('marginTop', value + 'pt');
@@ -911,6 +934,11 @@
     // like the Font launcher sharing 'font' with the font-name combo).
     launcher(groupId, control, node) {
       WC.closeFlyouts(); WC.hideTip();
+      if (WC.PM && WC.PM.active) {
+        const LAUNCHER_AREA_CMD = { font: 'font', paragraph: 'alignLeft', styles: 'stylesGallery' }; // clipboard pane = app-level, allowed
+        const probe = LAUNCHER_AREA_CMD[groupId];
+        if (probe && WC.PM.isBlocked(probe)) { WC.PM.notifyBlocked(groupId + ' settings'); return; }
+      }
       const map = {
         clipboard: () => (WC.Dialogs.clipboardPane ? WC.Dialogs.clipboardPane() : WC.notImplemented('Clipboard pane')),
         font: () => (WC.Dialogs.fontDialog ? WC.Dialogs.fontDialog() : WC.notImplemented('Font dialog')),

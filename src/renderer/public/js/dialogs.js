@@ -98,6 +98,9 @@
   // ---- Find & Replace pane ----
   let findState = { hits: [], idx: -1 };
   D.findPane = function (replace) {
+    // PM mode: legacy find/replace rewrites #editor text nodes (raw DOM —
+    // bypasses the editor.js chokepoints). Blocked until slice 5 (fork Search ext).
+    if (window.WC.PM && window.WC.PM.active) { window.WC.PM.notifyBlocked('Find & Replace'); return; }
     clearHits();
     let pane = document.getElementById('find-pane');
     if (pane) pane.remove();
@@ -224,12 +227,20 @@
 
   // ---- Word Count ----
   D.wordCount = function () {
-    const c = E().counts();
-    const text = E().node.innerText;
-    const paras = E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length;
-    const lines = (text.match(/\n/g) || []).length + 1;
-    const charsNoSpace = text.replace(/\s/g, '').length;
-    const rows = [['Pages', E().pageCount()], ['Words', c.words], ['Characters (no spaces)', charsNoSpace], ['Characters (with spaces)', c.chars], ['Paragraphs', paras], ['Lines', lines]];
+    const pmMode = WC.PM && WC.PM.active;
+    const c = pmMode
+      ? WC.PM.counts()
+      : (() => {
+          const ec = E().counts();
+          const text = E().node.innerText;
+          return Object.assign(ec, {
+            pages: E().pageCount(),
+            paras: E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length,
+            lines: (text.match(/\n/g) || []).length + 1,
+            charsNoSpace: text.replace(/\s/g, '').length,
+          });
+        })();
+    const rows = [['Pages', c.pages], ['Words', c.words], ['Characters (no spaces)', c.charsNoSpace], ['Characters (with spaces)', c.chars], ['Paragraphs', c.paras], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
     rows.forEach(([k, v]) => body.appendChild(el('div', { class: 'row', style: { borderBottom: '1px solid #f0f0f0', padding: '5px 0' } }, [el('span', { style: { width: '220px', color: '#444' }, text: k }), el('b', { text: String(v) })])));
     WC.dialog({ title: 'Word Count', width: '340px', body, footer: [{ label: 'Close', primary: true }] });

@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-05 — Phase 2 slice 0a BUILT (PM core is the visible editor)
+
+- **Branch:** `feature/phase-2-editing-core` (pushed to `origin`; PR pending).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 0a DONE, slice 0b next.**
+- **State summary:** PM core (`#pm-editor`) is now the **default visible editor** behind the
+  `WC.PM` bridge. The legacy app is still intact but boots only under `--legacy`. D6 two-layer
+  guards are live (dispatch courtesy block + legacy mutation chokepoint). Ribbon state-sync is
+  driven by engine events (caret-tracking font/size combos — fidelity win). Dirty state, statusbar,
+  and visible-page commands all re-pointed to be mode-aware. PM-mode Save/Open are intentionally
+  blocked until slice 0b. All gates green: legacy 257/257, PM 21/21, smoke 9/9 × 2 modes, docx 17/17.
+- **Done this session** (slice 0a tasks with commit SHAs):
+  - `870e01a` — `--legacy` boot flag (forwarded to renderer as `?legacy=1`)
+  - `210f13f` — PM functional suite skeleton + `test:*` npm aliases
+  - `a30f11c` — flip `#pm-editor` to the visible page + `WC.PM` bridge core
+  - `7c25a79` — harden `failBridge` against pre-init focus; un-swallow first blocked toast
+  - `cf68b84` — D6 integrity guard blocks legacy mutations in PM mode
+  - `1ccc507` — block PM-mode Save until the bytes path; correct D6 audit doc
+  - `9c6cad7` — D6 courtesy block: unflipped commands toast at dispatch, shortcuts D6-aware
+  - `e033fe1` — PM state-sync: engine events drive toggles, combos, statusbar
+  - `ab76c5f` — guard list toggle against undefined numberingType; tighten size parse
+  - `23f1251` — focus discipline: chrome clicks never blur the PM view
+  - `49e5e86` — keep scrollbar dragging alive inside focus-guarded containers
+  - `e4ea0bf` — dirty-state readers are mode-aware (PM edits trigger save prompts)
+  - `571b1e3` — visible-page commands (showHide, readMode, wordCount, properties) follow active engine
+  - `e41fb67` — align paragraph-count selectors; strip `contenteditable` from overlay clones
+- **Next:** slice 0b — file-IO bytes layer per
+  `docs/superpowers/plans/2026-06-05-phase2-slices-0a-1.md` Stage B; then 0c oracle harness;
+  then slice 1 character formatting.
+- **Blockers/notes:** none. PM-mode Save/Open intentionally blocked until slice 0b. FYI the
+  GitHub repo remote URL may still be `ogutdgn/ms-word-clone` (GitHub redirects; update when convenient).
+
+---
+
 ## 2026-06-05 — Phase 1 COMPLETE; Phase 2 next
 - **Branch:** `build/phase-1-scaffold` (pushed to `origin`; 18 commits ahead of `main`). Integration
   (merge/PR) is the user's pending choice; **Phase 2 starts on a fresh branch off the integration line.**

@@ -6,6 +6,13 @@
   const el = WC.el;
   const E = () => WC.Editor;
 
+  // D6 (spec §6.C): doc-touching shortcuts of UNFLIPPED areas block+toast in PM
+  // mode, exactly like their ribbon commands. App-level shortcuts pass through.
+  const pmBlockedOr = (area, fn) => () => {
+    if (WC.PM && WC.PM.active && !WC.PM.isFlipped(area)) { WC.PM.notifyBlocked('Keyboard shortcut'); return; }
+    fn();
+  };
+
   function buildTitleBar() {
     const tb = document.getElementById('titlebar');
 
@@ -17,8 +24,8 @@
     qat.appendChild(autosave);
     qat.appendChild(el('span', { class: 'qat-sep' }));
     qat.appendChild(qbtn('save', 'Save (Ctrl+S)', () => WC.Files.save()));
-    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', () => E().exec('undo')));
-    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', () => E().exec('redo')));
+    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', pmBlockedOr('history', () => E().exec('undo'))));
+    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', pmBlockedOr('history', () => E().exec('redo'))));
     qat.appendChild(qbtn('chevron_down', 'Customize Quick Access Toolbar', () => WC.toast('Customize Quick Access Toolbar is a UI placeholder.')));
     tb.appendChild(qat);
 
@@ -60,11 +67,11 @@
       if (!mod) return;
       const shift = e.shiftKey;
       const map = () => {
-        if (k === 'z' && !shift) return () => E().undo();
-        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => E().redo();
+        if (k === 'z' && !shift) return pmBlockedOr('history', () => E().undo());
+        if ((k === 'z' && shift) || (k === 'y' && !shift)) return pmBlockedOr('history', () => E().redo());
         if (k === 's' && !shift) return () => WC.Files.save();
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
-        if (k === 'enter' && !shift) return () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' });
+        if (k === 'enter' && !shift) return pmBlockedOr('insert-basics', () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }));
         if (k === 'o') return () => WC.Files.open();
         if (k === 'n') return () => WC.Files.newDoc();
         if (k === 'p') return () => WC.Files.print();
@@ -74,20 +81,20 @@
         if (k === '=' && !shift) return () => E().zoomIn();
         if (k === '-') return () => E().zoomOut();
         if (k === '0') return () => E().zoomReset();
-        if (k === 'l' && !shift) return () => E().exec('justifyLeft');
-        if (k === 'e' && !shift) return () => E().exec('justifyCenter');
-        if (k === 'r' && !shift) return () => E().exec('justifyRight');
-        if (k === 'j' && !shift) return () => E().exec('justifyFull');
-        if (k === 'l' && shift) return () => E().exec('insertUnorderedList');
-        if (k === 'd' && !shift) return () => WC.Dialogs.font();
-        if (shift && (k === '.' || k === '>')) return () => WC.Commands && incFont(1);
-        if (shift && (k === ',' || k === '<')) return () => incFont(-1);
-        if (k === ']') return () => incFont(1);
-        if (k === '[') return () => incFont(-1);
-        if (shift && k === 'n') return () => WC.applyNamedStyle('Normal');
-        if (e.altKey && k === '1') return () => WC.applyNamedStyle('Heading 1');
-        if (e.altKey && k === '2') return () => WC.applyNamedStyle('Heading 2');
-        if (e.altKey && k === '3') return () => WC.applyNamedStyle('Heading 3');
+        if (k === 'l' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyLeft'));
+        if (k === 'e' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyCenter'));
+        if (k === 'r' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyRight'));
+        if (k === 'j' && !shift) return pmBlockedOr('paragraph', () => E().exec('justifyFull'));
+        if (k === 'l' && shift) return pmBlockedOr('lists', () => E().exec('insertUnorderedList'));
+        if (k === 'd' && !shift) return pmBlockedOr('character', () => WC.Dialogs.font());
+        if (shift && (k === '.' || k === '>')) return pmBlockedOr('character', () => WC.Commands && incFont(1));
+        if (shift && (k === ',' || k === '<')) return pmBlockedOr('character', () => incFont(-1));
+        if (k === ']') return pmBlockedOr('character', () => incFont(1));
+        if (k === '[') return pmBlockedOr('character', () => incFont(-1));
+        if (shift && k === 'n') return pmBlockedOr('styles', () => WC.applyNamedStyle('Normal'));
+        if (e.altKey && k === '1') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 1'));
+        if (e.altKey && k === '2') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 2'));
+        if (e.altKey && k === '3') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 3'));
         return null;
       };
       const action = map();
@@ -149,7 +156,7 @@
     if (WC.Review && WC.Review.init) WC.Review.init();
     bindKeys();
     bindMisc();
-    WC.Editor.focus();
+    if (!(WC.PM && WC.PM.active)) WC.Editor.focus(); // PM mode: bridge focuses the PM view post-mount
     // initial state sync
     WC.Editor.emit();
     console.log('WORD_CLONE_READY tabs=' + WC.RIBBON.length);

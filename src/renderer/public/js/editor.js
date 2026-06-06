@@ -5,6 +5,17 @@
   const WC = window.WC;
   const el = WC.el;
 
+  // Phase 2 (spec D6/§7.1b): when the PM core is ACTIVE the legacy editor is
+  // hidden — any legacy mutation reaching it is an unflipped feature path.
+  // No-op + throttled toast instead of silently editing a document Save will
+  // never export. Under --legacy (WC.PM.active=false) this passes through.
+  function pmGuard(what) {
+    const PM = window.WC && window.WC.PM;
+    if (!PM || !PM.active) return false;
+    if (PM.notifyBlocked) PM.notifyBlocked(what);
+    return true;
+  }
+
   const Editor = {
     node: null,
     pagesHost: null,
@@ -84,6 +95,7 @@
 
     // Run an execCommand against the document, keeping editor focus/selection.
     exec(cmd, value) {
+      if (pmGuard('exec ' + cmd)) return false;
       if (cmd === 'undo') return this.undo();
       if (cmd === 'redo') return this.redo();
       this.node.focus();
@@ -103,6 +115,7 @@
     // Insert HTML at the caret via direct DOM, preserving classes/data-* attrs
     // (execCommand('insertHTML') with styleWithCSS strips them on some elements).
     insertNodeHTML(html) {
+      if (pmGuard('insertNodeHTML')) return;
       this.node.focus(); this.restoreRange();
       const sel = window.getSelection(); if (!sel.rangeCount) { this.node.insertAdjacentHTML('beforeend', html); return; }
       const range = sel.getRangeAt(0); range.deleteContents();
@@ -115,6 +128,7 @@
 
     // Wrap current selection / apply a style via CSS on the selection.
     applyInlineStyle(prop, value) {
+      if (pmGuard('applyInlineStyle ' + prop)) return;
       this.node.focus();
       this.restoreRange();
       const sel = window.getSelection();
@@ -139,6 +153,7 @@
     // Apply multiple CSS props atomically to the selection (for effects that
     // need >1 property, e.g. outline = stroke + fill).
     applyInlineStyles(styles) {
+      if (pmGuard('applyInlineStyles')) return;
       this.node.focus(); this.restoreRange();
       const sel = window.getSelection();
       if (!sel.rangeCount) return;
@@ -177,6 +192,7 @@
       return li ? [li] : [];
     },
     demoteListItem() {
+      if (pmGuard('demoteListItem')) return;
       const items = this.selectedListItems(); if (!items.length) return;
       items.forEach((li) => {
         if (this.listLevel(li) >= 9) return;
@@ -191,6 +207,7 @@
       this.dirty = true; this.repaginate(); this.updateStatus(); this.emit();
     },
     promoteListItem() {
+      if (pmGuard('promoteListItem')) return;
       const items = this.selectedListItems(); if (!items.length) return;
       let last = null;
       items.slice().reverse().forEach((li) => {
@@ -223,6 +240,7 @@
       const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); this.saveRange();
     },
     setListLevel(n) {
+      if (pmGuard('setListLevel')) return;
       const li = this.currentListItem(); if (!li) return; // same node persists across moves
       let guard = 0;
       while (guard++ < 20) {
@@ -234,6 +252,7 @@
       if (this.node.contains(li)) this.caretInto(li);
     },
     applyMultilevelPattern(key) {
+      if (pmGuard('applyMultilevelPattern')) return;
       let items = this.selectedListItems();
       if (!items.length) { this.exec('insertOrderedList'); items = this.selectedListItems(); }
       const cls = 'ml-' + key;
@@ -248,6 +267,7 @@
 
     // Apply a CSS property to the block(s) intersecting the selection.
     applyBlockStyle(prop, value) {
+      if (pmGuard('applyBlockStyle ' + prop)) return;
       this.node.focus(); this.restoreRange();
       const blocks = this.selectedBlocks();
       blocks.forEach((b) => { b.style[prop] = value; });
@@ -594,6 +614,7 @@
       return { html: clone.innerHTML.replace(/​/g, ''), header, footer, comments };
     },
     setHTML(html) {
+      if (pmGuard('setHTML')) return;
       this.node.innerHTML = html && html.trim() ? html : '<p><br></p>';
       this.dirty = false;
       // Images report height 0 until decoded — re-paginate once each settles so
@@ -623,6 +644,7 @@
       this._histPtr = this._history.length - 1;
     },
     undo() {
+      if (pmGuard('undo')) return false;
       if (!this._history || this._histPtr <= 0) return false;
       if (this._historyDebounced && this._historyDebounced.flush) this._historyDebounced.flush();
       this.recordHistory();                                    // capture the latest in-flight edit
@@ -632,6 +654,7 @@
       return true;
     },
     redo() {
+      if (pmGuard('redo')) return false;
       if (!this._history || this._histPtr >= this._history.length - 1) return false;
       this._histPtr++;
       this._restoreHistory(this._history[this._histPtr]);
