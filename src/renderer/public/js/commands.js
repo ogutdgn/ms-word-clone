@@ -302,18 +302,47 @@
     });
   }
 
+  // Word-native multilevel patterns: per-level OOXML numFmt + lvlText, applied as a real
+  // numbering definition (applyListDefinition). The legacy CSS-class fake (ml-decimal/
+  // ml-bullet/ml-outline) survives only on the --legacy branch.
+  const mlLevels = (mk) => Array.from({ length: 9 }, (_, i) => mk(i));
+  const compound = (i, suffix) => Array.from({ length: i + 1 }, (_, k) => '%' + (k + 1)).join('.') + suffix;
+  const ML_PATTERNS = {
+    'Decimal (1. 1.1. 1.1.1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: 'decimal', text: compound(i, '.') })) },
+    'Legal (1 1.1 1.1.1)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: 'decimal', text: compound(i, '') })) },
+    'Bullet hierarchy': { listType: 'bulletList', levels: mlLevels((i) => ({ fmt: 'bullet', text: ['•', '◦', '▪'][i % 3] })) },
+    'Outline (1) a) i))': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['decimal', 'lowerLetter', 'lowerRoman'][i % 3], text: '%' + (i + 1) + ')' })) },
+    'Upper Roman (I. A. 1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['upperRoman', 'upperLetter', 'decimal'][i % 3], text: '%' + (i + 1) + '.' })) },
+  };
   function multilevelMenu(node) {
     const lib = [['Decimal (1. 1.1. 1.1.1.)', 'decimal'], ['Legal (1 1.1 1.1.1)', 'decimal'], ['Bullet hierarchy', 'bullet'], ['Outline (1) a) i))', 'outline'], ['Upper Roman (I. A. 1.)', 'outline']];
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('List Library'));
-      lib.forEach(([label, key]) => fly.appendChild(WC.flyItem(label, { onClick: () => E().applyMultilevelPattern(key) })));
+      lib.forEach(([label, key]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
+        const pm = PMA();
+        if (pm) pm.cmd('applyListDefinition', ML_PATTERNS[label]);
+        else E().applyMultilevelPattern(key);
+      } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Change List Level', { onClick: () => changeListLevelMenu(node) }));
       fly.appendChild(WC.flyItem('Define New Multilevel List…', { onClick: () => WC.notImplemented('Define New Multilevel List dialog') }));
     });
   }
   function changeListLevelMenu(node) {
-    WC.flyout(node, (fly) => { for (let i = 1; i <= 5; i++) fly.appendChild(WC.flyItem('Level ' + i, { onClick: () => E().setListLevel(i) })); });
+    WC.flyout(node, (fly) => {
+      for (let i = 1; i <= 5; i++) fly.appendChild(WC.flyItem('Level ' + i, { onClick: () => {
+        const pm = PMA();
+        if (!pm) { E().setListLevel(i); return; }
+        // ONE full-delta call = one transaction = one undo step (changeListLevelBy).
+        // NEVER chain repeated increase/decreaseListIndent — changeListLevel reads
+        // editor.state, so chained ±1 steps land one short.
+        const attrs = pm.getEditor().getAttributes('paragraph');
+        const np = attrs && attrs.paragraphProperties ? attrs.paragraphProperties.numberingProperties : null;
+        const cur = np && np.ilvl != null ? np.ilvl : 0;
+        const delta = (i - 1) - cur;
+        if (delta !== 0) pm.cmd('changeListLevelBy', delta);
+      } }));
+    });
   }
 
   function sensitivityMenu(node) {
@@ -1214,12 +1243,23 @@
 
   function bulletMenu(node, ordered) {
     const bullets = ordered ? ['1.', '1)', 'A.', 'a)', 'i.', 'I.'] : ['●', '○', '■', '◆', '➤', '✓'];
+    // Engine style names (toggleOrderedListStyle / toggleBulletListStyle); glyphs without
+    // a canonical style mint a one-level definition via applyListDefinition.
+    const ORDERED_STYLE = { '1.': 'decimal', '1)': 'decimal-paren', 'A.': 'upper-alpha', 'a)': 'lower-alpha-paren', 'i.': 'lower-roman', 'I.': 'upper-roman' };
+    const BULLET_STYLE = { '●': 'disc', '○': 'circle', '■': 'square' };
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader(ordered ? 'Numbering Library' : 'Bullet Library'));
       const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px', padding: '6px 10px' } });
       bullets.forEach((b) => {
         const cell = el('div', { text: b, style: { border: '1px solid #ddd', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } });
-        cell.addEventListener('click', () => { WC.closeFlyouts(); E().exec(ordered ? 'insertOrderedList' : 'insertUnorderedList'); });
+        cell.addEventListener('click', () => {
+          WC.closeFlyouts();
+          const pm = PMA();
+          if (!pm) { E().exec(ordered ? 'insertOrderedList' : 'insertUnorderedList'); return; }
+          if (ordered) pm.cmd('toggleOrderedListStyle', ORDERED_STYLE[b]);
+          else if (BULLET_STYLE[b]) pm.cmd('toggleBulletListStyle', BULLET_STYLE[b]);
+          else pm.cmd('applyListDefinition', { listType: 'bulletList', levels: [{ fmt: 'bullet', text: b }] });
+        });
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
