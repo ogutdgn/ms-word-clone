@@ -3,8 +3,20 @@
 // that WC.Ribbon.syncToggles/TOGGLE_MAP consume (ribbon.js:46-51, 327-333).
 // Negation-attr-safe: Word marks explicit-off as e.g. bold {value:'0'}.
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
+import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
 
 type AnyEditor = any
+
+function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
+  try {
+    const $from = editor.state.selection.$from
+    for (let d = $from.depth; d >= 0; d--) {
+      const node = $from.node(d)
+      if (node?.type?.name === 'paragraph') return { node, pos: d > 0 ? $from.before(d) : 0 }
+    }
+  } catch { /* selection states the resolver can't read */ }
+  return null
+}
 
 export function toQueryState(editor: AnyEditor): Record<string, any> {
   const st: Record<string, any> = {
@@ -47,16 +59,36 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
   // (spec §7.5: paragraphProperties.justification, NOT a flat textAlign).
   const para = (editor.getAttributes('paragraph') || {}) as any
   const just = para?.paragraphProperties?.justification ?? para?.textAlign ?? null
-  if (just === 'left') st.justifyLeft = true
-  else if (just === 'center') st.justifyCenter = true
+  if (just === 'center') st.justifyCenter = true
   else if (just === 'right') st.justifyRight = true
   else if (just === 'both' || just === 'justify') st.justifyFull = true
+  else st.justifyLeft = true // explicit 'left' AND the unset default — real Word presses Align Left on a fresh paragraph (oracle-confirm in Task 13)
   // List membership: use listRendering.numberingType (probe-confirmed: "bullet" or "decimal").
   // numberingProperties.numId presence also indicates a list paragraph.
   const listRendering = para?.listRendering
   if (listRendering) {
     if (listRendering.numberingType === 'bullet') st.insertUnorderedList = true
     else if (listRendering.numberingType) st.insertOrderedList = true // decimal, lowerLetter, upperRoman…; undefined = custom marker, no toggle
+  }
+  // Resolved (style-cascade-included) paragraph values for the Layout spinners and the
+  // Paragraph dialog seeds. Inline attrs alone miss style-derived indents/spacing
+  // (getActiveFormatting is inline-only — recorded engine constraint).
+  const head = headParagraph(editor)
+  if (head) {
+    let resolved: any = null
+    try { resolved = calculateResolvedParagraphProperties(editor, head.node, editor.state.doc.resolve(head.pos)) } catch { resolved = head.node.attrs?.paragraphProperties || null }
+    const ind = resolved?.indent || {}
+    const sp = resolved?.spacing || {}
+    // undefined (NOT 0) when unresolved — so downstream `?? 0`/`?? 8` defaults engage
+    // instead of pushing a wrong hard 0 (legacy UI + Word show 8pt spacing-after default).
+    st.indentLeftIn = ind.left != null ? Math.round((ind.left / 1440) * 100) / 100 : undefined
+    st.indentRightIn = ind.right != null ? Math.round((ind.right / 1440) * 100) / 100 : undefined
+    st.spacingBeforePt = sp.before != null ? Math.round(sp.before / 20) : undefined
+    st.spacingAfterPt = sp.after != null ? Math.round(sp.after / 20) : undefined
+    // Multiplier only when the rule is 'auto' (or unset); exact/atLeast rules are
+    // pt-based and have no multiplier representation — report null (dialog shows default).
+    st.lineSpacing = sp.line != null && (sp.lineRule === 'auto' || sp.lineRule == null)
+      ? Math.round((sp.line / 240) * 100) / 100 : null
   }
   st.computedFontFamily = st.fontName
   const sizeNum = parseFloat(st.fontSize)
@@ -79,6 +111,18 @@ export function installStateSync(editor: AnyEditor) {
     // matching real Word; syncing them to the caret would be wrong.
     w.WC?.Ribbon?.setComboValue?.('font', st.fontName || '')
     w.WC?.Ribbon?.setComboValue?.('fontSize', st.fontSize || '')
+    // Caret-tracking Layout spinners (real Word does this; legacy never did).
+    // controlIndex entries exist from boot (Ribbon.renderBody renders every tab's
+    // panel at init — ribbon.js:97-104); skip the push while the user is typing in
+    // the input so sync() can't clobber a mid-edit value.
+    const pushSpin = (cmd: string, val: string) => {
+      const ent = w.WC?.Ribbon?.controlIndex?.[cmd]
+      if (ent?.input && document.activeElement !== ent.input) ent.input.value = val
+    }
+    pushSpin('indentLeft', String(st.indentLeftIn ?? 0))
+    pushSpin('indentRight', String(st.indentRightIn ?? 0))
+    pushSpin('spacingBefore', String(st.spacingBeforePt ?? 0))
+    pushSpin('spacingAfter', String(st.spacingAfterPt ?? 8))
     w.WC?.StatusBar?.update?.()
     // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
     const can = (w.WC?.editor as any)?.can?.()
