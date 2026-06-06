@@ -11,6 +11,14 @@
   const PMA = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
 
   const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+  // Layout spinner cmd → [paragraph attr dot-path, UI-unit → twips converter]
+  // (indents arrive in inches ×1440, spacing in points ×20).
+  const PARA_SPIN = {
+    indentLeft: ['paragraphProperties.indent.left', (v) => Math.round(v * 1440)],
+    indentRight: ['paragraphProperties.indent.right', (v) => Math.round(v * 1440)],
+    spacingBefore: ['paragraphProperties.spacing.before', (v) => Math.round(v * 20)],
+    spacingAfter: ['paragraphProperties.spacing.after', (v) => Math.round(v * 20)],
+  };
   const FONTS = ['Calibri', 'Calibri Light', 'Arial', 'Times New Roman', 'Cambria', 'Georgia', 'Verdana', 'Tahoma',
     'Courier New', 'Consolas', 'Comic Sans MS', 'Garamond', 'Trebuchet MS', 'Segoe UI', 'Helvetica', 'Carlito', 'Aptos'];
 
@@ -68,6 +76,9 @@
       // Word behavior: inside a list the ribbon indent buttons change the LIST LEVEL;
       // otherwise they step the paragraph text indent by 0.5" (engine: 36pt = 720tw).
       const para = pm.getEditor().getAttributes('paragraph') || {};
+      // NOTE: style-inherited list paragraphs carry no INLINE numberingProperties —
+      // they reach the list branch via listRendering (computed by numberingPlugin).
+      // Both arms are needed; do not simplify to one.
       const inList = !!(para.paragraphProperties && para.paragraphProperties.numberingProperties) || !!para.listRendering;
       if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
       else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
@@ -943,15 +954,11 @@
     },
 
     // Layout Paragraph spinners (indent in inches, spacing in points; model = twips).
+    // Negative indents are intentional pass-throughs (Word allows them); spacing
+    // can't go negative — the ribbon inputs enforce min:0 (ribbon.js renderSpinner).
     spinner(cmd, value) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
       const pm = PMA();
-      const PARA_SPIN = {
-        indentLeft: ['paragraphProperties.indent.left', (v) => Math.round(v * 1440)],
-        indentRight: ['paragraphProperties.indent.right', (v) => Math.round(v * 1440)],
-        spacingBefore: ['paragraphProperties.spacing.before', (v) => Math.round(v * 20)],
-        spacingAfter: ['paragraphProperties.spacing.after', (v) => Math.round(v * 20)],
-      };
       if (pm && PARA_SPIN[cmd]) {
         // withSelection: the spinner input took real focus — focus.ts snapshotted the
         // PM selection on focusin (.rspinner is in its capture list); restore it first.
@@ -1157,6 +1164,9 @@
 
   function lineSpacingMenu(node) {
     const opts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
+    // pm/st snapshot at MENU OPEN drives the dynamic labels; each click re-guards
+    // with a fresh PMA() (pm2) because failBridge can un-flip the mode while the
+    // flyout is open — never act on a stale mode through a captured pm.
     const pm = PMA();
     const st = pm ? pm.getState() : null;
     WC.flyout(node, (fly) => {
