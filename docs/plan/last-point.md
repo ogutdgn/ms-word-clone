@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-06-05 — Phase 2 slice 0b BUILT (file IO on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-0b` (stacked on `feature/phase-2-editing-core`; PR pending).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 0b DONE → 0c next.**
+- **State summary:** Open/Save/New run on the PM engine via bytes IPC (docx-only; html/txt/csv
+  blocked until slice 7); blank fixture; parse-once `replaceEditor` with `failBridge` recovery +
+  replace mutex; `Files.path` invariant enforced + tested. Done: commits `8c13d5f`/`9048cfe`
+  (fixture), `3819d82` (IPC), `f4b2443`/`9224d1b`/`041499f` (openDocx/newBlank),
+  `ecb33fb`/`7d8ee90` (files.js + tests). Gates: PM 28/28, legacy 257/257, smoke 9/9 × 2, docx 17/17.
+- **Done this session** (slice 0b tasks with commit SHAs):
+  - `8c13d5f` — blank-document fixture for New Document on the PM core.
+  - `9048cfe` — gen-fixture usage guard + regeneration commands in fixture headers.
+  - `3819d82` — `doc:saveBytes`/`saveAsBytes`/`openBytes` — raw `.docx` bytes IPC channels for the PM core.
+  - `f4b2443` — bridge `openDocx`/`newBlank` — editor re-creation from `.docx` bytes.
+  - `9224d1b` — `replaceEditor` parse-once: dry-parse BEFORE teardown.
+  - `041499f` — `replaceEditor` failBridge on failure, replace mutex, atomic exposure.
+  - `ecb33fb` — `files.js` save/open/new wired to PM engine in PM mode; `Files.path` invariant.
+  - `7d8ee90` — de-vacuize save-clean assertion; align PM file-IO toast wording.
+- **Next:** slice 0c (oracle harness for PM mode) then slice 1 (character formatting: bold/italic/underline/font/size/color → PM transactions).
+- **Blockers/notes:** none. html/txt/csv formats + generated docs (mail merge) stay blocked with toasts until their slices. PR stacked on `feature/phase-2-editing-core` (#11).
+
+---
+
 ## 2026-06-05 — Phase 2 slice 0a BUILT (PM core is the visible editor)
 
 - **Branch:** `feature/phase-2-editing-core` (pushed to `origin`; PR pending).

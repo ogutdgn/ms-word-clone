@@ -75,7 +75,7 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice 0a **dirty re-point** (`e4ea0bf`) — dirty-state readers mode-aware (PM edits trigger save prompts).
 - [x] Slice 0a **visible-page re-points** (`571b1e3`, `e41fb67`) — showHide/readMode/wordCount/properties follow active engine; paragraph-count selectors aligned.
 - [x] **All gates green: legacy 257/257, PM 21/21, smoke 9/9 × 2, docx 17/17.**
-- [ ] **Slice 0b** — file-IO bytes layer (PM-mode open/save via the fork's OOXML converter).
+- [x] **Slice 0b** — file-IO bytes layer (PM-mode open/save via the fork's OOXML converter). DONE: bytes IPC channels, parse-once replaceEditor + failBridge recovery + replace mutex, blank fixture, Files.path invariant enforced + tested. Gates: PM 28/28, legacy 257/257, smoke 9/9 × 2, docx 17/17.
 - [ ] **Slice 0c** — oracle harness for PM mode.
 - [ ] **Slice 1** — character formatting (bold/italic/underline/font/size/color → PM transactions).
 
