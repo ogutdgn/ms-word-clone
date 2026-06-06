@@ -198,12 +198,22 @@
 
   // ---- Paragraph dialog ----
   D.paragraph = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) pm.captureSelection(); // the dialog steals focus; restore before applying
+    const st = pm ? pm.getState() : null;
+    const fmtLine = (v) => (v == null ? '1.15' : (Number.isInteger(v) ? v + '.0' : String(v)));
     const align = el('select', {}, ['Left', 'Centered', 'Right', 'Justified'].map((o) => el('option', { text: o })));
-    const before = el('input', { type: 'number', value: '0', style: { width: '70px' } });
-    const after = el('input', { type: 'number', value: '8', style: { width: '70px' } });
-    const line = el('select', {}, ['1.0', '1.15', '1.5', '2.0', '3.0'].map((o) => el('option', { text: o })));
-    const indL = el('input', { type: 'number', value: '0', step: '0.1', style: { width: '70px' } });
-    const indR = el('input', { type: 'number', value: '0', step: '0.1', style: { width: '70px' } });
+    if (st) align.value = st.justifyCenter ? 'Centered' : st.justifyRight ? 'Right' : st.justifyFull ? 'Justified' : 'Left';
+    const indL = el('input', { type: 'number', value: String(st ? (st.indentLeftIn != null ? st.indentLeftIn : 0) : 0), step: '0.1', style: { width: '70px' } });
+    const indR = el('input', { type: 'number', value: String(st ? (st.indentRightIn != null ? st.indentRightIn : 0) : 0), step: '0.1', style: { width: '70px' } });
+    const before = el('input', { type: 'number', value: String(st ? (st.spacingBeforePt != null ? st.spacingBeforePt : 0) : 0), style: { width: '70px' } });
+    const after = el('input', { type: 'number', value: String(st ? (st.spacingAfterPt != null ? st.spacingAfterPt : 8) : 8), style: { width: '70px' } });
+    // PM mode adds 2.5 (ribbon parity); the legacy option list is frozen UI.
+    const lineOpts = pm ? ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'] : ['1.0', '1.15', '1.5', '2.0', '3.0'];
+    const line = el('select', {}, lineOpts.map((o) => el('option', { text: o })));
+    // lineSpacing is null for exact/atLeast rules (no multiplier form) — leave the
+    // select at its default rather than lie with a converted value.
+    if (st && st.lineSpacing != null && lineOpts.indexOf(fmtLine(st.lineSpacing)) !== -1) line.value = fmtLine(st.lineSpacing);
     const body = el('div', {}, [
       row('Alignment:', align),
       row('Indent left (in):', indL), row('Indent right (in):', indR),
@@ -213,13 +223,28 @@
     function row(label, ctrl) { return el('div', { class: 'row' }, [el('label', { text: label, style: { width: '160px' } }), ctrl]); }
     WC.dialog({ title: 'Paragraph', width: '460px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        const a = { Left: 'justifyLeft', Centered: 'justifyCenter', Right: 'justifyRight', Justified: 'justifyFull' }[align.value];
-        E().exec(a);
-        E().applyBlockStyle('marginTop', before.value + 'pt');
-        E().applyBlockStyle('marginBottom', after.value + 'pt');
-        E().applyBlockStyle('lineHeight', line.value);
-        E().applyBlockStyle('marginLeft', (parseFloat(indL.value) * 96) + 'px');
-        E().applyBlockStyle('marginRight', (parseFloat(indR.value) * 96) + 'px');
+        if (pm) {
+          const steps = [
+            ['setTextAlign', { Left: 'left', Centered: 'center', Right: 'right', Justified: 'justify' }[align.value]],
+            ['updateAttributes', 'paragraph', {
+              'paragraphProperties.spacing.before': Math.round((parseFloat(before.value) || 0) * 20),
+              'paragraphProperties.spacing.after': Math.round((parseFloat(after.value) || 0) * 20),
+              'paragraphProperties.spacing.line': Math.round((parseFloat(line.value) || 1.15) * 240),
+              'paragraphProperties.spacing.lineRule': 'auto',
+              'paragraphProperties.indent.left': Math.round((parseFloat(indL.value) || 0) * 1440),
+              'paragraphProperties.indent.right': Math.round((parseFloat(indR.value) || 0) * 1440),
+            }],
+          ];
+          pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (Word)
+        } else {
+          const a = { Left: 'justifyLeft', Centered: 'justifyCenter', Right: 'justifyRight', Justified: 'justifyFull' }[align.value];
+          E().exec(a);
+          E().applyBlockStyle('marginTop', before.value + 'pt');
+          E().applyBlockStyle('marginBottom', after.value + 'pt');
+          E().applyBlockStyle('lineHeight', line.value);
+          E().applyBlockStyle('marginLeft', (parseFloat(indL.value) * 96) + 'px');
+          E().applyBlockStyle('marginRight', (parseFloat(indR.value) * 96) + 'px');
+        }
       } },
       { label: 'Cancel' },
     ] });
