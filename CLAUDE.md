@@ -21,10 +21,10 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
-> dep). **Phase 2 slice 0a is DONE** (`feature/phase-2-editing-core`, PR pending): the new
-> ProseMirror core (`#pm-editor`) is now the **active visible editor** behind the `WC.PM` bridge;
-> the legacy app runs only under the `--legacy` boot flag. **Phase 2** continues wiring ribbon
-> commands → PM transactions (strangler-fig, slice by slice). Exact state: [docs/plan/](docs/plan/).
+> dep). **Phase 2 slices 0a–1 are DONE** (stacked PRs #11–#14): the PM core is the active visible
+> editor; file IO + character formatting are on the engine (oracle-validated against Word 16.77.1);
+> character formatting is the first flipped ribbon area; the legacy app runs only under `--legacy`.
+> **Phase 2** continues with slice 2 (paragraph + lists). Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 
@@ -60,7 +60,9 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 1. **Validate against real MS Word.** The dev box has Word reachable from WSL via
    `powershell.exe -ComObject Word.Application`. Use it as ground truth for any
    behaviour/geometry change. **PID-safe:** kill only the spawned WINWORD PID,
-   never the user's window (see AGENTS.md → COM oracle).
+   never the user's window (see AGENTS.md → COM oracle). On this machine the
+   in-repo macOS oracle (`scripts/oracle/word-oracle.js` — see its README) drives
+   Word via AppleScript and supersedes the WSL COM oracle.
 2. **Every fix ships a regression test.** PM-mode features go in `scripts/test-suite-pm.js`;
    `scripts/test-suite.js` is **frozen** (legacy gate, run under `--legacy`) until legacy
    retirement. Run both suites + `scripts/test_docx.js` (17 tests) before committing.
