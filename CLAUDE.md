@@ -21,7 +21,7 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
-> dep). **Phase 2 slices 0a–1 are DONE** (stacked PRs #11–#14): the PM core is the active visible
+> dep). **Phase 2 slices 0a–1 are DONE** (merged to `main` via PRs #11–#15): the PM core is the active visible
 > editor; file IO + character formatting are on the engine (oracle-validated against Word 16.77.1);
 > character formatting is the first flipped ribbon area; the legacy app runs only under `--legacy`.
 > **Phase 2** continues with slice 2 (paragraph + lists). Exact state: [docs/plan/](docs/plan/).
