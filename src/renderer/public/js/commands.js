@@ -951,7 +951,7 @@
       }
       const map = {
         clipboard: () => (WC.Dialogs.clipboardPane ? WC.Dialogs.clipboardPane() : WC.notImplemented('Clipboard pane')),
-        font: () => (WC.Dialogs.fontDialog ? WC.Dialogs.fontDialog() : WC.notImplemented('Font dialog')),
+        font: () => (WC.Dialogs.font ? WC.Dialogs.font() : WC.notImplemented('Font dialog')),
         paragraph: () => WC.Dialogs.paragraph(),
         styles: () => WC.Dialogs.stylesPane(),
       };
