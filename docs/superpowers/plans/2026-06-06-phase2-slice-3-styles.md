@@ -1315,8 +1315,10 @@ NOTICE summary, and the deferral list.
   style TEXT nodes only — plugin.js:162) — geometry deviation vs Word until a
   caret-line treatment lands.
 - **Direct-formatting clearing on style apply**: engine clears char marks
-  unconditionally; Word's >50% heuristic (if the Task-2.5 probe shows preservation) is
-  a recorded deviation, not fixed this slice.
+  unconditionally; ORACLE-VERIFIED (2026-06-07, notes/2026-06-07-slice3-word-behavior.json):
+  Word clears only at FULL coverage (whole paragraph bold → cleared) and PRESERVES
+  partial coverage (one bold word survives a style apply). The engine deviates on the
+  partial case — KNOWN DEVIATION, recorded, not fixed this slice.
 - **Plugin styles list is init-frozen** (LinkedStyles plugin state captured at editor
   construction): fine while Open/New rebuild the editor; a future modify-style feature
   must refresh both catalogs (converter.linkedStyles + translatedLinkedStyles).
