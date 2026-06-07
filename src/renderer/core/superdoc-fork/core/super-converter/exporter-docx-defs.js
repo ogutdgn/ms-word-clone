@@ -893,7 +893,10 @@ export const DEFAULT_LINKED_STYLES = {
           {
             type: 'element',
             name: 'w:color',
-            attributes: { 'w:val': '595959', 'w:themeColor': 'text1', 'w:themeTint': 'A6' },
+            // Live-Word value (16.77.1 emits 404040/themeTint BF — oracle leg B,
+            // notes/2026-06-07-slice3-oracleB.json mintedDefaultsDiff; 595959/A6 was
+            // the older Office-template gray).
+            attributes: { 'w:val': '404040', 'w:themeColor': 'text1', 'w:themeTint': 'BF' },
           },
         ],
       },
