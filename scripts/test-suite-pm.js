@@ -157,8 +157,12 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    window.WC.Commands.run({ cmd: 'cut', label: 'Cut' });
-    return document.querySelectorAll('.flyout').length === 0; // no flyout, no throw
+    // probe cmd lives in a STILL-UNFLIPPED area — repointed cut→replace when
+    // clipboard flipped (slice 4): a cut probe would go vacuously green with a
+    // destructive live cut mid-suite; replace keeps the test MEANINGFUL.
+    window.WC.Commands.run({ cmd: 'replace', label: 'Replace' });
+    return document.querySelectorAll('.flyout').length === 0
+      && !document.getElementById('find-pane'); // findPane stays closed
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
     window.WC.Commands.dropdown({ cmd: 'find', type: 'dropdown' }, document.body);
@@ -791,6 +795,185 @@
     const mark = markNames('strongbit').find((m) => m.startsWith('textStyle'));
     return a.paragraphProperties?.styleId === 'Heading1'
       && !!mark && mark.includes('"styleId":"Strong"');
+  });
+
+  // ---------- slice 4: clipboard + editing-misc (cut/copy/paste + painter + select) ----------
+  // These tests drive the REAL OS clipboard (wordAPI.clipboard channels, Task 4) so
+  // the prosemirror-view serializer/parser pipeline is what's under test — no mocks.
+  // selectText trap: the helper matches within a SINGLE text node — after run('bold')
+  // splits a paragraph's text node, painter sources select only the homogeneous bold
+  // word (also semantically required: getMarksFromSelection INTERSECTS mixed ranges).
+  await PM().newBlank(); await sleep(100);
+  const CB = () => window.wordAPI.clipboard;
+  // Sentinel poll: webContents paste/cut/copy land asynchronously in the renderer.
+  const until = async (fn, tries = 40) => { for (let i = 0; i < tries && !(await fn()); i++) await sleep(50); return !!(await fn()); };
+  await t('[4] ribbon Copy puts the selection on the OS clipboard', async () => {
+    await CB().writeText(''); // clear
+    setDoc('copyprobe alpha beta'); selectText('copyprobe');
+    run('copy');
+    const filled = await until(async () => (await CB().readText()).includes('copyprobe'), 20);
+    return filled && doc().textContent.includes('copyprobe');
+  });
+  await t('[4] ribbon Cut removes the selection AND fills the clipboard', async () => {
+    await CB().writeText('');
+    setDoc('cutprobe gamma delta'); selectText('cutprobe');
+    run('cut');
+    const filled = await until(async () => (await CB().readText()).includes('cutprobe'), 20);
+    const removed = await until(async () => !doc().textContent.includes('cutprobe'));
+    return filled && removed;
+  });
+  await t('[4] ribbon Paste inserts clipboard text through the PM pipeline', async () => {
+    await CB().writeText('pasteprobe-payload');
+    setDoc('target paragraph here');
+    const sel = selectText('target');
+    window.WC.editor.commands.setTextSelection({ from: sel.from, to: sel.from });
+    run('paste');
+    return until(async () => doc().textContent.includes('pasteprobe-payload'));
+  });
+  await t('[4] paste (KSF) preserves character formatting via the HTML parser', async () => {
+    await CB().writeHTML('<p><strong>boldbit</strong> plain</p>');
+    setDoc('ksf target text'); const s = selectText('ksf');
+    window.WC.editor.commands.setTextSelection({ from: s.from, to: s.from });
+    run('paste');
+    if (!(await until(async () => doc().textContent.includes('boldbit')))) return 'paste never landed';
+    // [1]-precedent guard: a negation mark (value '0') must not count as bold-on.
+    return markNames('boldbit').some((x) => x.startsWith('bold') && !x.includes('"value":"0"'));
+  });
+  await t('[4] paste is ONE undo step', async () => {
+    await CB().writeText('one-undo-payload');
+    setDoc('undo paste target');
+    const s0 = selectText('undo');
+    window.WC.editor.commands.setTextSelection({ from: s0.from, to: s0.from }); // caret, not whole-doc selection
+    await sleep(550); // close the history group
+    const before = JSON.stringify(doc().toJSON());
+    run('paste');
+    if (!(await until(async () => doc().textContent.includes('one-undo-payload')))) return 'paste never landed';
+    PM().cmd('undo'); await sleep(50);
+    return JSON.stringify(doc().toJSON()) === before;
+  });
+  await t('[4] Keep Text Only strips source formatting', async () => {
+    await CB().writeHTML('<p><strong>strippedbold</strong></p>');
+    setDoc('kto target text'); const s2 = selectText('kto');
+    window.WC.editor.commands.setTextSelection({ from: s2.from, to: s2.from });
+    await PM().pasteTextOnly(); await sleep(150);
+    if (!doc().textContent.includes('strippedbold')) return 'text did not paste';
+    return !markNames('strippedbold').some((x) => x.startsWith('bold') && !x.includes('"value":"0"'));
+  });
+  await t('[4] Picture flavor pastes an image node from the clipboard', async () => {
+    // 1×1 red PNG
+    await CB().writeImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    setDoc('pic target text');
+    await PM().pastePicture(); await sleep(150);
+    let found = false;
+    doc().descendants((n) => { if (n.type.name === 'image') found = true; });
+    return found;
+  });
+  await t('[4] paste dropdown renders the 6 Word items in PM mode', async () => {
+    const node = document.querySelector('[data-cmd="paste"]') || document.body;
+    window.WC.Commands.dropdown({ cmd: 'paste', type: 'split' }, node);
+    // PM pasteMenu prefetches the clipboard flavors (IPC) BEFORE building the
+    // flyout — poll for the items, never assert synchronously.
+    for (let i = 0; i < 20 && !document.querySelector('.flyout .fly-item'); i++) await sleep(50);
+    const items = Array.from(document.querySelectorAll('.flyout .fly-item')).map((n) => n.textContent.trim());
+    window.WC.closeFlyouts();
+    return ['Keep Source Formatting', 'Merge Formatting', 'Picture', 'Keep Text Only']
+      .every((l) => items.some((i) => i.startsWith(l)))
+      && items.some((i) => i.startsWith('Paste Special'))
+      && items.some((i) => i.startsWith('Set Default Paste'));
+  });
+  await t('[4] Paste Special dialog lists the flavors actually on the clipboard', async () => {
+    await CB().writeHTML('<p>flavor probe</p>'); // HTML write also sets text/plain
+    await window.WC.Dialogs.pasteSpecial(); // async: awaits the flavors IPC, then WC.dialog mounts synchronously
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'dialog did not open';
+    const rows = Array.from(dlg.querySelectorAll('li,option,.ps-item')).map((n) => n.textContent);
+    const ok = rows.some((r) => /HTML/i.test(r)) && rows.some((r) => /Unformatted/i.test(r));
+    const close = Array.from(dlg.parentNode.querySelectorAll('button')).find((b) => /^(Cancel|Close)$/.test(b.textContent.trim()));
+    if (close) close.click();
+    return ok;
+  });
+  await t('[4] format painter one-shot: char formatting copies, applies once, disarms', async () => {
+    setDocs(['painterbold source here', 'painterplain target here']);
+    selectText('painterbold'); run('bold'); await sleep(50);
+    // Arm from the HOMOGENEOUS bold word only: (a) selectText cannot span the
+    // mark-split text nodes; (b) getMarksFromSelection intersects a mixed range to [].
+    selectText('painterbold');
+    run('formatPainter'); await sleep(50);
+    selectText('painterplain'); await sleep(150); // fork auto-applies on selectionUpdate
+    const applied = markNames('painterplain').some((x) => x.startsWith('bold') && !x.includes('"value":"0"'));
+    // one-shot: a SECOND selection must NOT receive the format
+    selectText('target'); await sleep(150);
+    const second = markNames('target').some((x) => x.startsWith('bold') && !x.includes('"value":"0"'));
+    return applied && !second;
+  });
+  await t('[4] format painter copies PARAGRAPH formatting (Word scope)', async () => {
+    setDocs(['parapaint source line', 'parapaint target line two']);
+    selectText('parapaint source line'); PM().cmd('setTextAlign', 'center'); await sleep(50);
+    run('formatPainter'); await sleep(50);
+    selectText('target line two'); await sleep(150);
+    // Engine key is paragraphProperties.justification (text-align.js; [2] precedent).
+    return paraAttrs('target').paragraphProperties?.justification === 'center';
+  });
+  await t('[4] painter sticky (dblclick) survives two applies; Esc disarms', async () => {
+    setDocs(['stickybold source', 'stickyone target', 'stickytwo target']);
+    selectText('stickybold'); run('bold'); await sleep(50);
+    selectText('stickybold'); // homogeneous bold run (see one-shot test note)
+    run('formatPainterLock'); await sleep(50); // ribbon dblclick path
+    selectText('stickyone'); await sleep(150);
+    selectText('stickytwo'); await sleep(150);
+    const both = ['stickyone', 'stickytwo'].every((n) => markNames(n).some((x) => x.startsWith('bold') && !x.includes('"value":"0"')));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(150); // state-sync rAF tick
+    const fpBtn = window.WC.Ribbon.controlIndex.formatPainter?.node;
+    return both && !!fpBtn && !fpBtn.classList.contains('toggled');
+  });
+  await t('[4] painter button shows toggled while armed (state-sync chrome)', async () => {
+    setDoc('chromeprobe text'); selectText('chromeprobe');
+    run('formatPainter'); await sleep(150);
+    const fpBtn = window.WC.Ribbon.controlIndex.formatPainter?.node;
+    const on = !!fpBtn && fpBtn.classList.contains('toggled');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(150);
+    return on && !fpBtn.classList.contains('toggled');
+  });
+  await t('[4] Select All selects the whole document via the menu', async () => {
+    setDocs(['selall first para', 'selall second para']);
+    const node = document.querySelector('[data-cmd="select"]') || document.body;
+    window.WC.Commands.dropdown({ cmd: 'select', type: 'dropdown' }, node);
+    const item = Array.from(document.querySelectorAll('.flyout .fly-item')).find((n) => n.textContent.trim().startsWith('Select All'));
+    if (!item) { window.WC.closeFlyouts(); return 'Select All item not found'; }
+    item.click(); await sleep(50);
+    const sel = window.WC.editor.state.selection;
+    return sel.from <= 1 && sel.to >= doc().content.size - 1;
+  });
+  await t('[4] Similar Formatting selects the matching span (legacy-parity range)', async () => {
+    setDocs(['simfmt boldone here', 'plain middle para', 'simfmt boldtwo here']);
+    selectText('boldone'); run('bold'); await sleep(50);
+    selectText('boldtwo'); run('bold'); await sleep(50);
+    // DELIBERATE boundary selection: at the bold run's start, $from.marks() returns
+    // the PRECEDING run's marks — this input exposes a naive implementation.
+    const c = selectText('boldone');
+    window.WC.editor.commands.setTextSelection({ from: c.from, to: c.from + 2 });
+    await PM().selectSimilarFormatting(); await sleep(50);
+    const sel = window.WC.editor.state.selection;
+    // Tight assert: includes() can't tell a near-whole-doc selection from the right
+    // one; the correct span starts at boldone and ends at boldtwo.
+    const text = doc().textBetween(sel.from, sel.to, ' ');
+    return text.startsWith('boldone') && text.endsWith('boldtwo');
+  });
+  await t('[4] D6 flip: paste dropdown + select dropdown open in PM mode', async () => {
+    // inverse of the pre-flip block — proves the registry flip reached dispatch.
+    // The paste flyout fills AFTER the flavors prefetch — assert real items, not
+    // just the (synchronously-created, possibly empty) flyout shell.
+    const node = document.body;
+    window.WC.Commands.dropdown({ cmd: 'paste', type: 'split' }, node);
+    for (let i = 0; i < 20 && !document.querySelector('.flyout .fly-item'); i++) await sleep(50);
+    const pasteOpen = document.querySelectorAll('.flyout .fly-item').length > 0;
+    window.WC.closeFlyouts();
+    window.WC.Commands.dropdown({ cmd: 'select', type: 'dropdown' }, node);
+    const selOpen = document.querySelectorAll('.flyout .fly-item').length > 0;
+    window.WC.closeFlyouts();
+    return pasteOpen && selOpen;
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
