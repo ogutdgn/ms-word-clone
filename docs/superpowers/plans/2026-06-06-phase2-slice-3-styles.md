@@ -1122,7 +1122,9 @@ custom styles have no engine path):
     body.appendChild(list);
     const footer = el('div', { style: { display: 'flex', gap: '6px', padding: '10px 0 0', borderTop: '1px solid #eee', marginTop: '8px' } }, [
       el('button', { class: 'btn', text: 'New Style', onclick: () => { if (pm) { WC.toast("New Style isn't on the new engine yet", 'Custom styles land in a later slice — run with --legacy for the classic editor'); return; } D.createStyle(render); } }),
-      el('button', { class: 'btn', text: 'Clear All', onclick: () => { if (pm) { pm.applyStyleByName('Normal'); return; } WC.applyNamedStyle('Normal'); } }),
+      // Re-capture per click (the item-click pm2 pattern): failBridge can un-flip the
+      // mode while the pane is open — never act on a stale bridge reference.
+      el('button', { class: 'btn', text: 'Clear All', onclick: () => { const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm2) { if (!pm2.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); return; } WC.applyNamedStyle('Normal'); } }),
     ]);
     body.appendChild(footer);
     pane.appendChild(head); pane.appendChild(body);
