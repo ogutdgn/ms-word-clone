@@ -772,8 +772,12 @@ export const STYLE_ID_TO_NAME: Record<string, string> = Object.fromEntries(
 ```
 
 - [ ] **Step 6.2: Export `headParagraph` from state-sync.ts** — change line 10 from
-`function headParagraph(` to `export function headParagraph(` (commands.ts reuses it;
-no behavior change).
+`function headParagraph(` to `export function headParagraph(` (commands.ts reuses it).
+AS-BUILT addition (review-accepted): an AllSelection fallback — when the depth-walk
+finds no ancestor paragraph ($from at doc root, e.g. Ctrl+A), descend via
+`doc.descendants()` to the FIRST paragraph (the selection-start head, per the recorded
+head-paragraph convention). Unreachable for TextSelection (the depth-walk returns
+first); `pos` semantics identical to `$from.before(d)`.
 
 - [ ] **Step 6.3: commands.ts additions.** Imports at the top:
 
