@@ -804,6 +804,89 @@ export const DEFAULT_LINKED_STYLES = {
       },
     ],
   },
+  NoSpacing: {
+    type: 'element',
+    name: 'w:style',
+    attributes: { 'w:type': 'paragraph', 'w:styleId': 'NoSpacing' },
+    elements: [
+      { type: 'element', name: 'w:name', attributes: { 'w:val': 'No Spacing' } },
+      { type: 'element', name: 'w:uiPriority', attributes: { 'w:val': '1' } },
+      { type: 'element', name: 'w:qFormat' },
+      {
+        type: 'element',
+        name: 'w:pPr',
+        elements: [
+          {
+            type: 'element',
+            name: 'w:spacing',
+            attributes: { 'w:after': '0', 'w:line': '240', 'w:lineRule': 'auto' },
+          },
+        ],
+      },
+    ],
+  },
+  Strong: {
+    type: 'element',
+    name: 'w:style',
+    attributes: { 'w:type': 'character', 'w:styleId': 'Strong' },
+    elements: [
+      { type: 'element', name: 'w:name', attributes: { 'w:val': 'Strong' } },
+      { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
+      { type: 'element', name: 'w:uiPriority', attributes: { 'w:val': '22' } },
+      { type: 'element', name: 'w:qFormat' },
+      {
+        type: 'element',
+        name: 'w:rPr',
+        elements: [
+          { type: 'element', name: 'w:b' },
+          { type: 'element', name: 'w:bCs' },
+        ],
+      },
+    ],
+  },
+  Emphasis: {
+    type: 'element',
+    name: 'w:style',
+    attributes: { 'w:type': 'character', 'w:styleId': 'Emphasis' },
+    elements: [
+      { type: 'element', name: 'w:name', attributes: { 'w:val': 'Emphasis' } },
+      { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
+      { type: 'element', name: 'w:uiPriority', attributes: { 'w:val': '20' } },
+      { type: 'element', name: 'w:qFormat' },
+      {
+        type: 'element',
+        name: 'w:rPr',
+        elements: [
+          { type: 'element', name: 'w:i' },
+          { type: 'element', name: 'w:iCs' },
+        ],
+      },
+    ],
+  },
+  SubtleEmphasis: {
+    type: 'element',
+    name: 'w:style',
+    attributes: { 'w:type': 'character', 'w:styleId': 'SubtleEmphasis' },
+    elements: [
+      { type: 'element', name: 'w:name', attributes: { 'w:val': 'Subtle Emphasis' } },
+      { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
+      { type: 'element', name: 'w:uiPriority', attributes: { 'w:val': '19' } },
+      { type: 'element', name: 'w:qFormat' },
+      {
+        type: 'element',
+        name: 'w:rPr',
+        elements: [
+          { type: 'element', name: 'w:i' },
+          { type: 'element', name: 'w:iCs' },
+          {
+            type: 'element',
+            name: 'w:color',
+            attributes: { 'w:val': '595959', 'w:themeColor': 'text1', 'w:themeTint': 'A6' },
+          },
+        ],
+      },
+    ],
+  },
 };
 
 export const COMMENTS_XML_DEF = {
