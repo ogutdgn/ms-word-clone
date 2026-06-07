@@ -25,6 +25,9 @@ node scripts/oracle/word-oracle.js read-word-props <abs-path.docx> <paraIdx> [wo
 # Read paragraph-FORMAT + list formatting (spacing, indents, list type/level/string)
 node scripts/oracle/word-oracle.js read-para-props <abs-path.docx> [--out report.json]
 
+# Read per-paragraph STYLE names (built-in + custom — slice 3)
+node scripts/oracle/word-oracle.js read-style-props <abs-path.docx> [--out report.json]
+
 # Save-as roundtrip (open in Word, save to new path)
 node scripts/oracle/word-oracle.js roundtrip <abs-in.docx> <abs-out.docx>
 ```
@@ -188,6 +191,29 @@ Notes:
 
 Numeric fields pass through the comma-decimal normalisation (`"18,0"` → `18`).
 
+## JSON shape — `read-style-props`
+
+```json
+{
+  "file": "/abs/path/to/doc.docx",
+  "generatedBy": "word-oracle read-style-props",
+  "paragraphs": [
+    { "index": 2, "style": "Heading 1", "text": "heading probe" },
+    { "index": 4, "style": "MyProbeStyle", "text": "custom probe" }
+  ]
+}
+```
+
+| Field   | Type   | Notes                                                                  |
+|---------|--------|------------------------------------------------------------------------|
+| `index` | number | 1-based paragraph index                                                |
+| `style` | string | `name local` of the paragraph's style object — built-ins read as their display names (`"Normal"`, `"Heading 1"`, `"Title"`); custom styles as their creation name (`"MyProbeStyle"`). There is **no separate raw-enum form** on the read side: `style of paragraph` returns a style OBJECT, not a WdBuiltinStyle token (quirk #27) |
+| `text`  | string | Paragraph text (emitted LAST on the wire — quirk #16)                  |
+
+Verified live against Word for Mac 16.77.1 (2026-06-07) on a Word-authored probe
+(`tests/fixtures/oracle-style-probe.docx`, gitignored): Normal / Heading 1 /
+Title / custom `MyProbeStyle` all read back exactly as authored.
+
 ## PID-safety contract
 
 The oracle uses **name-verified, count-relative** PID safety — not ordinal-based:
@@ -262,7 +288,11 @@ the Windows COM object model. All verified against Word for Mac 16.77.1:
 | `list level number` of non-list para | returns `1`, not `0`    | Gate on `list type` ≠ `"list no numbering"` before trusting the level |
 | `close d` after `save as d ...` | close by the **new** basename | Even a variable-bound doc reference dangles after `save as` renames the document (−1728) — by-name close with the output basename is the only reliable form |
 | `.dotfile.docx` open/save | **copy to a normal name first** | Dot-prefixed filenames can hang `open file name`/`save as` indefinitely and wedge the session's file commands afterwards (observed 2026-06-06) |
-| long headless sessions    | opens degrade → −1712, then stop | Reads on already-open docs keep working while NEW opens stretch past the 2-min AppleEvent default and eventually never complete; wrap in `with timeout of N seconds`; only a USER relaunch of Word recovers it — never quit Word from a script |
+| long headless sessions    | opens degrade → −1712, then stop | Reads on already-open docs keep working while NEW opens stretch past the 2-min AppleEvent default and eventually never complete; wrap in `with timeout of N seconds`; only a USER relaunch of Word recovers it — never quit Word from a script. **Refined 2026-06-07:** the degradation is path-novelty-correlated, see the fresh-path row |
+| AppleEvent to non-running Word | **auto-launches Word HEADLESS** (quirk #24) | Zero windows; property reads answer instantly but `open file name` −1712s forever. Only a USER Dock/Finder launch yields a window-bearing instance whose opens work — check `count of windows` ≥ 1 first |
+| fresh-path opens "fail" with −1712 | they complete LATE — **minutes** later (quirk #25) | Paths Word has never opened (not in recents/sandbox grants) stall past the 2-min client timeout but the document **eventually materializes**; known paths open in seconds in the same session. After −1712 do NOT re-issue the open — poll `count of documents`/names and use the late-arriving doc |
+| `document "<name>"` after a late open | **intermittent −1728** (quirk #26) | By-name resolution flickers while late opens settle — fails in one AppleEvent, resolves in the next (even right after `exists document "<name>"` → true), while `name of document 1` stays reliable. Worker scripts use name-VERIFIED ordinal access (`document 1` only when its name equals the expected basename) with by-name fallback |
+| `style of paragraph` as WdBuiltinStyle enum | returns a style **OBJECT** («class w173») (quirk #27) | `as string` raises −1700; read `name local of (get style of paragraph i of d)` — built-ins → display names ("Normal", "Heading 1", "Title"), custom styles → creation name. SET accepts the enum token (`style heading1`) **and** a name string ("Heading 2", "MyProbeStyle"); style objects bind to variables (unlike word ranges); `make new Word style at d with properties {name local:"…", style type:style type paragraph}` works; `st` is a reserved token (−2741 as a variable name) |
 
 ## Per-feature validation protocol
 
