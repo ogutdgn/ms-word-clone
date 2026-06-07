@@ -73,7 +73,7 @@
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
         if (k === 'enter' && !shift) return pmBlockedOr('insert-basics', () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }));
         if (k === 'o') return () => WC.Files.open();
-        if (k === 'n' && !shift) return () => WC.Files.newDoc();
+        if (k === 'n' && !shift) return () => WC.Files.newDoc(); // !shift: don't shadow Ctrl+Shift+N (Apply Normal, below)
         if (k === 'p') return () => WC.Files.print();
         if (k === 'f') return () => WC.Dialogs.findPane(false);
         if (k === 'h') return () => WC.Dialogs.findPane(true);
