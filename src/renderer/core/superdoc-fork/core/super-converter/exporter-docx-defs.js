@@ -807,7 +807,10 @@ export const DEFAULT_LINKED_STYLES = {
   NoSpacing: {
     type: 'element',
     name: 'w:style',
-    attributes: { 'w:type': 'paragraph', 'w:styleId': 'NoSpacing' },
+    attributes: {
+      'w:type': 'paragraph',
+      'w:styleId': 'NoSpacing',
+    },
     elements: [
       { type: 'element', name: 'w:name', attributes: { 'w:val': 'No Spacing' } },
       { type: 'element', name: 'w:uiPriority', attributes: { 'w:val': '1' } },
@@ -828,7 +831,10 @@ export const DEFAULT_LINKED_STYLES = {
   Strong: {
     type: 'element',
     name: 'w:style',
-    attributes: { 'w:type': 'character', 'w:styleId': 'Strong' },
+    attributes: {
+      'w:type': 'character',
+      'w:styleId': 'Strong',
+    },
     elements: [
       { type: 'element', name: 'w:name', attributes: { 'w:val': 'Strong' } },
       { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
@@ -847,7 +853,10 @@ export const DEFAULT_LINKED_STYLES = {
   Emphasis: {
     type: 'element',
     name: 'w:style',
-    attributes: { 'w:type': 'character', 'w:styleId': 'Emphasis' },
+    attributes: {
+      'w:type': 'character',
+      'w:styleId': 'Emphasis',
+    },
     elements: [
       { type: 'element', name: 'w:name', attributes: { 'w:val': 'Emphasis' } },
       { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
@@ -866,7 +875,10 @@ export const DEFAULT_LINKED_STYLES = {
   SubtleEmphasis: {
     type: 'element',
     name: 'w:style',
-    attributes: { 'w:type': 'character', 'w:styleId': 'SubtleEmphasis' },
+    attributes: {
+      'w:type': 'character',
+      'w:styleId': 'SubtleEmphasis',
+    },
     elements: [
       { type: 'element', name: 'w:name', attributes: { 'w:val': 'Subtle Emphasis' } },
       { type: 'element', name: 'w:basedOn', attributes: { 'w:val': 'DefaultParagraphFont' } },
