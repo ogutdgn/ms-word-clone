@@ -112,6 +112,10 @@
       `open file name` times out (-1712) forever — no document ever appears.
       Only a USER launch (Dock/Finder) produces a window-bearing instance whose
       opens work. Check `count of windows` ≥ 1 before any open-based session.
+      RECOVERY WITHOUT QUITTING (observed 2026-06-07, leg A): `make new
+      document` succeeds even in the headless state and materializes a WINDOW
+      (windows 0→1); after closing that scratch doc (name-verified ordinal,
+      saving no), file opens work normally again in the same instance.
   25. Refines #23: the "degraded" opens are PATH-NOVELTY-correlated, not purely
       time-correlated. `open file name` on a path Word has NEVER opened before
       (not in its recents/sandbox-grant set) can stall for MINUTES and complete
