@@ -224,6 +224,8 @@ FAILURES, absence-asserts are guarded by a proven presence first.
       && !!normalCell && normalCell.classList.contains('active');
   });
   await t('[3] getState().block carries the display name (Heading 1 / Normal)', async () => {
+    // relies on the previous test's setDocs(['plain paragraph here', 'heading paragraph here'])
+    // with Heading1 applied to the second — deliberate chain, no doc reset between them.
     selectText('heading'); await sleep(50);
     const b1 = PM().getState().block === 'Heading 1';
     selectText('plain'); await sleep(50);
@@ -299,10 +301,14 @@ FAILURES, absence-asserts are guarded by a proven presence first.
     window.WC.Commands.launcher('styles', null, null);
     const pane = document.getElementById('styles-pane');
     if (!pane) return 'styles pane did not open';
-    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'Clear All').click();
+    const clearBtn = Array.from(pane.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Clear All');
+    if (!clearBtn) { window.WC.Dialogs.stylesPane(); return 'Clear All button not found'; }
+    clearBtn.click();
     await sleep(50);
     const cleared = paraAttrs('paneclear').paragraphProperties?.styleId === 'Normal';
-    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'New Style').click();
+    const newBtn = Array.from(pane.querySelectorAll('button')).find((b) => b.textContent.trim() === 'New Style');
+    if (!newBtn) { window.WC.Dialogs.stylesPane(); return 'New Style button not found'; }
+    newBtn.click();
     const noDialog = !document.querySelector('.modal-backdrop');
     if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane();
     return cleared && noDialog;
