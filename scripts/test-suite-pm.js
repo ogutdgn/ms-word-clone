@@ -81,6 +81,9 @@
     if (!it) throw new Error('flyout item not found: ' + re);
     it.click();
   };
+  // Styles-gallery cell by display name (ribbon.js renderStylesGallery: .style-cell
+  // carries dataset.style = the display name, e.g. "Heading 1").
+  const cellFor = (name) => document.querySelector('.style-cell[data-style="' + name + '"]');
 
   // ---------- slice 0a: infrastructure ----------
   await t('[0a] PM mode active + body flipped', () =>
@@ -582,6 +585,206 @@
     PM().cmd('increaseListIndent'); await sleep(150);
     const p0 = paraEl('nest level zero'); const p1 = paraEl('nest level one');
     return !!p0 && !!p1 && parseFloat(p1.style.marginLeft || '0') > parseFloat(p0.style.marginLeft || '0');
+  });
+
+  // ---------- slice 3: styles (gallery + pane + shortcuts + preview) ----------
+  // Context reset: the last [1] test left negation-run.docx live — its styles.xml has
+  // NO Quote/heading definitions and a BOLD Normal. [3] runs on the blank template
+  // (Quote/QuoteChar, Heading1-9+Char, Title, Subtitle, IntenseQuote, ListParagraph,
+  // plain Normal all present; Task 4 mints the remaining four).
+  await PM().newBlank(); await sleep(100);
+  // Vocabulary: UI speaks display names ('Heading 1'), the engine speaks styleIds
+  // ('Heading1'); styleId lives INSIDE paragraphProperties (cleared by setDoc's reset).
+  // SELECTION RULE: paragraph-style asserts REQUIRE a full-paragraph or collapsed
+  // selection — a PARTIAL selection takes the linked-character-style branch
+  // (linked-styles/helpers.js:454: w:link styles apply e.g. Heading1Char to the range
+  // and NEVER set paragraphProperties.styleId). Tests 6/7 exploit that deliberately;
+  // every other apply selects the FULL setDoc string.
+  await t('[3] gallery cell click applies Heading1 styleId + lights the cell', async () => {
+    setDoc('style probe text'); selectText('style probe text');
+    const cell = cellFor('Heading 1');
+    if (!cell) return 'gallery cell not found';
+    cell.click(); await sleep(150);
+    const a = paraAttrs('style');
+    return a.paragraphProperties?.styleId === 'Heading1' && cell.classList.contains('active');
+  });
+  await t('[3] applying a paragraph style clears direct char formatting', async () => {
+    setDoc('boldfirst styled text'); selectText('boldfirst styled text');
+    run('bold'); await sleep(50);
+    // [1]-precedent guard: a negation mark (value '0') must not count as bold-on.
+    const isBold = (m) => m.startsWith('bold:') && !m.includes('"value":"0"');
+    if (!markNames('boldfirst').some(isBold)) return 'bold did not apply — precondition failed';
+    PM().cmd('setStyleById', 'Heading1'); await sleep(50);
+    return !markNames('boldfirst').some(isBold);
+  });
+  await t('[3] re-applying the same style keeps it (apply, not toggle)', async () => {
+    // requires Heading1 to be ON first (previous test) — guards the absence-style assert
+    if (paraAttrs('boldfirst').paragraphProperties?.styleId !== 'Heading1') return 'precondition failed';
+    selectText('boldfirst styled text');
+    PM().cmd('setStyleById', 'Heading1'); await sleep(50);
+    return paraAttrs('boldfirst').paragraphProperties?.styleId === 'Heading1';
+  });
+  await t('[3] collapsed caret styles its containing paragraph (Title)', async () => {
+    setDoc('caret style probe');
+    const sel = selectText('caret');
+    window.WC.editor.commands.setTextSelection({ from: sel.from, to: sel.from });
+    PM().cmd('setStyleById', 'Title'); await sleep(50);
+    return paraAttrs('caret').paragraphProperties?.styleId === 'Title';
+  });
+  await t('[3] multi-paragraph selection styles every paragraph (Quote)', async () => {
+    setDocs(['multi quote one', 'multi quote two']);
+    window.WC.editor.commands.selectAll();
+    window.WC.Commands.applyStyle('Quote'); await sleep(50);
+    return paraAttrs('multi quote one').paragraphProperties?.styleId === 'Quote'
+      && paraAttrs('multi quote two').paragraphProperties?.styleId === 'Quote';
+  });
+  await t('[3] partial selection applies the LINKED char style, paragraph untouched', async () => {
+    setDoc('partial linked probe words'); selectText('linked'); // one word — never the full paragraph
+    window.WC.Commands.applyStyle('Heading 1'); await sleep(50);
+    const a = paraAttrs('partial');
+    const mark = markNames('linked').find((m) => m.startsWith('textStyle'));
+    return a.paragraphProperties?.styleId == null && !!mark && mark.includes('Heading1Char');
+  });
+  await t('[3] Strong (character style) marks the range, paragraph style untouched', async () => {
+    setDoc('strongchar probe text'); selectText('strongchar');
+    window.WC.Commands.applyStyle('Strong'); await sleep(50);
+    const mark = markNames('strongchar').find((m) => m.startsWith('textStyle'));
+    return !!mark && mark.includes('"styleId":"Strong"')
+      && paraAttrs('strongchar').paragraphProperties?.styleId == null;
+  });
+  await t('[3] No Spacing resolves spacing-after 0 through the cascade', async () => {
+    setDoc('nospace probe text'); selectText('nospace');
+    window.WC.Commands.applyStyle('No Spacing'); await sleep(150);
+    return paraAttrs('nospace').paragraphProperties?.styleId === 'NoSpacing'
+      && PM().getState().spacingAfterPt === 0;
+  });
+  await t('[3] Heading1 text renders the style color via decorations', async () => {
+    setDoc('decor probe text'); selectText('decor probe text');
+    PM().cmd('setStyleById', 'Heading1'); await sleep(150);
+    const p = paraEl('decor');
+    // LEAF span only: the fork nests .sd-paragraph-content → [data-run] → decorated
+    // span, and ALL of them contain the needle text — document-order find() grabs the
+    // undecorated outer wrapper (execution finding, Task 1).
+    const span = p && Array.from(p.querySelectorAll('span')).find((s) => s.textContent.includes('decor') && !s.querySelector('span'));
+    if (!span) return 'no decorated span found';
+    const color = getComputedStyle(span).color;
+    return color === 'rgb(15, 71, 97)'; // fixture Heading1 w:color 0F4761
+  });
+  await t('[3] gallery highlight tracks the caret (Heading1 ↔ Normal)', async () => {
+    setDocs(['plain paragraph here', 'heading paragraph here']);
+    selectText('heading paragraph here'); PM().cmd('setStyleById', 'Heading1'); await sleep(150);
+    const h1Cell = cellFor('Heading 1');
+    const onHeading = !!h1Cell && h1Cell.classList.contains('active');
+    selectText('plain'); await sleep(150);
+    const normalCell = cellFor('Normal');
+    return onHeading && !h1Cell.classList.contains('active')
+      && !!normalCell && normalCell.classList.contains('active');
+  });
+  await t('[3] getState().block carries the display name (Heading 1 / Normal)', async () => {
+    selectText('heading'); await sleep(50);
+    const b1 = PM().getState().block === 'Heading 1';
+    selectText('plain'); await sleep(50);
+    return b1 && PM().getState().block === 'Normal';
+  });
+  await t('[3] hover preview applies live; mouse-leave restores doc + dirty + history', async () => {
+    setDoc('preview probe text'); selectText('preview probe text');
+    await sleep(550); // close the history group so the assert below is clean
+    PM().setClean();
+    const before = JSON.stringify(doc().toJSON());
+    const cell = cellFor('Heading 1');
+    cell.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await sleep(50);
+    const during = paraAttrs('preview').paragraphProperties?.styleId === 'Heading1';
+    cell.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    await sleep(50);
+    // The editor-state asserts are the desync canaries: a view-only restore
+    // (raw view.updateState) would pass the doc() check but desync editor._state
+    // (Editor.ts:607) — assert BOTH copies restored and identical.
+    return during
+      && JSON.stringify(doc().toJSON()) === before
+      && JSON.stringify(window.WC.editor.state.doc.toJSON()) === before
+      && window.WC.editor.state === window.WC.view.state
+      && PM().isDirty() === false;
+  });
+  await t('[3] preview then click commits as ONE undo step', async () => {
+    setDoc('commit probe text'); selectText('commit probe text');
+    await sleep(550); // close the history group — undo must revert ONLY the commit
+    const cell = cellFor('Heading 2');
+    cell.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); await sleep(50);
+    cell.click(); await sleep(80);
+    const applied = paraAttrs('commit').paragraphProperties?.styleId === 'Heading2';
+    PM().cmd('undo'); await sleep(50);
+    return applied && paraAttrs('commit').paragraphProperties?.styleId == null;
+  });
+  await t('[3] Ctrl+Alt+2 applies Heading 2 in PM mode', async () => {
+    setDoc('kbd heading probe'); selectText('kbd heading probe');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true, altKey: true, bubbles: true, cancelable: true }));
+    await sleep(50);
+    return paraAttrs('kbd').paragraphProperties?.styleId === 'Heading2';
+  });
+  await t('[3] repeated Ctrl+Alt+1 keeps Heading1 (apply semantics, no toggle)', async () => {
+    setDoc('repeat kbd probe'); selectText('repeat kbd probe');
+    const fire = () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true, altKey: true, bubbles: true, cancelable: true }));
+    fire(); await sleep(50); fire(); await sleep(50);
+    return paraAttrs('repeat').paragraphProperties?.styleId === 'Heading1';
+  });
+  await t('[3] Ctrl+Shift+N applies Normal (explicit styleId, not null)', async () => {
+    // requires Heading1 to be ON first — guards against false-green in the red state.
+    // Depends on the Task-11.1b SHADOW FIX (app.js:76 gains !shift) — without it this
+    // chord triggers Files.newDoc + a stuck confirmDiscard modal.
+    if (paraAttrs('repeat').paragraphProperties?.styleId !== 'Heading1') return 'precondition failed';
+    selectText('repeat kbd probe');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    await sleep(50);
+    return paraAttrs('repeat').paragraphProperties?.styleId === 'Normal';
+  });
+  await t('[3] styles launcher opens the pane; pane item applies via the engine', async () => {
+    setDoc('pane probe text'); selectText('pane probe text');
+    window.WC.Commands.launcher('styles', null, null);
+    const pane = document.getElementById('styles-pane');
+    if (!pane) return 'styles pane did not open';
+    const item = Array.from(pane.querySelectorAll('.sl-item')).find((n) => n.textContent.trim() === 'Heading 3');
+    if (!item) { window.WC.Dialogs.stylesPane(); return 'Heading 3 pane item not found'; }
+    item.click(); await sleep(50);
+    const ok = paraAttrs('pane').paragraphProperties?.styleId === 'Heading3';
+    if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane(); // toggle-close
+    return ok;
+  });
+  await t('[3] pane Clear All applies Normal; New Style toasts (deferred)', async () => {
+    setDoc('paneclear probe text'); selectText('paneclear probe text');
+    PM().cmd('setStyleById', 'Quote'); await sleep(50);
+    window.WC.Commands.launcher('styles', null, null);
+    const pane = document.getElementById('styles-pane');
+    if (!pane) return 'styles pane did not open';
+    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'Clear All').click();
+    await sleep(50);
+    const cleared = paraAttrs('paneclear').paragraphProperties?.styleId === 'Normal';
+    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'New Style').click();
+    const noDialog = !document.querySelector('.modal-backdrop');
+    if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane();
+    return cleared && noDialog;
+  });
+  await t('[3] bridge resolved read exposes numbering ilvl (level-menu seam)', async () => {
+    setDoc('resolved probe text'); selectText('resolved');
+    run('numbering'); await sleep(50);
+    PM().cmd('changeListLevelBy', 2); await sleep(50);
+    const r = PM().getResolvedParaProps();
+    return r?.numberingProperties?.ilvl === 2;
+  });
+  // KEEP LAST in [3]: openDocx REPLACES the live document (the [0b] block below
+  // sets its own docs, so this is safe here and only here).
+  await t('[3] styleIds round-trip through save/open (w:pStyle + w:rStyle)', async () => {
+    setDocs(['roundtrip heading para', 'roundtrip strongbit para']);
+    selectText('roundtrip heading para'); PM().cmd('setStyleById', 'Heading1'); await sleep(50);
+    selectText('strongbit'); window.WC.Commands.applyStyle('Strong'); await sleep(50);
+    const bytes = await PM().exportDocxBytes();
+    const ok = await PM().openDocx(bytes);
+    if (!ok) return 'reopen failed';
+    await sleep(300); // replaceEditor remount + first sync
+    const a = paraAttrs('roundtrip heading');
+    const mark = markNames('strongbit').find((m) => m.startsWith('textStyle'));
+    return a.paragraphProperties?.styleId === 'Heading1'
+      && !!mark && mark.includes('"styleId":"Strong"');
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
