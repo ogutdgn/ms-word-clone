@@ -47,6 +47,10 @@ The following upstream packages are included in this directory tree:
 - **`changeListLevelBy` command added:** command-shaped wrapper applying an arbitrary
   list-level delta in one transaction (chained ±1 steps re-read stale editor.state and
   land one level short) — powers the Change List Level menu (slice 2, 2026-06-06).
+- **SuperDoc heading keymap removed:** `Mod-Alt-1..6` shortcuts deleted from the
+  Heading extension — they collide with the app's Ctrl/Cmd+Alt+1-3 heading chords
+  (document-level keydown map) and their toggle-to-no-style semantics contradict
+  Word's apply-only behavior (slice 3, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

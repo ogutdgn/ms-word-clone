@@ -19,12 +19,6 @@ import { Extension } from '@core/Extension.js';
  * @module Heading
  * @sidebarTitle Heading
  * @snippetPath /snippets/extensions/heading.mdx
- * @shortcut Mod-Alt-1 | toggleHeading | Toggle heading level 1
- * @shortcut Mod-Alt-2 | toggleHeading | Toggle heading level 2
- * @shortcut Mod-Alt-3 | toggleHeading | Toggle heading level 3
- * @shortcut Mod-Alt-4 | toggleHeading | Toggle heading level 4
- * @shortcut Mod-Alt-5 | toggleHeading | Toggle heading level 5
- * @shortcut Mod-Alt-6 | toggleHeading | Toggle heading level 6
  */
 export const Heading = Extension.create({
   name: 'heading',
@@ -70,17 +64,5 @@ export const Heading = Extension.create({
           return commands.toggleLinkedStyle({ id: `Heading${attributes.level}` }, 'paragraph');
         },
     };
-  },
-
-  addShortcuts() {
-    return this.options.levels.reduce(
-      (items, level) => ({
-        ...items,
-        ...{
-          [`Mod-Alt-${level}`]: () => this.editor.commands.toggleHeading({ level }),
-        },
-      }),
-      {},
-    );
   },
 });
