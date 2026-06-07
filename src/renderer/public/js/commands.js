@@ -986,6 +986,14 @@
 
     applyStyle(name) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
+      const pm = PMA();
+      if (pm) {
+        // setStyleById path (one transaction; Word gallery = plain apply). false =
+        // style missing from this doc's catalog (foreign docs beyond the import
+        // defaults — recorded deviation: real Word mints built-ins on demand).
+        if (!pm.applyStyleByName(name)) WC.toast('Style "' + name + '" is not available in this document.');
+        return;
+      }
       WC.applyNamedStyle(name);
     },
 

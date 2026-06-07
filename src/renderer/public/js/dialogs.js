@@ -317,6 +317,10 @@
   };
   D.stylesPane = function () {
     let pane = document.getElementById('styles-pane'); if (pane) { pane.remove(); return; }
+    // D6 (slice 3): the gallery chevron calls this directly (ribbon.js) with no
+    // launcher gate — block here until the styles area flips.
+    if (window.WC.PM && window.WC.PM.active && window.WC.PM.isBlocked('stylesGallery')) { window.WC.PM.notifyBlocked('Styles'); return; }
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
     pane = el('div', { class: 'taskpane right', id: 'styles-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Styles' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body styles-list' });
@@ -332,7 +336,11 @@
         const item = el('div', { class: 'sl-item', text: s });
         if (preview) item.setAttribute('style', (STYLE_PREVIEW[s] || '') + ';');
         item.addEventListener('mousedown', (e) => e.preventDefault());
-        item.addEventListener('click', () => WC.applyNamedStyle(s));
+        item.addEventListener('click', () => {
+          const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+          if (pm2) { if (!pm2.applyStyleByName(s)) WC.toast('Style "' + s + '" is not available in this document.'); return; }
+          WC.applyNamedStyle(s);
+        });
         list.appendChild(item);
       });
     }
@@ -340,8 +348,8 @@
     body.appendChild(previewRow);
     body.appendChild(list);
     const footer = el('div', { style: { display: 'flex', gap: '6px', padding: '10px 0 0', borderTop: '1px solid #eee', marginTop: '8px' } }, [
-      el('button', { class: 'btn', text: 'New Style', onclick: () => D.createStyle(render) }),
-      el('button', { class: 'btn', text: 'Clear All', onclick: () => WC.applyNamedStyle('Normal') }),
+      el('button', { class: 'btn', text: 'New Style', onclick: () => { if (pm) { WC.toast("New Style isn't on the new engine yet", 'Custom styles land in a later slice — run with --legacy for the classic editor'); return; } D.createStyle(render); } }),
+      el('button', { class: 'btn', text: 'Clear All', onclick: () => { if (pm) { pm.applyStyleByName('Normal'); return; } WC.applyNamedStyle('Normal'); } }),
     ]);
     body.appendChild(footer);
     pane.appendChild(head); pane.appendChild(body);
