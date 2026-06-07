@@ -338,7 +338,7 @@
         item.addEventListener('mousedown', (e) => e.preventDefault());
         item.addEventListener('click', () => {
           const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-          if (pm2) { if (!pm2.applyStyleByName(s)) WC.toast('Style "' + s + '" is not available in this document.'); return; }
+          if (pm2) { if (!pm2.applyStyleByName(s)) WC.toast('Style “' + s + '” is not available in this document.'); return; }
           WC.applyNamedStyle(s);
         });
         list.appendChild(item);

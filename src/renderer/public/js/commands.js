@@ -991,7 +991,7 @@
         // setStyleById path (one transaction; Word gallery = plain apply). false =
         // style missing from this doc's catalog (foreign docs beyond the import
         // defaults — recorded deviation: real Word mints built-ins on demand).
-        if (!pm.applyStyleByName(name)) WC.toast('Style "' + name + '" is not available in this document.');
+        if (!pm.applyStyleByName(name)) WC.toast('Style “' + name + '” is not available in this document.');
         return;
       }
       WC.applyNamedStyle(name);
