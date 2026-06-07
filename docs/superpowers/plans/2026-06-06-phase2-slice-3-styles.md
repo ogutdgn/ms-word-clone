@@ -205,7 +205,10 @@ FAILURES, absence-asserts are guarded by a proven presence first.
     setDoc('decor probe text'); selectText('decor probe text');
     PM().cmd('setStyleById', 'Heading1'); await sleep(150);
     const p = paraEl('decor');
-    const span = p && Array.from(p.querySelectorAll('span')).find((s) => s.textContent.includes('decor'));
+    // LEAF span only: the fork nests .sd-paragraph-content → [data-run] → decorated
+    // span, and ALL of them contain the needle text — document-order find() grabs the
+    // undecorated outer wrapper (execution finding, Task 1).
+    const span = p && Array.from(p.querySelectorAll('span')).find((s) => s.textContent.includes('decor') && !s.querySelector('span'));
     if (!span) return 'no decorated span found';
     const color = getComputedStyle(span).color;
     return color === 'rgb(15, 71, 97)'; // fixture Heading1 w:color 0F4761
