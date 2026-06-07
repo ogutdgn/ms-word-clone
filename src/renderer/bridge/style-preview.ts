@@ -32,9 +32,12 @@ export function installStylePreview(editor: AnyEditor) {
       editor.converter.documentGuid = snap.documentGuid
     }
     snap = null
-    // setState emits no events (documented) — nudge the rAF ribbon sync with a no-op
-    // meta transaction so toggles/highlight re-read the restored state. docChanged=false
-    // → no 'update' event → dirty untouched; applies cleanly (prevState === snap.state).
+    // setState emits NOTHING (documented) — this dispatch exists to fire the
+    // 'transaction' event (emitted on EVERY dispatch, docChanged or not), which is
+    // what schedules state-sync's rAF tick so toggles/highlight re-read the restored
+    // state. Do NOT remove it: setState alone leaves the ribbon frozen on preview
+    // state. docChanged=false → no 'update' event → dirty untouched; applies cleanly
+    // (prevState === snap.state).
     editor.view?.dispatch(editor.view.state.tr.setMeta(PREVIEW_META, true))
   }
 
