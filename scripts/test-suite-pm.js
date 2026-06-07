@@ -592,7 +592,7 @@
   // NO Quote/heading definitions and a BOLD Normal. [3] runs on the blank template
   // (Quote/QuoteChar, Heading1-9+Char, Title, Subtitle, IntenseQuote, ListParagraph,
   // plain Normal all present; Task 4 mints the remaining four).
-  await PM().newBlank(); await sleep(100);
+  await PM().newBlank(); await sleep(100); // blank-template IO settle (replaceEditor is awaited; 100ms covers the first sync)
   // Vocabulary: UI speaks display names ('Heading 1'), the engine speaks styleIds
   // ('Heading1'); styleId lives INSIDE paragraphProperties (cleared by setDoc's reset).
   // SELECTION RULE: paragraph-style asserts REQUIRE a full-paragraph or collapsed
@@ -681,6 +681,8 @@
       && !!normalCell && normalCell.classList.contains('active');
   });
   await t('[3] getState().block carries the display name (Heading 1 / Normal)', async () => {
+    // relies on the previous test's setDocs(['plain paragraph here', 'heading paragraph here'])
+    // with Heading1 applied to the second — deliberate chain, no doc reset between them.
     selectText('heading'); await sleep(50);
     const b1 = PM().getState().block === 'Heading 1';
     selectText('plain'); await sleep(50);
@@ -756,10 +758,14 @@
     window.WC.Commands.launcher('styles', null, null);
     const pane = document.getElementById('styles-pane');
     if (!pane) return 'styles pane did not open';
-    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'Clear All').click();
+    const clearBtn = Array.from(pane.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Clear All');
+    if (!clearBtn) { window.WC.Dialogs.stylesPane(); return 'Clear All button not found'; }
+    clearBtn.click();
     await sleep(50);
     const cleared = paraAttrs('paneclear').paragraphProperties?.styleId === 'Normal';
-    Array.from(pane.querySelectorAll('button')).find((b) => b.textContent === 'New Style').click();
+    const newBtn = Array.from(pane.querySelectorAll('button')).find((b) => b.textContent.trim() === 'New Style');
+    if (!newBtn) { window.WC.Dialogs.stylesPane(); return 'New Style button not found'; }
+    newBtn.click();
     const noDialog = !document.querySelector('.modal-backdrop');
     if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane();
     return cleared && noDialog;
@@ -780,7 +786,7 @@
     const bytes = await PM().exportDocxBytes();
     const ok = await PM().openDocx(bytes);
     if (!ok) return 'reopen failed';
-    await sleep(300); // replaceEditor remount + first sync
+    await sleep(300); // replaceEditor remounts + re-parses asynchronously; 300ms covers the load + first state-sync push (larger than the 150ms rAF tick by design)
     const a = paraAttrs('roundtrip heading');
     const mark = markNames('strongbit').find((m) => m.startsWith('textStyle'));
     return a.paragraphProperties?.styleId === 'Heading1'
