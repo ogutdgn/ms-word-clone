@@ -828,7 +828,8 @@
     const sel = selectText('target');
     window.WC.editor.commands.setTextSelection({ from: sel.from, to: sel.from });
     run('paste');
-    return until(async () => doc().textContent.includes('pasteprobe-payload'));
+    if (!(await until(async () => doc().textContent.includes('pasteprobe-payload')))) return 'paste never landed';
+    return true;
   });
   await t('[4] paste (KSF) preserves character formatting via the HTML parser', async () => {
     await CB().writeHTML('<p><strong>boldbit</strong> plain</p>');
@@ -888,8 +889,9 @@
     if (!dlg) return 'dialog did not open';
     const rows = Array.from(dlg.querySelectorAll('li,option,.ps-item')).map((n) => n.textContent);
     const ok = rows.some((r) => /HTML/i.test(r)) && rows.some((r) => /Unformatted/i.test(r));
-    const close = Array.from(dlg.parentNode.querySelectorAll('button')).find((b) => /^(Cancel|Close)$/.test(b.textContent.trim()));
+    const close = Array.from(dlg.querySelectorAll('.dlg-footer .btn, button')).find((b) => /^(Cancel|Close)$/.test(b.textContent.trim()));
     if (close) close.click();
+    else { const bd = document.querySelector('.modal-backdrop'); if (bd) bd.remove(); } // never leak the modal over the painter tests
     return ok;
   });
   await t('[4] format painter one-shot: char formatting copies, applies once, disarms', async () => {
@@ -907,6 +909,7 @@
     return applied && !second;
   });
   await t('[4] format painter copies PARAGRAPH formatting (Word scope)', async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(50); // defensive: never inherit an armed painter
     setDocs(['parapaint source line', 'parapaint target line two']);
     selectText('parapaint source line'); PM().cmd('setTextAlign', 'center'); await sleep(50);
     run('formatPainter'); await sleep(50);
