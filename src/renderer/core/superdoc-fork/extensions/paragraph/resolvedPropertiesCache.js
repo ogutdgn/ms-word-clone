@@ -35,7 +35,16 @@ function buildTableInfo($pos) {
       });
     }
   }
-  return { tableProperties: { tableStyleId }, rowIndex, cellIndex, numRows, numCells };
+  // Spread the table's full tableProperties (carries tblLook + band sizes — the
+  // style-engine reads tableInfo.tableProperties?.tblLook ?? DEFAULT_TBL_LOOK);
+  // top-level attrs.tableStyleId wins over any stale copy inside tableProperties.
+  return {
+    tableProperties: { ...(tableNode.node.attrs.tableProperties ?? {}), tableStyleId },
+    rowIndex,
+    cellIndex,
+    numRows,
+    numCells,
+  };
 }
 
 export function getResolvedParagraphProperties(node) {
