@@ -4,16 +4,28 @@
 // Negation-attr-safe: Word marks explicit-off as e.g. bold {value:'0'}.
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
+import { STYLE_ID_TO_NAME } from './style-names'
 
 type AnyEditor = any
 
-function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
+export function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
   try {
     const $from = editor.state.selection.$from
     for (let d = $from.depth; d >= 0; d--) {
       const node = $from.node(d)
       if (node?.type?.name === 'paragraph') return { node, pos: d > 0 ? $from.before(d) : 0 }
     }
+    // AllSelection ($from is doc root, depth 0) — take the FIRST paragraph as the head.
+    // NOTE: returning false from descendants() only skips that node's CHILDREN; sibling
+    // iteration continues (guarded by `if (result)`) — fine at document scale.
+    const doc = editor.state.doc
+    let result: { node: any; pos: number } | null = null
+    doc.descendants((node: any, pos: number) => {
+      if (result) return false
+      if (node.type?.name === 'paragraph') { result = { node, pos }; return false }
+      return true
+    })
+    return result
   } catch { /* selection states the resolver can't read */ }
   return null
 }
@@ -24,7 +36,7 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     subscript: false, superscript: false,
     justifyLeft: false, justifyCenter: false, justifyRight: false, justifyFull: false,
     insertUnorderedList: false, insertOrderedList: false,
-    fontName: '', fontSize: '', block: '', // populated when the styles area flips (slice 3)
+    fontName: '', fontSize: '', block: '', // block = display name of the head paragraph's resolved style (slice 3)
     computedFontFamily: '', computedFontSizePt: null, // Font-dialog aliases (dialogs.js:347-349)
   }
   let entries: Array<{ name: string; attrs: any }> = []
@@ -89,6 +101,10 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     // pt-based and have no multiplier representation — report null (dialog shows default).
     st.lineSpacing = sp.line != null && (sp.lineRule === 'auto' || sp.lineRule == null)
       ? Math.round((sp.line / 240) * 100) / 100 : null
+    // slice 3: resolved styleId → display name for the gallery highlight + pane.
+    // Unstyled paragraphs read as 'Normal' (real Word highlights Normal by default —
+    // oracle probe pending, Task 13.3). Unknown/foreign styleIds → '' (no highlight).
+    st.block = resolved?.styleId ? (STYLE_ID_TO_NAME[resolved.styleId] ?? '') : 'Normal'
   }
   st.computedFontFamily = st.fontName
   const sizeNum = parseFloat(st.fontSize)
@@ -123,6 +139,11 @@ export function installStateSync(editor: AnyEditor) {
     pushSpin('indentRight', String(st.indentRightIn ?? 0))
     pushSpin('spacingBefore', String(st.spacingBeforePt ?? 0))
     pushSpin('spacingAfter', String(st.spacingAfterPt ?? 8))
+    // Caret-driven styles-gallery highlight (real Word; legacy was apply-driven only).
+    // renderStylesGallery registers nothing in controlIndex — query the cells directly.
+    document.querySelectorAll('.style-cell').forEach((c: any) => {
+      c.classList.toggle('active', !!st.block && c.dataset.style === st.block)
+    })
     w.WC?.StatusBar?.update?.()
     // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
     const can = (w.WC?.editor as any)?.can?.()

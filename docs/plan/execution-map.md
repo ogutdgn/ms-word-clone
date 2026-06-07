@@ -49,9 +49,18 @@
 > `lists` FLIPPED** — align/indent/spinners/line-spacing/shading/borders/sort, glyph-honoring
 > list libraries, Word-native multilevel, Paragraph dialog, Word shortcuts; the slice-1
 > hanging-indent gap closed (fork CSS shipped); new `read-para-props` oracle verb (quirks
-> #16-23). Gates: **PM 76/76**, legacy 257, smoke 9/9 × 2, docx 17. Oracle legs A/B PASS except
-> two reads pending a Word relaunch (see last-point.md).
-> **Next: slice 3 — styles** (plan to be written via brainstorm → write-plan).
+> #16-23). Gates: **PM 76/76**, legacy 257, smoke 9/9 × 2, docx 17.
+>
+> **Slice 3 is DONE** (`feature/phase-2-slice-3-styles`, PR pending): area **`styles`
+> FLIPPED** — gallery click + PM-native hover live-preview (`bridge/style-preview.ts`:
+> throwaway txn + `editor.setState` restore), styles pane applies (chevron leak closed;
+> New Style deferred), 4 chords (+ the Ctrl+N `!shift` shadow fix), caret-driven gallery
+> highlight (`st.block`), 4 minted built-in style defaults (SubtleEmphasis oracle-amended),
+> heading keymap stripped; BOTH slice-2 revisits closed (resolved-ilvl level menu;
+> resolvedPropertiesCache TableInfo+tblLook). New `read-style-props` verb (quirks #24-27);
+> slice-2 oracle followUps closed; oracle legs A 5/5 + B 9/9 PASS. Gates: **PM 96/96**,
+> legacy 257, smoke 9/9 × 2, docx 17.
+> **Next: slice 4 — clipboard + editing-misc** (brainstorm-lite → write-plan → execute).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -72,6 +81,16 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-07 (Phase 2)
+- [x] Slice-3 **plan** written + 4-critic-hardened + committed (`a90ce67`) — `docs/superpowers/plans/2026-06-06-phase2-slice-3-styles.md` (4 blockers caught pre-build: setState restore channel, Ctrl+Shift+N shadow, linked-char selection trap, negation-fixture context leak).
+- [x] Slice-3 **red tests** (20 `[3]` + cellFor + 4 engine pins) (`1885d1d`, `6ec4e56`).
+- [x] Slice-3 **fork work**: heading keymap strip (`3b5d276`), minted style defaults (`ebaac6f`, `4800ce4`, SubtleEmphasis live-Word amendment `7c2f314`), TableInfo+tblLook fix (`8c5e672`, `fcba36a`).
+- [x] Slice-3 **bridge**: style-names/resolved-read/applyStyleByName (`131e1d3`), st.block + caret highlight (`c07d0b6`), PM-native hover preview (`d83b29ec`).
+- [x] Slice-3 **entry points**: applyStyle + pane (`1b4fdfd` +review fixes), Change-List-Level resolved read (`3ab3f32` — slice-2 deviation closed).
+- [x] Slice-3 **THE FLIP** (`af7c559`) — 96/96 first run, zero triage; all five gates green; final-review polish (`dceafa1`).
+- [x] **Oracle**: slice-2 followUps CLOSED (lists family PASS incl. the U+25AA discovery; literal roundtrip PASS); `read-style-props` verb + quirks #24-27 (`9951073`); behavior verdicts (re-apply=APPLY; clearing=full-coverage-only) (`b54bd69`); slice-3 legs A 5/5 + B 9/9 + table spot-check (`0e8134b`).
+- [ ] Slice-3 **PR** → `main` (open + merge).
 
 ### 2026-06-05 (Phase 2)
 - [x] Phase 2 **spec** written + committed (`d68c187`) — `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md`.
@@ -104,7 +123,7 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice-2 **THE FLIP** (`8d8e14f`) — 76/76 first run, zero triage; all five gates green.
 - [x] Slice-2 **evidence**: round-trip (`3e1a186`), oracle legs A/B JSONs (`882ea7e`), quirks #22-23 (`86ada55`).
 - [x] Slice-2 **PR #17** merged to `main` (conflict round vs PR #16 resolved in `fdef0e3`); gates re-verified on `main` (PM 76/76, legacy 257/257); branch deleted local+remote; CLAUDE/AGENTS banners advanced.
-- [ ] 5-min **oracle follow-up** after a Word relaunch (two pending reads — commands in the oracleA-lists JSON `followUp` fields).
+- [x] 5-min **oracle follow-up** after a Word relaunch (two pending reads — commands in the oracleA-lists JSON `followUp` fields). *(Closed 2026-06-07 in the slice-3 oracle session — all rows PASS.)*
 
 ### 2026-06-05 (Phase 1 wrap-up)
 - [x] Phase 1 **Stage D** — final review = READY TO INTEGRATE; hardened the smoke Tab test (`8de524e`).

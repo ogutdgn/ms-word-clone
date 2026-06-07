@@ -47,6 +47,20 @@ The following upstream packages are included in this directory tree:
 - **`changeListLevelBy` command added:** command-shaped wrapper applying an arbitrary
   list-level delta in one transaction (chained ±1 steps re-read stale editor.state and
   land one level short) — powers the Change List Level menu (slice 2, 2026-06-06).
+- **SuperDoc heading keymap removed:** `Mod-Alt-1..6` shortcuts deleted from the
+  Heading extension — they collide with the app's Ctrl/Cmd+Alt+1-3 heading chords
+  (document-level keydown map) and their toggle-to-no-style semantics contradict
+  Word's apply-only behavior (slice 3, 2026-06-06).
+- **Four built-in style definitions added to import defaults:**
+  `DEFAULT_LINKED_STYLES` (core/super-converter/exporter-docx-defs.js) additionally
+  carries NoSpacing, Strong, Emphasis, SubtleEmphasis (Word-standard definitions) so
+  `addDefaultStylesIfMissing` makes the full Quick-Styles gallery resolvable in every
+  document, like real Word's always-available built-ins (slice 3, 2026-06-06).
+- **resolvedPropertiesCache TableInfo fix:** both resolver entry points previously
+  passed the raw `tableStyleId` string where the style-engine expects a TableInfo
+  object — the table-style paragraph cascade was silently skipped for in-table
+  paragraphs. Now builds `{ tableProperties, rowIndex, cellIndex, numRows, numCells }`
+  with real indices from the ancestor chain (slice 3, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

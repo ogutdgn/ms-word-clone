@@ -1,0 +1,45 @@
+{
+  "scope": "Slice 3 (styles) — real-Word behavior probes via the AppleScript object model (slice-3 plan Task 2), plus live verification of the read-style-props oracle verb on a Word-authored style probe",
+  "date": "2026-06-07",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-3-styles",
+  "probes": [
+    {
+      "probe": "re-apply same paragraph style (apply-or-toggle)",
+      "method": "Scratch doc (never saved): set style of paragraph 1 of d to style heading1; read name local of (get style ...); set style ... to style heading1 AGAIN; re-read.",
+      "raw": "afterFirstApply=[Heading 1] afterSecondApply=[Heading 1]",
+      "verdict": "APPLY semantics — re-applying the active style is a no-op; it does NOT toggle the paragraph back to Normal."
+    },
+    {
+      "probe": "direct-format clearing — ONE bold word (minority coverage)",
+      "method": "set bold of font object of (words 1 thru 1 of text object of paragraph 2 of d) to true; set style of paragraph 2 of d to style heading1; re-read word-1 bold + a non-bolded word's bold.",
+      "raw": "preBold=[true] postApplyBold=[true] otherWordBold=[false] style=[Heading 1]",
+      "verdict": "PRESERVED — direct character formatting covering a minority of the paragraph SURVIVES applying a paragraph style."
+    },
+    {
+      "probe": "direct-format clearing — WHOLE paragraph bold (full coverage)",
+      "method": "set bold of font object of (text object of paragraph 3 of d) to true; set style of paragraph 3 of d to style heading1; re-read paragraph + word-1 bold.",
+      "raw": "preBold=[true] postApplyBold=[false] word1Bold=[false] style=[Heading 1]",
+      "verdict": "CLEARED — full-coverage direct bold is absorbed/reset by the style application. Combined with the minority probe: Word clears direct char marks ONLY at full/majority coverage; the PM engine's unconditional char-mark clearing matches Word only for that case and DEVIATES for partial coverage — record as the slice's recorded-deviation (or fix)."
+    },
+    {
+      "probe": "style gallery highlight (active style indication in the ribbon gallery)",
+      "method": "visual-only — no UI scripting (GUI/AX scripting excluded by the oracle contract)",
+      "raw": "",
+      "verdict": "deferred to user observation"
+    },
+    {
+      "probe": "hover preview scope (live preview while hovering a gallery entry)",
+      "method": "visual-only — no UI scripting (GUI/AX scripting excluded by the oracle contract)",
+      "raw": "",
+      "verdict": "deferred to user observation"
+    },
+    {
+      "probe": "read-style-props verb on the Word-authored style probe (oracle-style-probe.docx)",
+      "method": "Authored IN real Word: make new document; 4 paragraphs; set style of paragraph 2 to style heading1 (enum token, worked first try); paragraph 3 to style title; make new Word style at d with properties {name local:\"MyProbeStyle\", style type:style type paragraph} (worked first try); applied to paragraph 4 via plain name STRING; save as ~/Desktop/oracle-style-probe.docx; Word itself re-saved a copy to tests/fixtures/oracle-style-probe.docx (gitignored). Verb run against both paths.",
+      "raw": "1:Normal | 2:Heading 1 | 3:Title | 4:MyProbeStyle (identical from Desktop and fixtures copies)",
+      "verdict": "VERB VERIFIED — style reads must use name local of (get style of paragraph i of d): the GET returns a style OBJECT, not a WdBuiltinStyle enum token (as-string coercion -1700, word-oracle quirk #27); built-ins read as display names, custom styles as their creation name; SET accepts enum token AND name string."
+    }
+  ],
+  "pidSafety": "All probes on a scratch document (never saved) closed by name-verified ordinal saving no; the style probe closed by its NEW basename after save as (quirk #11/#21); document count verified 0 after every leg; one relaunch-restored copy of our own slice-2 fixture was closed by exact basename at session start to reach baseline 0; Word never quit."
+}

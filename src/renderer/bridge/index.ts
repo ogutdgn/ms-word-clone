@@ -4,6 +4,7 @@
 import { legacyBoot } from './mode'
 import { installCommands } from './commands'
 import { installIo } from './io'
+import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
 import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
@@ -20,7 +21,7 @@ let replacing = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists']) // slices 1-2
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles']) // slices 1-3
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -187,6 +188,9 @@ export function preinstallBridge() {
     withSelection: (fn: () => void) => fn(),
     openDocx: async () => false, // pre-mount stub — replaced by installBridge
     newBlank: async () => false, // pre-mount stub — replaced by installBridge
+    stylePreviewEnter: () => false,
+    stylePreviewLeave: () => {},
+    stylePreviewCommitRestore: () => {},
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -198,7 +202,7 @@ export function installBridge(editor: AnyEditor) {
   current = editor
   const PM = w.WC.PM
   if (legacyBoot) { PM.ready = true; return PM } // §4.3-3: passive under --legacy — zero listeners
-  Object.assign(PM, installCommands(editor), installIo(editor))
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

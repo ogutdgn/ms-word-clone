@@ -7,6 +7,7 @@
      node scripts/oracle/word-oracle.js read-props <abs path .docx> [--out report.json]
      node scripts/oracle/word-oracle.js read-word-props <abs path .docx> <paraIdx> [wordIdx] [--out report.json]
      node scripts/oracle/word-oracle.js read-para-props <abs path .docx> [--out report.json]
+     node scripts/oracle/word-oracle.js read-style-props <abs path .docx> [--out report.json]
      node scripts/oracle/word-oracle.js roundtrip  <abs in.docx> <abs out.docx>
 
    PID-safety contract (name-verified, not ordinal):
@@ -105,7 +106,47 @@
       every stock run) and eventually stop completing at all, while property
       reads on ALREADY-open documents keep working. Wrap long operations in
       `with timeout of N seconds`; if opens stop completing, the only fix is the
-      USER relaunching Word — never quit it from a script. */
+      USER relaunching Word — never quit it from a script. (Refined by #25.)
+  24. A bare AppleEvent sent to a NOT-running Word AUTO-LAUNCHES it HEADLESS
+      (zero windows). In that state property reads answer instantly but
+      `open file name` times out (-1712) forever — no document ever appears.
+      Only a USER launch (Dock/Finder) produces a window-bearing instance whose
+      opens work. Check `count of windows` ≥ 1 before any open-based session.
+      RECOVERY WITHOUT QUITTING (observed 2026-06-07, leg A): `make new
+      document` succeeds even in the headless state and materializes a WINDOW
+      (windows 0→1); after closing that scratch doc (name-verified ordinal,
+      saving no), file opens work normally again in the same instance.
+  25. Refines #23: the "degraded" opens are PATH-NOVELTY-correlated, not purely
+      time-correlated. `open file name` on a path Word has NEVER opened before
+      (not in its recents/sandbox-grant set) can stall for MINUTES and complete
+      LONG AFTER the client AppleEvent timeout (-1712) — the document then
+      materializes anyway. Known paths open in seconds in the same session
+      (verified 2026-06-07: fresh-named copy of a known-good file timed out
+      while the original opened instantly; both "failed" opens materialized
+      minutes later). After a -1712 on open, do NOT re-issue the open — poll
+      `count of documents`/names and work with the late-arriving document
+      (a roundtrip save-as leg was completed exactly this way).
+  26. While late opens (#25) are pending/settling, BY-NAME document resolution
+      is INTERMITTENT: `document "<name>"` raises -1728 in one AppleEvent and
+      resolves in the next — even immediately after `exists document "<name>"`
+      returned true — while `name of document 1` answers correctly throughout.
+      All worker scripts therefore use name-VERIFIED ordinal access (asDocRef /
+      asCloseOurs below): operate on `document 1` ONLY when its name equals the
+      expected basename, falling back to by-name otherwise. PID-safe: every
+      ordinal access is gated on the exact-basename comparison.
+  27. `style of paragraph` GETs back a Word style OBJECT («class w173»), NOT a
+      WdBuiltinStyle enum token — coercing it `as string` raises -1700. Read
+      `name local of (get style of paragraph i of d)`: built-ins return display
+      names ("Normal", "Heading 1", "Title"); custom styles return their
+      creation name ("MyProbeStyle") — same field, no separate raw-enum form on
+      the read side. SET accepts both the enum token (`style heading1`,
+      `style title`, `style normal`) and a plain name STRING ("Heading 2",
+      "MyProbeStyle"). Style objects DO bind to variables (unlike word ranges,
+      #14). Custom paragraph styles are scriptable: `make new Word style at d
+      with properties {name local:"MyProbeStyle", style type:style type
+      paragraph}` works first try. Beware: `st` is a reserved token in Word's
+      dictionary context — using it as a variable name is a syntax error
+      (-2741). */
 'use strict';
 const { execFileSync } = require('node:child_process');
 const os = require('node:os');
@@ -116,6 +157,25 @@ function osa(script) {
   return execFileSync('/usr/bin/osascript', ['-e', script], { encoding: 'utf8' }).trim();
 }
 const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+/* Name-VERIFIED ordinal access (quirk #26): after a wedged open (-1712, quirk
+   #23/#25) Word's BY-NAME document index turns intermittent — `document "<name>"`
+   raises -1728 in one AppleEvent and resolves fine in the next, while `name of
+   document 1` keeps answering correctly throughout. Worker scripts therefore
+   access OUR document through a name-verified ordinal (`document 1` ONLY when
+   its name equals the expected basename) and fall back to by-name otherwise.
+   PID-safety is preserved: every ordinal access is gated on the exact-basename
+   comparison, so a user document at the top of the stack is never touched. */
+const asDocRef = (basename) => `if (name of document 1) is equal to "${esc(basename)}" then
+      set d to document 1
+    else
+      set d to document "${esc(basename)}"
+    end if`;
+const asCloseOurs = (basename) => `if (name of document 1) is equal to "${esc(basename)}" then
+      close document 1 saving no
+    else
+      close document "${esc(basename)}" saving no
+    end if`;
 
 /**
  * Open a docx in Word and wait until it appears, then verify it is OUR doc.
@@ -166,7 +226,7 @@ function readProps(docxPath) {
 tell application "Microsoft Word"
   set out to ""
   try
-    set d to document "${esc(basename)}"
+    ${asDocRef(basename)}
     repeat with i from 1 to (count of paragraphs of d)
       set tr to text object of paragraph i of d
       set f to font object of tr
@@ -174,10 +234,12 @@ tell application "Microsoft Word"
       set out to out & i & tab & (content of tr) & tab & (bold of f) & tab & (italic of f) & tab & (underline of f) & tab & (name of f) & tab & (font size of f) & tab & (alignment of pf) & linefeed
     end repeat
   on error errMsg
-    close document "${esc(basename)}" saving no
+    try
+      ${asCloseOurs(basename)}
+    end try
     error errMsg
   end try
-  close document "${esc(basename)}" saving no
+  ${asCloseOurs(basename)}
   return out
 end tell`;
   const raw = osa(script);
@@ -218,16 +280,18 @@ function readWordProps(docxPath, paraIdx, wordIdx) {
 tell application "Microsoft Word"
   set out to ""
   try
-    set d to document "${esc(basename)}"
+    ${asDocRef(basename)}
     ${range}
     repeat with i from firstW to lastW
       set out to out & i & tab & (content of (words i thru i of text object of paragraph ${p} of d)) & tab & ${spec('bold')} & tab & ${spec('italic')} & tab & ${spec('underline')} & tab & ${spec('name')} & tab & ${spec('font size')} & linefeed
     end repeat
   on error errMsg
-    close document "${esc(basename)}" saving no
+    try
+      ${asCloseOurs(basename)}
+    end try
     error errMsg
   end try
-  close document "${esc(basename)}" saving no
+  ${asCloseOurs(basename)}
   return out
 end tell`;
   const raw = osa(script);
@@ -269,7 +333,7 @@ function readParaProps(docxPath) {
 tell application "Microsoft Word"
   set out to ""
   try
-    set d to document "${esc(basename)}"
+    ${asDocRef(basename)}
     repeat with i from 1 to (count of paragraphs of d)
       set pf to paragraph format of paragraph i of d
       set tr to text object of paragraph i of d
@@ -277,10 +341,12 @@ tell application "Microsoft Word"
       set out to out & i & tab & (alignment of pf) & tab & (line spacing rule of pf) & tab & (line spacing of pf) & tab & (space before of pf) & tab & (space after of pf) & tab & (paragraph format left indent of pf) & tab & (paragraph format right indent of pf) & tab & (first line indent of pf) & tab & (list type of lf) & tab & (list level number of lf) & tab & (list string of lf) & tab & (content of tr) & linefeed
     end repeat
   on error errMsg
-    close document "${esc(basename)}" saving no
+    try
+      ${asCloseOurs(basename)}
+    end try
     error errMsg
   end try
-  close document "${esc(basename)}" saving no
+  ${asCloseOurs(basename)}
   return out
 end tell`;
   const raw = osa(script);
@@ -310,6 +376,53 @@ end tell`;
   });
 }
 
+/**
+ * Per-paragraph STYLE read (slice 3). One row per paragraph: index, style name,
+ * text (LAST — quirk #16).
+ *
+ * VERIFIED live against Word for Mac 16.77.1 (2026-06-07, quirk #27):
+ * `style of paragraph` GETs back a Word style OBJECT (`«class w173» "Heading 1"
+ * of document ...`), NOT a WdBuiltinStyle enum token — coercing it `as string`
+ * raises -1700. Read the object's `name local` instead: built-ins return their
+ * display names ("Normal", "Heading 1", "Title"), custom styles return the
+ * name they were created with ("MyProbeStyle") — the same field for both, so
+ * there is no separate raw-enum form on the read side. SET accepts both the
+ * enum token (`set style ... to style heading1`) and a name STRING
+ * (`set style ... to "Heading 1"` / `"MyProbeStyle"`). Style objects DO bind
+ * to variables (unlike word ranges, quirk #14).
+ */
+function readStyleProps(docxPath) {
+  const basename = openDoc(docxPath);
+  const script = `
+tell application "Microsoft Word"
+  set out to ""
+  try
+    ${asDocRef(basename)}
+    repeat with i from 1 to (count of paragraphs of d)
+      set tr to text object of paragraph i of d
+      set sName to name local of (get style of paragraph i of d)
+      set out to out & i & tab & sName & tab & (content of tr) & linefeed
+    end repeat
+  on error errMsg
+    try
+      ${asCloseOurs(basename)}
+    end try
+    error errMsg
+  end try
+  ${asCloseOurs(basename)}
+  return out
+end tell`;
+  const raw = osa(script);
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const p = line.split('\t');
+    return {
+      index: Number(p[0]),
+      style: p[1] || '',
+      text: p.slice(2).join('\t').replace(/\r$/, ''),
+    };
+  });
+}
+
 function roundtrip(inPath, outPath) {
   // Validate output path is inside the user's home directory (Word for Mac sandbox:
   // save as to /tmp silently shows a sheet dialog and blocks indefinitely, or raises
@@ -333,20 +446,24 @@ function roundtrip(inPath, outPath) {
   osa(`
 tell application "Microsoft Word"
   try
-    save as document "${esc(inBasename)}" file name "${esc(outPath)}" file format format document
+    if (name of document 1) is equal to "${esc(inBasename)}" then
+      save as document 1 file name "${esc(outPath)}" file format format document
+    else
+      save as document "${esc(inBasename)}" file name "${esc(outPath)}" file format format document
+    end if
   on error errMsg
     -- save as failed; try to close whichever name the doc still has.
     -- First attempt the original name (save as may not have renamed it).
     try
-      close document "${esc(inBasename)}" saving no
+      ${asCloseOurs(inBasename)}
     on error
       try
-        close document "${esc(outBasename)}" saving no
+        ${asCloseOurs(outBasename)}
       end try
     end try
     error errMsg
   end try
-  close document "${esc(outBasename)}" saving no
+  ${asCloseOurs(outBasename)}
 end tell`);
 }
 
@@ -373,10 +490,12 @@ if (cmd === 'read-props' && a) {
   });
 } else if (cmd === 'read-para-props' && a) {
   emit({ file: a, generatedBy: 'word-oracle read-para-props', paragraphs: readParaProps(path.resolve(a)) });
+} else if (cmd === 'read-style-props' && a) {
+  emit({ file: a, generatedBy: 'word-oracle read-style-props', paragraphs: readStyleProps(path.resolve(a)) });
 } else if (cmd === 'roundtrip' && a && b) {
   roundtrip(path.resolve(a), path.resolve(b));
   console.log('ROUNDTRIP_OK ' + b);
 } else {
-  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>');
+  console.error('usage: word-oracle.js read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>');
   process.exit(2);
 }

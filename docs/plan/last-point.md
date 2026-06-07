@@ -7,6 +7,76 @@
 
 ---
 
+## 2026-06-07 — Phase 2 slice 3 BUILT (styles on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-3-styles` (directly off `main` post the slice-2
+  checkpoint merge — no stacked PRs; PR to open next).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 3 DONE → slice 4 (clipboard +
+  editing-misc) next.**
+- **State summary:** area **`styles` FLIPPED** (registry `bridge/index.ts`): Quick-Styles
+  gallery click (`Commands.applyStyle` → bridge `applyStyleByName` → engine `setStyleById`,
+  one transaction, Word plain-apply semantics), **Word's hover live-preview restored
+  PM-natively** (new `bridge/style-preview.ts`: throwaway transaction + `editor.setState`
+  restore — the fork double-books state in a private `_state`; converter
+  documentModified/documentGuid snapshotted; capture-phase keydown/beforeinput cancel so
+  typing mid-preview is never discarded), styles pane applies flip (D6 gate closes the
+  pre-existing chevron leak; New Style toasts — custom styles deferred), 4 keyboard chords
+  live (+ the **Ctrl+N `!shift` shadow fix** — Ctrl+Shift+N was dead code in both worlds,
+  now Apply-Normal per Word; recorded legacy-visible), **caret-driven gallery highlight**
+  (state-sync `st.block` = display name of the resolved styleId, 'Normal' default —
+  net-new fidelity win), bridge name↔id table (`style-names.ts`) + resolved-props read
+  (`getResolvedParaProps`), **4 built-in styles minted** into the fork import defaults
+  (NoSpacing/Strong/Emphasis/SubtleEmphasis; SubtleEmphasis oracle-amended to live-Word
+  404040/themeTint BF), fork Heading `Mod-Alt-1..6` keymap stripped (collision + toggle
+  ≠ Word). **Both slice-2 revisits CLOSED:** Change-List-Level reads the resolved ilvl;
+  `resolvedPropertiesCache` builds a real TableInfo (real row/cell indices + full
+  tableProperties incl. tblLook — review-found deepening). New oracle verb
+  **`read-style-props`** (style OBJECT discovery — `name local` reads, display names) +
+  quirks #24-27 (headless auto-launch + make-new-document recovery; fresh-path late opens;
+  ordinal access; style object forms). **Slice-2 oracle followUps CLOSED** (lists family
+  all PASS — U+25AA literal round-trip resolved the square-glyph discovery; literal
+  roundtrip PASS, shading/borders survive Word re-save). Gates: **PM 96/96** (76 + 20 new
+  `[3]`), legacy 257/257 frozen, smoke 9/9 ×2, docx 17/17.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-06-phase2-slice-3-styles.md`,
+  grounded by a 6-agent inventory + hardened by a 4-critic adversarial workflow — 20
+  findings applied incl. 4 blockers: the `editor.setState` restore channel, the Ctrl+Shift+N
+  shadow, the linked-character-style selection trap, the negation-fixture context leak;
+  executed subagent-driven with two-stage review per task):
+  - `a90ce67` plan · `1885d1d`/`6ec4e56` red tests (20 `[3]` + cellFor + 4 engine pins)
+  - `3b5d276` fork: heading keymap strip · `ebaac6f`/`4800ce4` minted defaults
+  - `8c5e672`/`fcba36a` TableInfo fix (+tblLook spread, review-found)
+  - `131e1d3` bridge (name table, resolved read, applyStyleByName + AllSelection head fallback)
+  - `c07d0b6` state-sync (st.block + caret-driven highlight) · `d83b29ec`/`53750c2` hover preview
+  - `1b4fdfd`/`4356684`/`e6a6ebc` applyStyle + pane (+Clear-All re-capture, review-found)
+  - `3ab3f32` Change-List-Level resolved read · `af7c559`/`dfef873` **THE FLIP** (96/96 first
+    run, zero triage) · `9e7c3dc` UI evidence
+  - `9951073`/`b54bd69` oracle verb + slice-2 followUps closed + behavior verdicts
+  - `7c2f314` SubtleEmphasis live-Word amendment · `02fcba7` quirk-#24 recovery
+  - `0e8134b` oracle legs A/B + table spot-check evidence · `dceafa1` final-review polish
+    (chords toast like gallery/pane; New Style per-click re-capture).
+- **Oracle validation (spec §8.3) vs Word 16.77.1:** leg A clone→Word **PASS 5/5**
+  (read-style-props reads back exact display names); leg B Word→clone **PASS 9/9**
+  (paragraph styles, Strong/SubtleEmphasis character styles as textStyle marks,
+  `st.block` = 'Heading 1'); minted-defaults diff (NoSpacing not-material, Strong match,
+  SubtleEmphasis material → amended); table spot-check PASS (Task-5 fix vs a real
+  GridTable4-Accent1 + tblLook doc). Behavior verdicts: **re-apply = APPLY (no toggle)**;
+  **clearing: Word clears char marks at FULL coverage only, preserves partial** — engine
+  clears unconditionally → KNOWN DEVIATION (partial case), recorded.
+- **KNOWN DEVIATIONS (recorded):** partial-coverage direct-formatting clearing (above);
+  custom styles / New Style deferred (no engine path); foreign docs missing built-ins
+  beyond the import defaults toast instead of minting (Word mints from its library);
+  empty styled paragraphs render base-size caret (decorations style text nodes only);
+  `D.applyStyles` dialog stays dead code; gallery hover preview vs Word's visual scope +
+  IME-mid-preview are visual-only probes deferred to user observation; plugin styles list
+  is init-frozen (future modify-style feature must refresh both catalogs).
+- **Next:** PR slice 3 → `main`; then **slice 4 — clipboard + editing-misc** (cut/copy/
+  paste PM-native, paste-special, format painter via fork `copyFormat`, select) via
+  brainstorm-lite → write-plan → execute. Backlog noted: `D.applyStyles` needs a PM branch
+  if ever wired; Phase-3 logger must learn `PREVIEW_META` (preview txns ≠ user edits).
+- **Blockers/notes:** none. Word left healthy (doc count 0, never quit).
+
+---
+
 ## 2026-06-06 — Phase 2 slice 2 INTEGRATED to `main`
 
 - **Branch:** `main` (PR #17 merged — one conflict round in the plan docs vs PR #16's

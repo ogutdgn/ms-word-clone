@@ -73,7 +73,7 @@
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
         if (k === 'enter' && !shift) return pmBlockedOr('insert-basics', () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }));
         if (k === 'o') return () => WC.Files.open();
-        if (k === 'n') return () => WC.Files.newDoc();
+        if (k === 'n' && !shift) return () => WC.Files.newDoc(); // !shift: don't shadow Ctrl+Shift+N (Apply Normal, below)
         if (k === 'p') return () => WC.Files.print();
         if (k === 'f') return () => WC.Dialogs.findPane(false);
         if (k === 'h') return () => WC.Dialogs.findPane(true);
@@ -91,10 +91,12 @@
         if (shift && (k === ',' || k === '<')) return pmBlockedOr('character', () => incFont(-1));
         if (k === ']') return pmBlockedOr('character', () => incFont(1));
         if (k === '[') return pmBlockedOr('character', () => incFont(-1));
-        if (shift && k === 'n') return pmBlockedOr('styles', () => WC.applyNamedStyle('Normal'));
-        if (e.altKey && k === '1') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 1'));
-        if (e.altKey && k === '2') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 2'));
-        if (e.altKey && k === '3') return pmBlockedOr('styles', () => WC.applyNamedStyle('Heading 3'));
+        // Styles chords route through applyStyleByName so a catalog-missing style
+        // toasts exactly like the gallery/pane paths (foreign-doc edge; final-review).
+        if (shift && k === 'n') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Normal'); if (!pm.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); };
+        if (e.altKey && k === '1') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 1'); if (!pm.applyStyleByName('Heading 1')) WC.toast('Style “Heading 1” is not available in this document.'); };
+        if (e.altKey && k === '2') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 2'); if (!pm.applyStyleByName('Heading 2')) WC.toast('Style “Heading 2” is not available in this document.'); };
+        if (e.altKey && k === '3') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 3'); if (!pm.applyStyleByName('Heading 3')) WC.toast('Style “Heading 3” is not available in this document.'); };
         return null;
       };
       // PM keymaps own the history keys when focus is in the view — stand down
