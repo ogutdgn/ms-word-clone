@@ -4,6 +4,7 @@
 import { legacyBoot } from './mode'
 import { installCommands } from './commands'
 import { installIo } from './io'
+import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
 import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
@@ -187,6 +188,9 @@ export function preinstallBridge() {
     withSelection: (fn: () => void) => fn(),
     openDocx: async () => false, // pre-mount stub — replaced by installBridge
     newBlank: async () => false, // pre-mount stub — replaced by installBridge
+    stylePreviewEnter: () => false,
+    stylePreviewLeave: () => {},
+    stylePreviewCommitRestore: () => {},
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -198,7 +202,7 @@ export function installBridge(editor: AnyEditor) {
   current = editor
   const PM = w.WC.PM
   if (legacyBoot) { PM.ready = true; return PM } // §4.3-3: passive under --legacy — zero listeners
-  Object.assign(PM, installCommands(editor), installIo(editor))
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

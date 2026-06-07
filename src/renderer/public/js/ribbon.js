@@ -14,12 +14,23 @@
   function serializeSel() { const s = window.getSelection(); if (!s.rangeCount || !E().node.contains(s.anchorNode)) return null; const r = s.getRangeAt(0); return { sp: selPath(r.startContainer), so: r.startOffset, ep: selPath(r.endContainer), eo: r.endOffset }; }
   function restoreSel(d) { if (!d) return; try { const r = document.createRange(); r.setStart(nodeAtPath(d.sp), d.so); r.setEnd(nodeAtPath(d.ep), d.eo); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E().saveRange(); } catch (e) { /* selection drifted */ } }
   function stylePreviewEnter(name) {
-    if (window.WC.PM && window.WC.PM.active) return; // PM mode: gallery preview lands in slice 3
+    if (window.WC.PM && window.WC.PM.active) {
+      // PM-native preview (slice 3): throwaway transaction via the bridge. Gate on
+      // the area flip so an unflipped build previews nothing (D6 courtesy).
+      if (window.WC.PM.ready && !window.WC.PM.isBlocked('stylesGallery')) {
+        window.WC.PM.stylePreviewEnter(window.WC.PM.styleIdForName(name) || '');
+      }
+      return;
+    }
     if (!E() || !E().node) return;
     if (!gallerySnap) gallerySnap = { html: E().node.innerHTML, sel: serializeSel(), dirty: E().dirty };
     WC.applyNamedStyle(name);
   }
   function stylePreviewLeave() {
+    if (window.WC.PM && window.WC.PM.active) {
+      if (window.WC.PM.ready) window.WC.PM.stylePreviewLeave();
+      return;
+    }
     if (!gallerySnap) return;
     E().node.innerHTML = gallerySnap.html;
     restoreSel(gallerySnap.sel);
@@ -27,7 +38,13 @@
     E().repaginate();
     gallerySnap = null;
   }
-  function stylePreviewCommit() { gallerySnap = null; }
+  function stylePreviewCommit() {
+    if (window.WC.PM && window.WC.PM.active) {
+      if (window.WC.PM.ready) window.WC.PM.stylePreviewCommitRestore();
+      return;
+    }
+    gallerySnap = null;
+  }
 
   // Commands rendered as large buttons (the prominent button in each group).
   const LARGE = new Set([

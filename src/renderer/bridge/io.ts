@@ -1,11 +1,17 @@
 // IO side of the bridge (spec §5.1 io.ts): export wrapper that un-swallows the
 // engine's error contract, the dirty flag, and PM-doc counts for the chrome.
+import { PREVIEW_META } from './style-preview'
+
 type AnyEditor = any
 
 export function installIo(editor: AnyEditor) {
   const w = window as any
   let dirty = false
-  editor.on('update', () => { dirty = true; w.WC?.Files?.updateTitle?.() }) // 'update' fires only on docChanged
+  editor.on('update', ({ transaction }: any = {}) => {
+    if (transaction?.getMeta?.(PREVIEW_META)) return // gallery hover preview is not an edit
+    dirty = true
+    w.WC?.Files?.updateTitle?.()
+  }) // 'update' fires only on docChanged
 
   async function exportDocxBytes(): Promise<Uint8Array> {
     const blob = await editor.exportDocx()
