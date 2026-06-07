@@ -7,13 +7,22 @@ import { calculateResolvedParagraphProperties } from '@extensions/paragraph/reso
 
 type AnyEditor = any
 
-function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
+export function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
   try {
     const $from = editor.state.selection.$from
     for (let d = $from.depth; d >= 0; d--) {
       const node = $from.node(d)
       if (node?.type?.name === 'paragraph') return { node, pos: d > 0 ? $from.before(d) : 0 }
     }
+    // AllSelection ($from is doc root, depth 0) — descend to the first paragraph.
+    const doc = editor.state.doc
+    let result: { node: any; pos: number } | null = null
+    doc.descendants((node: any, pos: number) => {
+      if (result) return false
+      if (node.type?.name === 'paragraph') { result = { node, pos }; return false }
+      return true
+    })
+    return result
   } catch { /* selection states the resolver can't read */ }
   return null
 }

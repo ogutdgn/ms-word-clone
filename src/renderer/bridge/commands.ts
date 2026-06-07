@@ -1,6 +1,9 @@
 // Command side of the WC.PM bridge (spec §5.1). The ONLY caller of
 // editor.commands/chain in the app. editor.commands is a GETTER capturing a
 // fresh tr per access — resolve at call time, never cache (CommandService.js:57-81).
+import { STYLE_NAME_TO_ID } from './style-names'
+import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
+import { headParagraph } from './state-sync'
 type AnyEditor = any
 
 export function installCommands(editor: AnyEditor) {
@@ -105,5 +108,28 @@ export function installCommands(editor: AnyEditor) {
     return true
   }
 
-  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs }
+  // Resolved (style-cascade-included) head-paragraph properties — the bridge read
+  // the slice-2 changeListLevelMenu DEVIATION comment stipulated for slice 3.
+  // Mirrors state-sync's resolved block (same fallback semantics).
+  function getResolvedParaProps(): any {
+    const head = headParagraph(editor)
+    if (!head) return null
+    try { return calculateResolvedParagraphProperties(editor, head.node, editor.state.doc.resolve(head.pos)) }
+    catch { return head.node.attrs?.paragraphProperties || null }
+  }
+
+  const styleIdForName = (name: string): string | null => STYLE_NAME_TO_ID[name] || null
+
+  // Named-style apply: display name → styleId → setStyleById (ONE transaction; the
+  // full plugin-state style object, so the partial-selection linked-character-style
+  // branch works — never pass bare {id}). Returns false for unknown names AND for
+  // styles absent from the doc's catalog (foreign docs missing built-ins beyond the
+  // import defaults — recorded deviation: Word mints from its built-in library).
+  function applyStyleByName(name: string): boolean {
+    const id = styleIdForName(name)
+    if (!id) return false
+    return cmd('setStyleById', id)
+  }
+
+  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs, getResolvedParaProps, styleIdForName, applyStyleByName }
 }
