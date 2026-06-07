@@ -7,6 +7,28 @@
 
 ---
 
+## 2026-06-07 — Phase 2 slice 3 INTEGRATED to `main`
+
+- **Branch:** `main` (PR #19 merged clean — no conflict round; `feature/phase-2-slice-3-styles`
+  deleted local+remote).
+- **Phase:** **Phase 2 — slices 0a–3 DONE and on `main` → slice 4 (clipboard + editing-misc) next.**
+- **State summary:** gates re-verified **on `main` post-merge**: PM 96/96, legacy 257/257.
+  CLAUDE.md/AGENTS.md banners advanced to slices-0a–3/slice-4-next (this entry's PR).
+- **Next:** **slice 4 — clipboard + editing-misc** in a FRESH session (orient at docs/plan/ →
+  brainstorm-lite → write-plan → execute; branch `feature/phase-2-slice-4-clipboard` directly
+  off `main`). ⚠️ Slice-4-specific carry-over: the `[0a]` **D6 dispatch-block test probes cmd
+  `cut`** (test-suite-pm.js ~line 156) — it INVERTS when `clipboard` flips; repoint it to a
+  still-unflipped area (find-replace is slice 5) in the red-tests task, exactly like slice 2
+  repointed it off `bullets`. Spec-vs-registry reconciliation needed in brainstorm-lite: spec
+  §9.1 row 4 lists `select` in slice 4, but the D6 registry maps `select` → area `find-replace`
+  (slice 5, bridge/index.ts). Backlog notes: `D.applyStyles` (dead code) needs a PM branch if
+  ever wired; the Phase-3 logger must learn the `wcStylePreview` meta (preview txns ≠ user
+  edits); slice-3 visual-only probes (Word's hover-preview scope, IME-mid-preview) still open
+  for user observation.
+- **Blockers/notes:** none.
+
+---
+
 ## 2026-06-07 — Phase 2 slice 3 BUILT (styles on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-3-styles` (directly off `main` post the slice-2
