@@ -90,7 +90,7 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice-3 **entry points**: applyStyle + pane (`1b4fdfd` +review fixes), Change-List-Level resolved read (`3ab3f32` — slice-2 deviation closed).
 - [x] Slice-3 **THE FLIP** (`af7c559`) — 96/96 first run, zero triage; all five gates green; final-review polish (`dceafa1`).
 - [x] **Oracle**: slice-2 followUps CLOSED (lists family PASS incl. the U+25AA discovery; literal roundtrip PASS); `read-style-props` verb + quirks #24-27 (`9951073`); behavior verdicts (re-apply=APPLY; clearing=full-coverage-only) (`b54bd69`); slice-3 legs A 5/5 + B 9/9 + table spot-check (`0e8134b`).
-- [ ] Slice-3 **PR** → `main` (open + merge).
+- [x] Slice-3 **PR #19** merged to `main` (clean, no conflicts); gates re-verified on `main` (PM 96/96, legacy 257/257); branch deleted local+remote; CLAUDE/AGENTS banners advanced.
 
 ### 2026-06-05 (Phase 2)
 - [x] Phase 2 **spec** written + committed (`d68c187`) — `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md`.

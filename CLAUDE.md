@@ -21,11 +21,12 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
-> dep). **Phase 2 slices 0a–2 are DONE** (merged to `main` via PRs #11–#15 and #17): the PM core
-> is the active visible editor; file IO, character formatting, and **paragraph + lists** are on
-> the engine (oracle-validated against Word 16.77.1); flipped ribbon areas: `character`,
-> `paragraph`, `lists`; the legacy app runs only under `--legacy`.
-> **Phase 2** continues with slice 3 (styles). Exact state: [docs/plan/](docs/plan/).
+> dep). **Phase 2 slices 0a–3 are DONE** (merged to `main` via PRs #11–#15, #17 and #19): the PM
+> core is the active visible editor; file IO, character formatting, **paragraph + lists**, and
+> **styles** (gallery + PM-native hover live-preview + pane + caret-driven gallery highlight) are
+> on the engine (oracle-validated against Word 16.77.1); flipped ribbon areas: `character`,
+> `paragraph`, `lists`, `styles`; the legacy app runs only under `--legacy`.
+> **Phase 2** continues with slice 4 (clipboard + editing-misc). Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 
