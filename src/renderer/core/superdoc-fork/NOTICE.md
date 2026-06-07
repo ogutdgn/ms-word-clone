@@ -56,6 +56,11 @@ The following upstream packages are included in this directory tree:
   carries NoSpacing, Strong, Emphasis, SubtleEmphasis (Word-standard definitions) so
   `addDefaultStylesIfMissing` makes the full Quick-Styles gallery resolvable in every
   document, like real Word's always-available built-ins (slice 3, 2026-06-06).
+- **resolvedPropertiesCache TableInfo fix:** both resolver entry points previously
+  passed the raw `tableStyleId` string where the style-engine expects a TableInfo
+  object — the table-style paragraph cascade was silently skipped for in-table
+  paragraphs. Now builds `{ tableProperties, rowIndex, cellIndex, numRows, numCells }`
+  with real indices from the ancestor chain (slice 3, 2026-06-06).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
