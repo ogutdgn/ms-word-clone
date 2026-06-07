@@ -337,12 +337,11 @@
         // ONE full-delta call = one transaction = one undo step (changeListLevelBy).
         // NEVER chain repeated increase/decreaseListIndent — changeListLevel reads
         // editor.state, so chained ±1 steps land one short.
-        // DEVIATION (recorded): `cur` is the INLINE ilvl, but the engine applies the
-        // delta to the RESOLVED level — style-inherited list paragraphs (numbering
-        // from a named style, no inline attrs) can land off-target. Revisit with
-        // slice 3 (styles), where resolved style reads land on the bridge.
-        const attrs = pm.getEditor().getAttributes('paragraph');
-        const np = attrs && attrs.paragraphProperties ? attrs.paragraphProperties.numberingProperties : null;
+        // Slice 3: `cur` reads the RESOLVED level via the bridge (closes the recorded
+        // slice-2 deviation — style-inherited list paragraphs land on target; the
+        // engine applies the delta against the same resolved source).
+        const resolved = pm.getResolvedParaProps();
+        const np = resolved && resolved.numberingProperties ? resolved.numberingProperties : null;
         const cur = np && np.ilvl != null ? np.ilvl : 0;
         const delta = (i - 1) - cur;
         // Non-list paragraph: changeListLevelBy → underlying changeListLevel finds no
