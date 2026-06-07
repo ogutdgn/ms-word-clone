@@ -1,0 +1,36 @@
+{
+  "leg": "A — clone → Word, styles (spec §8.3 step 1, slice 3 Task 13.1)",
+  "date": "2026-06-07",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-3-styles",
+  "method": "Clone driven headlessly (--probe-out + --shot-evalfile, sentinel-gated on window.__WC_READY): 5 paragraphs built clean (insertContent + unsetAllMarks + resetAttributes), then styles applied via the REAL dispatcher — full-paragraph TextSelection per paragraph followed by WC.Commands.applyStyle('Heading 1'/'Heading 2'/'Title'/'Quote') (gallery click path → applyStyleByName → setStyleById, one transaction each); 'normal alpha' left untouched (Normal). Export via WC.PM.exportDocxBytes, base64-chunked through the probe, node-decoded to tests/fixtures/oracle-out-s3-styles.docx (untracked fixture). Word read the export through read-style-props (name local of (get style of paragraph i of d), quirk #27).",
+  "cloneModelState": [
+    { "text": "normal alpha", "styleId": null },
+    { "text": "heading one beta", "styleId": "Heading1" },
+    { "text": "heading two gamma", "styleId": "Heading2" },
+    { "text": "title delta", "styleId": "Title" },
+    { "text": "quote epsilon", "styleId": "Quote" }
+  ],
+  "exportedXml": "word/document.xml pStyle per paragraph: p2 <w:pStyle w:val='Heading1'/>, p3 'Heading2', p4 'Title', p5 'Quote'; p1 no pStyle (Normal). word/styles.xml carries the full minted catalog (Heading1-9 + linked Char styles, Title, Subtitle, Quote, IntenseQuote, NoSpacing, ListParagraph, Strong, Emphasis, SubtleEmphasis, IntenseEmphasis, DefaultParagraphFont, ...).",
+  "wordRead": {
+    "generatedBy": "word-oracle read-style-props",
+    "paragraphs": [
+      { "index": 1, "style": "Normal", "text": "normal alpha" },
+      { "index": 2, "style": "Heading 1", "text": "heading one beta" },
+      { "index": 3, "style": "Heading 2", "text": "heading two gamma" },
+      { "index": 4, "style": "Title", "text": "title delta" },
+      { "index": 5, "style": "Quote", "text": "quote epsilon" }
+    ]
+  },
+  "rows": [
+    { "para": 1, "applied": "(none — left Normal)", "expectedWordDisplayName": "Normal", "wordRead": "Normal", "verdict": "MATCH" },
+    { "para": 2, "applied": "applyStyle('Heading 1')", "expectedWordDisplayName": "Heading 1", "wordRead": "Heading 1", "verdict": "MATCH" },
+    { "para": 3, "applied": "applyStyle('Heading 2')", "expectedWordDisplayName": "Heading 2", "wordRead": "Heading 2", "verdict": "MATCH" },
+    { "para": 4, "applied": "applyStyle('Title')", "expectedWordDisplayName": "Title", "wordRead": "Title", "verdict": "MATCH" },
+    { "para": 5, "applied": "applyStyle('Quote')", "expectedWordDisplayName": "Quote", "wordRead": "Quote", "verdict": "MATCH" }
+  ],
+  "verdict": "PASS 5/5 — Word 16.77.1 resolves every clone-applied paragraph style to the exact built-in display name; the unstyle d paragraph stays Normal.",
+  "strongCharacterStyleNote": "The Strong character style is NOT validated by this verb — read-style-props is paragraph-level (style of paragraph). Strong / Subtle Emphasis w:rStyle coverage comes from leg B (Word-authored character styles imported by the clone) plus the green '[3] w:rStyle round-trip' test in scripts/test-suite-pm.js.",
+  "sessionWedge": "This Word session began in the quirk-#24 headless auto-launched state (Word had quit since the Task-2 health check; the first oracle AppleEvent relaunched it window-less: windows=0). In that state the verb's open -1712'd and NEVER materialized — 11+ minutes of count-polling stayed at 0 (note: this run contradicts quirk #25's 'fresh paths materialize late' for the headless instance; nothing ever arrived), and a LaunchServices document open (open -a Word <file>) also never landed. Recovery WITHOUT quitting Word: 'make new document' succeeded immediately and produced a WINDOW (windows 0→1); after closing that scratch doc by name-verified ordinal (by-name close -1728'd first — quirk #26 flicker), the re-run verb opened/read/closed normally in seconds. Two stray opens issued before the wedge was understood never materialized as documents (count stayed 0 before and after the successful run).",
+  "pidSafety": "Oracle verb's own name-verified count-relative open/close; scratch Document3 closed by name-verified ordinal saving no; document count 0 and window count 0 verified after the leg; Word never quit."
+}

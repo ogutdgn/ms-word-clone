@@ -1,0 +1,25 @@
+{
+  "leg": "table-style spot check (slice 3 Task 13.4 — exercises the Task-5 resolvedPropertiesCache TableInfo fix)",
+  "date": "2026-06-07",
+  "wordVersion": "Word for Mac 16.77.1",
+  "branch": "feature/phase-2-slice-3-styles",
+  "method": "Word-authored fixture (make new table via the object model; table style 'Grid Table 4 - Accent 1' applied; Word saved directly to tests/fixtures/oracle-word-s3-table.docx — gitignored, regeneration = re-author per this method). Word-side capture: notes/2026-06-07-slice3-table.png. Clone side: headless --probe-out evalfile inlining the file as base64 → WC.PM.openDocx → caret into the first in-table paragraph → getState() + getResolvedParaProps().",
+  "fixtureXml": "word/document.xml: <w:tblStyle w:val=\"GridTable4-Accent1\"/> + <w:tblLook w:val=\"04A0\" w:firstRow=\"1\" w:lastRow=\"0\" w:firstColumn=\"1\" w:lastColumn=\"0\" w:noHBand=\"0\" w:noVBand=\"1\"/> — a REAL non-trivial tblLook, exactly what the Task-5 fix (full tableProperties spread incl. tblLook) feeds to resolveCellStyles.",
+  "cloneProbe": {
+    "openOk": true,
+    "caretInCell": true,
+    "stOk": true,
+    "block": "Normal",
+    "resolvedOk": true,
+    "tableStyleId": "GridTable4-Accent1",
+    "threw": false
+  },
+  "rows": [
+    { "check": "Word-authored styled-table doc imports", "expected": "openDocx true", "actual": "true", "verdict": "PASS" },
+    { "check": "resolved read on an in-table paragraph (the pre-fix bug path: string-vs-TableInfo silently dropped the cascade; the fix must not throw and must resolve)", "expected": "getResolvedParaProps() non-null, no throw", "actual": "resolvedOk true, threw false", "verdict": "PASS" },
+    { "check": "state-sync alive with caret in a table cell (st.block for an unstyled cell paragraph)", "expected": "block 'Normal'", "actual": "Normal", "verdict": "PASS" },
+    { "check": "table-style VISUAL rendering (header-row fill etc.)", "expected": "future-slice territory — paragraph-level cascade only this slice", "actual": "clone renders the table plain (capture /tmp/slice3-table-clone.png, committed as notes/2026-06-07-slice3-table-clone.png); no error, content intact", "verdict": "RECORDED — visual table-style paint is beyond slice 3 scope (insert-basics/table tools, slice 6)" }
+  ],
+  "verdict": "PASS — the Task-5 TableInfo fix holds against a real Word-authored styled table; no resolution errors, cascade machinery fed with the real tblStyle + tblLook.",
+  "pidSafety": "Word-side authoring closed by new basename via name-verified ordinal; document count at baseline after the leg; Word never quit. Clone side is fully headless."
+}
