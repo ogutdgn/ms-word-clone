@@ -537,10 +537,12 @@ ipcMain.handle('insert:screenshot', async () => {
   }
 });
 
-// ---- Slice 4: clipboard (reads/writes via the clipboard module; cut/copy/paste
-// triggers via webContents edit methods → native DOM events in the renderer).
+// ---------------------------------------------------------------------------
+// IPC: Slice 4 clipboard — reads/writes via the clipboard module; cut/copy/paste
+// triggers via webContents edit methods → native DOM events in the renderer.
 // NOTE: webContents.paste() is FIRE-AND-FORGET — the renderer paste lands async;
-// callers poll the document, never assume completion on invoke-resolve. ----
+// callers poll the document, never assume completion on invoke-resolve.
+// ---------------------------------------------------------------------------
 ipcMain.handle('clipboard:flavors', () => {
   const formats = clipboard.availableFormats();
   return {
@@ -559,8 +561,16 @@ ipcMain.handle('clipboard:readImage', () => {
   return { dataUrl: img.toDataURL(), width, height };
 });
 ipcMain.handle('clipboard:writeText', (_evt, text) => clipboard.writeText(String(text ?? '')));
-ipcMain.handle('clipboard:writeHTML', (_evt, html) => clipboard.write({ html: String(html ?? ''), text: String(html ?? '').replace(/<[^>]+>/g, '') }));
-ipcMain.handle('clipboard:writeImage', (_evt, dataUrl) => clipboard.writeImage(nativeImage.createFromDataURL(String(dataUrl ?? ''))));
+ipcMain.handle('clipboard:writeHTML', (_evt, html) => {
+  const s = String(html ?? '');
+  const text = s.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+  clipboard.write({ html: s, text });
+});
+ipcMain.handle('clipboard:writeImage', (_evt, dataUrl) => {
+  const s = String(dataUrl ?? '');
+  if (!s.startsWith('data:')) return; // invalid: no-op, don't touch the clipboard
+  clipboard.writeImage(nativeImage.createFromDataURL(s));
+});
 ipcMain.handle('clipboard:cut', () => mainWindow && mainWindow.webContents.cut());
 ipcMain.handle('clipboard:copy', () => mainWindow && mainWindow.webContents.copy());
 ipcMain.handle('clipboard:paste', () => mainWindow && mainWindow.webContents.paste());
