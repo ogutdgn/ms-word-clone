@@ -22,6 +22,7 @@
     "deferred": ["Sounds like", "Find all word forms", "Match prefix/suffix", "Ignore punctuation/whitespace"],
     "goTo": "Go To tab targets NOT captured (dialog crashed). Our D.goToDialog offers Heading/Bookmark/Page/Line (Heading works on the model; Page/Line pagination-gated → Phase 7). Full Word Go-To target list UNVERIFIED this run — recorded follow-up."
   },
-  "legsAB": "NOT RUN — Word degraded to windows=0 after Codex's crash/recovery (quirk #24: opens dead-−1712 with 0 windows). Semantic validation above is via Word's own find engine (authoritative); .docx save round-trip is covered by the 17/17 docx gate + the design guarantee that PM Decorations are view-only and never serialize (verified in the Task-4 code review). Formal legs A/B deferred unless Word is revived.",
+  "legA_cloneToWord": "PASS — our engine replace-all (foo->QUX ×3) saved to .docx; real Word (read-props) read it back as 'QUX bar QUX bar QUX'. XML-level check (unzip document.xml): QUX×3, bar×2, foo×0; markup-leak scan ProseMirror-search-match/active-search-match/find-hit/search-match/decoration ALL 0 — decorations are view-only and never serialize.",
+  "legB_wordToClone": "PASS — Word authored 'alpha beta alpha gamma alpha delta alpha' (alpha×4), saved .docx; our app imported it (importedText identical) and findSession('alpha')=4 (whole-word 4, gamma 1) — our find count matches the Word-authored content.",
   "verdict": "Find/replace SEMANTICS validated against Word 16.77.1 — all PASS; one deviation (wildcard case) found and FIXED. Recorded deviations: selection-scoped Replace All (whole-doc only), Mac toolbar-search vs our sidebar chrome, deferred advanced linguistic options, Go-To target list unverified."
 }
