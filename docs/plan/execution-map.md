@@ -106,7 +106,7 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice-4 **state-sync painter chrome** — button latch + copy cursor (`34c1633`).
 - [x] Slice-4 **THE FLIP** + Cmd+Shift+C/V chords (`ac98db2`, `0746464`) — 112/0, one triage (sdBlockRev normalization).
 - [x] Slice-4 **oracle legs A/B** + Task-9 manual sanity (`3858b64`) — leg A clone→Word PASS (full list fidelity), leg B core PASS + recorded list-marker leak (ship-and-track, user-approved); five gates green; physical Cmd+C/V both directions confirmed.
-- [ ] Slice-4 **PR** → `main` (open next; CLAUDE/AGENTS banners to advance on integration).
+- [x] Slice-4 **PR #21** merged to `main` (from GitHub, `696b84b`); gates re-verified on `main` (PM 112/112, legacy 257/257, docx 17/17); CLAUDE/AGENTS/plan banners advanced to slices-0a–4 / slice-5-next.
 
 ### 2026-06-07 (Phase 2)
 - [x] Slice-3 **plan** written + 4-critic-hardened + committed (`a90ce67`) — `docs/superpowers/plans/2026-06-06-phase2-slice-3-styles.md` (4 blockers caught pre-build: setState restore channel, Ctrl+Shift+N shadow, linked-char selection trap, negation-fixture context leak).

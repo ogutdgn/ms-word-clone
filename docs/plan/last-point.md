@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-06-08 — Phase 2 slice 4 INTEGRATED to `main`
+
+- **Branch:** `main` (PR #21 merged from GitHub — `696b84b`; `feature/phase-2-slice-4-clipboard`
+  can be deleted local+remote).
+- **Phase:** **Phase 2 — slices 0a–4 DONE and on `main` → slice 5 (find-replace) next.**
+- **State summary:** gates re-verified **on `main` post-merge**: PM 112/112, legacy 257/257,
+  docx 17/17. CLAUDE.md/AGENTS.md/plan.md banners advanced to slices-0a–4/slice-5-next
+  (this entry's commit). Flipped ribbon areas now: `character`, `paragraph`, `lists`,
+  `styles`, `clipboard`, `editing-misc`.
+- **Next:** **slice 5 — find-replace** in a FRESH session (orient at docs/plan/ →
+  brainstorm-lite → write-plan → execute; branch `feature/phase-2-slice-5-find-replace`
+  directly off `main`). ⚠️ **Slice-5-specific carry-over:** BOTH `[0a]` D6 tests now sit on
+  `find-replace` cmds — the **run-block** test probes `replace` (test-suite-pm.js ~line 159)
+  and the **dropdown-block** test probes `find` (~line 163); BOTH INVERT when `find-replace`
+  flips, so slice 5's red-tests task must repoint BOTH to a still-unflipped area (insert-basics,
+  e.g. `link`/`table`), exactly like slice 4 repointed the run-block test off `cut`. Slice-4
+  recorded follow-up to carry: the **Word→clone list-marker leak** (supportLists markers paste
+  as text → double-marker; candidate fix in bridge `pasteHTML` preprocessing or the converter;
+  native-Word list paste still UNCONFIRMED). Spec: slice 5 = fork Search extension
+  (decoration-based, replaces destructive `.find-hit` spans) + find pane re-point.
+- **Blockers/notes:** none. Word left clean.
+
+---
+
 ## 2026-06-08 — Phase 2 slice 4 BUILT (clipboard + editing-misc on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-4-clipboard` (directly off `main` post the slice-3
