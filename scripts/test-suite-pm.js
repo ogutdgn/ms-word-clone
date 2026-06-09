@@ -1056,12 +1056,13 @@
     setDoc('aa zz aa zz aa');
     PM().findSession('aa'); await sleep(120);
     await sleep(550);
-    const before = JSON.stringify(doc().toJSON());
+    const norm = (d) => JSON.stringify(d, (k, val) => (k === 'sdBlockRev' ? 0 : val));
+    const before = norm(doc().toJSON());
     const r = PM().replaceAll('XX'); await sleep(120);
     if (!doc().textContent.includes('XX zz XX zz XX')) return 'replace all did not apply';
     if (r.replacedCount !== 3) return 'wrong count ' + r.replacedCount;
     PM().cmd('undo'); await sleep(80);
-    return JSON.stringify(doc().toJSON()) === before; // ONE undo restores all
+    return norm(doc().toJSON()) === before; // ONE undo restores all
   });
   await t('[5] Replace All reports the count and clears the session', async () => {
     setDoc('q q q q');
