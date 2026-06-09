@@ -7,6 +7,80 @@
 
 ---
 
+## 2026-06-08 — Phase 2 slice 4 BUILT (clipboard + editing-misc on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-4-clipboard` (directly off `main` post the slice-3
+  integration — no stacked PRs; PR to open next).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 4 DONE → slice 5
+  (find-replace) next.**
+- **State summary:** areas **`clipboard` + `editing-misc` FLIPPED** (registry
+  `bridge/index.ts`): ribbon **Cut/Copy/Paste** (PM-native — `webContents.cut/copy/paste`
+  IPC triggers so the prosemirror-view serializer/parser own the document work), the
+  **Paste split-button dropdown** (Keep Source Formatting / Merge Formatting [deferred,
+  disabled] / Picture / Keep Text Only / Paste Special… / Set Default Paste… [deferred]),
+  a real **`D.pasteSpecial` dialog** (flavor list clipboard-state-driven — oracle-confirmed:
+  rich→HTML/RTF/Unformatted/PDF, text→Unformatted only, image→Picture PNG/TIFF; dblclick +
+  Enter = OK), **Format Painter** flipped onto the fork's `copyFormat` extended to **Word
+  scope** (paragraph props incl. numbering + first-run marks; replace-not-merge; `link`
+  mark preserved; idempotent `persistent` fixing the ribbon click,click,dblclick disarm
+  trap; new `cancelFormatPainter`/Esc), single + **double-click-sticky** + Esc-disarm with
+  state-sync **button latch + copy cursor**, and **Select** (Select All + Similar
+  Formatting — single-range deviation recorded; Select Objects/Selection Pane → slice 10).
+  New **clipboard IPC** (`wordAPI.clipboard.*` — module reads/writes + webContents edit
+  triggers; nativeImage round-trip). **`select` remapped** `find-replace` → `editing-misc`
+  (spec §9.1 row 4 beat the slice-0a ribbon-group-adjacency mapping). **Cmd+Shift+C/V**
+  copy/paste-formatting chords (oracle B5; PM-only, null under legacy). Office Clipboard
+  pane gated to a toast in PM mode (legacy-DOM pipeline). Gates: **PM 112/112** (96 + 16
+  new `[4]`), legacy 257/257 byte-identical, smoke 9/9 ×2, docx 17/17.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-07-phase2-slice-4-clipboard.md`,
+  hardened by a 4-critic adversarial workflow — 32 findings, 8 confirmed blockers applied
+  incl. the painter double-click trap, two never-green tests, the async flyout/dialog
+  races; executed subagent-driven with two-stage review per task):
+  - `37b03fd` plan · `23c9062`/`6031cc2` red `[4]` tests + D6 run-block repoint (cut→replace)
+  - `579c5a0`/`281a08e` clipboard IPC (+ review hardening)
+  - `d5d1002` oracle clipboard/painter probes + verdicts (Step 2.1 scripted; UI-only probes
+    via **Codex computer-use** into `.oracle-probes/slice4/` — gitignored)
+  - `5793f6e`/`e434dfd` fork painter Word scope (+ the resolved-vs-direct-marks fix:
+    `getFormattingStateAtPos().inlineMarks`, review-found)
+  - `dc70b2e`/`7f9e010` bridge clipboard/select/painter surface (+ Esc layering/pasteHTML
+    text/plain) · `1bc5ce5` gitignore `.agents/`
+  - `5a27de3`/`2f8f891` entry points — handlers, pasteMenu, Paste Special dialog, selectMenu,
+    flyItem disabled (+ dead-toast/keyboard-a11y polish)
+  - `34c1633` state-sync painter chrome · `ac98db2`/`0746464` **THE FLIP** + chords (112/0,
+    one triage: sdBlockRev normalization in the one-undo test)
+  - `3858b64` oracle legs A/B + Task-9 manual-sanity verdicts
+- **Oracle validation (spec §8.3) vs Word 16.77.1:** painter matrix B1-B9 (caret-arming,
+  paragraph scope incl. style, **replace-not-merge**, **hyperlink survives paint-over**,
+  first-run capture on mixed source — all drove the fork code); **leg A clone→Word PASS**
+  (clone clipboard HTML is Word-ingestible — Generator meta + MSO `@list` + ListParagraph;
+  real Word renders the full list structure incl. nesting/markers, screenshot); **leg B
+  Word→clone PASS core** (9 paras, ListParagraph styleId, ilvl nesting survive Word's 46KB
+  MSO-list HTML through the PM parser); **physical Cmd+C/V both directions** confirmed via
+  real OS keystrokes (Blink-native; no hidden menu needed — closes the Task-8 keyboard
+  verdict).
+- **KNOWN DEVIATIONS / recorded follow-ups:** **(1) Word→clone LIST-marker leak** — Word's
+  supportLists literal markers (`-`/`◦`/`1.`/`a.`) paste in as TEXT alongside the engine's
+  numbering (double-marker); Word strips its own `mso-list:Ignore` spans on import, the
+  clone's PM parser does not. CAVEAT: leg-B content was clone-round-tripped (carried the
+  `data-superdoc-slice` blob) — native-Word list paste UNCONFIRMED (Word session degraded
+  this run). USER DECISION (2026-06-08): **ship slice 4, track the fix as a follow-up**
+  (candidate: strip supportLists/`mso-list:Ignore` marker spans in bridge `pasteHTML`
+  preprocessing — our code; `view.pasteHTML` uses the PM clipboard parser not the OOXML
+  converter — or in the converter import; fits slice-7 converter work). **(2)** Merge
+  Formatting + Set Default Paste deferred (menu items disabled/toast). **(3)** Similar
+  Formatting selects ONE range (PM TextSelection single-range vs Word multi-select). **(4)**
+  Office Clipboard pane inert in PM mode. **(5)** Paste Special omits Paste-link radio.
+- **Carry-overs for slice 5 (find-replace):** **BOTH `[0a]` D6 tests now sit on
+  `find-replace` cmds** (`replace` run-block + `find` dropdown-block) — slice 5's red-tests
+  task must repoint BOTH to a later-slice area (insert-basics, e.g. `link`). Phase-3 logger:
+  the painter chrome nudge carries `wcPainterChrome` meta (+ reuses `PREVIEW_META`); the
+  `clipboard:write*` IPC channels are test-only surface.
+- **Blockers/notes:** Word left clean (doc count 0). The user's pre-existing Word `Document1`
+  was already absent (count 0) before leg A — not closed by our scripts (which only close
+  name-verified scratch docs); flagged to the user.
+
+---
+
 ## 2026-06-07 — Phase 2 slice 3 INTEGRATED to `main`
 
 - **Branch:** `main` (PR #19 merged clean — no conflict round; `feature/phase-2-slice-3-styles`
