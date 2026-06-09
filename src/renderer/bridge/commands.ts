@@ -4,6 +4,7 @@
 import { STYLE_NAME_TO_ID } from './style-names'
 import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
 import { headParagraph } from './state-sync'
+import { PREVIEW_META } from './style-preview'
 type AnyEditor = any
 
 export function installCommands(editor: AnyEditor) {
@@ -131,5 +132,72 @@ export function installCommands(editor: AnyEditor) {
     return cmd('setStyleById', id)
   }
 
-  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs, getResolvedParaProps, styleIdForName, applyStyleByName }
+  // slice 4: editing-misc
+  function selectAll(): boolean { return cmd('selectAll') }
+
+  // Legacy-parity similar-formatting: ONE TextSelection spanning the first→last
+  // text run whose mark signature matches the reference run's. Recorded deviation:
+  // real Word multi-selects discontiguous ranges; PM TextSelection is single-range.
+  function selectSimilarFormatting(): boolean {
+    const { state } = editor
+    const { $from, from, to, empty } = state.selection
+    const sig = (marks: readonly any[]) =>
+      JSON.stringify(marks.map((m: any) => [m.type.name, m.attrs]).sort())
+    // Reference marks: at a run's START boundary $from.marks() returns the PRECEDING
+    // run's marks. For a non-empty selection take the FIRST text run the selection
+    // actually covers; the empty-caret case stays storedMarks ?? $from.marks().
+    let refMarks: readonly any[] | null = null
+    if (!empty) {
+      state.doc.nodesBetween(from, to, (node: any) => {
+        if (refMarks === null && node.isText) refMarks = node.marks
+        return refMarks === null
+      })
+    }
+    if (refMarks === null) refMarks = state.storedMarks ?? $from.marks()
+    const ref = sig(refMarks!)
+    let first = -1, last = -1
+    state.doc.descendants((node: any, pos: number) => {
+      if (!node.isText) return
+      if (sig(node.marks) === ref) {
+        if (first < 0) first = pos
+        last = pos + node.nodeSize
+      }
+    })
+    if (first < 0) return false
+    return cmd('setTextSelection', { from: first, to: last })
+  }
+
+  // slice 4: format painter (fork FormatCommands storage is the state of record)
+  const painterStorage = () => (editor as any).extensionStorage?.formatCommands
+  // Nudge a no-op meta transaction so state-sync's rAF tick fires immediately after
+  // arm/cancel — copyFormat/cancelFormatPainter only mutate storage (no dispatch).
+  // A step-less tr has docChanged=false → 'update' never fires → dirty untouched.
+  // PREVIEW_META is also set so io.ts's guard covers any future docChanged edge case.
+  function nudgePainterChrome(): void {
+    try {
+      const tr = editor.state.tr
+        .setMeta('addToHistory', false)
+        .setMeta(PREVIEW_META, true)
+        .setMeta('wcPainterChrome', true)
+      editor.view?.dispatch(tr)
+    } catch { /* view gone */ }
+  }
+  function armFormatPainter(sticky: boolean): boolean {
+    const ok = cmd('copyFormat', { persistent: sticky })
+    nudgePainterChrome()
+    return ok
+  }
+  function cancelFormatPainter(): boolean {
+    const ok = cmd('cancelFormatPainter')
+    nudgePainterChrome()
+    return ok
+  }
+  function painterArmed(): boolean {
+    const s = painterStorage()
+    return !!(s && (s.storedStyle || s.storedParaProps))
+  }
+
+  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs,
+    getResolvedParaProps, styleIdForName, applyStyleByName,
+    selectAll, selectSimilarFormatting, armFormatPainter, cancelFormatPainter, painterArmed }
 }

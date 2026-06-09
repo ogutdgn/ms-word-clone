@@ -144,6 +144,15 @@ export function installStateSync(editor: AnyEditor) {
     document.querySelectorAll('.style-cell').forEach((c: any) => {
       c.classList.toggle('active', !!st.block && c.dataset.style === st.block)
     })
+    // slice 4: format-painter chrome — button latches + the page shows a copy
+    // cursor while armed (fork FormatCommands storage is the state of record;
+    // arm/cancel don't dispatch a transaction, so the bridge wrappers nudge sync).
+    const fpStorage = (editor as any).extensionStorage?.formatCommands
+    const fpArmed = !!(fpStorage && (fpStorage.storedStyle || fpStorage.storedParaProps))
+    const fpBtn = w.WC?.Ribbon?.controlIndex?.formatPainter?.node
+    if (fpBtn) fpBtn.classList.toggle('toggled', fpArmed)
+    const pmPage = document.getElementById('pm-editor')
+    if (pmPage) pmPage.style.cursor = fpArmed ? 'copy' : ''
     w.WC?.StatusBar?.update?.()
     // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
     const can = (w.WC?.editor as any)?.can?.()

@@ -40,6 +40,12 @@
 .dialog .tabs .t { padding: 6px 14px; font-size: 13px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
 .dialog .tabs .t.active { background: #fff; border-color: #e1dfdd; border-bottom: 2px solid var(--word-blue); color: var(--word-blue); }
 
+/* Paste Special flavor list */
+.dialog .ps-list { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid #c8c6c4; max-height: 160px; overflow-y: auto; }
+.dialog .ps-item { padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.dialog .ps-item:hover { background: #f3f2f1; }
+.dialog .ps-item.selected { background: var(--word-blue); color: #fff; }
+
 .btn {
   height: 28px; padding: 0 16px; border: 1px solid #8a8886; background: #fff; border-radius: 2px; font-size: 13px;
   min-width: 76px;

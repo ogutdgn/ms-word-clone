@@ -77,11 +77,12 @@
 
   WC.flyItem = function (label, opts) {
     opts = opts || {};
-    const item = el('div', { class: 'fly-item' });
+    const item = el('div', { class: 'fly-item' + (opts.disabled ? ' disabled' : '') });
+    if (opts.disabled) item.setAttribute('aria-disabled', 'true');
     if (opts.icon !== undefined) item.appendChild(el('span', { class: 'fi-ic', html: WC.icon(opts.icon, 16) }));
     item.appendChild(el('span', { text: label, class: 'fi-label' }));
     if (opts.key) item.appendChild(el('span', { class: 'fi-key', text: opts.key }));
-    if (opts.onClick) item.addEventListener('click', () => { WC.closeFlyouts(); opts.onClick(); });
+    if (opts.onClick && !opts.disabled) item.addEventListener('click', () => { WC.closeFlyouts(); opts.onClick(); });
     return item;
   };
   WC.flySep = () => el('div', { class: 'fly-sep' });

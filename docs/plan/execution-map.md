@@ -60,7 +60,20 @@
 > resolvedPropertiesCache TableInfo+tblLook). New `read-style-props` verb (quirks #24-27);
 > slice-2 oracle followUps closed; oracle legs A 5/5 + B 9/9 PASS. Gates: **PM 96/96**,
 > legacy 257, smoke 9/9 × 2, docx 17.
-> **Next: slice 4 — clipboard + editing-misc** (brainstorm-lite → write-plan → execute).
+>
+> **Slice 4 is DONE** (`feature/phase-2-slice-4-clipboard`, PR pending): areas
+> **`clipboard` + `editing-misc` FLIPPED** — ribbon Cut/Copy/Paste (PM-native via
+> `webContents` clipboard IPC), the Paste dropdown + a real `D.pasteSpecial` dialog
+> (flavor list clipboard-state-driven, oracle-confirmed), Format Painter on the fork's
+> `copyFormat` extended to Word scope (para props + first-run marks, replace-not-merge,
+> link-preserving, double-click-sticky + Esc, state-sync button latch/copy cursor),
+> Select All + Similar Formatting; `select` remapped find-replace → editing-misc (spec
+> §9.1 row 4); Cmd+Shift+C/V chords (oracle B5). New `wordAPI.clipboard.*` IPC. Oracle
+> leg A clone→Word PASS (full list fidelity), leg B Word→clone PASS core + a recorded
+> list-marker leak (ship-and-track, user-approved 2026-06-08); physical Cmd+C/V both
+> directions confirmed. Gates: **PM 112/112**, legacy 257, smoke 9/9 × 2, docx 17.
+> **Next: slice 5 — find-replace** (brainstorm-lite → write-plan → execute). ⚠️ slice 5
+> must repoint BOTH `[0a]` D6 tests (now on `replace`/`find`) to a later-slice area.
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -81,6 +94,19 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-08 (Phase 2)
+- [x] Slice-4 **plan** written + 4-critic-hardened + committed (`37b03fd`) — `docs/superpowers/plans/2026-06-07-phase2-slice-4-clipboard.md` (32 findings, 8 confirmed blockers applied: painter double-click trap, two never-green tests, async flyout/dialog races).
+- [x] Slice-4 **red `[4]` tests** (16) + D6 run-block repoint cut→replace (`23c9062`, `6031cc2`).
+- [x] Slice-4 **clipboard IPC** — `wordAPI.clipboard.*` + webContents edit triggers (`579c5a0`, `281a08e`).
+- [x] Slice-4 **oracle probes** — clipboard flavors + Paste Special lists + 9-probe painter matrix vs Word 16.77.1; Step 2.1 scripted, UI-only probes via Codex computer-use → `.oracle-probes/slice4/` (`d5d1002`).
+- [x] Slice-4 **fork painter Word scope** — para props + first-run marks, replace-not-merge, link-preserving, cancel cmd, double-click-trap fix (`5793f6e`); resolved→direct marks fix (`e434dfd`).
+- [x] Slice-4 **bridge** — clipboard surface + select + painter arm/cancel + Esc layering (`dc70b2e`, `7f9e010`); gitignore `.agents/` (`1bc5ce5`).
+- [x] Slice-4 **entry points** — handlers, pasteMenu, `D.pasteSpecial` dialog, selectMenu, flyItem disabled (`5a27de3`, `2f8f891`).
+- [x] Slice-4 **state-sync painter chrome** — button latch + copy cursor (`34c1633`).
+- [x] Slice-4 **THE FLIP** + Cmd+Shift+C/V chords (`ac98db2`, `0746464`) — 112/0, one triage (sdBlockRev normalization).
+- [x] Slice-4 **oracle legs A/B** + Task-9 manual sanity (`3858b64`) — leg A clone→Word PASS (full list fidelity), leg B core PASS + recorded list-marker leak (ship-and-track, user-approved); five gates green; physical Cmd+C/V both directions confirmed.
+- [ ] Slice-4 **PR** → `main` (open next; CLAUDE/AGENTS banners to advance on integration).
 
 ### 2026-06-07 (Phase 2)
 - [x] Slice-3 **plan** written + 4-critic-hardened + committed (`a90ce67`) — `docs/superpowers/plans/2026-06-06-phase2-slice-3-styles.md` (4 blockers caught pre-build: setState restore channel, Ctrl+Shift+N shadow, linked-char selection trap, negation-fixture context leak).

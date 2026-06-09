@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, desktopCapturer, screen, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -536,6 +536,44 @@ ipcMain.handle('insert:screenshot', async () => {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
 });
+
+// ---------------------------------------------------------------------------
+// IPC: Slice 4 clipboard — reads/writes via the clipboard module; cut/copy/paste
+// triggers via webContents edit methods → native DOM events in the renderer.
+// NOTE: webContents.paste() is FIRE-AND-FORGET — the renderer paste lands async;
+// callers poll the document, never assume completion on invoke-resolve.
+// ---------------------------------------------------------------------------
+ipcMain.handle('clipboard:flavors', () => {
+  const formats = clipboard.availableFormats();
+  return {
+    formats,
+    hasText: formats.includes('text/plain'),
+    hasHtml: formats.includes('text/html'),
+    hasImage: formats.some((f) => f.startsWith('image/')) || !clipboard.readImage().isEmpty(),
+  };
+});
+ipcMain.handle('clipboard:readText', () => clipboard.readText());
+ipcMain.handle('clipboard:readHTML', () => clipboard.readHTML());
+ipcMain.handle('clipboard:readImage', () => {
+  const img = clipboard.readImage();
+  if (img.isEmpty()) return null;
+  const { width, height } = img.getSize();
+  return { dataUrl: img.toDataURL(), width, height };
+});
+ipcMain.handle('clipboard:writeText', (_evt, text) => clipboard.writeText(String(text ?? '')));
+ipcMain.handle('clipboard:writeHTML', (_evt, html) => {
+  const s = String(html ?? '');
+  const text = s.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+  clipboard.write({ html: s, text });
+});
+ipcMain.handle('clipboard:writeImage', (_evt, dataUrl) => {
+  const s = String(dataUrl ?? '');
+  if (!s.startsWith('data:')) return; // invalid: no-op, don't touch the clipboard
+  clipboard.writeImage(nativeImage.createFromDataURL(s));
+});
+ipcMain.handle('clipboard:cut', () => mainWindow && mainWindow.webContents.cut());
+ipcMain.handle('clipboard:copy', () => mainWindow && mainWindow.webContents.copy());
+ipcMain.handle('clipboard:paste', () => mainWindow && mainWindow.webContents.paste());
 
 // ---------------------------------------------------------------------------
 // App lifecycle

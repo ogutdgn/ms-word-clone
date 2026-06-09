@@ -3,6 +3,7 @@
 // NEVER reassign window.WC or window.WC.Editor (main.ts invariant).
 import { legacyBoot } from './mode'
 import { installCommands } from './commands'
+import { installClipboard } from './clipboard'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -14,6 +15,9 @@ import { blankArrayBuffer } from '@/core/fixture'
 
 type AnyEditor = any
 let current: AnyEditor = null
+// Single document-level Esc listener for the format painter — attached exactly
+// once (installBridge re-runs on Open/New; per-call addEventListener would stack).
+let painterEscInstalled = false
 // Concurrency guard: replaceEditor must not overlap itself (concurrent Open/New
 // clicks must not race — second call is refused while first is in flight).
 let replacing = false
@@ -21,7 +25,7 @@ let replacing = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles']) // slices 1-3
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc']) // slices 1-4
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -44,7 +48,8 @@ const AREA: Record<string, string> = {
   // styles (slice 3)
   stylesGallery: 'styles',
   // editing/find (slice 5)
-  find: 'find-replace', replace: 'find-replace', select: 'find-replace',
+  find: 'find-replace', replace: 'find-replace',
+  select: 'editing-misc', // slice 4 — spec row 4; was find-replace (ribbon-group adjacency accident, slice 0a)
   // insert basics (slice 6)
   table: 'insert-basics', link: 'insert-basics', bookmark: 'insert-basics', pageBreak: 'insert-basics',
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
@@ -191,6 +196,18 @@ export function preinstallBridge() {
     stylePreviewEnter: () => false,
     stylePreviewLeave: () => {},
     stylePreviewCommitRestore: () => {},
+    cutSelection: async () => false,
+    copySelection: async () => false,
+    pasteDefault: async () => false,
+    pasteTextOnly: async () => false,
+    pasteHTML: async () => false,
+    pastePicture: async () => false,
+    clipboardFlavors: async () => null,
+    selectAll: () => false,
+    selectSimilarFormatting: () => false,
+    armFormatPainter: () => false,
+    cancelFormatPainter: () => false,
+    painterArmed: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -202,7 +219,26 @@ export function installBridge(editor: AnyEditor) {
   current = editor
   const PM = w.WC.PM
   if (legacyBoot) { PM.ready = true; return PM } // §4.3-3: passive under --legacy — zero listeners
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor))
+  if (!painterEscInstalled) {
+    painterEscInstalled = true
+    // slice 4: Esc cancels an armed format painter (Word). Capture-phase so the PM
+    // keymap can't swallow it; defers to any open flyout/dialog (their own Esc
+    // handling closes those first — the painter survives until a bare-Esc press).
+    // The handler reads the LIVE WC.PM, so a single document-level listener is
+    // correct across replaceEditor re-mounts (never re-add — would stack).
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (document.querySelector('.flyout, .modal-backdrop')) return
+      const pm = (window as any).WC?.PM
+      if (pm?.painterArmed?.()) {
+        // Word disarms the painter and does nothing else — stop the press here so it
+        // can't ALSO exit focus-mode / close backstage via app.js's bubble handler.
+        e.preventDefault(); e.stopPropagation()
+        pm.cancelFormatPainter()
+      }
+    }, true)
+  }
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
