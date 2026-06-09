@@ -4,6 +4,7 @@
 import { STYLE_NAME_TO_ID } from './style-names'
 import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
 import { headParagraph } from './state-sync'
+import { PREVIEW_META } from './style-preview'
 type AnyEditor = any
 
 export function installCommands(editor: AnyEditor) {
@@ -168,10 +169,29 @@ export function installCommands(editor: AnyEditor) {
 
   // slice 4: format painter (fork FormatCommands storage is the state of record)
   const painterStorage = () => (editor as any).extensionStorage?.formatCommands
-  function armFormatPainter(sticky: boolean): boolean {
-    return cmd('copyFormat', { persistent: sticky })
+  // Nudge a no-op meta transaction so state-sync's rAF tick fires immediately after
+  // arm/cancel — copyFormat/cancelFormatPainter only mutate storage (no dispatch).
+  // A step-less tr has docChanged=false → 'update' never fires → dirty untouched.
+  // PREVIEW_META is also set so io.ts's guard covers any future docChanged edge case.
+  function nudgePainterChrome(): void {
+    try {
+      const tr = editor.state.tr
+        .setMeta('addToHistory', false)
+        .setMeta(PREVIEW_META, true)
+        .setMeta('wcPainterChrome', true)
+      editor.view?.dispatch(tr)
+    } catch { /* view gone */ }
   }
-  function cancelFormatPainter(): boolean { return cmd('cancelFormatPainter') }
+  function armFormatPainter(sticky: boolean): boolean {
+    const ok = cmd('copyFormat', { persistent: sticky })
+    nudgePainterChrome()
+    return ok
+  }
+  function cancelFormatPainter(): boolean {
+    const ok = cmd('cancelFormatPainter')
+    nudgePainterChrome()
+    return ok
+  }
   function painterArmed(): boolean {
     const s = painterStorage()
     return !!(s && (s.storedStyle || s.storedParaProps))
