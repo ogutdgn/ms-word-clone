@@ -31,11 +31,19 @@
   const H = {}; // handlers keyed by cmd
 
   // ---- Clipboard ----
-  H.cut = () => E().exec('cut');
-  H.copy = () => E().exec('copy');
-  H.paste = () => E().exec('paste');
-  H.formatPainter = (c, node) => armPainterFromSelection(node, false);
-  H.formatPainterLock = (c, node) => armPainterFromSelection(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true);
+  H.cut = () => { const pm = PMA(); pm ? pm.cutSelection() : E().exec('cut'); };
+  H.copy = () => { const pm = PMA(); pm ? pm.copySelection() : E().exec('copy'); };
+  H.paste = () => { const pm = PMA(); pm ? pm.pasteDefault() : E().exec('paste'); };
+  H.formatPainter = (c, node) => {
+    const pm = PMA();
+    if (pm) { armPainterPM(node, false); return; }
+    armPainterFromSelection(node, false);
+  };
+  H.formatPainterLock = (c, node) => {
+    const pm = PMA();
+    if (pm) { armPainterPM(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true); return; }
+    armPainterFromSelection(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true);
+  };
 
   // ---- Font ----
   H.bold = () => { const pm = PMA(); pm ? pm.cmd('toggleBold') : E().exec('bold'); };
@@ -1066,6 +1074,17 @@
     if (painterHandler) { E().node.removeEventListener('mouseup', painterHandler); painterHandler = null; }
     if (painterEsc) { document.removeEventListener('keydown', painterEsc); painterEsc = null; }
   }
+  // PM painter: the fork's FormatCommands owns capture/apply/release; this wrapper
+  // adds Word's UX toasts. Esc lives in the bridge; button toggle + cursor live in
+  // state-sync. Word arms from a CARET too (paragraph + caret-char formatting —
+  // oracle 2.3 probe B3); no empty-selection refusal.
+  function armPainterPM(node, sticky) {
+    const pm = PMA();
+    if (!pm.armFormatPainter(sticky)) { WC.toast('Format Painter could not copy the formatting here.'); return; }
+    WC.toast(sticky ? 'Format Painter locked — apply to multiple selections. Press Esc to stop.'
+                    : 'Format Painter — select text to apply the copied formatting once.');
+  }
+
   function armPainterFromSelection(node, sticky) {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !E().node.contains(sel.anchorNode)) { WC.toast('Select formatted text first, then click Format Painter.'); return; }
@@ -1304,6 +1323,17 @@
   }
 
   function selectMenu(node) {
+    const pm = PMA();
+    if (pm) {
+      WC.flyout(node, (fly) => {
+        fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => pm.selectAll() }));
+        fly.appendChild(WC.flyItem('Select Objects', { onClick: () => WC.toast('Select Objects arrives with the Draw engine re-host (slice 10).') }));
+        fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => { if (!pm.selectSimilarFormatting()) WC.toast('Place the cursor in text first.'); } }));
+        fly.appendChild(WC.flySep());
+        fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));
+      });
+      return;
+    }
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => E().exec('selectAll') }));
       fly.appendChild(WC.flyItem('Select Objects', { onClick: () => { if (WC.Draw) { WC.Draw.setEnabled(true); WC.Draw.setTool('select'); } WC.toast('Click objects to select them.'); } }));
@@ -1370,6 +1400,24 @@
   }
 
   function pasteMenu(node) {
+    const pm = PMA();
+    if (pm) {
+      pm.clipboardFlavors().then((fl) => {
+        fl = fl || { hasText: false, hasHtml: false, hasImage: false };
+        WC.flyout(node, (fly) => {
+          const item = (label, enabled, onClick) =>
+            fly.appendChild(WC.flyItem(label, enabled ? { onClick } : { disabled: true }));
+          item('Keep Source Formatting', fl.hasHtml || fl.hasText, () => pm.pasteDefault());
+          item('Merge Formatting', false, () => {}); // recorded deferral — destination-formatting rules engine
+          item('Picture', fl.hasImage, () => pm.pastePicture());
+          item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
+          fly.appendChild(WC.flySep());
+          fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
+          fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.toast('Set Default Paste is not implemented (recorded deferral).') }));
+        });
+      });
+      return;
+    }
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('Keep Source Formatting', { onClick: () => E().exec('paste') }));
       fly.appendChild(WC.flyItem('Merge Formatting', { onClick: () => E().exec('paste') }));

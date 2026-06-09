@@ -487,6 +487,7 @@
 
   // ---- Office Clipboard task pane ----
   D.clipboardPane = function () {
+    if (WC.PM && WC.PM.active) { WC.toast('Office Clipboard history arrives in a later slice.'); return; }
     let pane = document.getElementById('clipboard-pane'); if (pane) { pane.remove(); WC.Clipboard.onChange = null; return; }
     pane = el('div', { class: 'taskpane', id: 'clipboard-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Clipboard' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => { pane.remove(); WC.Clipboard.onChange = null; } })]);
@@ -518,6 +519,43 @@
     render();
     pane.appendChild(head); pane.appendChild(body);
     document.getElementById('workarea').appendChild(pane);
+  };
+
+  // ---- Paste Special (PM-only) ----
+  // Word's flavor list is clipboard-STATE-driven (oracle 16.77.1): rich clipboard →
+  // HTML Format / Unformatted Text; plain text → only Unformatted Text; image →
+  // Picture. Double-click on a row = OK (Word behavior).
+  D.pasteSpecial = async function () {
+    const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null;
+    if (!pm) { WC.notImplemented('Paste Special'); return; }
+    pm.captureSelection();
+    const fl = (await pm.clipboardFlavors()) || { hasText: false, hasHtml: false, hasImage: false };
+    const options = [];
+    if (fl.hasHtml) options.push(['HTML Format', () => pm.pasteHTML()]);
+    if (fl.hasText) options.push(['Unformatted Text', () => pm.pasteTextOnly()]);
+    if (fl.hasImage) options.push(['Picture', () => pm.pastePicture()]);
+    let chosen = 0;
+    const doPaste = () => { if (options[chosen]) pm.withSelection(() => options[chosen][1]()); };
+    const list = el('ul', { class: 'ps-list' }, options.map(([label], i) =>
+      el('li', { class: 'ps-item' + (i === 0 ? ' selected' : ''), text: label, tabindex: '0' })));
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('li'); if (!li) return;
+      chosen = Array.from(list.children).indexOf(li);
+      list.querySelectorAll('li').forEach((n, i) => n.classList.toggle('selected', i === chosen));
+    });
+    const body = el('div', {}, [
+      el('div', { class: 'row', text: 'As:' }),
+      options.length ? list : el('div', { text: 'The Clipboard is empty.' }),
+    ]);
+    const handle = WC.dialog({ title: 'Paste Special', width: '420px', body, footer: [
+      { label: 'OK', primary: true, onClick: doPaste },
+      { label: 'Cancel' },
+    ] });
+    list.addEventListener('dblclick', (e) => {
+      if (!e.target.closest('li')) return;
+      doPaste();
+      handle.close(); // Word: dblclick = OK
+    });
   };
 
   // ---- Editor / Proofing pane ----
