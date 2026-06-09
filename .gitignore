@@ -20,3 +20,6 @@ tests/fixtures/oracle-*
 
 # Slice-4 Codex computer-use probe evidence (screenshots; never checked in)
 .oracle-probes/
+
+# Codex/agent scratch (not part of the project)
+.agents/
