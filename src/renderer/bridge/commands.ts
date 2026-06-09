@@ -131,5 +131,53 @@ export function installCommands(editor: AnyEditor) {
     return cmd('setStyleById', id)
   }
 
-  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs, getResolvedParaProps, styleIdForName, applyStyleByName }
+  // slice 4: editing-misc
+  function selectAll(): boolean { return cmd('selectAll') }
+
+  // Legacy-parity similar-formatting: ONE TextSelection spanning the first→last
+  // text run whose mark signature matches the reference run's. Recorded deviation:
+  // real Word multi-selects discontiguous ranges; PM TextSelection is single-range.
+  function selectSimilarFormatting(): boolean {
+    const { state } = editor
+    const { $from, from, to, empty } = state.selection
+    const sig = (marks: readonly any[]) =>
+      JSON.stringify(marks.map((m: any) => [m.type.name, m.attrs]).sort())
+    // Reference marks: at a run's START boundary $from.marks() returns the PRECEDING
+    // run's marks. For a non-empty selection take the FIRST text run the selection
+    // actually covers; the empty-caret case stays storedMarks ?? $from.marks().
+    let refMarks: readonly any[] | null = null
+    if (!empty) {
+      state.doc.nodesBetween(from, to, (node: any) => {
+        if (refMarks === null && node.isText) refMarks = node.marks
+        return refMarks === null
+      })
+    }
+    if (refMarks === null) refMarks = state.storedMarks ?? $from.marks()
+    const ref = sig(refMarks!)
+    let first = -1, last = -1
+    state.doc.descendants((node: any, pos: number) => {
+      if (!node.isText) return
+      if (sig(node.marks) === ref) {
+        if (first < 0) first = pos
+        last = pos + node.nodeSize
+      }
+    })
+    if (first < 0) return false
+    return cmd('setTextSelection', { from: first, to: last })
+  }
+
+  // slice 4: format painter (fork FormatCommands storage is the state of record)
+  const painterStorage = () => (editor as any).extensionStorage?.formatCommands
+  function armFormatPainter(sticky: boolean): boolean {
+    return cmd('copyFormat', { persistent: sticky })
+  }
+  function cancelFormatPainter(): boolean { return cmd('cancelFormatPainter') }
+  function painterArmed(): boolean {
+    const s = painterStorage()
+    return !!(s && (s.storedStyle || s.storedParaProps))
+  }
+
+  return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs,
+    getResolvedParaProps, styleIdForName, applyStyleByName,
+    selectAll, selectSimilarFormatting, armFormatPainter, cancelFormatPainter, painterArmed }
 }
