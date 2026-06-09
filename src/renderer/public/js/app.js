@@ -97,6 +97,10 @@
         if (e.altKey && k === '1') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 1'); if (!pm.applyStyleByName('Heading 1')) WC.toast('Style “Heading 1” is not available in this document.'); };
         if (e.altKey && k === '2') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 2'); if (!pm.applyStyleByName('Heading 2')) WC.toast('Style “Heading 2” is not available in this document.'); };
         if (e.altKey && k === '3') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 3'); if (!pm.applyStyleByName('Heading 3')) WC.toast('Style “Heading 3” is not available in this document.'); };
+        // slice 4: copy/paste formatting chords (Word: Cmd+Shift+C / Cmd+Shift+V —
+        // oracle B5). PM-only — legacy returns null so the chord keeps its default.
+        if (shift && k === 'c') { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; return pm ? () => pm.armFormatPainter(false) : null; }
+        if (shift && k === 'v') { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; return pm ? () => pm.cmd('applyStoredFormat') : null; }
         return null;
       };
       // PM keymaps own the history keys when focus is in the view — stand down

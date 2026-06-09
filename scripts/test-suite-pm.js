@@ -846,11 +846,16 @@
     const s0 = selectText('undo');
     window.WC.editor.commands.setTextSelection({ from: s0.from, to: s0.from }); // caret, not whole-doc selection
     await sleep(550); // close the history group
-    const before = JSON.stringify(doc().toJSON());
+    // sdBlockRev is a per-block revision counter the numbering plugin bumps via an
+    // addToHistory:false appendTransaction — it is NOT undoable content, so it
+    // legitimately drifts across paste+undo (unlike a snapshot-restore). Normalize
+    // it out so this asserts "one undo reverts the CONTENT", not the rev counter.
+    const norm = (d) => JSON.stringify(d, (k, val) => (k === 'sdBlockRev' ? 0 : val));
+    const before = norm(doc().toJSON());
     run('paste');
     if (!(await until(async () => doc().textContent.includes('one-undo-payload')))) return 'paste never landed';
     PM().cmd('undo'); await sleep(50);
-    return JSON.stringify(doc().toJSON()) === before;
+    return norm(doc().toJSON()) === before;
   });
   await t('[4] Keep Text Only strips source formatting', async () => {
     await CB().writeHTML('<p><strong>strippedbold</strong></p>');
