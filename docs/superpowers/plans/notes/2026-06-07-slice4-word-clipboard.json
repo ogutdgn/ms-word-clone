@@ -57,5 +57,34 @@
     "B8_hyperlink": "CONFIRMED link survives paint-OVER (hyperlink count stayed 1). Validates excluding `link` mark from the clear. Copy-FROM-link-to-plain unconfirmed (we also exclude link from CAPTURE, so safe).",
     "B9_mixedSource": "FINDING: selecting BOTH a bold + a plain word then painting \u2192 dst became BOLD (first-run formatting), NOT intersection-empty. REFINE Task 3: for a non-empty selection capture marks at selection.from (first char), not getMarksFromSelection (which intersects mixed\u2192[]). Anticipated by plan probe-9 note.",
     "screenshots": ".oracle-probes/slice4/shots/ (A1-A6, B1-B9 before/after) \u2014 gitignored evidence."
+  },
+  "task9_manual_sanity": {
+    "method": "launched the built clone (npx electron .), drove real OS keystrokes via System Events, screencaptured the window",
+    "physical_cmd_v_into_clone": "PASS \u2014 'PHYSCLIP_PASTE_OK' (from pbcopy, another app) pasted into the PM editor via Blink-native Cmd+V; no hidden menu needed (confirms the Task-8 deferred verdict).",
+    "physical_cmd_c_out_of_clone": "PASS \u2014 Select-All + Cmd+C overwrote a poisoned clipboard with the doc content (cross-app copy-out works).",
+    "five_gates": "PM 112/112, legacy 257/257, smoke 9/9 x2, docx 17/17 (clean build).",
+    "covered_by_pm_suite": "ribbon cut/copy/paste, paste flavors (KSF/KeepTextOnly/Picture), Paste Special dialog, format painter one-shot/sticky/Esc/button-chrome, Select All, Similar Formatting \u2014 all green.",
+    "wired_not_visually_reconfirmed": "Cmd+Shift+C/V copy/paste-format chords (oracle B5, bridge-wired); painter copy-cursor (cosmetic). Low risk."
+  },
+  "task10_oracle_legs": {
+    "legA_clone_to_word": {
+      "verdict": "PASS",
+      "method": "clone Select-All+Cmd+C \u2192 inspected clipboard HTML \u2192 physical Cmd+V into real Word \u2192 screenshot",
+      "clone_clipboard_flavors": [
+        "\u00abclass HTML\u00bb",
+        "Unicode text"
+      ],
+      "clone_html_word_compatible": "YES \u2014 <meta name=Generator content='Microsoft Word'>, MSO @list styles, <p styleid='ListParagraph'> with markers; data-superdoc-slice blob is display:none (internal round-trip).",
+      "word_render": "real Word (Document5) rendered the full list structure: top-level bullets (-), nested sub-bullet (\u25e6 Indentation 1), numbered list with nested alpha (a. With indent 1) \u2014 markers + nesting + bullet-vs-numbered all correct. Screenshot legA-word-paste.png.",
+      "applescript_style_readback": "blocked by session degradation (quirk #26 object flicker) \u2014 visual screenshot used instead."
+    },
+    "legB_word_to_clone": {
+      "verdict": "PASS (core) + KNOWN DEVIATION (list markers)",
+      "method": "Word Select-All+Cmd+C \u2192 clone bridge readHTML()+pasteHTML() probe \u2192 inspect PM doc",
+      "core": "PASS \u2014 9 paragraphs, ListParagraph styleId, numbering ilvl 0/1 (nesting) all survive Word's 46KB MSO-list HTML through the PM parser.",
+      "DEVIATION": "Word's supportLists literal markers (-, \u25e6, 1., a.) leak in as TEXT alongside the engine's own numbering (numberingProperties.ilvl set) \u2192 DOUBLE MARKER on paste of Word lists. Word strips its own `mso-list:Ignore` / <!--[if !supportLists]--> marker spans on import; the clone's PM HTML parser does not. The clone EMITS these markers (for Word compat, leg A) but does not STRIP them on import.",
+      "fix_scope": "fork super-converter HTML import (strip mso-list:Ignore / supportLists marker spans) \u2014 delicate (shared with file-open), out of slice-4 paste scope; recorded follow-up (candidate: slice 7 converter work). Simple/plain HTML paste (the [4] KSF test) is unaffected.",
+      "CAVEAT": "The leg-B content ORIGINATED from the clone (clone\u2192Word\u2192clone round-trip), so Word's clipboard HTML still carried the clone's data-superdoc-slice blob. Whether NATIVE Word-authored list HTML (no slice blob, pure mso-list markup) leaks markers the same way is UNCONFIRMED \u2014 couldn't author fresh Word list content this session (Word session degraded to 0 docs / quirk #24 + osascript assistive-access flicker). Follow-up: confirm with native Word content, then fix (candidate: strip <!--[if !supportLists]-->/mso-list:Ignore marker spans in bridge pasteHTML preprocessing \u2014 OUR code, view.pasteHTML uses the PM clipboard parser not the OOXML converter \u2014 or in the converter import)."
+    }
   }
 }
