@@ -70,6 +70,11 @@ The following upstream packages are included in this directory tree:
   callers, fixing the ribbon click,click,dblclick disarm trap); the UI-guard
   selector covers the app's ribbon/flyout/dialog chrome so chrome clicks never
   consume the armed painter (slice 4, 2026-06-08).
+  - The painter copies DIRECT character formatting + the paragraph style (not the
+    resolved style cascade), matching Word — captured via the run's inline-override
+    marks (`getFormattingStateAtPos(...).inlineMarks`), so a styled (e.g. Heading 1)
+    source no longer bakes the style's font/color as explicit inline overrides on the
+    target; the style travels via paragraphProperties (slice 4, 2026-06-08).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Extension } from '@core/Extension.js';
-import { getMarksFromSelection, getFormattingStateAtPos } from '@core/helpers/getMarksFromSelection.js';
+import { getSelectionFormattingState, getFormattingStateAtPos } from '@core/helpers/getMarksFromSelection.js';
 import { toggleMarkCascade } from '@core/commands/toggleMarkCascade.js';
 
 const FORMAT_PAINTER_DOUBLE_CLICK_MS = 500;
@@ -162,7 +162,7 @@ export const FormatCommands = Extension.create({
             return true;
           }
 
-          return applyStoredFormat.call(this, { chain, storage: this.storage });
+          return applyStoredFormat({ chain, storage: this.storage });
         },
 
       /**
@@ -227,24 +227,35 @@ function isSameSelection(selection, otherSelection) {
 }
 
 /** Capture the marks the Word painter copies (slice 4). Word copies the FIRST run's
- *  formatting on a non-empty selection (oracle probe B9 — getMarksFromSelection
- *  INTERSECTS, returning [] on mixed runs, which is wrong); a collapsed caret keeps
- *  getMarksFromSelection (correct caret marks). The `link` mark is never carried
- *  (oracle B8 — painter must not spray hyperlinks). Returns mark INSTANCES (with
- *  `.type.name`/`.attrs`), matching the shape applyStoredFormat re-applies.
+ *  DIRECT (inline-override) character formatting on a non-empty selection (oracle
+ *  probe B9 — the old `getMarksFromSelection`/`resolvedMarks` path INTERSECTED,
+ *  returning [] on mixed runs, which is wrong); a collapsed caret copies the caret's
+ *  direct marks. The `link` mark is never carried (oracle B8 — painter must not spray
+ *  hyperlinks). Returns mark INSTANCES (with `.type.name`/`.attrs`), matching the
+ *  shape applyStoredFormat re-applies.
  *
- *  NOTE (fork deviation from the plan's `state.doc.nodeAt(sel.from)`): this fork
- *  wraps text in `run` nodes, so at a run boundary `nodeAt` returns the run node
- *  whose `.marks` is empty — bold/italic live on the inner text node and partly in
- *  run/paragraph runProperties. We therefore reuse the engine's own per-position
- *  resolver `getFormattingStateAtPos` (the exact primitive `getFormattingStateForRange`
- *  feeds per segment) at the FIRST text segment, giving the first run's resolved
- *  marks with no intersection. Verified live (devtools probe): bold source → stored
- *  bold; uniform/mixed both copy the first run. */
+ *  NOTE — we read the first run's INLINE marks, NOT the cascade-resolved marks.
+ *  `getFormattingStateAtPos(...).resolvedMarks` is cascade-resolved: it bakes the
+ *  paragraph STYLE's font/size/color (e.g. Heading 1's appearance) into explicit mark
+ *  instances. Because `captureParaProps` already carries the styleId, painting those
+ *  resolved marks would double-apply the source style's appearance — once as direct
+ *  inline overrides, once via the copied style cascade — broader than Word (which
+ *  copies direct char formatting + the style separately, letting the style supply its
+ *  own font/color). We therefore take `.inlineMarks` (direct-override-only, from the
+ *  run's own runProperties with a `$pos.marks()` fallback when a run has no overrides);
+ *  the paragraph style travels via paraProps (captureParaProps) and supplies its own
+ *  cascade on apply, matching Word.
+ *
+ *  Fork deviation (vs the plan's `state.doc.nodeAt(sel.from)`): this fork wraps text in
+ *  `run` nodes, so at a run boundary `nodeAt` returns the run node whose `.marks` is
+ *  empty. We instead use the engine's own per-position resolver at the FIRST text
+ *  segment. Verified live (devtools probe): bold source → stored bold; a Heading-1
+ *  source with no extra direct formatting → empty storedStyle (style travels via
+ *  paraProps). */
 function captureMarks(state, editor) {
   const sel = state.selection;
   if (sel.empty) {
-    return (getMarksFromSelection(state, editor) || []).filter((m) => m.type.name !== 'link');
+    return (getSelectionFormattingState(state, editor).inlineMarks || []).filter((m) => m.type.name !== 'link');
   }
   let firstTextPos = null;
   state.doc.nodesBetween(sel.from, sel.to, (node, pos) => {
@@ -257,7 +268,7 @@ function captureMarks(state, editor) {
   });
   const marks =
     firstTextPos !== null
-      ? getFormattingStateAtPos(state, firstTextPos, editor).resolvedMarks
+      ? getFormattingStateAtPos(state, firstTextPos, editor).inlineMarks
       : state.doc.resolve(sel.from).marks();
   return (marks || []).filter((m) => m.type.name !== 'link');
 }
