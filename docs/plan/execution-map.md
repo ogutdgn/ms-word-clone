@@ -72,8 +72,21 @@
 > leg A clone→Word PASS (full list fidelity), leg B Word→clone PASS core + a recorded
 > list-marker leak (ship-and-track, user-approved 2026-06-08); physical Cmd+C/V both
 > directions confirmed. Gates: **PM 112/112**, legacy 257, smoke 9/9 × 2, docx 17.
-> **Next: slice 5 — find-replace** (brainstorm-lite → write-plan → execute). ⚠️ slice 5
-> must repoint BOTH `[0a]` D6 tests (now on `replace`/`find`) to a later-slice area.
+>
+> **Slice 5 is DONE** (`feature/phase-2-slice-5-find-replace`, PR pending): area
+> **`find-replace` FLIPPED** — the legacy destructive `.find-hit` rewrite replaced by the fork's
+> **decoration-based Search extension**; find pane (`pmFindPane`) drives the `WC.PM` search surface
+> with a Word-faithful options row (Match case / Whole words / Use wildcards), live count, Replace +
+> Replace All, close→`clearFind`; full Word scope (Match Case + Whole Words + Wildcards + Advanced
+> Find) + all three Find-dropdown items (Find · Advanced Find · Go To); new `D.goToDialog`;
+> Ctrl+F/H + edit.find/replace `pmBlockedOr`-wrapped in the flip commit. Fork edits (NOTICE'd): the
+> Search ext gained `name:'search'` (was undefined storage), whole-word + Word-wildcard on the
+> session path, wildcards forced case-sensitive (oracle A4). Oracle legs A 'QUX' clone→Word + B
+> 'alpha×4' Word→clone both PASS; zero decoration leak in saved docx. Gates: **PM 130/130**, legacy
+> 257, smoke 9/9 × 2, docx 17.
+> **Next: slice 6 — insert-basics** (brainstorm-lite → write-plan → execute). ⚠️ slice 6 must
+> repoint BOTH `[0a]` D6 tests (now on `link`/`table`) to a later-slice area, or invert them as the
+> insert-basics flip tests.
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -94,6 +107,17 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-09 (Phase 2)
+- [x] Slice-5 **brainstorm-lite** — confirmed the find/replace entry-point inventory against real code (`H.find`/`H.replace`→`D.findPane`; the legacy `.find-hit` TreeWalker; the fork **already ships** a decoration-based Search extension; ribbon `find` split + `replace` button; app.js Ctrl+F/H). User scope decision: **maximum** (Match Case + Whole Words + Wildcards + Advanced Find + all three Find-dropdown items).
+- [x] Slice-5 **plan** written + 3-critic-hardened + committed (`c3f7fb2`) — 3 blockers pre-build (unnamed Search ext → `extensionStorage.search` undefined; bare Ctrl+F/H bypassing D6; `goToDialog` not exported) + 4 majors; one critic "blocker" (missing `.sd-editor-scoped`) refuted by direct verification.
+- [x] Slice-5 **red `[5]` tests** (18) + D6 repoint `replace`→`link`, `find`→`table` (`7262ea7`, `4485dc3`).
+- [x] Slice-5 **fork work**: `name:'search'` + whole-word + Word-wildcards, threaded through setSearchSession/invalidator/replaceSearchMatch (`0343330`, NOTICE'd).
+- [x] Slice-5 **bridge** find/replace surface (`0fe1e60`) + one-undo `norm()` test fix (`375e12b`).
+- [x] Slice-5 **entry points**: find pane re-point + options row + `D.goToDialog` (`43e3f78`).
+- [x] Slice-5 **THE FLIP** + Ctrl+F/H/edit re-points (`f768175`) — 129/0 first run, zero triage.
+- [x] Slice-5 **oracle**: Codex computer-use semantics probes (all match Word) → **wildcard case-sensitivity fix** (`1186532`, 130/0); verdicts (`8a9b9ef`); **legs A/B PASS** (`2fb33e3`).
+- [x] **All five gates green: PM 130/130, legacy 257/257, smoke 9/9 ×2, docx 17/17.** Checkpoint + PR next.
 
 ### 2026-06-08 (Phase 2)
 - [x] Slice-4 **plan** written + 4-critic-hardened + committed (`37b03fd`) — `docs/superpowers/plans/2026-06-07-phase2-slice-4-clipboard.md` (32 findings, 8 confirmed blockers applied: painter double-click trap, two never-green tests, async flyout/dialog races).

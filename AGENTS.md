@@ -27,8 +27,11 @@ first, then dive into the linked `docs/`.
 > **styles** (slice 3 — gallery + PM-native hover live-preview, styles pane, caret-driven
 > gallery highlight, 4 minted built-in style defaults), and **clipboard + editing-misc**
 > (slice 4 — cut/copy/paste via webContents IPC, paste-special dialog, Word-scope Format
-> Painter, select; Cmd+Shift+C/V chords).
-> **Phase 2** continues wiring ribbon commands → PM transactions (slice 5: find-replace).
+> Painter, select; Cmd+Shift+C/V chords), and **find-replace** (slice 5 — BUILT on branch
+> `feature/phase-2-slice-5-find-replace`, PR pending: the fork's decoration-based Search extension
+> replaces the destructive `.find-hit` rewrite; Match Case + Whole Words + Wildcards + Advanced
+> Find + Go To; oracle legs A/B PASS).
+> **Phase 2** continues wiring ribbon commands → PM transactions (slice 6: insert-basics).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## What this is

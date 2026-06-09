@@ -25,9 +25,12 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > core is the active visible editor; file IO, character formatting, **paragraph + lists**,
 > **styles** (gallery + PM-native hover live-preview + pane + caret-driven gallery highlight), and
 > **clipboard + editing-misc** (cut/copy/paste + paste-special + Word-scope Format Painter + select)
-> are on the engine (oracle-validated against Word 16.77.1); flipped ribbon areas: `character`,
-> `paragraph`, `lists`, `styles`, `clipboard`, `editing-misc`; the legacy app runs only under `--legacy`.
-> **Phase 2** continues with slice 5 (find-replace). Exact state: [docs/plan/](docs/plan/).
+> are on the engine (oracle-validated against Word 16.77.1). **Slice 5 (find-replace) is BUILT**
+> (branch `feature/phase-2-slice-5-find-replace`, PR pending): the fork's **decoration-based Search
+> extension** replaces the destructive `.find-hit` rewrite — Match Case + Whole Words + Wildcards +
+> Advanced Find + Go To, options row, oracle legs A/B PASS. Flipped ribbon areas: `character`,
+> `paragraph`, `lists`, `styles`, `clipboard`, `editing-misc`, `find-replace`; the legacy app runs
+> only under `--legacy`. **Phase 2** continues with slice 6 (insert-basics). Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 

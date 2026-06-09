@@ -7,6 +7,66 @@
 
 ---
 
+## 2026-06-09 — Phase 2 slice 5 BUILT (find-replace on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-5-find-replace` (directly off `main` post slice-4 — no
+  stacked PRs; **PR to open next**).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 5 DONE → slice 6 (insert-basics) next.**
+- **State summary:** area **`find-replace` FLIPPED** (registry `bridge/index.ts:29`): the legacy
+  destructive `.find-hit` span rewrite is replaced by the fork's **decoration-based Search
+  extension** (non-destructive `.ProseMirror-search-match`/`-active-search-match` highlights). The
+  **find pane** (`D.findPane` PM branch → `pmFindPane`) drives the `WC.PM` search surface
+  (`findSession` highlight-only/`findNext`/`findPrev`/`replaceOne`/`replaceAll`/`clearFind`/
+  `findCount`/`goTo`), with a Word-faithful **options row** (Match case / Whole words / Use
+  wildcards), live "N of M" counter, Replace + Replace All (count toast), and **close→`clearFind`**
+  (no orphan highlights). **Full Word option scope shipped** (user-approved maximum): **Match Case +
+  Whole Words + Wildcards + Advanced Find** (options expanded) + **all three Find-dropdown items**
+  (Find · Advanced Find… · Go To…). New **`D.goToDialog`** (B3) with a PM branch (Heading works on
+  the model; Page/Line pagination-gated → Phase 7); `findMenu` re-pointed. **Ctrl+F/Ctrl+H +
+  edit.find/replace** wrapped in `pmBlockedOr('find-replace', …)` in the flip commit (B2).
+  **Fork edits (NOTICE'd):** the Search extension was **unnamed** (defaulted to `'extension'` →
+  `extensionStorage.search` was undefined) — now `name: 'search'` (B1); `setSearchSession` + the
+  search-index invalidator (M1) + `replaceSearchMatch` (M2) thread `{wholeWord, useWildcards}`;
+  `SearchIndex.wildcardToRegExp` (Word wildcard→RegExp) + `isWholeWordMatch` post-filter; **wildcards
+  forced case-sensitive** to match Word (oracle A4). Gates: **PM 130/130** (112 + 18 new `[5]`),
+  legacy 257/257, smoke 9/9 ×2, docx 17/17.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-09-phase2-slice-5-find-replace.md`,
+  hardened by a 3-critic adversarial workflow — 3 blockers caught pre-build [unnamed Search
+  extension; bare Ctrl+F/H bypassing D6; `goToDialog` not exported] + 4 majors; one critic "blocker"
+  [missing `.sd-editor-scoped`] REFUTED by direct verification of ProseMirrorRenderer.ts:584;
+  executed subagent-driven with two-stage review per task):
+  - `c3f7fb2` plan · `7262ea7`/`4485dc3` red `[5]` tests + D6 repoint (`replace`→`link`, `find`→`table`)
+  - `0343330` fork: `name:'search'` + whole-word + Word-wildcards (M1/M2 threaded, NOTICE'd)
+  - `0fe1e60`/`375e12b` bridge find/replace surface + one-undo `norm()` test fix
+  - `43e3f78` re-point find pane + options row + `D.goToDialog` (B3)
+  - `f768175` **THE FLIP** + Ctrl+F/H + edit.find/replace re-points (B2) — 129/0, zero triage
+  - `1186532` wildcard case-sensitivity fidelity fix (oracle A4) — 130/0
+  - `8a9b9ef`/`2fb33e3` oracle verdicts + legs A/B PASS
+- **Oracle validation (spec §8.3) vs Word 16.77.1:** SEMANTICS via Codex computer-use driving
+  Word's own AppleScript find object (authoritative) — match-case 3/1, whole-word 4/2, wildcard
+  `b?t`=3/`b*t`=5, replace-all 4/2 **all MATCH** our engine; **deviation found+fixed:** Word forces
+  wildcards case-sensitive (A4). **Leg A clone→Word PASS** (engine replace-all → Word read-props
+  reads 'QUX bar QUX bar QUX'; document.xml QUX×3/bar×2/foo×0; **zero decoration/highlight leak** —
+  decorations are view-only). **Leg B Word→clone PASS** (Word-authored 'alpha×4' imports identically;
+  `findSession('alpha')`=4). Evidence: `docs/superpowers/plans/notes/2026-06-09-slice5-word-find-replace.json`
+  + `.oracle-probes/slice5/` (gitignored: Codex `results.md` + 17 shots).
+- **KNOWN DEVIATIONS / recorded follow-ups:** (1) **selection-scoped Replace All** — Word can limit
+  Replace All to a selection; our engine replaces whole-doc only (deferred). (2) Mac Word ⌘F is a
+  top-right **toolbar search field**, not a sidebar; we keep our preserved sidebar-pane chrome
+  (UI-fidelity constraint — cosmetic deviation). (3) Advanced exotic options (Sounds like, Find all
+  word forms, Match prefix/suffix, Ignore punctuation/whitespace) deferred. (4) **Go To target list
+  unverified** (Word's Find dialog crashed/recovered during the Codex probe) — our Heading/Bookmark/
+  Page/Line is a reasonable subset; Page/Line visual landing pagination-gated (Phase 7).
+- **Carry-overs for slice 6 (insert-basics):** **BOTH `[0a]` D6 tests now sit on insert-basics
+  cmds** (`link` run-block + `table` dropdown-block) — slice 6's red-tests task must repoint BOTH
+  (or invert them as the insert-basics flip tests). Slice-4 follow-up still open (NOT slice-5 work):
+  the Word→clone list-marker leak (supportLists markers paste as literal text → double-marker).
+- **Blockers/notes:** none. Word left name-safe (our scripts only close docs by their own
+  `slice5-leg*.docx` names); the long crash-recovered Word session degraded back to windows=0 after
+  validation (not a script fault) — user relaunch recovers it when next needed.
+
+---
+
 ## 2026-06-08 — Phase 2 slice 4 INTEGRATED to `main`
 
 - **Branch:** `main` (PR #21 merged from GitHub — `696b84b`; `feature/phase-2-slice-4-clipboard`
