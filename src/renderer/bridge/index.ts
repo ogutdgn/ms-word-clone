@@ -4,6 +4,7 @@
 import { legacyBoot } from './mode'
 import { installCommands } from './commands'
 import { installClipboard } from './clipboard'
+import { installSearch } from './search'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -208,6 +209,15 @@ export function preinstallBridge() {
     armFormatPainter: () => false,
     cancelFormatPainter: () => false,
     painterArmed: () => false,
+    // slice 5: find/replace pre-mount stubs (replaced by installSearch on mount)
+    findSession: () => ({ total: 0, activeMatchIndex: -1 }),
+    findNext: () => -1,
+    findPrev: () => -1,
+    replaceOne: () => ({ total: 0, activeMatchIndex: -1 }),
+    replaceAll: () => ({ replacedCount: 0 }),
+    clearFind: () => false,
+    findCount: () => ({ total: 0, activeMatchIndex: -1 }),
+    goTo: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -238,7 +248,7 @@ export function installBridge(editor: AnyEditor) {
       }
     }, true)
   }
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor))
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
