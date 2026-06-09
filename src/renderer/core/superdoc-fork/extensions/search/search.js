@@ -224,6 +224,14 @@ const getPositionTracker = (editor) => {
  * @snippetPath /snippets/extensions/search.mdx
  */
 export const Search = Extension.create({
+  // FORK EDIT (slice 5): the Search extension declared NO `name:`, so the base
+  // Extension class defaulted it to `'extension'` (Extension.ts), and
+  // ExtensionService keys storage as `editor.extensionStorage[extension.name]`
+  // — leaving `editor.extensionStorage.search` undefined (and risking a
+  // last-write-wins collision on the `'extension'` key). Naming it 'search' is
+  // load-bearing for the bridge store() key and every find/replace consumer.
+  name: 'search',
+
   // @ts-expect-error - Storage type mismatch will be fixed in TS migration
   addStorage() {
     return {
@@ -270,6 +278,18 @@ export const Search = Extension.create({
       ignoreDiacritics: false,
       /**
        * @private
+       * @type {boolean}
+       * Whether the current search matches only whole words (FORK EDIT, slice 5)
+       */
+      wholeWord: false,
+      /**
+       * @private
+       * @type {boolean}
+       * Whether the current query is a Word "Use wildcards" pattern (FORK EDIT, slice 5)
+       */
+      useWildcards: false,
+      /**
+       * @private
        * @type {'raw'|'visible'}
        * Internal search text model for future behavior switches.
        */
@@ -303,14 +323,24 @@ export const Search = Extension.create({
             searchModel: storage.searchModel ?? DEFAULT_SEARCH_MODEL,
           });
 
-          const searchFn = storage.ignoreDiacritics
-            ? (q, opts) => storage.searchIndex.searchIgnoringDiacritics(q, opts)
-            : (q, opts) => storage.searchIndex.search(q, opts);
+          // FORK EDIT (slice 5): mirror setSearchSession's pattern-build + whole-word
+          // post-filter here, or live edits (typing / replace) would silently drop the
+          // whole-word/wildcard options on every doc change.
+          const wholeWord = storage.wholeWord;
+          const useWildcards = storage.useWildcards;
+          const caseSensitive = storage.caseSensitive;
+          const searchModel = storage.searchModel ?? DEFAULT_SEARCH_MODEL;
 
-          const indexMatches = searchFn(storage.query, {
-            caseSensitive: storage.caseSensitive,
-            searchModel: storage.searchModel ?? DEFAULT_SEARCH_MODEL,
-          });
+          const pattern = useWildcards
+            ? new RegExp(SearchIndex.wildcardToRegExp(storage.query), caseSensitive ? 'g' : 'gi')
+            : storage.query;
+          let indexMatches =
+            storage.ignoreDiacritics && !useWildcards
+              ? storage.searchIndex.searchIgnoringDiacritics(storage.query, { caseSensitive, searchModel })
+              : storage.searchIndex.search(pattern, { caseSensitive, searchModel });
+          if (wholeWord) {
+            indexMatches = indexMatches.filter((m) => storage.searchIndex.isWholeWordMatch(m.start, m.end));
+          }
 
           const refreshed = mapIndexMatchesToDocMatches({
             searchIndex: storage.searchIndex,
@@ -623,12 +653,17 @@ export const Search = Extension.create({
           const caseSensitive = options.caseSensitive ?? false;
           const ignoreDiacritics = options.ignoreDiacritics ?? false;
           const highlight = options.highlight ?? true;
+          // FORK EDIT (slice 5): whole-word + Word-wildcard session options.
+          const wholeWord = options.wholeWord ?? false;
+          const useWildcards = options.useWildcards ?? false;
           const searchModel = normalizeSearchModel(options.searchModel);
 
           // Store session state
           this.storage.query = query;
           this.storage.caseSensitive = caseSensitive;
           this.storage.ignoreDiacritics = ignoreDiacritics;
+          this.storage.wholeWord = wholeWord;
+          this.storage.useWildcards = useWildcards;
           this.storage.searchModel = searchModel;
 
           // Clear existing position trackers
@@ -646,10 +681,20 @@ export const Search = Extension.create({
           const searchIndex = this.storage.searchIndex;
           searchIndex.ensureValid(state.doc, { searchModel });
 
-          // Search with diacritic support
-          const indexMatches = ignoreDiacritics
-            ? searchIndex.searchIgnoringDiacritics(query, { caseSensitive, searchModel })
-            : searchIndex.search(query, { caseSensitive, searchModel });
+          // FORK EDIT (slice 5): build the search pattern — wildcards translate the
+          // Word pattern to a RegExp (ignoreDiacritics does not apply to wildcards);
+          // plain queries use the existing whitespace-flexible string path.
+          const pattern = useWildcards
+            ? new RegExp(SearchIndex.wildcardToRegExp(query), caseSensitive ? 'g' : 'gi')
+            : query;
+          let indexMatches =
+            ignoreDiacritics && !useWildcards
+              ? searchIndex.searchIgnoringDiacritics(query, { caseSensitive, searchModel })
+              : searchIndex.search(pattern, { caseSensitive, searchModel });
+          // FORK EDIT (slice 5): whole-word post-filter on index offsets.
+          if (wholeWord) {
+            indexMatches = indexMatches.filter((m) => searchIndex.isWholeWordMatch(m.start, m.end));
+          }
 
           // Map matches to document positions
           const resultMatches = mapIndexMatchesToDocMatches({
@@ -682,6 +727,9 @@ export const Search = Extension.create({
           this.storage.query = '';
           this.storage.caseSensitive = false;
           this.storage.ignoreDiacritics = false;
+          // FORK EDIT (slice 5): reset whole-word + wildcard session options.
+          this.storage.wholeWord = false;
+          this.storage.useWildcards = false;
           this.storage.searchModel = DEFAULT_SEARCH_MODEL;
 
           return true;
@@ -770,6 +818,10 @@ export const Search = Extension.create({
           const result = commands.setSearchSession(this.storage.query, {
             caseSensitive: this.storage.caseSensitive,
             ignoreDiacritics: this.storage.ignoreDiacritics,
+            // FORK EDIT (slice 5): preserve whole-word/wildcards so a replace does
+            // not widen the refreshed result set by dropping the session options.
+            wholeWord: this.storage.wholeWord,
+            useWildcards: this.storage.useWildcards,
             highlight: this.storage.highlightEnabled,
             searchModel: this.storage.searchModel,
           });

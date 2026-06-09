@@ -451,6 +451,79 @@ export class SearchIndex {
   }
 
   /**
+   * FORK EDIT (slice 5): translate a Word "Use wildcards" pattern into a RegExp
+   * source string. Supports the operators confirmed against Word 16.77.1:
+   *   ?  → .            (any single char)
+   *   *  → .*?          (any run, lazy)
+   *   [abc] / [a-z]     → character set/range (passed through verbatim)
+   *   [!abc]            → [^abc] (negated set)
+   *   <  → \b(?=\w)     (word start)
+   *   >  → (?<=\w)\b    (word end)
+   * Everything else is escaped literally; `\x` escapes the next char to a literal.
+   * @param {string} pattern
+   * @returns {string} RegExp source (caller adds flags)
+   */
+  static wildcardToRegExp(pattern) {
+    let out = '';
+    for (let i = 0; i < pattern.length; i++) {
+      const ch = pattern[i];
+      if (ch === '\\' && i + 1 < pattern.length) {
+        out += pattern[i + 1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        i++;
+        continue;
+      }
+      if (ch === '?') {
+        out += '.';
+        continue;
+      }
+      if (ch === '*') {
+        out += '.*?';
+        continue;
+      }
+      if (ch === '<') {
+        out += '\\b(?=\\w)';
+        continue;
+      }
+      if (ch === '>') {
+        out += '(?<=\\w)\\b';
+        continue;
+      }
+      if (ch === '[') {
+        // copy a char class verbatim, mapping a leading ! to ^
+        let cls = '[';
+        i++;
+        if (pattern[i] === '!') {
+          cls += '^';
+          i++;
+        }
+        while (i < pattern.length && pattern[i] !== ']') {
+          cls += pattern[i];
+          i++;
+        }
+        cls += ']';
+        out += cls;
+        continue;
+      }
+      out += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    return out;
+  }
+
+  /**
+   * FORK EDIT (slice 5): true when the [start,end) offset range is a "whole word"
+   * — the chars immediately outside the range are non-word (or string edges).
+   * Operates on the flat index text; the neighbor chars are the whole-word
+   * boundary signal for the common case (single-range matches).
+   * @param {number} start @param {number} end @returns {boolean}
+   */
+  isWholeWordMatch(start, end) {
+    const wordRe = /\w/;
+    const before = start > 0 ? this.text[start - 1] : '';
+    const after = end < this.text.length ? this.text[end] : '';
+    return !(before && wordRe.test(before)) && !(after && wordRe.test(after));
+  }
+
+  /**
    * Pattern matching combining diacritical marks, Hebrew vowel points/cantillation,
    * and other common combining marks that should be ignored during search.
    */

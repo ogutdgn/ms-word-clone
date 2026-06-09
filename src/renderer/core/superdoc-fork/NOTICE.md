@@ -75,6 +75,15 @@ The following upstream packages are included in this directory tree:
     marks (`getFormattingStateAtPos(...).inlineMarks`), so a styled (e.g. Heading 1)
     source no longer bakes the style's font/color as explicit inline overrides on the
     target; the style travels via paragraphProperties (slice 4, 2026-06-08).
+- **Search extension named + session extended for whole-word + Word wildcards:** the
+  `Search` extension now declares `name: 'search'` (was the unnamed `'extension'`
+  default, which left `extensionStorage.search` undefined and risked key collisions);
+  `SearchIndex` gains `static wildcardToRegExp()` (Word "Use wildcards" → RegExp,
+  oracle-matched operator set) and `isWholeWordMatch(start,end)` (word-boundary filter);
+  `setSearchSession`, the search-index invalidator, AND `replaceSearchMatch` accept +
+  thread `{wholeWord, useWildcards}`, building the pattern / post-filter accordingly.
+  Non-destructive (decorations only), back-compatible (`search()` signature unchanged)
+  (slice 5, 2026-06-09).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
