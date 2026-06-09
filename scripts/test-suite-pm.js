@@ -846,10 +846,11 @@
     const s0 = selectText('undo');
     window.WC.editor.commands.setTextSelection({ from: s0.from, to: s0.from }); // caret, not whole-doc selection
     await sleep(550); // close the history group
-    // sdBlockRev is a per-block revision counter the numbering plugin bumps via an
-    // addToHistory:false appendTransaction — it is NOT undoable content, so it
-    // legitimately drifts across paste+undo (unlike a snapshot-restore). Normalize
-    // it out so this asserts "one undo reverts the CONTENT", not the rev counter.
+    // sdBlockRev is a per-block revision counter bumped by the numbering plugin's
+    // appendTransaction. The bump folds into the paste's own history step, but the
+    // UNDO replay re-fires the appendTransaction and re-increments it — so the
+    // counter legitimately drifts forward across paste+undo while the CONTENT fully
+    // reverts. Normalize it out so this asserts reverted CONTENT, not the counter.
     const norm = (d) => JSON.stringify(d, (k, val) => (k === 'sdBlockRev' ? 0 : val));
     const before = norm(doc().toJSON());
     run('paste');
