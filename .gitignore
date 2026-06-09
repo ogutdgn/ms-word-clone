@@ -17,3 +17,6 @@ spike/
 # Oracle scratch fixtures (clone exports / Word-authored probes; never checked in)
 tests/fixtures/.oracle-*
 tests/fixtures/oracle-*
+
+# Slice-4 Codex computer-use probe evidence (screenshots; never checked in)
+.oracle-probes/

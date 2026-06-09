@@ -1,0 +1,61 @@
+{
+  "generatedBy": "slice-4 oracle Step 2.1 (clipboard-formats probe)",
+  "wordVersion": "16.77.1",
+  "date": "2026-06-07",
+  "step_2_1_clipboard_flavors": {
+    "method": "authored Heading-1 + bold/red content in a scratch doc, copy object (text object of d), read `clipboard info`",
+    "flavorsPublishedOnCopy": [
+      "\u00abclass RTF \u00bb",
+      "\u00abclass ut16\u00bb",
+      "\u00abclass HTML\u00bb",
+      "Unicode text",
+      "\u00abclass PDF \u00bb",
+      "\u00abclass weba\u00bb (webarchive)",
+      "\u00abclass rtfd\u00bb",
+      "\u00abclass utf8\u00bb",
+      "string"
+    ],
+    "verdict": "Word publishes HTML + RTF + plain text (+ PDF/webarchive) on every rich copy. Our serializer must publish at least text/html + text/plain; the clone's Paste Special offers HTML / Unformatted Text / Picture classes accordingly.",
+    "html_payload_excerpt": "<h1>Heading sample line</h1><p class=MsoNormal><b>plain boldword <span style='color:red'>redword </span>tail</b></p>",
+    "html_fidelity_note": "h1 preserves Heading 1; <b> preserves bold; color:red span preserves font color \u2014 leg-B paste of Word HTML into the clone should map these via the PM clipboardParser (Heading1 style + bold mark + color mark).",
+    "plain_text_payload": "Heading sample line\nplain boldword redword tail",
+    "artifacts": [
+      "/tmp/slice4/word-clip.html",
+      "/tmp/slice4/word-clip.txt"
+    ]
+  },
+  "step_2_2_paste_menus": {
+    "method": "Codex computer-use: Paste Special dialog per clipboard state (screenshots A2/A4/A6 corroborated); ribbon Paste-arrow menu NOT capturable (transient layer).",
+    "pasteSpecial_rich": [
+      "Microsoft Word Document Object",
+      "Formatted Text (RTF)",
+      "Unformatted Text",
+      "HTML Format (default)",
+      "PDF",
+      "Unformatted Unicode Text"
+    ],
+    "pasteSpecial_plainText": [
+      "Unformatted Text"
+    ],
+    "pasteSpecial_image": [
+      "Picture (PNG) (default)",
+      "Picture (TIFF)"
+    ],
+    "pasteLinkRadio": "present but DISABLED in all three states",
+    "verdict": "D.pasteSpecial flavor-from-clipboard CONFIRMED. Clone classes map: HTML Format\u2192pasteHTML, Unformatted Text\u2192pasteTextOnly, Picture\u2192pastePicture. Mac ribbon Paste-ARROW item composition UNCONFIRMED \u2014 keep the plan's flavor-gated menu, recorded deviation, re-check in Task 10/user-visual.",
+    "editMenu_states": "rich+text+image all show Paste enabled, Paste Special enabled; Paste-and-Match-Formatting disabled for plain text."
+  },
+  "step_2_3_painter_matrix": {
+    "method": "Codex computer-use; Format Painter BUTTON refused by Computer-Use, so Word native `copy/paste format selection` (same engine) with AppleScript property readbacks.",
+    "B1_charFromWord": "target got bold+red ONLY; style/align/spacing untouched \u2014 char-scope capture from a word.",
+    "B2_wholeParagraph": "target became Heading 1 + centered + space-before 12 + Heading-1 char appearance \u2014 paragraph formatting AND style transfer. CONFIRMS captureParaProps carries styleId/justification/spacing.",
+    "B3_caretOnly": "CONFIRMED caret-arming: target got Heading 1 + centered + spacing from a mere caret. Keep armPainterPM caret default (no empty-selection refusal).",
+    "B4_sticky": "two-paint state both bold; the double-click/Esc gesture itself NOT observed \u2014 sticky/Esc assumed standard.",
+    "B5_chords": "native copy/paste-format equivalent \u2192 dst bold. Supports \u2318\u21e7C/\u2318\u21e7V = painter (Task 8 chords).",
+    "B6_replaceVsMerge": "CONFIRMED REPLACE: dst was italic+underline, became bold ONLY (italic+underline removed). Validates clear-then-apply.",
+    "B7_listMembership": "NOT OBSERVED (bullet source couldn't be created via Computer-Use/AppleScript). Keep plan default: numbering CARRIED; validate in Task 10.",
+    "B8_hyperlink": "CONFIRMED link survives paint-OVER (hyperlink count stayed 1). Validates excluding `link` mark from the clear. Copy-FROM-link-to-plain unconfirmed (we also exclude link from CAPTURE, so safe).",
+    "B9_mixedSource": "FINDING: selecting BOTH a bold + a plain word then painting \u2192 dst became BOLD (first-run formatting), NOT intersection-empty. REFINE Task 3: for a non-empty selection capture marks at selection.from (first char), not getMarksFromSelection (which intersects mixed\u2192[]). Anticipated by plan probe-9 note.",
+    "screenshots": ".oracle-probes/slice4/shots/ (A1-A6, B1-B9 before/after) \u2014 gitignored evidence."
+  }
+}
