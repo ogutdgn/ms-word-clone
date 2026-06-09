@@ -229,7 +229,12 @@ export function installBridge(editor: AnyEditor) {
       if (e.key !== 'Escape') return
       if (document.querySelector('.flyout, .modal-backdrop')) return
       const pm = (window as any).WC?.PM
-      if (pm?.painterArmed?.()) pm.cancelFormatPainter()
+      if (pm?.painterArmed?.()) {
+        // Word disarms the painter and does nothing else — stop the press here so it
+        // can't ALSO exit focus-mode / close backstage via app.js's bubble handler.
+        e.preventDefault(); e.stopPropagation()
+        pm.cancelFormatPainter()
+      }
     }, true)
   }
   Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor))

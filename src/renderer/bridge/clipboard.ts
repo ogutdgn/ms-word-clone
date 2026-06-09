@@ -38,7 +38,10 @@ export function installClipboard(editor: AnyEditor) {
     const html = await api()?.readHTML()
     if (!html) return false
     focusView()
-    return !!editor.view.pasteHTML(html, pasteEvent({ 'text/html': html }))
+    // Carry a text/plain companion too (matches the fork's own createPasteEventShim)
+    // so the fork's pasteHtml-empty fallback branch can never read undefined.
+    const text = (await api()?.readText()) || ''
+    return !!editor.view.pasteHTML(html, pasteEvent({ 'text/html': html, 'text/plain': text }))
   }
   async function pastePicture(): Promise<boolean> {
     const img = await api()?.readImage()
