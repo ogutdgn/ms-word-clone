@@ -1079,8 +1079,8 @@
   // state-sync. Word arms from a CARET too (paragraph + caret-char formatting —
   // oracle 2.3 probe B3); no empty-selection refusal.
   function armPainterPM(node, sticky) {
-    const pm = PMA();
-    if (!pm.armFormatPainter(sticky)) { WC.toast('Format Painter could not copy the formatting here.'); return; }
+    // The fork's copyFormat always arms (caret-arming, oracle B3) — no failure path.
+    PMA().armFormatPainter(sticky);
     WC.toast(sticky ? 'Format Painter locked — apply to multiple selections. Press Esc to stop.'
                     : 'Format Painter — select text to apply the copied formatting once.');
   }

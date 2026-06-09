@@ -538,10 +538,10 @@
     const doPaste = () => { if (options[chosen]) pm.withSelection(() => options[chosen][1]()); };
     const list = el('ul', { class: 'ps-list' }, options.map(([label], i) =>
       el('li', { class: 'ps-item' + (i === 0 ? ' selected' : ''), text: label, tabindex: '0' })));
+    const select = (i) => { chosen = i; list.querySelectorAll('li').forEach((n, j) => n.classList.toggle('selected', j === chosen)); };
     list.addEventListener('click', (e) => {
       const li = e.target.closest('li'); if (!li) return;
-      chosen = Array.from(list.children).indexOf(li);
-      list.querySelectorAll('li').forEach((n, i) => n.classList.toggle('selected', i === chosen));
+      select(Array.from(list.children).indexOf(li));
     });
     const body = el('div', {}, [
       el('div', { class: 'row', text: 'As:' }),
@@ -551,10 +551,15 @@
       { label: 'OK', primary: true, onClick: doPaste },
       { label: 'Cancel' },
     ] });
-    list.addEventListener('dblclick', (e) => {
-      if (!e.target.closest('li')) return;
-      doPaste();
-      handle.close(); // Word: dblclick = OK
+    const okAndClose = () => { doPaste(); handle.close(); }; // Word: dblclick / Enter = OK
+    list.addEventListener('dblclick', (e) => { if (e.target.closest('li')) okAndClose(); });
+    // Keyboard: arrow to move the selection, Enter/Space to apply the focused row.
+    list.addEventListener('keydown', (e) => {
+      const li = e.target.closest('li'); if (!li) return;
+      const i = Array.from(list.children).indexOf(li);
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i); okAndClose(); }
+      else if (e.key === 'ArrowDown' && list.children[i + 1]) { e.preventDefault(); list.children[i + 1].focus(); select(i + 1); }
+      else if (e.key === 'ArrowUp' && list.children[i - 1]) { e.preventDefault(); list.children[i - 1].focus(); select(i - 1); }
     });
   };
 
