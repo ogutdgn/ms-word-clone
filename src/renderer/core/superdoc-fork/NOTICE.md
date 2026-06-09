@@ -61,6 +61,15 @@ The following upstream packages are included in this directory tree:
   object — the table-style paragraph cascade was silently skipped for in-table
   paragraphs. Now builds `{ tableProperties, rowIndex, cellIndex, numRows, numCells }`
   with real indices from the ancestor chain (slice 3, 2026-06-06).
+- **Format painter extended to Word scope:** `FormatCommands` stores paragraph
+  properties (incl. numbering) alongside marks, captures first-run marks on a
+  non-empty selection (oracle B9) and caret marks when collapsed, applies
+  generically (replace-not-merge per oracle B6, `link` mark preserved per oracle
+  B8), gains `cancelFormatPainter` (Esc path) and an idempotent `persistent`
+  option on `copyFormat` (the 500ms double-click heuristic now only serves no-arg
+  callers, fixing the ribbon click,click,dblclick disarm trap); the UI-guard
+  selector covers the app's ribbon/flyout/dialog chrome so chrome clicks never
+  consume the armed painter (slice 4, 2026-06-08).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
