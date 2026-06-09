@@ -1043,6 +1043,17 @@
     const star = searchStore().searchResults.length;   // bat,bet,bit,boot,brat = 5
     return single === 3 && star === 5;
   });
+  await t('[5] wildcards are case-sensitive even when Match case is off (Word fidelity)', async () => {
+    setDoc('NEEDLE needle');
+    // wildcard search for the literal uppercase term with Match case OFF.
+    // Word forces wildcards case-sensitive → only the uppercase NEEDLE matches (1), not 2.
+    PM().findSession('NEEDLE', { useWildcards: true, caseSensitive: false }); await sleep(120);
+    const wc = window.WC.editor.extensionStorage.search.searchResults.length;
+    // control: same term WITHOUT wildcards + Match case off → case-insensitive → 2.
+    PM().findSession('NEEDLE', { useWildcards: false, caseSensitive: false }); await sleep(120);
+    const plain = window.WC.editor.extensionStorage.search.searchResults.length;
+    return wc === 1 && plain === 2;
+  });
   await t('[5] Replace replaces the active match and advances', async () => {
     setDoc('foo bar foo bar foo');
     PM().findSession('foo'); await sleep(120);

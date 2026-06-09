@@ -332,7 +332,7 @@ export const Search = Extension.create({
           const searchModel = storage.searchModel ?? DEFAULT_SEARCH_MODEL;
 
           const pattern = useWildcards
-            ? new RegExp(SearchIndex.wildcardToRegExp(storage.query), caseSensitive ? 'g' : 'gi')
+            ? new RegExp(SearchIndex.wildcardToRegExp(storage.query), 'g') // Word: wildcards are always case-sensitive
             : storage.query;
           let indexMatches =
             storage.ignoreDiacritics && !useWildcards
@@ -684,8 +684,11 @@ export const Search = Extension.create({
           // FORK EDIT (slice 5): build the search pattern — wildcards translate the
           // Word pattern to a RegExp (ignoreDiacritics does not apply to wildcards);
           // plain queries use the existing whitespace-flexible string path.
+          // FORK EDIT (slice 5, fidelity): Word's "Use wildcards" mode is ALWAYS
+          // case-sensitive — the Match Case option is greyed/ignored in Word 16.77.1
+          // when wildcards are on. Force 'g' (no 'i') regardless of caseSensitive.
           const pattern = useWildcards
-            ? new RegExp(SearchIndex.wildcardToRegExp(query), caseSensitive ? 'g' : 'gi')
+            ? new RegExp(SearchIndex.wildcardToRegExp(query), 'g') // Word: wildcards are always case-sensitive
             : query;
           let indexMatches =
             ignoreDiacritics && !useWildcards

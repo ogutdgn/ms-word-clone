@@ -83,7 +83,10 @@ The following upstream packages are included in this directory tree:
   `setSearchSession`, the search-index invalidator, AND `replaceSearchMatch` accept +
   thread `{wholeWord, useWildcards}`, building the pattern / post-filter accordingly.
   Non-destructive (decorations only), back-compatible (`search()` signature unchanged)
-  (slice 5, 2026-06-09).
+  (slice 5, 2026-06-09). Oracle fidelity fix (A4 verdict vs Word 16.77.1): wildcard
+  searches are forced case-sensitive (`'g'` only, no `'i'`) — Word greys/ignores
+  Match Case when Use Wildcards is on; our engine now matches this behavior in both
+  `setSearchSession` and the search-index invalidator plugin (slice 5, 2026-06-09).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

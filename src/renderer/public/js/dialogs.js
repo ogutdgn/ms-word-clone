@@ -231,9 +231,22 @@
       cb.addEventListener('change', () => { currentOpts[key] = cb.checked; runFind(); });
       return el('label', { class: 'row', style: { gap: '4px', alignItems: 'center' } }, [cb, el('span', { text: ' ' + label })]);
     };
-    optRow.appendChild(mkOpt('Match case', 'caseSensitive'));
+    const matchCaseLabel = mkOpt('Match case', 'caseSensitive');
+    const matchCaseCb = matchCaseLabel.querySelector('input');
+    optRow.appendChild(matchCaseLabel);
     optRow.appendChild(mkOpt('Whole words only', 'wholeWord'));
-    optRow.appendChild(mkOpt('Use wildcards', 'useWildcards'));
+    const wcLabel = mkOpt('Use wildcards', 'useWildcards');
+    const wcCb = wcLabel.querySelector('input');
+    // Word fidelity: wildcard mode is always case-sensitive — grey Match case when wildcards on.
+    wcCb.addEventListener('change', () => {
+      if (wcCb.checked) {
+        matchCaseCb.disabled = true;
+        matchCaseCb.checked = true;   // signal that search is now case-sensitive
+      } else {
+        matchCaseCb.disabled = false;
+      }
+    });
+    optRow.appendChild(wcLabel);
     body.appendChild(optRow);
     if (replace) {
       body.appendChild(el('div', { class: 'tp-search', style: { marginTop: '8px' } }, [replInput]));
