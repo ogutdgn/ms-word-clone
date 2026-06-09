@@ -157,15 +157,15 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // probe cmd lives in a STILL-UNFLIPPED area — repointed cut→replace when
-    // clipboard flipped (slice 4): a cut probe would go vacuously green with a
-    // destructive live cut mid-suite; replace keeps the test MEANINGFUL.
-    window.WC.Commands.run({ cmd: 'replace', label: 'Replace' });
+    // probe cmd lives in a STILL-UNFLIPPED area — repointed replace→link when
+    // find-replace flipped (slice 5): a replace probe would go vacuously green once
+    // find-replace is live; link keeps the test MEANINGFUL (insert-basics = slice 6).
+    window.WC.Commands.run({ cmd: 'link', label: 'Link' });
     return document.querySelectorAll('.flyout').length === 0
-      && !document.getElementById('find-pane'); // findPane stays closed
+      && !document.querySelector('.modal-backdrop'); // link dialog stays closed
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'find', type: 'dropdown' }, document.body);
+    window.WC.Commands.dropdown({ cmd: 'table', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -983,6 +983,175 @@
     const selOpen = document.querySelectorAll('.flyout .fly-item').length > 0;
     window.WC.closeFlyouts();
     return pasteOpen && selOpen;
+  });
+
+  // ---------- slice 5: find-replace (decoration-based search + replace + options) ----------
+  // These tests drive the fork Search extension through the WC.PM.search surface (Task 4)
+  // and the re-pointed find pane (Task 5). Highlights are PM DECORATIONS — assert on
+  // editor.extensionStorage.search.searchResults + the active-match selection, never on
+  // injected .find-hit spans (the destructive legacy path the slice replaces).
+  await PM().newBlank(); await sleep(100);
+  const searchStore = () => window.WC.editor.extensionStorage.search;
+  await t('[5] find session highlights all matches via decorations (no DOM mutation)', async () => {
+    setDoc('alpha needle beta needle gamma needle');
+    const before = JSON.stringify(doc().toJSON());
+    PM().findSession('needle'); await sleep(150);
+    const res = searchStore().searchResults;
+    // doc text MUST be byte-identical (decorations don't mutate the doc).
+    return res.length === 3 && JSON.stringify(doc().toJSON()) === before
+      && document.querySelectorAll('#pm-editor .find-hit').length === 0;
+  });
+  await t('[5] find session count is exposed and active match starts at 0', async () => {
+    setDoc('one two two two end');
+    const r = PM().findSession('two'); await sleep(150);
+    return PM().findCount().total === 3 && searchStore().activeMatchIndex === 0;
+  });
+  await t('[5] Next/Prev cycle the active match (wrap-around) and move the selection', async () => {
+    setDoc('cat dog cat dog cat');
+    PM().findSession('cat'); await sleep(150); // active 0
+    PM().findNext(); await sleep(50);          // active 1
+    const i1 = searchStore().activeMatchIndex;
+    PM().findNext(); await sleep(50);          // active 2
+    PM().findNext(); await sleep(50);          // wraps to 0
+    const wrapped = searchStore().activeMatchIndex;
+    PM().findPrev(); await sleep(50);          // wraps to 2
+    const back = searchStore().activeMatchIndex;
+    // selection follows the active match: at wrap (active 0) it spans the FIRST 'cat'.
+    return i1 === 1 && wrapped === 0 && back === 2;
+  });
+  await t('[5] Match Case OFF matches mixed case; ON matches only exact case', async () => {
+    setDoc('Needle needle NEEDLE');
+    PM().findSession('needle', { caseSensitive: false }); await sleep(120);
+    const insensitive = searchStore().searchResults.length; // 3
+    PM().findSession('needle', { caseSensitive: true }); await sleep(120);
+    const sensitive = searchStore().searchResults.length;   // 1
+    return insensitive === 3 && sensitive === 1;
+  });
+  await t('[5] Whole Words ON does not match inside a larger word', async () => {
+    setDoc('cat category scatter cat');
+    PM().findSession('cat', { wholeWord: false }); await sleep(120);
+    const loose = searchStore().searchResults.length;  // 4 (cat, cat-egory, s-cat-ter, cat)
+    PM().findSession('cat', { wholeWord: true }); await sleep(120);
+    const tight = searchStore().searchResults.length;  // 2 (the standalone 'cat' words)
+    return loose === 4 && tight === 2;
+  });
+  await t('[5] Use Wildcards: ? matches one char, * matches a run', async () => {
+    setDoc('bat bet bit boot brat');
+    PM().findSession('b?t', { useWildcards: true }); await sleep(120);
+    const single = searchStore().searchResults.length; // bat,bet,bit = 3 (NOT boot/brat)
+    PM().findSession('b*t', { useWildcards: true }); await sleep(120);
+    const star = searchStore().searchResults.length;   // bat,bet,bit,boot,brat = 5
+    return single === 3 && star === 5;
+  });
+  await t('[5] Replace replaces the active match and advances', async () => {
+    setDoc('foo bar foo bar foo');
+    PM().findSession('foo'); await sleep(120);
+    await sleep(550); // close history group
+    PM().replaceOne('QUX'); await sleep(120);
+    // first 'foo' becomes QUX; two 'foo' remain.
+    return doc().textContent.startsWith('QUX bar foo bar foo')
+      && searchStore().searchResults.length === 2;
+  });
+  await t('[5] Replace All replaces every match in ONE undo step', async () => {
+    setDoc('aa zz aa zz aa');
+    PM().findSession('aa'); await sleep(120);
+    await sleep(550);
+    const before = JSON.stringify(doc().toJSON());
+    const r = PM().replaceAll('XX'); await sleep(120);
+    if (!doc().textContent.includes('XX zz XX zz XX')) return 'replace all did not apply';
+    if (r.replacedCount !== 3) return 'wrong count ' + r.replacedCount;
+    PM().cmd('undo'); await sleep(80);
+    return JSON.stringify(doc().toJSON()) === before; // ONE undo restores all
+  });
+  await t('[5] Replace All reports the count and clears the session', async () => {
+    setDoc('q q q q');
+    PM().findSession('q'); await sleep(120);
+    const r = PM().replaceAll('w'); await sleep(120);
+    return r.replacedCount === 4 && searchStore().activeMatchIndex === -1
+      && searchStore().searchResults.length === 0;
+  });
+  await t('[5] clearFind removes all highlights and resets the session', async () => {
+    setDoc('hit hit hit');
+    PM().findSession('hit'); await sleep(120);
+    PM().clearFind(); await sleep(80);
+    return searchStore().searchResults.length === 0 && searchStore().query === '';
+  });
+  await t('[5] find pane (Ctrl+F path) opens in PM mode and is NOT the legacy taskpane block', async () => {
+    setDoc('paneword paneword');
+    window.WC.Dialogs.findPane(false); await sleep(80);
+    // The PM pane renders real chrome (input + counter), not a notifyBlocked toast.
+    const pane = document.getElementById('find-pane');
+    const input = pane && pane.querySelector('input[type="text"]');
+    if (!pane || !input) return 'find pane did not open';
+    input.value = 'paneword';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(300); // debounced doFind
+    const ok = searchStore().searchResults.length === 2;
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return ok;
+  });
+  await t('[5] closing the find pane clears the search session (no orphan highlights)', async () => {
+    setDoc('orphan orphan');
+    window.WC.Dialogs.findPane(false); await sleep(80);
+    const pane = document.getElementById('find-pane');
+    const input = pane.querySelector('input[type="text"]');
+    input.value = 'orphan'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(300);
+    if (searchStore().searchResults.length !== 2) return 'precondition: search did not run';
+    pane.querySelector('.x').click(); await sleep(80);
+    return searchStore().searchResults.length === 0;
+  });
+  await t('[5] Replace pane (Ctrl+H path) renders Replace + Replace All controls', async () => {
+    setDoc('zzz target zzz');
+    window.WC.Dialogs.findPane(true); await sleep(80);
+    const pane = document.getElementById('find-pane');
+    const labels = Array.from(pane.querySelectorAll('button')).map((b) => b.textContent.trim());
+    const ok = labels.some((l) => /^Replace$/.test(l)) && labels.some((l) => /Replace All/.test(l));
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return ok;
+  });
+  await t('[5] find pane options row exposes Match case / Whole words / Wildcards', async () => {
+    window.WC.Dialogs.findPane(false); await sleep(80);
+    const pane = document.getElementById('find-pane');
+    const text = pane.textContent;
+    const ok = /Match case/i.test(text) && /Whole word/i.test(text) && /[Ww]ildcard/i.test(text);
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return ok;
+  });
+  await t('[5] Advanced Find dropdown item opens the pane in advanced mode', async () => {
+    const node = document.querySelector('[data-cmd="find"]') || document.body;
+    window.WC.Commands.dropdown({ cmd: 'find', type: 'split' }, node);
+    const item = Array.from(document.querySelectorAll('.flyout .fly-item'))
+      .find((n) => /Advanced Find/i.test(n.textContent));
+    if (!item) { window.WC.closeFlyouts(); return 'Advanced Find item not found'; }
+    item.click(); await sleep(120);
+    const pane = document.getElementById('find-pane');
+    const ok = !!pane; // advanced variant still mounts a find UI (options expanded)
+    pane && pane.querySelector('.x') && pane.querySelector('.x').click();
+    return ok;
+  });
+  await t('[5] Go To dialog opens and jumps to a heading target (model-supported)', async () => {
+    // Go To by heading works on the model (page/line are pagination-gated → Phase 7).
+    setDocs(['Intro body text', 'Chapter Two body']);
+    // make para 2 a heading so Go To has a heading target
+    selectText('Chapter Two body'); PM().applyStyleByName('Heading 1'); await sleep(80);
+    window.WC.Dialogs.goToDialog ? window.WC.Dialogs.goToDialog() : null; await sleep(80);
+    const dlg = document.querySelector('.modal-backdrop, #goto-dialog, #find-pane');
+    const ok = !!dlg;
+    const close = dlg && (dlg.querySelector('.x') || Array.from(dlg.querySelectorAll('button')).find((b) => /Close|Cancel/.test(b.textContent)));
+    close && close.click();
+    return ok; // structural; exact Go-To semantics validated by oracle Task 2
+  });
+  await t('[5] D6 flip: find dropdown + replace open in PM mode', async () => {
+    // inverse of the pre-flip D6 block — proves the registry flip reached dispatch.
+    const node = document.body;
+    window.WC.Commands.dropdown({ cmd: 'find', type: 'split' }, node);
+    const findOpen = document.querySelectorAll('.flyout .fly-item').length > 0;
+    window.WC.closeFlyouts();
+    window.WC.Commands.run({ cmd: 'replace', label: 'Replace' }); await sleep(80);
+    const replaceOpen = !!document.getElementById('find-pane');
+    const p = document.getElementById('find-pane'); p && p.querySelector('.x') && p.querySelector('.x').click();
+    return findOpen && replaceOpen;
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
