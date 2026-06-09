@@ -1094,7 +1094,8 @@
     setDoc('orphan orphan');
     window.WC.Dialogs.findPane(false); await sleep(80);
     const pane = document.getElementById('find-pane');
-    const input = pane.querySelector('input[type="text"]');
+    const input = pane && pane.querySelector('input[type="text"]');
+    if (!pane || !input) return 'find pane did not open';
     input.value = 'orphan'; input.dispatchEvent(new Event('input', { bubbles: true }));
     await sleep(300);
     if (searchStore().searchResults.length !== 2) return 'precondition: search did not run';
