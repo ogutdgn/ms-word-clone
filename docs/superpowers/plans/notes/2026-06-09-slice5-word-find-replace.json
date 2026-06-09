@@ -1,0 +1,28 @@
+{
+  "generatedBy": "slice-5 oracle — find/replace semantics + Mac UI",
+  "date": "2026-06-09",
+  "wordVersion": "Microsoft Word for Mac 16.77.1",
+  "method": "Codex computer-use drove Word; semantic counts obtained via Word's AppleScript find OBJECT (Word's own find engine = authoritative); the built-in Find DIALOG crashed/recovered Word, so dialog screenshots are the document surface, not the expanded dialogs (composition partly user/observed). Probe text: 'Needle needle NEEDLE cat category scatter cat bat bet bit boot brat'. Evidence: .oracle-probes/slice5/ (results.md + shots/, gitignored).",
+  "semantics": {
+    "matchCase": { "term": "needle", "off": 3, "on": 1, "engineExpected": { "off": 3, "on": 1 }, "verdict": "PASS" },
+    "wholeWord": { "term": "cat", "off": 4, "on": 2, "offMatches": ["cat", "cat(category)", "cat(scatter)", "cat"], "engineExpected": { "off": 4, "on": 2 }, "verdict": "PASS" },
+    "wildcards": { "qmark": { "term": "b?t", "count": 3, "matches": ["bat", "bet", "bit"] }, "star": { "term": "b*t", "count": 5, "matches": ["bat", "bet", "bit", "boot", "brat"] }, "engineExpected": { "qmark": 3, "star": 5 }, "verdict": "PASS" },
+    "wildcardCaseInteraction": { "observed": "with Match wildcards ON and Match case set FALSE, 'NEEDLE' matched only NEEDLE and 'needle' matched only needle — wildcard search is ALWAYS case-sensitive regardless of Match case", "engineBefore": "wildcard regex built 'gi' (case-insensitive) when Match case off", "verdict": "DEVIATION — FIXED", "fix": "commit 1186532: wildcard regex forced 'g' (case-sensitive) in both setSearchSession and the invalidator; find pane greys 'Match case' when 'Use wildcards' is on; new [5] test locks it" }
+  },
+  "replace": {
+    "replaceAll_wholeWordOff": { "from": "cat", "to": "DOG", "count": 4, "result": "Needle needle NEEDLE DOG DOGegory sDOGter DOG bat bet bit boot brat", "engineExpected": 4, "verdict": "PASS" },
+    "replaceAll_wholeWordOn": { "from": "cat", "to": "DOG", "count": 2, "result": "Needle needle NEEDLE DOG category scatter DOG bat bet bit boot brat", "engineExpected": 2, "verdict": "PASS" },
+    "singleReplaceAdvance": { "observed": "object-model Replace One replaced the first match but did NOT advance/select the next (object-model path). Word's GUI Replace advances; our engine's replaceOne re-runs the session and advances ([5] 'Replace replaces the active match and advances' passes)", "verdict": "PASS (our GUI behavior matches Word GUI; object-model non-advance is an OM artifact, not a deviation)" },
+    "selectionScope": { "observed": "Word Replace-All scoped to a selection replaced ONLY within the selection (object-model). Our engine replaceAll replaces ALL session matches in the whole document", "verdict": "DEVIATION — RECORDED (selection-scoped Replace All deferred; whole-doc only this slice)" }
+  },
+  "uiComposition": {
+    "cmdF": "Mac Word 16.77 ⌘F = a top-right 'Search in Document' TOOLBAR field (search field + magnifier + prev/next + clear token), NOT a left Navigation sidebar; no 'N of M' textual count observed. Our PM find pane is the preserved sidebar taskpane chrome (UI-fidelity constraint: chrome stays). DEVIATION — RECORDED (cosmetic; chrome preserved).",
+    "advancedDialog": "Find and Replace modal has tabs Find / Replace / Go To; 'Find what'; 'Highlight all items found in' + Main Document popup; buttons Find All / Cancel / Find Next. Search Options (per Word find properties): Match case, Find whole words only, Use wildcards, Sounds like, Find all word forms. prefix/suffix/ignore-punct/ignore-whitespace NOT observed (dialog crashed before full expand).",
+    "shipped": ["Match case", "Whole words only", "Use wildcards"],
+    "deferred": ["Sounds like", "Find all word forms", "Match prefix/suffix", "Ignore punctuation/whitespace"],
+    "goTo": "Go To tab targets NOT captured (dialog crashed). Our D.goToDialog offers Heading/Bookmark/Page/Line (Heading works on the model; Page/Line pagination-gated → Phase 7). Full Word Go-To target list UNVERIFIED this run — recorded follow-up."
+  },
+  "legA_cloneToWord": "PASS — our engine replace-all (foo->QUX ×3) saved to .docx; real Word (read-props) read it back as 'QUX bar QUX bar QUX'. XML-level check (unzip document.xml): QUX×3, bar×2, foo×0; markup-leak scan ProseMirror-search-match/active-search-match/find-hit/search-match/decoration ALL 0 — decorations are view-only and never serialize.",
+  "legB_wordToClone": "PASS — Word authored 'alpha beta alpha gamma alpha delta alpha' (alpha×4), saved .docx; our app imported it (importedText identical) and findSession('alpha')=4 (whole-word 4, gamma 1) — our find count matches the Word-authored content.",
+  "verdict": "Find/replace SEMANTICS validated against Word 16.77.1 — all PASS; one deviation (wildcard case) found and FIXED. Recorded deviations: selection-scoped Replace All (whole-doc only), Mac toolbar-search vs our sidebar chrome, deferred advanced linguistic options, Go-To target list unverified."
+}

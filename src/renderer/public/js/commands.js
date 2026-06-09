@@ -1359,16 +1359,8 @@
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('Find', { icon: 'find', onClick: () => WC.Dialogs.findPane(false) }));
       fly.appendChild(WC.flyItem('Advanced Find…', { onClick: () => WC.Dialogs.findPane(false, true) }));
-      fly.appendChild(WC.flyItem('Go To…', { key: 'Ctrl+G', onClick: () => goToDialog() }));
+      fly.appendChild(WC.flyItem('Go To…', { key: 'Ctrl+G', onClick: () => WC.Dialogs.goToDialog() }));
     });
-  }
-  function goToDialog() {
-    const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter page number' });
-    WC.dialog({ title: 'Go To', width: '380px', body: el('div', {}, [el('div', { text: 'Go to page:' }), input]), footer: [
-      { label: 'Go To', primary: true, onClick: () => { const p = parseInt(input.value, 10); if (p > 0) { const top = (p - 1) * E().pageMetrics().pitch * E().zoom; document.getElementById('canvas').scrollTop = top; } } },
-      { label: 'Close' },
-    ] });
-    setTimeout(() => input.focus(), 30);
   }
   function sortDialog() {
     const pmOpen = PMA();

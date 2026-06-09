@@ -97,10 +97,12 @@
 
   // ---- Find & Replace pane ----
   let findState = { hits: [], idx: -1 };
-  D.findPane = function (replace) {
-    // PM mode: legacy find/replace rewrites #editor text nodes (raw DOM —
-    // bypasses the editor.js chokepoints). Blocked until slice 5 (fork Search ext).
-    if (window.WC.PM && window.WC.PM.active) { window.WC.PM.notifyBlocked('Find & Replace'); return; }
+  D.findPane = function (replace, advanced) {
+    // PM mode (slice 5): drive the fork Search extension (non-destructive
+    // decoration highlights) instead of the legacy .find-hit TreeWalker rewrite.
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) return pmFindPane(replace, advanced, pm);
+    // ---- legacy arm (unchanged, byte-identical — frozen for --legacy) ----
     clearHits();
     let pane = document.getElementById('find-pane');
     if (pane) pane.remove();
@@ -195,6 +197,130 @@
     findState = { hits: [], idx: -1 };
   }
   function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  // ---- Find & Replace pane — PM (fork Search extension) branch ----
+  // Same chrome/classes as the legacy pane (so CSS + layout match) but drives the
+  // non-destructive decoration session via WC.PM. The doc is NEVER mutated to
+  // highlight — counts come from WC.PM.findCount(), highlights are PM decorations.
+  function pmFindPane(replace, advanced, pm) {
+    pm.clearFind(); // drop any stale session before re-opening
+    let pane = document.getElementById('find-pane');
+    if (pane) pane.remove();
+    pane = el('div', { class: 'taskpane', id: 'find-pane' });
+    const currentOpts = { caseSensitive: false, wholeWord: false, useWildcards: false };
+    const input = el('input', { type: 'text', placeholder: 'Find in document' });
+    const replInput = el('input', { type: 'text', placeholder: 'Replace with' });
+    const counter = el('div', { style: { fontSize: '12px', color: '#666', padding: '4px 0' } });
+    const head = el('div', { class: 'tp-head' }, [
+      el('div', { class: 'tp-title', text: replace ? 'Replace' : 'Navigation' }),
+      el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => { pm.clearFind(); pane.remove(); } }),
+    ]);
+    const body = el('div', { class: 'tp-body' });
+    const search = el('div', { class: 'tp-search' }, [input, el('span', { class: 'go', html: WC.icon('search', 14), onclick: () => runFind() })]);
+    body.appendChild(search);
+    body.appendChild(counter);
+    const nav = el('div', { class: 'row', style: { gap: '6px' } }, [
+      el('button', { class: 'btn', text: '▲ Prev', onclick: () => stepNav(-1) }),
+      el('button', { class: 'btn', text: 'Next ▼', onclick: () => stepNav(1) }),
+    ]);
+    body.appendChild(nav);
+    // options row (Word-faithful: Match case / Whole words only / Use wildcards)
+    const optRow = el('div', { class: 'find-opts', style: { display: advanced ? 'block' : 'none', padding: '6px 0', fontSize: '12px' } });
+    const mkOpt = (label, key) => {
+      const cb = el('input', { type: 'checkbox' });
+      cb.addEventListener('change', () => { currentOpts[key] = cb.checked; runFind(); });
+      return el('label', { class: 'row', style: { gap: '4px', alignItems: 'center' } }, [cb, el('span', { text: ' ' + label })]);
+    };
+    const matchCaseLabel = mkOpt('Match case', 'caseSensitive');
+    const matchCaseCb = matchCaseLabel.querySelector('input');
+    optRow.appendChild(matchCaseLabel);
+    optRow.appendChild(mkOpt('Whole words only', 'wholeWord'));
+    const wcLabel = mkOpt('Use wildcards', 'useWildcards');
+    const wcCb = wcLabel.querySelector('input');
+    // Word fidelity: wildcard mode is always case-sensitive — grey Match case when wildcards on.
+    wcCb.addEventListener('change', () => {
+      if (wcCb.checked) {
+        matchCaseCb.disabled = true;
+        matchCaseCb.checked = true;   // signal that search is now case-sensitive
+      } else {
+        matchCaseCb.disabled = false;
+      }
+    });
+    optRow.appendChild(wcLabel);
+    body.appendChild(optRow);
+    if (replace) {
+      body.appendChild(el('div', { class: 'tp-search', style: { marginTop: '8px' } }, [replInput]));
+      body.appendChild(el('div', { class: 'row', style: { gap: '6px' } }, [
+        el('button', { class: 'btn', text: 'Replace', onclick: () => doReplaceOne() }),
+        el('button', { class: 'btn primary', text: 'Replace All', onclick: () => doReplaceAll() }),
+      ]));
+    }
+    pane.appendChild(head); pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+    input.focus();
+
+    let timer;
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runFind, 200); });
+    // (M3) Enter navigates — runFind is highlight-only (keeps focus in the input).
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pm.findNext(); refreshCount(); } });
+
+    function refreshCount() {
+      const c = pm.findCount();
+      counter.textContent = c.total ? `${c.activeMatchIndex + 1} of ${c.total}` : 'No matches';
+    }
+    function runFind() {
+      const term = input.value;
+      if (!term) { pm.clearFind(); counter.textContent = ''; return; }
+      pm.findSession(term, currentOpts); // highlight-only, no jump (M3)
+      refreshCount();
+    }
+    function stepNav(d) {
+      if (!input.value) return;
+      d < 0 ? pm.findPrev() : pm.findNext();
+      refreshCount();
+    }
+    function doReplaceOne() {
+      if (!pm.findCount().total) { runFind(); if (!pm.findCount().total) return; }
+      pm.replaceOne(replInput.value);
+      refreshCount();
+    }
+    function doReplaceAll() {
+      if (!pm.findCount().total) { runFind(); if (!pm.findCount().total) return; }
+      const r = pm.replaceAll(replInput.value);
+      WC.toast('Replaced ' + (r && r.replacedCount != null ? r.replacedCount : 0));
+      refreshCount(); // session cleared by replaceAll → "No matches"
+    }
+  }
+
+  // ---- Go To dialog ----
+  D.goToDialog = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) {
+      const sel = el('select', {}, ['Heading', 'Bookmark', 'Page', 'Line'].map((o) => el('option', { text: o })));
+      const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter target' });
+      const body = el('div', {}, [
+        el('div', { class: 'row' }, [el('label', { text: 'Go to what:', style: { width: '110px' } }), sel]),
+        el('div', { class: 'row' }, [el('label', { text: 'Enter value:', style: { width: '110px' } }), input]),
+      ]);
+      WC.dialog({ title: 'Go To', width: '380px', body, footer: [
+        { label: 'Go To', primary: true, close: false, onClick: () => {
+          const target = sel.value.toLowerCase();
+          const ok = pm.goTo(target, input.value);
+          if (!ok) WC.toast('Go To ' + sel.value + ' is available after pagination (Phase 7)');
+        } },
+        { label: 'Close' },
+      ] });
+      setTimeout(() => input.focus(), 30);
+      return;
+    }
+    // ---- legacy arm (byte-identical to the former commands.js goToDialog) ----
+    const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter page number' });
+    WC.dialog({ title: 'Go To', width: '380px', body: el('div', {}, [el('div', { text: 'Go to page:' }), input]), footer: [
+      { label: 'Go To', primary: true, onClick: () => { const p = parseInt(input.value, 10); if (p > 0) { const top = (p - 1) * E().pageMetrics().pitch * E().zoom; document.getElementById('canvas').scrollTop = top; } } },
+      { label: 'Close' },
+    ] });
+    setTimeout(() => input.focus(), 30);
+  };
 
   // ---- Paragraph dialog ----
   D.paragraph = function () {
