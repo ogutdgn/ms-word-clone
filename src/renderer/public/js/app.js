@@ -75,8 +75,8 @@
         if (k === 'o') return () => WC.Files.open();
         if (k === 'n' && !shift) return () => WC.Files.newDoc(); // !shift: don't shadow Ctrl+Shift+N (Apply Normal, below)
         if (k === 'p') return () => WC.Files.print();
-        if (k === 'f') return () => WC.Dialogs.findPane(false);
-        if (k === 'h') return () => WC.Dialogs.findPane(true);
+        if (k === 'f') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false));
+        if (k === 'h') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true));
         if (k === 'k') return () => WC.Dialogs.insertLink();
         if (k === '=' && !shift) return () => E().zoomIn();
         if (k === '-') return () => E().zoomOut();
@@ -125,7 +125,7 @@
       const m = {
         'file.new': () => WC.Files.newDoc(), 'file.open': () => WC.Files.open(), 'file.save': () => WC.Files.save(),
         'file.saveAs': () => WC.Files.saveAs(), 'file.print': () => WC.Files.print(),
-        'edit.find': () => WC.Dialogs.findPane(false), 'edit.replace': () => WC.Dialogs.findPane(true),
+        'edit.find': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false)), 'edit.replace': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true)),
         'view.zoomIn': () => E().zoomIn(), 'view.zoomOut': () => E().zoomOut(), 'view.zoomReset': () => E().zoomReset(),
       };
       if (m[action]) m[action]();
