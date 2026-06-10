@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-06-10 — Slice 6 Word UI probe partially captured
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics`.
+- **Phase:** **Phase 2 — slice 6 DONE → slice 7 (file-io) next.**
+- **State summary:** ran the `.oracle-probes/slice6/CODEX-PROMPT.md` Word-for-Mac
+  computer-use probe. Captured real screenshots for the Insert Hyperlink dialog, Table grid,
+  Symbol dialog, Equation contextual editor, and Table Design contextual tab into
+  `.oracle-probes/slice6/shots/`; appended literal observations to `.oracle-probes/slice6/results.md`.
+  These oracle artifacts are gitignored.
+- **Done this session:** verified Computer Use can drive Word; saved `A1.png`, `A2-grid.png`,
+  `A3-dialog.png`, `A3-menu.png`, `A4.png`, and `B-design.png`; recorded exact visible controls for
+  those surfaces. Confirmed Mac Word exposes an Equation contextual editor with Unicode/LaTeX/Text,
+  Convert, 188-symbol gallery, and structure menus; confirmed Table Design exposes Table Style Options,
+  Table Styles, Shading, Border Styles, Pen Style/Weight/Color, Borders, and Border Painter.
+- **Next:** rerun the remaining slice-6 UI probe steps in a clean Word session with only one scratch
+  document open: A2 Insert Table dialog, A5 Bookmark dialog, B-design gallery/Shading/Borders
+  dropdowns, B-layout, B-autofit, C1 context menu, and C2 Text Direction.
+- **Blockers/notes:** Word repeatedly snapped focus among existing unsaved Word windows after modal
+  close/screenshot events, including an existing oracle-looking document. I stopped short of further
+  coordinate actions and did not close ambiguous unsaved windows to avoid touching user state.
+
+---
+
 ## 2026-06-10 — Phase 2 slice 6 BUILT (insert-basics + full Table Tools on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-6-insert-basics` (directly off `main` post slice-5 merge

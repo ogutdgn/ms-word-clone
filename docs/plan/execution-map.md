@@ -121,6 +121,10 @@ hold the single-PM-copy + telemetry-off invariants.
 ## Daily work log (newest first — check off what got done)
 
 ### 2026-06-10 (Phase 2)
+- [x] Slice-6 **Word UI Codex probe partially captured** via `.oracle-probes/slice6/CODEX-PROMPT.md`
+  — screenshots saved for `A1`, `A2-grid`, `A3-dialog`/`A3-menu`, `A4`, and `B-design`; transcript
+  appended to `.oracle-probes/slice6/results.md`. Remaining UI-Codex steps carry because Word kept
+  snapping focus among existing unsaved windows after modal close/screenshot events.
 - [x] Slice-6 **brainstorm-lite** — confirmed the insert entry-point inventory against real code (6-agent inventory workflow). Key findings: fork ships all insert-primitive + core table commands; **legacy app has NO Table Tools ribbon tab** (table editing was a 9-item right-click menu) → full Table Tools = net-new; equation has no fork `insertMath` (→ styled text); contextual tabs are runtime-injected. User scope decisions: **full Table Tools** + styled-text equation + exotica carve-out + UI-Codex when needed.
 - [x] Slice-6 **plan** written + 3-critic-hardened + author-pre-verified + committed (`eb23de9`) — 4 blockers + 6 majors (the two biggest — contextual-tab `{cmd,label,type}` dispatch not `onClick`; ribbon single-tab limit — caught by pre-verification after a critic wrongly cleared them).
 - [x] Slice-6 **red `[6]` tests** (19) + D6 repoint `link`→`newComment`, `table`→`tableOfContents` (`20a4fc3`); **docx-inspect** unzip helper (`f8e76e3`).
