@@ -183,6 +183,12 @@ import { createColGroup } from './tableHelpers/createColGroup.js';
 import { deleteTableWhenSelected } from './tableHelpers/deleteTableWhenSelected.js';
 import { normalizeNewTableAttrs } from './tableHelpers/normalizeNewTableAttrs.js';
 import { resolveTableStyleVisuals } from './tableHelpers/resolveTableStyleVisuals.js';
+// Fork addition (slice 6 T4 review fix, 2026-06-10 — NOTICE.md): the importer's own
+// px projection for direct w:tblPr borders. setTableStyle mirrors the importer's
+// `{ ...styleBorders, ...directBorders }` merge (tbl-translator.js encode), so it must
+// project through the SAME function — importing it (a pure, hoisted helper; no cycle
+// back into this module) keeps the apply-time merge from drifting against reopen.
+import { _processTableBorders } from '@converter/v3/handlers/w/tbl/tbl-translator.js';
 import { computeColumnWidths } from './tableHelpers/computeColumnWidths.js';
 import { createTableBorders } from './tableHelpers/createTableBorders.js';
 import {
@@ -1438,10 +1444,26 @@ export const Table = Node.create({
        */
       setCellBackground:
         (value) =>
-        ({ editor, commands, dispatch }) => {
+        ({ editor, commands, tr, dispatch }) => {
           const { selection } = editor.state;
 
           const color = value?.startsWith('#') ? value.slice(1) : value;
+
+          // T4 review Minor (2026-06-10): an EXPLICIT user shading OWNS the cell — drop
+          // the styleBakedBackground provenance marker so the color exports even when it
+          // happens to EQUAL the previously baked fill (marker == background tells the
+          // exporter "style-owned, suppress <w:shd>"; a user-picked color must export).
+          // commands.* inside a command share ONE transaction (CommandService.createProps
+          // threads the same tr), so the marker clear lands atomically with the
+          // background write — this also covers the bridge path (tableSetCellShading
+          // routes through this command).
+          const clearBakeMarker = (pos) => {
+            const mapped = tr.mapping.map(pos);
+            const cell = tr.doc.nodeAt(mapped);
+            if (cell && cell.attrs.styleBakedBackground != null) {
+              tr.setNodeMarkup(mapped, undefined, { ...cell.attrs, styleBakedBackground: null });
+            }
+          };
 
           if (!isCellSelection(selection)) {
             // Caret fallback (Word parity): a TextSelection inside a table shades
@@ -1452,14 +1474,21 @@ export const Table = Node.create({
             }
 
             if (dispatch) {
-              return commands.setCellAttr('background', { color });
+              const ok = commands.setCellAttr('background', { color });
+              if (ok) {
+                const $cell = cellAround(selection.$from);
+                if ($cell) clearBakeMarker($cell.pos);
+              }
+              return ok;
             }
 
             return true;
           }
 
           if (dispatch) {
-            return commands.setCellAttr('background', { color });
+            const ok = commands.setCellAttr('background', { color });
+            if (ok) selection.forEachCell((_cell, pos) => clearBakeMarker(pos));
+            return ok;
           }
 
           return true;
@@ -1557,7 +1586,10 @@ export const Table = Node.create({
        * (resolveTableStyleVisuals) and bakes the STABLE subset into render attrs —
        * the style's base w:tblPr borders into the table's px `borders` attr (render
        * only; w:tblPr is decoded from `tableProperties`, so no direct-formatting
-       * leak into the export) and the firstRow w:tblStylePr fill into first-row cell
+       * leak into the export), MERGED UNDER the px projection of any existing direct
+       * `tableProperties.borders` (Word precedence — direct w:tblBorders beat the
+       * style frame; mirrors the importer's merge, see the bake comment below), and
+       * the firstRow w:tblStylePr fill into first-row cell
        * `background` attrs. Baked fills are marked via `styleBakedBackground` so a
        * re-apply can clear OUR fill while an explicit user-set shading (direct
        * formatting) survives, exactly like Word. Banding / the remaining conditional
@@ -1583,11 +1615,20 @@ export const Table = Node.create({
               tableStyleId: id,
               tableProperties: nextProps,
             };
-            // Bake table-level borders. The table `borders` attr has no UI-reachable
-            // direct-formatting writer (the Borders flyout writes CELL borders), so
-            // the style owns it: overwrite on apply, clear on style removal.
-            if (visuals) nextAttrs.borders = visuals.borders;
-            else if (!id) nextAttrs.borders = {};
+            // Bake table-level borders — Word precedence: DIRECT w:tblPr borders beat
+            // the style frame. The Borders flyout has no TABLE-level writer yet, but
+            // direct borders ARE importable (docs with explicit w:tblBorders), and the
+            // importer merges `{ ...referencedStyles.borders, ...borderProps }` on every
+            // open (tbl-translator.js encode) — so an apply-time overwrite made the
+            // table change appearance across its own save cycle (style frame until
+            // save→reopen flipped it back). Mirror that merge exactly: project the
+            // direct `tableProperties.borders` through the importer's own
+            // _processTableBorders px projection and spread it OVER the style visuals.
+            // On style CLEAR, fall back to the direct projection instead of {} for the
+            // same reason (a direct frame survives the clear like it survives a reopen).
+            const directBorders = _processTableBorders(nextProps.borders || {});
+            if (visuals) nextAttrs.borders = { ...visuals.borders, ...directBorders };
+            else if (!id) nextAttrs.borders = directBorders;
             tr.setNodeMarkup(table.pos, undefined, nextAttrs);
 
             // Bake/clear first-row cell fills. Walk rows/cells computing absolute

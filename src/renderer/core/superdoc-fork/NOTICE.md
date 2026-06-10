@@ -186,8 +186,9 @@ The following upstream packages are included in this directory tree:
     primitives (`resolveTableProperties` for base `w:tblPr` borders down the basedOn chain;
     `resolveTableCellProperties` for the `w:tblStylePr` conditional cascade) into the fork's
     renderable shapes: the px `borders` table attr (importer projection) + the firstRow fill.
-    `setTableStyle` bakes both at apply time (table borders overwrite — no UI-reachable direct
-    writer exists for that attr; first-row cell `background` honoring `tblLook.firstRow`), and
+    `setTableStyle` bakes both at apply time (table borders with Word precedence — see the
+    "direct table borders beat the baked style frame" entry below; first-row cell `background`
+    honoring `tblLook.firstRow`), and
     `normalizeNewTableAttrs`'s style-resolved branch bakes the borders so newly inserted tables
     keep their TableGrid outline (the upstream comment's "borders come from the style at render
     time via `resolveTableProperties`" only ever existed in the layout-adapter, which the live PM
@@ -216,6 +217,25 @@ The following upstream packages are included in this directory tree:
     `w:tcPr`/`w:tblPr` shading, marked with `styleBakedBackground`) — previously only the style's
     borders/cellMargins were baked, so imported styled tables rendered the frame but lost the
     header-row fill; this also makes the clone's own save→reopen visually stable.
+  - **Direct table borders beat the baked style frame (T4 review fix, 2026-06-10):** the original
+    bake OVERWROTE `attrs.borders` with the style's borders (and cleared to `{}` on style removal),
+    ignoring any existing DIRECT `tableProperties.borders` — importable from Word docs with explicit
+    `w:tblBorders` (no UI-reachable table-level writer yet). Word precedence: direct borders win.
+    The clone rendered the style frame until save→reopen, where the importer's merge
+    (`{ ...referencedStyles.borders, ...borderProps }`, tbl-translator.js encode) flipped it back —
+    the table changed appearance across its own save cycle. `setTableStyle` now mirrors that merge
+    exactly: the direct `tableProperties.borders` are projected through the importer's OWN
+    `_processTableBorders` px projection (imported from the tbl translator — a pure hoisted helper,
+    no cycle back into the extension; single source of truth, no drift) and spread OVER the style
+    visuals; on style CLEAR the attr falls back to the direct projection instead of `{}`.
+  - **Explicit user shading clears the `styleBakedBackground` marker (T4 review Minor,
+    2026-06-10):** `setCellBackground` (and therefore the bridge's `tableSetCellShading`, which
+    routes through it) now nulls the provenance marker on the cells it shades — both the
+    CellSelection path (`forEachCell`) and the caret fallback (`cellAround`), on the SAME
+    transaction as the background write (CommandService threads one `tr` through nested
+    `commands.*`). Without this, a user-picked color EQUAL to the previously baked fill stayed
+    marker-matched ("style-owned") and the exporter suppressed its `<w:shd>` — a user choice
+    must become user-owned and export.
 - **`textDirection` cell attr added (slice 6, 2026-06-09):** a new `textDirection` attribute (default
   `null`) on the `tableCell` (`extensions/table-cell/table-cell.js`) and `tableHeader`
   (`extensions/table-header/table-header.js`) nodes, rendering `writing-mode: vertical-rl` for `'tbRl'`

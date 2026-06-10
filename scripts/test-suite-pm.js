@@ -1609,6 +1609,42 @@
     if (!secondBg || String(secondBg.color).toUpperCase() !== '4472C4') return 'sibling first-row cell not baked: ' + JSON.stringify(secondBg);
     return true;
   });
+  await t('[6b] direct table borders beat the baked style frame (Word precedence)', async () => {
+    // T4 review fix: a table with explicit DIRECT w:tblBorders (importable from Word
+    // docs; not UI-writable yet) keeps its direct frame when a style is applied — Word
+    // precedence. The importer merges `{ ...styleBorders, ...directBorders }` on reopen
+    // (tbl-translator.js), so an apply-time overwrite made the table change appearance
+    // across its own save cycle. Build the importer's two shapes directly in a
+    // transaction: OOXML eighth-points in tableProperties.borders + the px projection
+    // (_processTableBorders: 24 eighths = 3pt → 4px, '#'-prefixed color) in attrs.borders.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    let tablePos = -1, tableNode = null;
+    doc().descendants((n, pos) => { if (tablePos < 0 && n.type.name === 'table') { tablePos = pos; tableNode = n; } });
+    if (tablePos < 0) return 'no table';
+    const ooxml = {}, px = {};
+    for (const s of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+      ooxml[s] = { val: 'single', size: 24, space: 0, color: 'FF0000' };
+      px[s] = { color: '#FF0000', size: 4, val: 'single' };
+    }
+    v().dispatch(v().state.tr.setNodeMarkup(tablePos, undefined, {
+      ...tableNode.attrs,
+      borders: px,
+      tableProperties: { ...(tableNode.attrs.tableProperties || {}), borders: ooxml },
+    }));
+    await sleep(80);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); await sleep(120);
+    const b = tableAttr('borders');
+    if (!b || !b.top) return 'borders attr lost after style apply: ' + JSON.stringify(b);
+    if (String(b.top.color).toUpperCase() !== '#FF0000' || b.top.size !== 4)
+      return 'style frame stomped the direct border: ' + JSON.stringify(b.top);
+    if (tableAttr('tableStyleId') !== 'GridTable4-Accent1') return 'styleId not applied';
+    // Style CLEAR falls back to the direct projection, not {} — same merge on the way out.
+    ecmd('setTableStyle', null); await sleep(120);
+    const b2 = tableAttr('borders');
+    if (!b2 || !b2.top || String(b2.top.color).toUpperCase() !== '#FF0000')
+      return 'style clear wiped the direct borders: ' + JSON.stringify(b2);
+    return true;
+  });
   // ---- T2 geometry regression: alignment must MOVE the table, not just set attrs ----
   // The fork's TableView.updateColumns used to write table.style.marginLeft from
   // `tableIndent?.value ?? 0` UNCONDITIONALLY ('0px' when no indent exists), stomping
