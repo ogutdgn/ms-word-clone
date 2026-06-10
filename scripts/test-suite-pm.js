@@ -157,15 +157,15 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // probe cmd lives in a STILL-UNFLIPPED area — repointed replace→link when
-    // find-replace flipped (slice 5): a replace probe would go vacuously green once
-    // find-replace is live; link keeps the test MEANINGFUL (insert-basics = slice 6).
-    window.WC.Commands.run({ cmd: 'link', label: 'Link' });
+    // probe lives in a STILL-UNFLIPPED area — repointed link→newComment when
+    // insert-basics flipped (slice 6): a link probe would go vacuously green once
+    // insert-basics is live; newComment (review, slice 8) keeps the test MEANINGFUL.
+    window.WC.Commands.run({ cmd: 'newComment', label: 'New Comment' });
     return document.querySelectorAll('.flyout').length === 0
-      && !document.querySelector('.modal-backdrop'); // link dialog stays closed
+      && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'table', type: 'dropdown' }, document.body);
+    window.WC.Commands.dropdown({ cmd: 'tableOfContents', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -1165,6 +1165,153 @@
     const replaceOpen = !!document.getElementById('find-pane');
     const p = document.getElementById('find-pane'); p && p.querySelector('.x') && p.querySelector('.x').click();
     return findOpen && replaceOpen;
+  });
+
+  // ---------- slice 6: insert-basics (link/image/bookmark/symbol/equation/break/hr + table insert) ----------
+  // Every insert is a REAL PM transaction. Assert on doc().toJSON() nodes/marks + round-trip,
+  // never on legacy #editor DOM.
+  await PM().newBlank(); await sleep(100);
+  const hasNode = (name) => { let f = false; doc().descendants((n) => { if (n.type.name === name) f = true; }); return f; };
+  const hasMark = (name) => { let f = false; doc().descendants((n) => { if (n.marks && n.marks.some((m) => m.type.name === name)) f = true; }); return f; };
+
+  await t('[6] insertLink applies a link mark with href over the display text', async () => {
+    setDoc('click here please');
+    selectText('click here'); await sleep(60);
+    PM().insertLink({ href: 'https://example.com', text: 'click here' }); await sleep(120);
+    if (!hasMark('link')) return 'no link mark';
+    let href = null; doc().descendants((n) => { (n.marks || []).forEach((m) => { if (m.type.name === 'link') href = m.attrs.href; }); });
+    return /example\.com/.test(href || '');
+  });
+  await t('[6] insertLink with new display text inserts that text + link', async () => {
+    setDoc('prefix '); selectText(' '); // collapsed-ish; rely on caret
+    // selectText(' ') leaves the space selected; insertLink is expected to overwrite it with 'Anthropic'.
+    // place caret at end, insert a link with explicit text
+    PM().insertLink({ href: 'https://anthropic.com', text: 'Anthropic' }); await sleep(120);
+    return doc().textContent.includes('Anthropic') && hasMark('link');
+  });
+  await t('[6] removeLink clears the link mark', async () => {
+    setDoc('linked word'); selectText('linked word');
+    PM().insertLink({ href: 'https://x.com', text: 'linked word' }); await sleep(80);
+    selectText('linked word'); PM().removeLink(); await sleep(80);
+    return !hasMark('link');
+  });
+  await t('[6] insertImage inserts an image node with the data-url src', async () => {
+    setDoc('photo: ');
+    const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    PM().insertImage({ src: px, alt: 'dot' }); await sleep(120);
+    let src = null; doc().descendants((n) => { if (n.type.name === 'image') src = n.attrs.src; });
+    return hasNode('image') && /^data:image\/png/.test(src || '');
+  });
+  await t('[6] insertBookmark wraps the selection in PAIRED start+end (same id)', async () => {
+    setDoc('mark this range'); selectText('this range'); await sleep(60);
+    PM().insertBookmark({ name: 'spot1' }); await sleep(120);
+    let startId = null, endId = null, name = null;
+    doc().descendants((n) => {
+      if (n.type.name === 'bookmarkStart') { startId = n.attrs.id; name = n.attrs.name; }
+      if (n.type.name === 'bookmarkEnd') endId = n.attrs.id;
+    });
+    return hasNode('bookmarkStart') && hasNode('bookmarkEnd') && startId != null && startId === endId && name === 'spot1';
+  });
+  await t('[6] listBookmarks returns inserted bookmarks; goToBookmark finds one', async () => {
+    setDoc('alpha beta gamma'); selectText('beta');
+    PM().insertBookmark({ name: 'bk_beta' }); await sleep(80);
+    const list = PM().listBookmarks();
+    const ok = Array.isArray(list) && list.some((b) => b.name === 'bk_beta');
+    return ok && PM().goToBookmark('bk_beta') === true;
+  });
+  await t('[6] removeBookmark deletes the pair', async () => {
+    setDoc('one two three'); selectText('two');
+    PM().insertBookmark({ name: 'gone' }); await sleep(80);
+    PM().removeBookmark('gone'); await sleep(80);
+    return !hasNode('bookmarkStart') && !hasNode('bookmarkEnd');
+  });
+  await t('[6] insertSymbol inserts the unicode character as text', async () => {
+    setDoc('temp ');
+    PM().insertSymbol('©'); await sleep(80);
+    return doc().textContent.includes('temp') && doc().textContent.includes('©');
+  });
+  await t('[6] insertEquation inserts styled Cambria Math italic text', async () => {
+    setDoc('eq: ');
+    PM().insertEquation('a² + b² = c²'); await sleep(120);
+    if (!doc().textContent.includes('a²')) return 'equation text missing';
+    let fam = null, ital = false;
+    doc().descendants((n) => { (n.marks || []).forEach((m) => { if (m.type.name === 'textStyle' && m.attrs.fontFamily) fam = m.attrs.fontFamily; if (m.type.name === 'italic') ital = true; }); });
+    return /Cambria Math/i.test(fam || '') && ital === true;
+  });
+  await t('[6] insertPageBreak inserts a hardBreak page-break node', async () => {
+    setDoc('before break');
+    PM().insertPageBreak(); await sleep(80);
+    let pb = false; doc().descendants((n) => { if (n.type.name === 'hardBreak' && (n.attrs.pageBreakType === 'page')) pb = true; });
+    return pb === true;
+  });
+  await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
+    setDoc('above line');
+    PM().insertHr(); await sleep(80);
+    let hr = false; doc().descendants((n) => { if (n.type.name === 'contentBlock' && n.attrs.horizontalRule) hr = true; });
+    return hr === true;
+  });
+  await t('[6] insertTable inserts a table with the requested rows×cols', async () => {
+    setDoc('table here');
+    PM().insertTable({ rows: 3, cols: 4 }); await sleep(120);
+    let rows = 0, cols = 0;
+    doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
+    return hasNode('table') && rows === 3 && cols === 4;
+  });
+  // ---- migrate the legacy 9 table ops (caret-in-table) ----
+  await t('[6] table addRow below grows the row count', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableAddRow('below'); await sleep(100);
+    let rows = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    return rows === 3;
+  });
+  await t('[6] table addColumn right grows each row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableAddColumn('right'); await sleep(100);
+    let cols = 0; doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
+    return cols === 3;
+  });
+  await t('[6] table deleteRow shrinks the row count', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(120);
+    PM().tableDeleteRow(); await sleep(100);
+    let rows = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    return rows === 2;
+  });
+  await t('[6] table deleteColumn shrinks each row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(120);
+    PM().tableDeleteColumn(); await sleep(100);
+    let cols = 99; doc().descendants((n) => { if (n.type.name === 'tableRow') cols = Math.min(cols, n.childCount); });
+    return cols === 2;
+  });
+  await t('[6] table deleteTable removes the table node', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableDeleteTable(); await sleep(100);
+    return !hasNode('table');
+  });
+  // NOTE (Critique B3): mergeCells/setCellBackground need a CellSelection, whose test helper
+  // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
+  // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table
+  // ops that work off a plain caret-in-cell (insert/delete row+col, header toggle).
+  await t('[6] table toggleHeaderRow converts the first row to header cells', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableToggleHeaderRow(); await sleep(100);
+    let hasHeaderCell = false; doc().descendants((n) => { if (n.type.name === 'tableHeader') hasHeaderCell = true; });
+    return hasHeaderCell === true;
+  });
+  await t('[6] D6 flip: link dialog + table grid open in PM mode', async () => {
+    // inverse of the pre-flip D6 block — proves the registry flip reached dispatch.
+    window.WC.Commands.run({ cmd: 'link', label: 'Link' }); await sleep(80);
+    const linkOpen = !!document.querySelector('.modal-backdrop');
+    const bd = document.querySelector('.modal-backdrop');
+    if (bd) {
+      const cancel = Array.from(bd.querySelectorAll('button')).find((b) => /Cancel/.test(b.textContent));
+      if (cancel) cancel.click(); else bd.remove(); // never leak
+    }
+    await sleep(40);
+    window.WC.Commands.dropdown({ cmd: 'table', type: 'dropdown' }, document.body); await sleep(60);
+    const tableOpen = document.querySelectorAll('.flyout').length > 0;
+    window.WC.closeFlyouts();
+    return linkOpen && tableOpen;
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
