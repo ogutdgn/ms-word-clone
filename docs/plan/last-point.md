@@ -7,6 +7,54 @@
 
 ---
 
+## 2026-06-10 — Slice 6 table-defect fix batch (user report → hunt → 5 fixes on PR #23)
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (PR #23, still unmerged — fixes pushed onto it).
+- **Phase:** **Phase 2 — slice 6 DONE (PR #23 + fix batch) → slice 7 (file-io) next.**
+- **State summary:** the user reported "some of the table things not working properly." A 4-agent
+  defect-hunt workflow (live-repro probes in the built app + code audit + real-Word fidelity compare
+  vs `.oracle-probes/slice6/` + style-minting research) found the real causes; 5 fix tasks executed
+  subagent-driven with per-step review:
+  - `fdcb7f6` **ribbon yank fixed** — contextual table tabs are now PASSIVE (caret enter/exit never
+    steals the active tab; user-chosen tab survives exit; `showContextualTab(def,{activate:false})`
+    + conditional restore in `hideContextualTab`; H&F byte-identical); Layout tab display label →
+    Word Mac's **'Layout'**.
+  - `72b270f` **table Center/Right alignment fixed** — TableView no longer clobbers `margin-left`
+    with the zero-indent default (geometry-proven: center 233/233, right 466/0; was always 0/466).
+  - `dd56a1a` **caret-cell shading parity** (Word shades the caret cell — fork `setCellBackground`
+    caret fallback; bridge gate removed) + **AutoFit Fixed now clears the Window stretch**.
+  - `61d84d9` **table styles work end-to-end** — minted REAL Word definitions (`TableGrid` authored
+    live via the oracle; `GridTable4-Accent1` from the s3 fixture, all 6 `w:tblStylePr` conditional
+    blocks byte-faithful) into `DEFAULT_LINKED_STYLES` → every export carries the definitions (closes
+    the Leg-C `w:tblStyle` drop); **apply now visibly bakes** (style-engine-resolved border frame +
+    firstRow fill via a non-rendered `styleBakedBackground` marker — user shading survives, exports
+    stay free of direct-formatting leaks); **dynamic honest style gallery** (`getTableStyles()` from
+    the runtime catalog, display names, phantom IDs dropped); `docx-inspect` gained
+    `tableStyles`/`tblStyleRefs`.
+  - `474291f` **direct-border precedence** (direct `w:tblBorders` beat the baked style frame across
+    save→reopen — importer-merge mirrored via the actual `_processTableBorders`) + user shading
+    clears the baked marker; `a23c868` **27 real Fluent icons** for the tbl* contextual-tab commands
+    (icon-map + regen; also fixed gen-icons.js's stale pre-Phase-1 output path).
+- **Gates (final, run by the coordinator):** **PM 189/189** (176 → +13 new regression tests incl.
+  geometry + precedence + export-purity), legacy 257/257, smoke 9/9 ×2, docx 17/17.
+- **Verified working (hunt, no action needed):** row/col insert/delete, merge/split via CellSelection,
+  cell width, distribute columns, header toggles, text direction, context menu, dropdown flyouts,
+  convert-to-text, window-autofit.
+- **Recorded deferrals from the hunt (NOT fixed, by design):** Table Style Options checkboxes
+  (tblLook toggles — needs conditional-formatting render), full ~50-style gallery, Borders-group pen
+  controls/Border Painter, Height/Width spinner fields, View Gridlines/Draw/Eraser/Properties,
+  Cell Margins dialog (stub toast), AutoFit-Contents reflow, banded-row live rendering (exported
+  definitions carry it — real Word renders the full style), text-direction dropdown gallery,
+  Excel-Spreadsheet/Quick-Tables menu items (legacy carryover, absent in Word Mac).
+- **Blockers/notes:** a Word **live reopen re-check of the style fix is pending** — scripted opens
+  now hit a macOS "Grant File Access" prompt (and Word crashed/recovered during T4's attempt; left
+  clean) — artifact-level validation is strong (docx-inspect: definitions byte-faithful + ref +
+  conditionals intact); re-run interactively after granting file access. One process incident: a T2
+  reviewer subagent left the repo on the slice-5 branch (no data loss — everything was committed;
+  coordinator restored the branch and added a no-branch-switch rule to subsequent agent briefs).
+
+---
+
 ## 2026-06-10 — Slice 6 Word oracle legs run + PR #23 opened
 
 - **Branch:** `feature/phase-2-slice-6-insert-basics` (pushed) → **PR #23** open to `main`.
