@@ -1573,6 +1573,41 @@
     const designGone = !document.querySelector('.contextual-tab[data-tab="table-design"]');
     return layoutGone === true && designGone === true;
   });
+  // Word fidelity (live-repro probe S1.x): contextual tabs are PASSIVE — entering or
+  // leaving a table must never change which ribbon tab is active. Real Word Mac shows
+  // 'Table Design' + 'Layout' without ever stealing the active tab
+  // (.oracle-probes/slice6/results.md, B-design).
+  await t('[6b] caret into a table does NOT steal the active ribbon tab', async () => {
+    setDoc('x'); await sleep(250); // state-sync tick hides any leftover contextual tabs
+    window.WC.Ribbon.activate('insert');
+    PM().insertTable({ rows: 2, cols: 2 }); await sleep(400); // rAF state-sync tick auto-shows tabs
+    const layout = !!document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const design = !!document.querySelector('.contextual-tab[data-tab="table-design"]');
+    // Panels too — a tab button without its body panel is a broken inject (the
+    // legacy H&F gate asserts the panel; keep the PM tabs honest the same way).
+    const layoutPanel = !!document.querySelector('.ribbon-panel[data-tab="table-layout"]');
+    const designPanel = !!document.querySelector('.ribbon-panel[data-tab="table-design"]');
+    const activeEl = document.querySelector('.ribbon-tab.active');
+    const active = activeEl && activeEl.dataset.tab;
+    if (!layout || !design) return `tabs missing: layout=${layout} design=${design}`;
+    if (!layoutPanel || !designPanel) return `panels missing: layout=${layoutPanel} design=${designPanel}`;
+    return active === 'insert' || `active tab stolen: expected 'insert', got '${active}'`;
+  });
+  await t('[6b] leaving a table preserves a user-chosen tab', async () => {
+    setDoc('x'); await sleep(250);
+    window.WC.Ribbon.activate('insert'); // the inject will record 'insert' as _ctxPrev
+    PM().insertTable({ rows: 2, cols: 2 }); await sleep(400);
+    if (!document.querySelector('.contextual-tab[data-tab="table-layout"]')) return 'tabs never appeared';
+    window.WC.Ribbon.activate('home'); // user explicitly picks Home while the caret is in the table
+    // Caret out: insertTable leaves a trailing empty paragraph after the table (end of doc).
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), doc().content.size - 1)));
+    await sleep(400);
+    if (PM().isInTable() !== false) return 'caret still reports in-table after moving out';
+    if (document.querySelector('.contextual-tab')) return 'contextual tabs still present after exit';
+    const activeEl = document.querySelector('.ribbon-tab.active');
+    const active = activeEl && activeEl.dataset.tab;
+    return active === 'home' || `expected 'home' to stay active, got '${active}' (jumped to stale prev)`;
+  });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {

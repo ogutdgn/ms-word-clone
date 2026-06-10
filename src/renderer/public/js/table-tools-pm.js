@@ -16,10 +16,12 @@
   const PM = () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null;
   let shown = false;
 
-  // ---- Table Layout contextual tab ----
+  // ---- Table Layout contextual tab (Word Mac displays it as plain 'Layout' —
+  // .oracle-probes/slice6/results.md shows 'Table Design' + 'Layout'; id stays
+  // 'table-layout' so it can't collide with the standard Layout tab id) ----
   function layoutTab() {
     return {
-      id: 'table-layout', name: 'Table Layout', contextual: true, groups: [
+      id: 'table-layout', name: 'Layout', contextual: true, groups: [
         { id: 'tl-rowscols', name: 'Rows & Columns', controls: [
           { cmd: 'tblInsertAbove', label: 'Insert Above', type: 'button' },
           { cmd: 'tblInsertBelow', label: 'Insert Below', type: 'button' },
@@ -79,8 +81,10 @@
   function syncContextualTabs(inTable) {
     if (!WC.Ribbon || !WC.Ribbon.showContextualTab) return;
     if (inTable && !shown) {
-      WC.Ribbon.showContextualTab(designTab());
-      WC.Ribbon.showContextualTab(layoutTab());
+      // PASSIVE, like real Word: the tabs appear but never steal the active tab
+      // (probe S1.x — Word's active ribbon tab is unchanged on caret entry).
+      WC.Ribbon.showContextualTab(designTab(), { activate: false });
+      WC.Ribbon.showContextualTab(layoutTab(), { activate: false });
       shown = true;
     } else if (!inTable && shown) {
       WC.Ribbon.hideContextualTab('table-design');
