@@ -129,10 +129,163 @@ export function installTable(editor: AnyEditor) {
     return false
   }
 
-  // Returns { inTable } for Table Tools tab show/hide.
-  // TODO(Stage E/F): add cell pos/rect for context-menu anchoring.
-  function tableInfo(): { inTable: boolean } {
-    return { inTable: isInTable() }
+  // ---------- 6b: net-new Table Tools commands (Task 9) ----------
+  // All 14 fork commands use raw PM dispatch ({ state, tr, dispatch }) and work off
+  // a plain caret-in-table — no CellSelection gate needed (confirmed by Task 8 tests).
+  // Use editor.commands.X() directly (same pattern as addColumnBefore/After).
+
+  function tableSetStyle(id: string): boolean {
+    const ok = editor.commands.setTableStyle(id)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetAlignment(a: 'left' | 'center' | 'right'): boolean {
+    const ok = editor.commands.setTableAlignment(a)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetIndent(px: number): boolean {
+    const ok = editor.commands.setTableIndent(px)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetCellWidth(px: number): boolean {
+    const ok = editor.commands.setCellWidth(px)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetRowHeight(px: number, rule?: string): boolean {
+    const ok = editor.commands.setRowHeight(px, rule)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetCellMargins(m: { top?: number; right?: number; bottom?: number; left?: number }): boolean {
+    const ok = editor.commands.setCellMargins(m)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetCellBorders(b: Record<string, unknown>): boolean {
+    const ok = editor.commands.setCellBorders(b)
+    refocus()
+    return ok !== false
+  }
+
+  function tableDistributeColumns(): boolean {
+    const ok = editor.commands.distributeColumnsEvenly()
+    refocus()
+    return ok !== false
+  }
+
+  function tableDistributeRows(): boolean {
+    const ok = editor.commands.distributeRowsEvenly()
+    refocus()
+    return ok !== false
+  }
+
+  function tableSplit(): boolean {
+    const ok = editor.commands.splitTableAtRow()
+    refocus()
+    return ok !== false
+  }
+
+  function tableToText(d?: string): boolean {
+    const ok = editor.commands.convertTableToText(d)
+    refocus()
+    return ok !== false
+  }
+
+  function textToTable(d?: string): boolean {
+    const ok = editor.commands.convertTextToTable(d)
+    refocus()
+    return ok !== false
+  }
+
+  function tableSetTextDirection(dir: string): boolean {
+    const ok = editor.commands.setTextDirection(dir)
+    refocus()
+    return ok !== false
+  }
+
+  function tableAutoFit(mode: 'fixed' | 'contents' | 'window'): boolean {
+    const ok = editor.commands.autoFitTable(mode)
+    refocus()
+    return ok !== false
+  }
+
+  // Test helper (Task 9 / Critique B3): build a CellSelection over the first two
+  // @internal — test helper (CellSelection over the first row pair); not a stable public API
+  // cells of the table's first row. Used by the [6b] merge test in test-suite-pm.js.
+  // Calls the fork's setCellSelection({ anchorCell, headCell }) command with the
+  // absolute positions of cells [0] and [1] in the first row.
+  function tableSelectFirstRowPair(): boolean {
+    try {
+      const { selection, doc } = editor.state
+      // Walk $from ancestors to find the table node.
+      const { $from } = selection
+      let tablePos = -1
+      let tableNode: any = null
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          tableNode = $from.node(d)
+          tablePos = $from.before(d)
+          break
+        }
+      }
+      if (!tableNode || tablePos < 0) return false
+
+      // tableStart is 1 past the table's opening token.
+      const tableStart = tablePos + 1
+      // First row is the first child of the table.
+      const firstRow = tableNode.child(0)
+      if (!firstRow || firstRow.childCount < 2) return false
+
+      // Cell positions are relative to tableStart (prosemirror-tables convention).
+      // cell[0] offset = 0 (right after row open token).
+      // cell[1] offset = cell[0].nodeSize.
+      const cell0RelPos = 1 // row open token = 1 offset inside tableStart
+      const cell1RelPos = cell0RelPos + firstRow.child(0).nodeSize
+
+      // Absolute positions inside the document (setCellSelection wants doc-absolute).
+      const anchorCell = tableStart + cell0RelPos
+      const headCell = tableStart + cell1RelPos
+
+      const ok = editor.commands.setCellSelection({ anchorCell, headCell })
+      refocus()
+      return ok !== false
+    } catch {
+      return false
+    }
+  }
+
+  // Returns { inTable, rows, cols, styleId, alignment } for Table Tools tab state.
+  // Falls back to { inTable: false } when not in a table (safe for pre-mount stubs).
+  function tableInfo(): { inTable: boolean; rows?: number; cols?: number; styleId?: string | null; alignment?: string | null } {
+    if (!isInTable()) return { inTable: false }
+    try {
+      const { $from } = editor.state.selection
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type.name === 'table') {
+          const node = $from.node(d)
+          const rows: number = node.childCount
+          // cols = number of cells in first row (header or body).
+          const cols: number = rows > 0 ? node.child(0).childCount : 0
+          const styleId: string | null = node.attrs?.tableStyleId ?? null
+          // Fork stores alignment as 'justification' attr (or inside tableProperties).
+          const alignment: string | null =
+            node.attrs?.justification ??
+            node.attrs?.tableProperties?.justification ??
+            null
+          return { inTable: true, rows, cols, styleId, alignment }
+        }
+      }
+    } catch { /* fall through */ }
+    return { inTable: false }
   }
 
   return {
@@ -150,5 +303,21 @@ export function installTable(editor: AnyEditor) {
     tableSetCellVAlign,
     isInTable,
     tableInfo,
+    // 6b: net-new Table Tools verbs
+    tableSetStyle,
+    tableSetAlignment,
+    tableSetIndent,
+    tableSetCellWidth,
+    tableSetRowHeight,
+    tableSetCellMargins,
+    tableSetCellBorders,
+    tableDistributeColumns,
+    tableDistributeRows,
+    tableSplit,
+    tableToText,
+    textToTable,
+    tableSetTextDirection,
+    tableAutoFit,
+    tableSelectFirstRowPair,
   }
 }

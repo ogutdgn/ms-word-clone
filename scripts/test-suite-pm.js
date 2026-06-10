@@ -1495,6 +1495,51 @@
     return (hasBorders && hasCenter) || `borders=${hasBorders} center=${hasCenter}`;
   });
 
+  // ---------- slice 6b (Task 9): bridge-layer WC.PM-routed tests ----------
+  // These exercise the same fork commands as above but through WC.PM.* wrappers,
+  // proving the index.ts stubs are replaced and calls reach the fork.
+  await t('[6b][bridge] WC.PM.tableSetStyle routes through bridge to setTableStyle', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.styleId === 'GridTable4-Accent1';
+  });
+  await t('[6b][bridge] WC.PM.tableSetAlignment routes through bridge to setTableAlignment', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetAlignment('right'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.alignment === 'right';
+  });
+  await t('[6b][bridge] tableInfo returns rows/cols/styleId/alignment from live table node', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 4 }); await sleep(150);
+    PM().tableSetStyle('TableGrid'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.rows === 3 && info.cols === 4 && info.styleId === 'TableGrid';
+  });
+  await t('[6b][bridge] B3: tableSelectFirstRowPair + tableMerge reduces first row cell count', async () => {
+    // Insert 2×3 table (2 rows, 3 cols), select first two cells of first row, merge.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    const selOk = PM().tableSelectFirstRowPair(); await sleep(80);
+    if (!selOk) return 'tableSelectFirstRowPair returned false';
+    const mergeOk = PM().tableMerge(); await sleep(80);
+    if (!mergeOk) return 'tableMerge returned false after CellSelection';
+    // After merge the first row has 2 cells (merged cell + remaining cell).
+    try {
+      // Navigate to the table node.
+      const sel = PM().getEditor().state.selection;
+      const from = sel.$from;
+      for (let d = from.depth; d > 0; d--) {
+        if (from.node(d).type.name === 'table') {
+          const firstRow = from.node(d).child(0);
+          return firstRow.childCount === 2 || `expected 2 cells, got ${firstRow.childCount}`;
+        }
+      }
+      return 'table node not found after merge';
+    } catch (e) {
+      return String(e);
+    }
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
     const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;

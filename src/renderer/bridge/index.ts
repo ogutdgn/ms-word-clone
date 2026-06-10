@@ -236,6 +236,14 @@ export function preinstallBridge() {
     tableToggleHeaderRow: () => false, tableToggleHeaderColumn: () => false,
     tableSetCellShading: () => false, tableSetCellVAlign: () => false,
     isInTable: () => false, tableInfo: () => ({ inTable: false }),
+    // slice 6b: net-new Table Tools verbs (replaced by installTable on mount)
+    tableSetStyle: () => false, tableSetAlignment: () => false, tableSetIndent: () => false,
+    tableSetCellWidth: () => false, tableSetRowHeight: () => false,
+    tableSetCellMargins: () => false, tableSetCellBorders: () => false,
+    tableDistributeColumns: () => false, tableDistributeRows: () => false,
+    tableSplit: () => false, tableToText: () => false, textToTable: () => false,
+    tableSetTextDirection: () => false, tableAutoFit: () => false,
+    tableSelectFirstRowPair: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
