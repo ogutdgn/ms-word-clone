@@ -141,6 +141,17 @@ The following upstream packages are included in this directory tree:
   - Private helper `getSelectedRowPositions(rect, selection, allWhenCaret?)` added (bottom of
     table.js) to resolve the absolute positions of the rows in the current selection for the
     row-sizing commands.
+- **TableView margin-left write gated on an explicit indent (slice 6 fix, 2026-06-10):**
+  `extensions/table/TableView.js` `updateColumns()` no longer unconditionally overwrites
+  `table.style.marginLeft` from a zero indent (`tableIndent?.value ?? 0` always produced
+  `'0px'`, stomping — on every NodeView construct/update — the justification margins
+  `margin: 0 auto` / `margin-left: auto` that `updateTable()` had just applied from the
+  renderDOM attrs, so `setTableAlignment('center'|'right')` was visually inert). The
+  margin-left write now runs only for an explicit non-zero indent (honoring BOTH the
+  canonical nested `tableProperties.tableIndent.value` twips shape and the top-level
+  `tableIndent.width` px shape) or, when the table is not center/right justified, the
+  legacy cell-padding/zero-indent default — justification margins now take effect;
+  explicit indents still apply (and win over justification when both are set).
 - **`textDirection` cell attr added (slice 6, 2026-06-09):** a new `textDirection` attribute (default
   `null`) on the `tableCell` (`extensions/table-cell/table-cell.js`) and `tableHeader`
   (`extensions/table-header/table-header.js`) nodes, rendering `writing-mode: vertical-rl` for `'tbRl'`

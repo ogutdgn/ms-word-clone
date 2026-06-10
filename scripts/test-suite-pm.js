@@ -1512,6 +1512,61 @@
     const info = PM().tableInfo();
     return info.inTable && info.alignment === 'right';
   });
+  // ---- T2 geometry regression: alignment must MOVE the table, not just set attrs ----
+  // The fork's TableView.updateColumns used to write table.style.marginLeft from
+  // `tableIndent?.value ?? 0` UNCONDITIONALLY ('0px' when no indent exists), stomping
+  // the justification margins (`margin: 0 auto` / `margin-left: auto`) that
+  // updateTable() had just applied from renderDOM — center/right were visually inert.
+  // These measure real pixels against the .tableWrapper (the table's containing block).
+  const tableGeom = () => {
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tbl) return null;
+    const tr = tbl.getBoundingClientRect();
+    const wr = tbl.parentElement.getBoundingClientRect();
+    return { leftGap: tr.left - wr.left, rightGap: wr.right - tr.right };
+  };
+  // 80px columns keep the table well under the wrapper width so alignment has room to move it.
+  const insertNarrowTable = async () => {
+    setDoc('x'); ecmd('insertTable', { rows: 2, cols: 2, columnWidths: [80, 80] }); await sleep(150);
+  };
+  await t('[6b] tableSetAlignment center visibly centers the table (geometry)', async () => {
+    await insertNarrowTable();
+    if (!tableGeom()) return 'no table rendered';
+    if (!PM().tableSetAlignment('center')) return 'tableSetAlignment returned false';
+    await sleep(150);
+    const g = tableGeom();
+    if (!g) return 'table lost after align';
+    if (!(g.leftGap > 20)) return `still hard-left: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    if (!(Math.abs(g.leftGap - g.rightGap) < 40)) return `lopsided: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    return true;
+  });
+  await t('[6b] tableSetAlignment right hugs the right (geometry)', async () => {
+    await insertNarrowTable();
+    if (!tableGeom()) return 'no table rendered';
+    if (!PM().tableSetAlignment('right')) return 'tableSetAlignment returned false';
+    await sleep(150);
+    const g = tableGeom();
+    if (!g) return 'table lost after align';
+    if (!(g.rightGap < g.leftGap)) return `not right-aligned: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    if (!(g.rightGap < 40)) return `right gap too big: rightGap=${g.rightGap.toFixed(1)}`;
+    return true;
+  });
+  await t('[6b] tableSetIndent still indents (no regression after the margin gating)', async () => {
+    await insertNarrowTable();
+    const before = tableGeom();
+    if (!before) return 'no table rendered';
+    if (!PM().tableSetIndent(48)) return 'tableSetIndent returned false';
+    await sleep(150);
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    const ml = parseFloat(getComputedStyle(tbl).marginLeft);
+    const g = tableGeom();
+    const grew = g.leftGap - before.leftGap;
+    // 48px → 720 twips → back to 48px through convertSizeToCSS; tiny rounding slack only.
+    if (!(Math.abs(ml - 48) <= 2)) return `computed margin-left=${ml} (expected ~48)`;
+    if (!(grew > 30)) return `leftGap did not grow ~48: before=${before.leftGap.toFixed(1)} after=${g.leftGap.toFixed(1)}`;
+    return true;
+  });
+
   await t('[6b][bridge] tableInfo returns rows/cols/styleId/alignment from live table node', async () => {
     setDoc('x'); PM().insertTable({ rows: 3, cols: 4 }); await sleep(150);
     PM().tableSetStyle('TableGrid'); await sleep(80);
