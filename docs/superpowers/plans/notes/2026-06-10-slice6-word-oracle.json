@@ -1,0 +1,114 @@
+{
+  "generatedBy": "slice-6 Word-oracle validation (Tasks 7+11, Word-dependent legs)",
+  "date": "2026-06-10",
+  "branch": "feature/phase-2-slice-6-insert-basics",
+  "wordVersion": "Microsoft Word for Mac 16.77.1",
+  "oracle": "scripts/oracle/word-oracle.js (AppleScript object model only)",
+  "overallVerdict": "DONE_WITH_CONCERNS",
+  "overallSummary": "Leg A PASS (clone->Word reopen: hyperlink + table + image + bookmark all survived Word's round-trip, no repair prompt). Leg C PARTIAL (styled-table clone->Word: alignment + shading + merge survived, but Word DROPPED the table-style reference because the clone never emits the style DEFINITION in styles.xml). Leg B BLOCKED by Word session-instability quirks #24-26 (make-new-document authoring spawned spurious untitled windows + dangling references; native table+bookmark authoring never completed and was never saved). Word NEVER showed a repair/recovery prompt for any clone-authored file -> our OOXML is well-formed. Open+save-as round-trip path is fully healthy; only the make-new-document authoring path is broken in this session.",
+  "repairPromptEverShown": false,
+  "repairPromptNote": "Neither roundtrip (Leg A nor Leg C) raised an AppleEvent error/timeout, and neither spawned an extra recovery document. The roundtrip verb returned ROUNDTRIP_OK both times. Word accepted the clone's OOXML cleanly.",
+
+  "legA": {
+    "name": "reopen-in-Word (clone -> Word, THE KEY TEST)",
+    "verdict": "PASS",
+    "input": "/tmp/slice6-legA.docx (clone-exported: hyperlink->https://example.com + 3x4 table + embedded image + paired bookmark)",
+    "method": "word-oracle.js roundtrip: open in real Word -> save-as to slice6-legA-wordsaved.docx -> close (name-verified). Then docx-inspect on the Word-resaved file.",
+    "repairPrompt": false,
+    "preWord_inspect": {
+      "hyperlinks": ["rId7"],
+      "relTargets_link": {"id": "rId7", "target": "https://example.com"},
+      "bookmarks": [{"id": "0", "name": "spot1"}],
+      "bookmarkEnds": ["0"],
+      "tables": 1, "rows": 3, "gridCols": 4,
+      "blips": ["rId-bridge-3ly8u9r"],
+      "media": [{"name": "word/media/image-2116158338.png", "bytes": 70}]
+    },
+    "postWord_inspect": {
+      "hyperlinks": ["rId5"],
+      "relTargets_link": {"id": "rId5", "target": "https://example.com"},
+      "bookmarks": [{"id": "0", "name": "spot1"}],
+      "bookmarkEnds": ["0"],
+      "tables": 1, "rows": 3, "gridCols": 4,
+      "blips": ["rId6"],
+      "media": [{"name": "word/media/image1.png", "bytes": 70}]
+    },
+    "featuresSurvived": {
+      "hyperlink": "PASS - rId renumbered rId7->rId5, target https://example.com preserved exactly",
+      "table": "PASS - 1 tbl / 3 rows / 4 gridCols (exact)",
+      "image": "PASS - 1 a:blip + 1 word/media file; 70 bytes preserved; Word renamed media to canonical word/media/image1.png",
+      "bookmark": "PASS - paired bookmarkStart(id=0 name=spot1) + bookmarkEnd(id=0) preserved"
+    },
+    "normalizedByWord": [
+      "relationship IDs renumbered (rId7->rId5 for the link, image rel renumbered to rId6) - benign, expected",
+      "image part renamed from media/image-2116158338.png to word/media/image1.png - benign, canonicalization"
+    ],
+    "droppedByWord": []
+  },
+
+  "legB": {
+    "name": "Word-authored -> clone (native Word authoring, NO hyperlink)",
+    "verdict": "BLOCKED",
+    "blockedBy": "Word session-instability quirks #24-26 (scripts/oracle/README.md). 'make new document' authoring in this long-lived AppleScript session produced dangling document references (-1728 'object does not exist' / 'Can't get text range') and repeatedly spawned spurious untitled documents (Document3..Document8). Native table + bookmark authoring never completed; the legB scratch .docx was NEVER written to disk, so there was nothing to import into the clone.",
+    "whatWasAttempted": "4 distinct AppleScript authoring strategies: (1) make new document + create range + make new table (table created but bookmark via 'text object:anchorRange' raised -1728); (2-3) corrected bookmark-properties syntax + save-as-by-var (dangling 'd' ref -> save as on wrong/renamed doc failed); (4) fully name-verified document-ref form with 90s timeout (-1728 on first table-dependent access). Each make-new-document call destabilized the session further.",
+    "rootCauseRef": "README quirk #24 (bare AppleEvent / make-new-document can spawn extra headless/untitled docs whose refs don't bind) + #26 (by-name/ordinal resolution flickers -1728 while the session is unsettled). Recovery prescription is a USER relaunch of Word, which is forbidden (never quit Word).",
+    "whatWasValidatedInstead": "Nothing for the Word->clone direction (no file produced). The clone's IMPORT of Word-authored tables+bookmarks is covered structurally by Leg A's reverse round-trip evidence (the clone-authored bookmark+table survive a full Word open/save cycle) but a true native-Word->clone import was not exercised.",
+    "decisionNotToThrash": "Per the task's ABSOLUTE SAFETY RULES, stopped after the session showed it was unhealthy (auto-spawning docs on nearly every interaction) rather than thrashing Word. Closed every scratch doc I created (Document3,5,6,7,8) by exact name; the session settled back to 3 untitled docs."
+  },
+
+  "legC": {
+    "name": "6b styled-table round-trip (clone -> Word)",
+    "verdict": "PARTIAL",
+    "input": "/tmp/slice6-legC.docx (clone-exported via WC.PM verbs: insertTable 3x3 + tableSetStyle('GridTable4-Accent1') + tableSetAlignment('center') + tableSetCellShading('FFFF00') over first-row pair + tableMerge first-row pair)",
+    "probe": "scripts/slice6-legC-probe.js (electron --shot-evalfile probe; 9/9 build steps passed)",
+    "method": "word-oracle.js roundtrip (same healthy open+save-as path as Leg A) -> unzip-grep both the clone-exported file and the Word-resaved file.",
+    "repairPrompt": false,
+    "preWord_attrs": {
+      "tblStyle": "<w:tblStyle w:val=\"GridTable4-Accent1\"/>  (PRESENT but style is NOT defined in styles.xml)",
+      "jc": "<w:jc w:val=\"center\"/>",
+      "shd": "<w:shd w:fill=\"FFFF00\"/>",
+      "gridSpan": "<w:gridSpan w:val=\"2\"/>",
+      "vMerge": "(none - horizontal merge only)",
+      "styleDefInStylesXml": false
+    },
+    "postWord_attrs": {
+      "tblStyle": "DROPPED - no <w:tblStyle> in Word-resaved document.xml",
+      "jc": "<w:jc w:val=\"center\"/> (PRESERVED; Word writes it per-row, 4 occurrences)",
+      "shd": "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FFFF00\"/> (PRESERVED + enriched to canonical form)",
+      "gridSpan": "<w:gridSpan w:val=\"2\"/> (PRESERVED)",
+      "vMerge": "(none)",
+      "tableStructure": "1 tbl / 3 tr / 3 gridCol (PRESERVED)"
+    },
+    "attrVerdicts": {
+      "tblStyle": "FAIL/DROPPED - Word discarded the GridTable4-Accent1 reference because the clone exporter emits the style ID on the table but never writes the style DEFINITION into word/styles.xml. Word drops a tblStyle reference whose definition is absent. This is a clone-exporter gap, NOT a Word quirk and NOT malformed OOXML (no repair prompt).",
+      "jc_alignment": "PASS - center alignment survived",
+      "shd_shading": "PASS - fill FFFF00 survived; Word normalized <w:shd w:fill=...> to the canonical <w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FFFF00\"/>",
+      "gridSpan_merge": "PASS - horizontal merge (gridSpan=2) survived"
+    },
+    "normalizedByWord": [
+      "shd: clone's minimal <w:shd w:fill=\"FFFF00\"/> expanded to canonical <w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"FFFF00\"/> - benign enrichment",
+      "jc: re-emitted at per-row scope (4 occurrences) - benign"
+    ],
+    "droppedByWord": [
+      "w:tblStyle (GridTable4-Accent1) - dropped due to missing style definition in styles.xml (clone-side export gap to fix)"
+    ]
+  },
+
+  "wordCleanliness": {
+    "pidSafe": true,
+    "neverQuit": true,
+    "baselineAtStart": "windows=1 documents=1 (one user doc, untitled)",
+    "stateAtEnd": "windows=3 documents=3 (Document1, Document2, Document4 - all untitled, none clone-named, none the user's saved/named work)",
+    "myScratchDocsClosed": "All named round-trip scratch docs (slice6-legA-scratch.docx, slice6-legC-scratch.docx) were closed by the oracle's name-verified close. All make-new-document scratch docs I created (Document3,5,6,7,8) were closed by exact name.",
+    "residualConcern": "Document2 and Document4 are untitled blank documents that appeared during Leg B's failed make-new-document authoring under the session-instability quirks. They were NOT closed because they cannot be safely attributed to my scratch-name set (PID-safety: only close docs created with my scratch names). They hold no content and are not the user's named files. Document1 is the original user baseline doc, untouched.",
+    "wordNeverShowedRepairPrompt": true
+  },
+
+  "artifactsRemoved": [
+    "slice6-legA-scratch.docx, slice6-legA-wordsaved.docx, slice6-legC-scratch.docx, slice6-legC-wordsaved.docx (repo-root scratch round-trip files - removed, not committed)"
+  ],
+  "artifactsKept": [
+    "scripts/slice6-legC-probe.js (permanent probe that builds the styled-table fixture)",
+    "/tmp/slice6-legA.docx, /tmp/slice6-legC.docx (transient /tmp fixtures, gitignored location)"
+  ]
+}
