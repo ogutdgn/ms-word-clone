@@ -119,17 +119,18 @@
   // ---- Insert ----
   H.table = (c, node) => WC.Dialogs.insertTable();
   H.pictures = async () => {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
     const r = await window.wordAPI.pickImage();
-    if (r && r.ok) {
-      E().insertHTML(`<img src="${r.dataUrl}" alt="${WC.escapeHtml(r.name || '')}">`);
-      // the new image decodes asynchronously — repaginate once it has a real height
-      E().node.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', () => E().repaginate(), { once: true }); });
-    }
+    if (!r || !r.ok) return;
+    if (pm) { pm.insertImage({ src: r.dataUrl, alt: r.name || 'Picture' }); return; }
+    E().insertHTML(`<img src="${r.dataUrl}" alt="${WC.escapeHtml(r.name || '')}">`);
+    // the new image decodes asynchronously — repaginate once it has a real height
+    E().node.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', () => E().repaginate(), { once: true }); });
   };
   H.link = () => WC.Dialogs.insertLink();
   H.symbol = (c, node) => WC.Dialogs.symbol(node);
-  H.pageBreak = () => insertPageBreak();
-  H.blankPage = () => insertBlankPage();
+  H.pageBreak = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertPageBreak(); return; } insertPageBreak(); };
+  H.blankPage = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertBlankPage(); return; } insertBlankPage(); };
   // ---- Header & Footer contextual tab ----
   H.goToHeader = () => WC.HeaderFooter.goTo('header');
   H.goToFooter = () => WC.HeaderFooter.goTo('footer');
@@ -140,7 +141,7 @@
   H.differentOddEven = (c, node) => { const on = E().node.classList.toggle('hf-diff-oddeven'); if (node) node.classList.toggle('toggled', on); WC.toast('Different Odd & Even Pages ' + (on ? 'on' : 'off') + '.'); };
   H.showDocText = (c, node) => { const on = !E().node.classList.toggle('hf-hide-body'); if (node) node.classList.toggle('toggled', !on); };
   H.dateAndTime = () => E().insertHTML(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
-  H.horizontalLine = () => E().insertHTML('<hr>');
+  H.horizontalLine = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertHr(); return; } E().insertHTML('<hr>'); };
   H.wordArt = (c, node) => insertWordArt();
   H.textBox = () => E().insertHTML('<div style="border:1px solid #888;padding:8px;margin:6px 0;display:inline-block;min-width:200px">Text box — type here</div>&nbsp;');
   H.dropCap = () => dropCap();

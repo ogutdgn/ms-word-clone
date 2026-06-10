@@ -34,6 +34,8 @@
         WC.toast('Rows and columns must be whole numbers between 1 and 1000.');
         return false; // keep dialog open
       }
+      const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+      if (pm) { pm.insertTable({ rows, cols }); return true; }
       let html = '<table><tbody>';
       for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td><br></td>'; html += '</tr>'; }
       html += '</tbody></table><p><br></p>';
@@ -47,6 +49,8 @@
 
   // ---- Insert Link ----
   D.insertLink = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) pm.captureSelection(); // dialog steals focus; restore selection before inserting
     const sel = window.getSelection();
     const selText = sel && !sel.isCollapsed ? sel.toString() : '';
     const text = el('input', { type: 'text', value: selText, class: 'grow' });
@@ -58,8 +62,10 @@
     WC.dialog({ title: 'Insert Hyperlink', width: '460px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
         const raw = addr.value.trim(); if (!raw) return;
-        const url = WC.safeUrl(raw);
         const label = text.value.trim() || raw;
+        const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+        if (pm2) { pm2.insertLink({ href: raw, text: label }); return; }
+        const url = WC.safeUrl(raw);
         E().insertHTML(`<a href="${WC.escapeHtml(url)}">${WC.escapeHtml(label)}</a>&nbsp;`);
       } },
       { label: 'Cancel' },
@@ -73,7 +79,12 @@
       const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(8, 28px)', gap: '2px', padding: '8px' } });
       SYMBOLS.forEach((s) => {
         const cell = el('div', { text: s, style: { height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', border: '1px solid #eee' } });
-        cell.addEventListener('click', () => { WC.closeFlyouts(); E().insertHTML(s); });
+        cell.addEventListener('click', () => {
+          WC.closeFlyouts();
+          const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+          if (pm) { pm.insertSymbol(s); return; }
+          E().insertHTML(s);
+        });
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
@@ -90,7 +101,12 @@
     presets.forEach((p) => { const c = el('button', { class: 'btn', text: p, style: { minWidth: 'auto' } }); c.addEventListener('click', () => ta.value = p); chips.appendChild(c); });
     const body = el('div', {}, [el('div', { text: 'Common equations:' }), chips, ta]);
     WC.dialog({ title: 'Insert Equation', width: '520px', body, footer: [
-      { label: 'Insert', primary: true, onClick: () => { if (ta.value.trim()) E().insertHTML(`<span style="font-family:'Cambria Math',Cambria,serif;font-style:italic">${WC.escapeHtml(ta.value.trim())}</span>&nbsp;`); } },
+      { label: 'Insert', primary: true, onClick: () => {
+        if (!ta.value.trim()) return;
+        const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+        if (pm) { pm.insertEquation(ta.value.trim()); return; }
+        E().insertHTML(`<span style="font-family:'Cambria Math',Cambria,serif;font-style:italic">${WC.escapeHtml(ta.value.trim())}</span>&nbsp;`);
+      } },
       { label: 'Cancel' },
     ] });
   };
