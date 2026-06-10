@@ -1,0 +1,68 @@
+{
+  "title": "Slice 6 leg-A headless oracle — link/table/image/bookmark survive clone exportDocx",
+  "date": "2026-06-10",
+  "branch": "feature/phase-2-slice-6-insert-basics",
+  "leg": "A (headless, no real Word needed — Tasks 7+11 autonomous part)",
+  "method": "Temporary electron probe (scripts/_tmp-slice6-legA-probe.js, removed before commit). On a fresh WC.PM.newBlank() doc: insertLink({href:'https://example.com', text:'example'}) over a selected word, insertBookmark({name:'spot1'}) over a selected word, insertImage({src:<1x1 PNG data-url>}), insertTable({rows:3, cols:4}). Exported bytes via WC.PM.exportDocxBytes() and wrote them to /tmp/slice6-legA.docx via the bytes-IPC (window.wordAPI.saveBytes). Then inspected with `node scripts/docx-inspect.js /tmp/slice6-legA.docx`.",
+  "artifact": "/tmp/slice6-legA.docx (14472 bytes, valid PK zip)",
+  "probe_output": {
+    "steps": [
+      { "newBlank": true },
+      { "insertLink": true },
+      { "insertBookmark": true, "bookmarks": [{ "name": "spot1", "id": "0", "pos": 38 }] },
+      { "insertImage": true },
+      { "insertTable": true, "liveTables": 1, "liveRows": 3 },
+      { "exportBytes": { "len": 14472, "pk": true } }
+    ],
+    "saved": { "ok": true, "path": "/tmp/slice6-legA.docx", "name": "slice6-legA.docx" },
+    "error": null
+  },
+  "docx_inspect": {
+    "hyperlinks": ["rId7"],
+    "relTargets": [
+      { "id": "rId3", "target": "settings.xml" },
+      { "id": "rId2", "target": "styles.xml" },
+      { "id": "rId1", "target": "numbering.xml" },
+      { "id": "rId6", "target": "theme/theme1.xml" },
+      { "id": "rId5", "target": "fontTable.xml" },
+      { "id": "rId4", "target": "webSettings.xml" },
+      { "id": "rId7", "target": "https://example.com" },
+      { "id": "rId-bridge-3ly8u9r", "target": "media/image-2116158338.png" }
+    ],
+    "bookmarks": [{ "id": "0", "name": "spot1" }],
+    "bookmarkEnds": ["0"],
+    "tables": 1,
+    "rows": 3,
+    "gridCols": 4,
+    "blips": ["rId-bridge-3ly8u9r"],
+    "media": [{ "name": "word/media/image-2116158338.png", "bytes": 70 }]
+  },
+  "assertions": [
+    {
+      "name": "hyperlink relationship round-trips",
+      "expect": "hyperlinks has >=1 rId, and relTargets includes Target 'https://example.com' for that rId",
+      "actual": "hyperlinks=['rId7']; relTargets has {id:'rId7', target:'https://example.com'}",
+      "verdict": "PASS"
+    },
+    {
+      "name": "table is 3x4",
+      "expect": "tables===1, rows===3, gridCols===4",
+      "actual": "tables=1, rows=3, gridCols=4",
+      "verdict": "PASS"
+    },
+    {
+      "name": "image embedded in word/media",
+      "expect": "blips has >=1 rEmbed rId, and media has >=1 file with bytes>0",
+      "actual": "blips=['rId-bridge-3ly8u9r'] (matches relTarget -> media/image-2116158338.png); media[0]=word/media/image-2116158338.png bytes=70",
+      "verdict": "PASS"
+    },
+    {
+      "name": "bookmark is a PAIRED start+end (Critique B1)",
+      "expect": "bookmarks has >=1 entry with the name used ('spot1'), and bookmarkEnds contains a matching id",
+      "actual": "bookmarks=[{id:'0', name:'spot1'}]; bookmarkEnds=['0'] (matching id 0 -> paired start+end)",
+      "verdict": "PASS"
+    }
+  ],
+  "overall_verdict": "PASS — clone exportDocx produces valid OOXML; hyperlink rel, 3x4 table, embedded image (word/media, 70 bytes), and paired bookmark all survive the round-trip on a clone-authored .docx.",
+  "notes": "Headless leg only. Word-dependent legs (reopen-in-Word fidelity, Word-authored leg B) deferred to a later session with Word windowed. No gate was changed and real Word was not touched."
+}
