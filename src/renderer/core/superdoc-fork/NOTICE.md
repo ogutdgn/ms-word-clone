@@ -236,6 +236,26 @@ The following upstream packages are included in this directory tree:
     `commands.*`). Without this, a user-picked color EQUAL to the previously baked fill stayed
     marker-matched ("style-owned") and the exporter suppressed its `<w:shd>` — a user choice
     must become user-owned and export.
+- **Table-level inside borders paint cell gridlines (slice 6 gridline fix, 2026-06-10):** the
+  table node's `borders` attr carries all six OOXML sides, but the renderDOM emitted
+  `border-${key}` for EVERY key — `border-insideH`/`border-insideV` are invalid CSS and were
+  silently dropped, and cells in the style-driven path carry no `borders` attr (the importer
+  puts explicit `w:tcBorders` into the non-rendered `tableCellProperties.borders`; styled cells
+  have neither), so every style-driven table — freshly inserted TableGrid AND imported
+  real-Word styled tables (probe-verified on `tests/fixtures/oracle-word-s3-table.docx`) —
+  rendered as a bare outer frame ("a big box", no row/column lines). RENDER-ONLY fix, two
+  halves: the `borders` attr handler (`extensions/table/table.js`) now publishes visible
+  `insideH`/`insideV` (val not `none`/`nil`, px size > 0 — so `deleteCellAndTableBorders`'
+  size-0 write paints nothing) as the inherited custom properties
+  `--wc-inside-h`/`--wc-inside-v` on the table's inline style, and
+  `assets/styles/elements/prosemirror.css` paints INTERIOR cell edges from them (top edge of
+  rows 2+, left edge of columns 2+ — outer edges stay table-frame-owned, Word's inside/outside
+  split). No doc-model or export impact (nothing new in attrs; fresh tables stay free of direct
+  `w:tcBorders`/`w:tblBorders`, like real Word's style-driven tables). A cell with an explicit
+  `borders` attr keeps winning (its inline `border-*` style beats the stylesheet rule), and a
+  `--wc-inside-*: none` reset on `table` stops an outer table's vars from leaking into nested
+  tables. Conditional-format border overrides (e.g. a style's firstRow `w:tcBorders`) remain
+  un-painted — same Phase-7 deferral as banding above.
 - **`textDirection` cell attr added (slice 6, 2026-06-09):** a new `textDirection` attribute (default
   `null`) on the `tableCell` (`extensions/table-cell/table-cell.js`) and `tableHeader`
   (`extensions/table-header/table-header.js`) nodes, rendering `writing-mode: vertical-rl` for `'tbRl'`

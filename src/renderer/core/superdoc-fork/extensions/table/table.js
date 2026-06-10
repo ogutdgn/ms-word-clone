@@ -612,7 +612,23 @@ export const Table = Node.create({
         renderDOM({ borders, borderCollapse, tableCellSpacing }) {
           if (!Object.keys(borders).length && borderCollapse !== 'separate' && !tableCellSpacing) return {};
 
-          const style = Object.entries(borders).reduce((acc, [key, { size, color }]) => {
+          const style = Object.entries(borders).reduce((acc, [key, { size, color, val }]) => {
+            // Gridlines (fork change, slice 6 gridline fix, 2026-06-10 — NOTICE.md):
+            // insideH/insideV have no per-element CSS form — `border-insideH:` was
+            // emitted and silently dropped, so style-driven tables rendered as a
+            // bare outer frame ("big box", no row/column lines; the imported
+            // real-Word fixture probe showed the same). Publish them as inherited
+            // custom properties; the stylesheet rule in
+            // assets/styles/elements/prosemirror.css paints INTERIOR cell edges
+            // from them (outer edges stay frame-owned, like Word). Gated on a
+            // genuinely visible border so a borderless table (e.g. after
+            // deleteCellAndTableBorders: size 0) paints no gridlines.
+            if (key === 'insideH' || key === 'insideV') {
+              const px = Math.ceil(size);
+              if (val === 'none' || val === 'nil' || !(px > 0)) return acc;
+              const cssVar = key === 'insideH' ? '--wc-inside-h' : '--wc-inside-v';
+              return `${acc}${cssVar}: ${px}px solid ${color || 'black'};`;
+            }
             return `${acc}border-${key}: ${Math.ceil(size)}px solid ${color || 'black'};`;
           }, '');
 

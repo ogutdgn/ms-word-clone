@@ -1645,6 +1645,57 @@
       return 'style clear wiped the direct borders: ' + JSON.stringify(b2);
     return true;
   });
+  // ---- gridlines: table-level insideH/insideV must PAINT (user defect: "just a big box") ----
+  // The table node's `borders` attr carries all six OOXML sides, but the renderDOM
+  // border-${key} emission is only valid CSS for the four physical sides — insideH/
+  // insideV produced `border-insideH:` (dropped) and NOTHING painted cell gridlines
+  // (cells carry no `borders` attr in the styled path; probe-verified the imported
+  // real-Word s3 fixture was a big box too). The render-only fix publishes the inside
+  // borders as inherited CSS vars (--wc-inside-h/--wc-inside-v) consumed by a
+  // stylesheet rule on INTERIOR cell edges (top of rows 2+, left of columns 2+) —
+  // outer edges stay table-frame-owned, exactly Word's inside/outside split.
+  const interiorCellBorders = () => {
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tbl) return null;
+    const rows = tbl.querySelectorAll('tbody > tr');
+    if (rows.length < 2) return null;
+    const cell = rows[1].querySelectorAll('td, th')[1]; // row 2, col 2: both edges interior
+    if (!cell) return null;
+    const cs = getComputedStyle(cell);
+    return {
+      top: { w: parseFloat(cs.borderTopWidth) || 0, style: cs.borderTopStyle },
+      left: { w: parseFloat(cs.borderLeftWidth) || 0, style: cs.borderLeftStyle },
+    };
+  };
+  await t('[6b] fresh table renders visible cell gridlines (Word parity)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    const b = interiorCellBorders();
+    if (!b) return 'no 3x3 table rendered';
+    if (!(b.top.w >= 1 && b.top.style === 'solid')) return 'no insideH gridline: border-top=' + b.top.w + 'px ' + b.top.style;
+    if (!(b.left.w >= 1 && b.left.style === 'solid')) return 'no insideV gridline: border-left=' + b.left.w + 'px ' + b.left.style;
+    return true;
+  });
+  await t('[6b] borderless table shows no gridlines', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    ecmd('deleteCellAndTableBorders'); await sleep(150);
+    const b = interiorCellBorders();
+    if (!b) return 'no 3x3 table rendered';
+    if (b.top.w !== 0 || b.left.w !== 0)
+      return 'gridlines painted on a borderless table: top=' + b.top.w + 'px ' + b.top.style + ' left=' + b.left.w + 'px ' + b.left.style;
+    return true;
+  });
+  await t('[6b] EXPORT purity: fresh table writes no direct w:tcBorders', async () => {
+    // Real Word style-driven tables carry NO per-cell w:tcBorders (the style
+    // definition in styles.xml owns the gridlines). The render-only gridline fix
+    // must not bake borders into cell attrs — the translate-table-cell legacy
+    // fallback would export them as direct formatting.
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    const xml = await exportDocumentXml();
+    if (!xml) return 'export produced no xml';
+    if (/<w:tcBorders\b/.test(xml)) return 'direct w:tcBorders leaked into document.xml';
+    if (/<w:tblBorders\b/.test(xml)) return 'direct w:tblBorders leaked into document.xml';
+    return true;
+  });
   // ---- T2 geometry regression: alignment must MOVE the table, not just set attrs ----
   // The fork's TableView.updateColumns used to write table.style.marginLeft from
   // `tableIndent?.value ?? 0` UNCONDITIONALLY ('0px' when no indent exists), stomping
