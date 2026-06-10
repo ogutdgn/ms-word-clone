@@ -95,7 +95,13 @@
 > Header & Footer byte-identical) + a PM table context menu; exotica carve-out (14 → `insert-exotica`,
 > `crossReference` → `references`); `Ctrl+K` guard; D6 tests repointed `link`→`newComment`,
 > `table`→`tableOfContents`. Headless leg-A oracle PASS (link/table/image/bookmark survive export —
-> docx-inspect). Gates: **PM 176/176**, legacy 257, smoke 9/9 × 2, docx 17.
+> docx-inspect). A post-build **table-defect fix batch** (user report → 4-agent hunt → 6 reviewed
+> fixes on PR #23) landed: passive contextual tabs (no ribbon yank; Word Mac 'Layout' label),
+> Center/Right table alignment geometry fix, caret-cell shading parity, AutoFit-Fixed un-stretch,
+> **table styles end-to-end** (minted real-Word definitions + visual bake + dynamic gallery +
+> direct-border precedence), 27 real Fluent icons, and **fresh/imported tables now render cell
+> gridlines** (the "big box" fix — inside borders paint via CSS vars, export-pure).
+> Gates: **PM 192/192**, legacy 257, smoke 9/9 × 2, docx 17.
 > **Next: slice 7 — file-io** (open html/txt/csv re-enabled; PM-converter round-trip suite replaces
 > `test_docx.js`). ⚠️ slice-6 follow-ups: the Word-dependent oracle legs + UI Codex still to run
 > (Word windowed); BOTH `[0a]` D6 tests now on `newComment`/`tableOfContents` (slice 8/9 repoints).
@@ -136,6 +142,9 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] Slice-6 **contextual tabs + PM context menu** (`e2840f3`) — Table Layout/Design tabs (runtime `{cmd,label,type}` + new `H.tbl*` handlers + dropdown flyouts), `ribbon.js` multi-tab extension (Header & Footer byte-identical, 257 green), PM `td/th`-scoped context menu (native selection preserved).
 - [x] Slice-6 **headless leg-A oracle** (`366aa66`) — clone-exported `.docx` validated via `docx-inspect`: hyperlink rel → `https://example.com`, table 3×4, image embedded in `word/media`, bookmark paired start+end. **All four PASS.**
 - [x] **All five gates green: PM 176/176, legacy 257/257, smoke 9/9 ×2, docx 17/17.** Build complete; checkpoint this entry; PR + Word-dependent oracle legs + UI Codex next.
+- [x] Slice-6 **Word oracle legs** (`0bd3773`) — leg A reopen-in-Word PASS (no repair prompt); leg C styled-table PARTIAL (`w:tblStyle` dropped → fixed below); leg B blocked (Word session quirks). **PR #23 opened**; banners advanced.
+- [x] Slice-6 **table-defect fix batch** (user report → 4-agent hunt: live-repro/code-audit/Word-fidelity/minting-research → 6 reviewed fixes): `fdcb7f6` passive contextual tabs + 'Layout' label; `72b270f` Center/Right alignment geometry fix; `dd56a1a` caret-shading parity + AutoFit-Fixed; `61d84d9` **table styles end-to-end** (minted real-Word defs + visual bake + dynamic gallery); `474291f` direct-border precedence; `a23c868` 27 Fluent icons.
+- [x] Slice-6 **"big box" fix** (`d6a07e4`, user re-report) — fresh AND imported tables never painted cell gridlines (invalid `border-insideH/V` CSS, silently dropped); render-only inside-border CSS vars + interior-edge rules; export purity proven. **Final gates: PM 192/192, legacy 257/257, smoke 9/9 ×2, docx 17/17.**
 
 ### 2026-06-09 (Phase 2)
 - [x] Slice-5 **brainstorm-lite** — confirmed the find/replace entry-point inventory against real code (`H.find`/`H.replace`→`D.findPane`; the legacy `.find-hit` TreeWalker; the fork **already ships** a decoration-based Search extension; ribbon `find` split + `replace` button; app.js Ctrl+F/H). User scope decision: **maximum** (Match Case + Whole Words + Wildcards + Advanced Find + all three Find-dropdown items).
