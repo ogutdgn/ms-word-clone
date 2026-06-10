@@ -77,7 +77,7 @@
         if (k === 'p') return () => WC.Files.print();
         if (k === 'f') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false));
         if (k === 'h') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true));
-        if (k === 'k') return () => WC.Dialogs.insertLink();
+        if (k === 'k') return pmBlockedOr('insert-basics', () => WC.Dialogs.insertLink());
         if (k === '=' && !shift) return () => E().zoomIn();
         if (k === '-') return () => E().zoomOut();
         if (k === '0') return () => E().zoomReset();

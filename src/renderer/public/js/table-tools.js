@@ -17,12 +17,17 @@
   function tableOf(cell) { return up(cell, 'TABLE'); }
   function rowsOf(table) { return Array.from(table.querySelectorAll('tr')); }
 
+  // B2 belt-and-suspenders: in PM mode the legacy #editor is hidden (unreachable
+  // by pointer), but direct JS calls could still bypass the PM engine. Block them.
+  const pmBlock = () => { const pm = window.WC.PM; if (pm && pm.active && pm.ready) { pm.notifyBlocked('Table edit'); return true; } return false; };
+
   const Table = {
     currentCell: caretCell,
     currentTable() { const c = caretCell(); return c ? tableOf(c) : null; },
     isInTable() { return !!caretCell(); },
 
     insertRow(dir, cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return;
       const row = cell.parentNode; const cols = row.children.length;
       const nr = document.createElement('tr');
@@ -31,12 +36,14 @@
       done();
     },
     deleteRow(cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return;
       const row = cell.parentNode; const table = tableOf(cell);
       if (rowsOf(table).length <= 1) { return this.deleteTable(cell); }
       row.remove(); done();
     },
     insertColumn(dir, cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return;
       const table = tableOf(cell);
       const vcol = visualColOf(cell);
@@ -49,6 +56,7 @@
       done();
     },
     deleteColumn(cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return;
       const table = tableOf(cell);
       if (totalCols(table) <= 1) return this.deleteTable(cell);
@@ -60,13 +68,15 @@
       });
       done();
     },
-    deleteTable(cell) { cell = cell || caretCell(); const t = cell ? tableOf(cell) : this.currentTable(); if (t) { t.remove(); done(); } },
+    deleteTable(cell) { if (pmBlock()) return; cell = cell || caretCell(); const t = cell ? tableOf(cell) : this.currentTable(); if (t) { t.remove(); done(); } },
     mergeRight(cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return; const next = cell.nextElementSibling; if (!next) { WC.toast('No cell to the right to merge.'); return; }
       const span = parseInt(cell.getAttribute('colspan') || '1', 10) + parseInt(next.getAttribute('colspan') || '1', 10);
       cell.setAttribute('colspan', span); cell.innerHTML += ' ' + next.innerHTML; next.remove(); done();
     },
     splitCell(cell) {
+      if (pmBlock()) return;
       cell = cell || caretCell(); if (!cell) return; const span = parseInt(cell.getAttribute('colspan') || '1', 10);
       // Split only THIS cell within its own row (a merged cell un-merges by one;
       // a normal cell becomes two) — never add a whole column to every row.

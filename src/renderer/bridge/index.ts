@@ -28,7 +28,7 @@ let replacing = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace']) // slices 1-5
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics']) // slices 1-6
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -53,14 +53,17 @@ const AREA: Record<string, string> = {
   // editing/find (slice 5)
   find: 'find-replace', replace: 'find-replace',
   select: 'editing-misc', // slice 4 — spec row 4; was find-replace (ribbon-group adjacency accident, slice 0a)
-  // insert basics (slice 6)
+  // insert basics (slice 6) — these FLIP
   table: 'insert-basics', link: 'insert-basics', bookmark: 'insert-basics', pageBreak: 'insert-basics',
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
-  horizontalLine: 'insert-basics', pictures: 'insert-basics', onlinePictures: 'insert-basics',
-  screenshot: 'insert-basics', icons: 'insert-basics', smartart: 'insert-basics', chart: 'insert-basics',
-  onlineVideo: 'insert-basics', dropCap: 'insert-basics', wordart: 'insert-basics', textBox: 'insert-basics',
-  object: 'insert-basics', signatureLine: 'insert-basics', dateTime: 'insert-basics',
-  coverPage: 'insert-basics', quickParts: 'insert-basics', crossReference: 'insert-basics',
+  horizontalLine: 'insert-basics', pictures: 'insert-basics',
+  // insert exotica (slice 10) — STAY blocked (carved out of insert-basics in the slice-6 flip)
+  onlinePictures: 'insert-exotica', screenshot: 'insert-exotica', icons: 'insert-exotica',
+  smartart: 'insert-exotica', chart: 'insert-exotica', onlineVideo: 'insert-exotica',
+  dropCap: 'insert-exotica', wordart: 'insert-exotica', textBox: 'insert-exotica',
+  object: 'insert-exotica', signatureLine: 'insert-exotica', dateTime: 'insert-exotica',
+  coverPage: 'insert-exotica', quickParts: 'insert-exotica',
+  crossReference: 'references', // slice 9 (fork has the cross-reference extension)
   // review (slice 8)
   newComment: 'review', comment: 'review', delete: 'review', previous: 'review', next: 'review',
   showComments: 'review', trackChanges: 'review', accept: 'review', reject: 'review',
