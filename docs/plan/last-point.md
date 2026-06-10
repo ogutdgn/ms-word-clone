@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-06-10 — Slice 6 Word oracle legs run + PR #23 opened
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (pushed) → **PR #23** open to `main`.
+- **Phase:** **Phase 2 — slice 6 DONE (PR up) → slice 7 (file-io) next.**
+- **State summary:** the slice-6 build is complete + all gates green (PM 176/176, legacy 257, smoke
+  9/9 ×2, docx 17 — see the BUILT entry below). Ran the **Word-dependent oracle legs** vs Word 16.77.1
+  (notes `docs/superpowers/plans/notes/2026-06-10-slice6-word-oracle.json`; probe
+  `scripts/slice6-legC-probe.js`):
+  - **Leg A reopen-in-Word — PASS** (the key test): real Word **accepted the clone's OOXML with NO
+    repair prompt**; hyperlink→`https://example.com` + 3×4 table + embedded image + paired bookmark all
+    survive Word's own round-trip (Word canonicalized rIds / image filename / `w:shd` — benign).
+  - **Leg C styled-table — PARTIAL:** `w:jc` (align) + `w:shd` (shading) + `w:gridSpan` (merge) survive;
+    **`w:tblStyle` DROPPED** — the clone emits the styleId *reference* but never writes the style
+    *definition* into `word/styles.xml`, so Word discards the orphaned reference (NEW recorded
+    deviation — same minting gap as slice-3 styles; follow-up = mint built-in table-style definitions).
+  - **Leg B Word-authored→clone — BLOCKED** by Word session quirks #24-26 (`make new document`
+    spawned spurious untitled windows + dangling refs; native authoring never saved). Open+save-as path
+    stayed healthy (legs A/C ran fine); only `make-new-document` was broken this session. Clone import
+    of tables/bookmarks is covered indirectly by Leg A's reverse evidence. Re-run in a fresh Word
+    session = minor follow-up.
+  - **UI Codex** (Task 12): partially captured by the user (Insert dialogs + Table Design tab
+    screenshots in `.oracle-probes/slice6/`, gitignored — see the UI-probe entry below); remaining
+    steps (A2 dialog, A5 bookmark, B-layout/autofit, context menu, text-direction) a follow-up.
+- **Done this session:** Word oracle legs A/C/B (`0bd3773`); **PR #23** opened with full body (what
+  flipped, fork edits NOTICE'd, oracle verdicts, gate counts, deviations + carry-overs).
+- **Carry-overs for slice 7 / merge:** (1) **mint built-in table-style definitions into `styles.xml`**
+  so applied table styles render in Word (closes the Leg-C `tblStyle` gap; slice-3-scale follow-up).
+  (2) Re-run Word oracle **leg B** + finish the **UI Codex** steps in a fresh Word session. (3) BOTH
+  `[0a]` D6 tests now on `newComment`/`tableOfContents` (slice 8/9 repoints). (4) slice-4 list-marker
+  leak still open.
+- **Blockers/notes:** none for the PR — Word accepted our OOXML cleanly (well-formed). Word left
+  RUNNING (never quit); 2 empty untitled artifacts (`Document2`/`Document4`) from the blocked leg-B
+  authoring were left open (PID-safety — not the user's named docs); the user may close them +
+  relaunch Word for the remaining UI Codex steps.
+
+---
+
 ## 2026-06-10 — Slice 6 Word UI probe partially captured
 
 - **Branch:** `feature/phase-2-slice-6-insert-basics`.
