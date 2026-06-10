@@ -174,6 +174,7 @@ import { generateDocxHexId } from '../../utils/generateDocxHexId.js';
 import { Fragment } from 'prosemirror-model';
 import { Node } from '@core/Node.js';
 import { Attribute } from '@core/Attribute.js';
+import { pixelsToTwips } from '@core/super-converter/helpers.js';
 import { callOrGet } from '@core/utilities/callOrGet.js';
 import { getExtensionConfigField } from '@core/helpers/getExtensionConfigField.js';
 import { /* TableView */ createTableView } from './TableView.js';
@@ -181,6 +182,13 @@ import { createTable } from './tableHelpers/createTable.js';
 import { createColGroup } from './tableHelpers/createColGroup.js';
 import { deleteTableWhenSelected } from './tableHelpers/deleteTableWhenSelected.js';
 import { normalizeNewTableAttrs } from './tableHelpers/normalizeNewTableAttrs.js';
+import { resolveTableStyleVisuals } from './tableHelpers/resolveTableStyleVisuals.js';
+// Fork addition (slice 6 T4 review fix, 2026-06-10 — NOTICE.md): the importer's own
+// px projection for direct w:tblPr borders. setTableStyle mirrors the importer's
+// `{ ...styleBorders, ...directBorders }` merge (tbl-translator.js encode), so it must
+// project through the SAME function — importing it (a pure, hoisted helper; no cycle
+// back into this module) keeps the apply-time merge from drifting against reopen.
+import { _processTableBorders } from '@converter/v3/handlers/w/tbl/tbl-translator.js';
 import { computeColumnWidths } from './tableHelpers/computeColumnWidths.js';
 import { createTableBorders } from './tableHelpers/createTableBorders.js';
 import {
@@ -604,7 +612,23 @@ export const Table = Node.create({
         renderDOM({ borders, borderCollapse, tableCellSpacing }) {
           if (!Object.keys(borders).length && borderCollapse !== 'separate' && !tableCellSpacing) return {};
 
-          const style = Object.entries(borders).reduce((acc, [key, { size, color }]) => {
+          const style = Object.entries(borders).reduce((acc, [key, { size, color, val }]) => {
+            // Gridlines (fork change, slice 6 gridline fix, 2026-06-10 — NOTICE.md):
+            // insideH/insideV have no per-element CSS form — `border-insideH:` was
+            // emitted and silently dropped, so style-driven tables rendered as a
+            // bare outer frame ("big box", no row/column lines; the imported
+            // real-Word fixture probe showed the same). Publish them as inherited
+            // custom properties; the stylesheet rule in
+            // assets/styles/elements/prosemirror.css paints INTERIOR cell edges
+            // from them (outer edges stay frame-owned, like Word). Gated on a
+            // genuinely visible border so a borderless table (e.g. after
+            // deleteCellAndTableBorders: size 0) paints no gridlines.
+            if (key === 'insideH' || key === 'insideV') {
+              const px = Math.ceil(size);
+              if (val === 'none' || val === 'nil' || !(px > 0)) return acc;
+              const cssVar = key === 'insideH' ? '--wc-inside-h' : '--wc-inside-v';
+              return `${acc}${cssVar}: ${px}px solid ${color || 'black'};`;
+            }
             return `${acc}border-${key}: ${Math.ceil(size)}px solid ${color || 'black'};`;
           }, '');
 
@@ -1427,23 +1451,60 @@ export const Table = Node.create({
        * Set background color for selected cells
        * @category Command
        * @param {string} value - Color value (hex with or without #)
+       * @note Word parity (slice 6 fix): with a plain caret inside a table (no
+       * CellSelection) Word shades the CARET cell — fall back to setCellAttr,
+       * which resolves the caret cell via prosemirror-tables' selectionCell.
        * @example
        * editor.commands.setCellBackground('#ff0000')
        * editor.commands.setCellBackground('ff0000')
        */
       setCellBackground:
         (value) =>
-        ({ editor, commands, dispatch }) => {
+        ({ editor, commands, tr, dispatch }) => {
           const { selection } = editor.state;
-
-          if (!isCellSelection(selection)) {
-            return false;
-          }
 
           const color = value?.startsWith('#') ? value.slice(1) : value;
 
+          // T4 review Minor (2026-06-10): an EXPLICIT user shading OWNS the cell — drop
+          // the styleBakedBackground provenance marker so the color exports even when it
+          // happens to EQUAL the previously baked fill (marker == background tells the
+          // exporter "style-owned, suppress <w:shd>"; a user-picked color must export).
+          // commands.* inside a command share ONE transaction (CommandService.createProps
+          // threads the same tr), so the marker clear lands atomically with the
+          // background write — this also covers the bridge path (tableSetCellShading
+          // routes through this command).
+          const clearBakeMarker = (pos) => {
+            const mapped = tr.mapping.map(pos);
+            const cell = tr.doc.nodeAt(mapped);
+            if (cell && cell.attrs.styleBakedBackground != null) {
+              tr.setNodeMarkup(mapped, undefined, { ...cell.attrs, styleBakedBackground: null });
+            }
+          };
+
+          if (!isCellSelection(selection)) {
+            // Caret fallback (Word parity): a TextSelection inside a table shades
+            // the caret cell. setCellAttr is caret-safe (selectionCell). Outside a
+            // table there is nothing to shade — keep returning false.
+            if (!isInTable(editor.state)) {
+              return false;
+            }
+
+            if (dispatch) {
+              const ok = commands.setCellAttr('background', { color });
+              if (ok) {
+                const $cell = cellAround(selection.$from);
+                if ($cell) clearBakeMarker($cell.pos);
+              }
+              return ok;
+            }
+
+            return true;
+          }
+
           if (dispatch) {
-            return commands.setCellAttr('background', { color });
+            const ok = commands.setCellAttr('background', { color });
+            if (ok) selection.forEachCell((_cell, pos) => clearBakeMarker(pos));
+            return ok;
           }
 
           return true;
@@ -1507,6 +1568,656 @@ export const Table = Node.create({
             },
           });
 
+          return true;
+        },
+
+      // ---------------------------------------------------------------------
+      // Table Tools commands (fork additions, slice 6, 2026-06-09).
+      // Each mutates an EXISTING node attr via setNodeMarkup / setCellAttr;
+      // several land model/attr only with the visual cascade deferred to
+      // Phase 7 (noted per-command + in NOTICE.md). Most cell-scoped commands
+      // route through the prosemirror-tables `setCellAttr`, which honors a plain
+      // caret-in-cell and a CellSelection alike.
+      //
+      // ROUND-TRIP NOTE: the OOXML w:tblPr / w:tcPr decoders iterate the NESTED
+      // `tableProperties` / `tableCellProperties` keys (the importer copies those
+      // nested values up to convenience top-level attrs, but there is NO reverse
+      // copy on export). So any command whose value must reach the saved .docx
+      // DUAL-WRITES: the top-level attr (read by the fork's render/layout) AND the
+      // nested properties key (read by the exporter). setTableStyle/setTableIndent/
+      // setTextDirection/setTableAlignment all dual-write; the attr-only/visual
+      // commands (sizing, autofit, distribute) intentionally do not.
+      // ---------------------------------------------------------------------
+
+      /**
+       * Apply a table style id to the table under the cursor.
+       * @category Command
+       * @param {string} styleId - Table style identifier (e.g. 'GridTable4-Accent1')
+       * @returns {Function} Command
+       * @note Dual-writes the top-level `tableStyleId` (read by the fork's table
+       * layout) AND `tableProperties.tableStyleId` (the nested key the `w:tblPr`
+       * decoder iterates → `<w:tblStyle w:val="…">`), so the id exports +
+       * round-trips. Mirrors how `setTableAlignment` writes `tableProperties.justification`.
+       * @note Visual bake (slice 6 T4): resolves the style from the runtime catalog
+       * (resolveTableStyleVisuals) and bakes the STABLE subset into render attrs —
+       * the style's base w:tblPr borders into the table's px `borders` attr (render
+       * only; w:tblPr is decoded from `tableProperties`, so no direct-formatting
+       * leak into the export), MERGED UNDER the px projection of any existing direct
+       * `tableProperties.borders` (Word precedence — direct w:tblBorders beat the
+       * style frame; mirrors the importer's merge, see the bake comment below), and
+       * the firstRow w:tblStylePr fill into first-row cell
+       * `background` attrs. Baked fills are marked via `styleBakedBackground` so a
+       * re-apply can clear OUR fill while an explicit user-set shading (direct
+       * formatting) survives, exactly like Word. Banding / the remaining conditional
+       * formats are NOT baked (stale on row edits) — Phase-7 paint; the exported
+       * definition carries them so real Word renders the full style.
+       * @example
+       * editor.commands.setTableStyle('GridTable4-Accent1')
+       */
+      setTableStyle:
+        (styleId) =>
+        ({ state, tr, dispatch, editor }) => {
+          if (!isInTable(state)) return false;
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+          if (dispatch) {
+            const id = styleId || null;
+            const nextProps = { ...(table.node.attrs.tableProperties || {}) };
+            if (id) nextProps.tableStyleId = id;
+            else delete nextProps.tableStyleId;
+            const visuals = id ? resolveTableStyleVisuals(editor, id, nextProps.tblLook || null) : null;
+            const nextAttrs = {
+              ...table.node.attrs,
+              tableStyleId: id,
+              tableProperties: nextProps,
+            };
+            // Bake table-level borders — Word precedence: DIRECT w:tblPr borders beat
+            // the style frame. The Borders flyout has no TABLE-level writer yet, but
+            // direct borders ARE importable (docs with explicit w:tblBorders), and the
+            // importer merges `{ ...referencedStyles.borders, ...borderProps }` on every
+            // open (tbl-translator.js encode) — so an apply-time overwrite made the
+            // table change appearance across its own save cycle (style frame until
+            // save→reopen flipped it back). Mirror that merge exactly: project the
+            // direct `tableProperties.borders` through the importer's own
+            // _processTableBorders px projection and spread it OVER the style visuals.
+            // On style CLEAR, fall back to the direct projection instead of {} for the
+            // same reason (a direct frame survives the clear like it survives a reopen).
+            const directBorders = _processTableBorders(nextProps.borders || {});
+            if (visuals) nextAttrs.borders = { ...visuals.borders, ...directBorders };
+            else if (!id) nextAttrs.borders = directBorders;
+            tr.setNodeMarkup(table.pos, undefined, nextAttrs);
+
+            // Bake/clear first-row cell fills. Walk rows/cells computing absolute
+            // positions (tableStart = table.pos + 1; standard PM offset walk).
+            const tblLook = nextProps.tblLook;
+            const firstRowOn = !tblLook || tblLook.firstRow !== false;
+            const fill = firstRowOn && visuals ? visuals.firstRowFill : null;
+            let rowPos = table.pos + 1;
+            for (let r = 0; r < table.node.childCount; r++) {
+              const row = table.node.child(r);
+              let cellPos = rowPos + 1;
+              for (let c = 0; c < row.childCount; c++) {
+                const cell = row.child(c);
+                const baked = cell.attrs.styleBakedBackground || null;
+                const current = cell.attrs.background?.color || null;
+                const isUserOverride =
+                  current != null && (baked == null || String(current).toUpperCase() !== String(baked).toUpperCase());
+                if (!isUserOverride) {
+                  const nextFill = r === 0 ? fill : null;
+                  const changed = (current || null) !== (nextFill || null) || baked !== (nextFill || null);
+                  if (changed) {
+                    tr.setNodeMarkup(cellPos, undefined, {
+                      ...cell.attrs,
+                      background: nextFill ? { color: nextFill } : null,
+                      styleBakedBackground: nextFill || null,
+                    });
+                  }
+                } else if (baked != null) {
+                  // User overrode a previously baked fill — drop the stale marker.
+                  tr.setNodeMarkup(cellPos, undefined, { ...cell.attrs, styleBakedBackground: null });
+                }
+                cellPos += cell.nodeSize;
+              }
+              rowPos += row.nodeSize;
+            }
+          }
+          return true;
+        },
+
+      /**
+       * Set the horizontal alignment of the table.
+       * @category Command
+       * @param {'left' | 'center' | 'right'} align - Table justification
+       * @returns {Function} Command
+       * @example
+       * editor.commands.setTableAlignment('center')
+       */
+      setTableAlignment:
+        (align) =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          if (!['left', 'center', 'right'].includes(align)) return false;
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+          if (dispatch) {
+            tr.setNodeMarkup(table.pos, undefined, {
+              ...table.node.attrs,
+              justification: align,
+              tableProperties: { ...(table.node.attrs.tableProperties || {}), justification: align },
+            });
+          }
+          return true;
+        },
+
+      /**
+       * Set the table's left indent.
+       * @category Command
+       * @param {number} px - Indent width in pixels
+       * @returns {Function} Command
+       * @note Dual-writes two shapes that the import/export pipeline keeps distinct:
+       * the top-level `tableIndent` is the px shape `{ width, type }` (what the fork's
+       * layout reads, matching the importer's `twipsToPixels` projection), while the
+       * nested `tableProperties.tableIndent` is the OOXML measurement shape
+       * `{ value: <twips>, type }` — the `w:tblInd` decoder reads `value` straight into
+       * `w:w` (no px→twips conversion on export), so the nested value MUST already be
+       * twips. So it exports `<w:tblInd w:w="<twips>" w:type="dxa">` and round-trips.
+       * @example
+       * editor.commands.setTableIndent(36)
+       */
+      setTableIndent:
+        (px) =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const width = Math.max(0, Math.round(Number(px) || 0));
+          const twips = Math.max(0, Math.round(pixelsToTwips(width) || 0));
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+          if (dispatch) {
+            tr.setNodeMarkup(table.pos, undefined, {
+              ...table.node.attrs,
+              tableIndent: { width, type: 'dxa' },
+              tableProperties: {
+                ...(table.node.attrs.tableProperties || {}),
+                tableIndent: { value: twips, type: 'dxa' },
+              },
+            });
+          }
+          return true;
+        },
+
+      /**
+       * Set the width (in pixels) of the column(s) under the selection.
+       * @category Command
+       * @param {number} px - Column width in pixels
+       * @returns {Function} Command
+       * @note Sets `colwidth` on every cell in the selected column(s) (a per-cell
+       * colwidth would be re-normalized by the column-resizing plugin, matching
+       * Word's column-scoped "cell width"). Best-effort pixel landing — refined
+       * under the Phase-7 layout pass. Marks the table `userEdited` so the grid
+       * honors the explicit width.
+       * @example
+       * editor.commands.setCellWidth(120)
+       */
+      setCellWidth:
+        (px) =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const width = Math.max(1, Math.round(Number(px) || 0));
+          const rect = selectedRect(state);
+          const tablePos = rect.tableStart - 1;
+          const left = rect.left;
+          const right = Math.max(rect.right, left + 1);
+          if (dispatch) {
+            const seen = new Set();
+            for (let col = left; col < right; col++) {
+              for (let row = 0; row < rect.map.height; row++) {
+                const cellIndex = rect.map.map[row * rect.map.width + col];
+                if (seen.has(cellIndex)) continue;
+                seen.add(cellIndex);
+                const cellPos = rect.tableStart + cellIndex;
+                const cell = tr.doc.nodeAt(cellPos);
+                if (!cell) continue;
+                const cellRect = rect.map.findCell(cellIndex);
+                const span = Math.max(1, cellRect.right - cellRect.left);
+                const nextWidth = (cell.attrs.colwidth ? [...cell.attrs.colwidth] : new Array(span).fill(width));
+                // Update only the entries that fall inside [left,right).
+                for (let i = 0; i < span; i++) {
+                  if (cellRect.left + i >= left && cellRect.left + i < right) nextWidth[i] = width;
+                }
+                tr.setNodeMarkup(cellPos, undefined, { ...cell.attrs, colwidth: nextWidth });
+              }
+            }
+            tr.setNodeMarkup(tablePos, undefined, { ...tr.doc.nodeAt(tablePos).attrs, userEdited: true });
+          }
+          return true;
+        },
+
+      /**
+       * Set the height of the row(s) in the current selection.
+       * @category Command
+       * @param {number} px - Row height in pixels
+       * @param {'atLeast' | 'exact' | 'auto'} [rule='atLeast'] - Height rule
+       * @returns {Function} Command
+       * @example
+       * editor.commands.setRowHeight(40, 'atLeast')
+       */
+      setRowHeight:
+        (px, rule = 'atLeast') =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const height = Math.max(0, Math.round(Number(px) || 0));
+          const heightRule = ['atLeast', 'exact', 'auto'].includes(rule) ? rule : 'atLeast';
+          const rect = selectedRect(state);
+          const rowPositions = getSelectedRowPositions(rect, state.selection);
+          if (!rowPositions.length) return false;
+          if (dispatch) {
+            rowPositions.forEach(({ pos, node }) => {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                rowHeight: height,
+                tableRowProperties: {
+                  ...(node.attrs.tableRowProperties || {}),
+                  rowHeight: { value: height, rule: heightRule },
+                },
+              });
+            });
+          }
+          return true;
+        },
+
+      /**
+       * Set the internal margins (padding) of the selected cell(s).
+       * @category Command
+       * @param {{ top?: number, right?: number, bottom?: number, left?: number }} margins - Margins in pixels
+       * @returns {Function} Command
+       * @example
+       * editor.commands.setCellMargins({ top: 4, right: 8, bottom: 4, left: 8 })
+       */
+      setCellMargins:
+        (margins) =>
+        ({ state, dispatch }) => {
+          if (!margins || typeof margins !== 'object') return false;
+          const value = {
+            top: Math.max(0, Math.round(Number(margins.top) || 0)),
+            right: Math.max(0, Math.round(Number(margins.right) || 0)),
+            bottom: Math.max(0, Math.round(Number(margins.bottom) || 0)),
+            left: Math.max(0, Math.round(Number(margins.left) || 0)),
+          };
+          return setCellAttr('cellMargins', value)(state, dispatch);
+        },
+
+      /**
+       * Set the borders of the selected cell(s).
+       * @category Command
+       * @param {Object} borders - OOXML border spec `{ top|bottom|left|right: { val, color, size } }`
+       * @returns {Function} Command
+       * @note The set-path counterpart to `deleteCellAndTableBorders` (the clear path).
+       * @example
+       * editor.commands.setCellBorders({ top: { val: 'single', color: '000000', size: 4 } })
+       */
+      setCellBorders:
+        (borders) =>
+        ({ state, dispatch }) => {
+          if (!borders || typeof borders !== 'object') return false;
+          return setCellAttr('borders', borders)(state, dispatch);
+        },
+
+      /**
+       * Distribute the table's columns to equal widths.
+       * @category Command
+       * @returns {Function} Command
+       * @note Best-effort — splits the resolved table width across the columns and
+       * writes `colwidth` on every cell; exact pixel landing refines under Phase 7.
+       * @example
+       * editor.commands.distributeColumnsEvenly()
+       */
+      distributeColumnsEvenly:
+        () =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+          const map = TableMap.get(table.node);
+          const colCount = map.width;
+          if (!colCount) return false;
+
+          // Resolve a total width: sum of existing colwidths, else table-level width, else a default.
+          let total = 0;
+          for (let c = 0; c < colCount; c++) {
+            const cellPos = map.map[c];
+            const cell = table.node.nodeAt(cellPos);
+            const cw = cell?.attrs?.colwidth;
+            if (cw && cw[0]) total += cw[0];
+          }
+          if (!total) {
+            const tw = table.node.attrs?.tableProperties?.tableWidth?.value;
+            // Fall back to a Word-ish default column width (100px) when no widths exist.
+            total = typeof tw === 'number' && tw > 0 ? tw : colCount * 100;
+          }
+          const each = Math.max(1, Math.round(total / colCount));
+
+          if (dispatch) {
+            // Write the per-column width on the cell whose colwidth array index is col.
+            table.node.descendants((node, pos) => {
+              if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') return;
+              const span = Math.max(1, node.attrs.colspan || 1);
+              tr.setNodeMarkup(table.pos + 1 + pos, undefined, {
+                ...node.attrs,
+                colwidth: new Array(span).fill(each),
+              });
+            });
+            tr.setNodeMarkup(table.pos, undefined, { ...table.node.attrs, userEdited: true });
+          }
+          return true;
+        },
+
+      /**
+       * Distribute the selected rows to equal (average) heights.
+       * @category Command
+       * @returns {Function} Command
+       * @note The height attr lands now; the visual row-height honoring is a
+       * pagination-gated Phase-7 paint.
+       * @example
+       * editor.commands.distributeRowsEvenly()
+       */
+      distributeRowsEvenly:
+        () =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const rect = selectedRect(state);
+          const tablePos = rect.tableStart - 1;
+          const tableNode = state.doc.nodeAt(tablePos);
+          if (!tableNode) return false;
+
+          // Use every row in the table (Word's Distribute Rows targets the whole table
+          // unless a sub-range is selected; we honor a row CellSelection range too).
+          const rowPositions = getSelectedRowPositions(rect, state.selection, /* allWhenCaret */ true);
+          if (!rowPositions.length) return false;
+
+          let sum = 0;
+          let known = 0;
+          rowPositions.forEach(({ node }) => {
+            const h = node.attrs.rowHeight || node.attrs.tableRowProperties?.rowHeight?.value;
+            if (h) {
+              sum += h;
+              known += 1;
+            }
+          });
+          const avg = known ? Math.max(1, Math.round(sum / known)) : 24;
+
+          if (dispatch) {
+            rowPositions.forEach(({ pos, node }) => {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                rowHeight: avg,
+                tableRowProperties: {
+                  ...(node.attrs.tableRowProperties || {}),
+                  rowHeight: { value: avg, rule: 'atLeast' },
+                },
+              });
+            });
+          }
+          return true;
+        },
+
+      /**
+       * Split the current table into two tables at the current row boundary.
+       * @category Command
+       * @returns {Function} Command - false when the cursor is in the first row
+       * (no boundary to split) or a merged cell spans the boundary.
+       * @note A vertically-merged (rowspan > 1) cell crossing the split boundary is
+       * a KNOWN DEVIATION — the command refuses (returns false) rather than corrupt
+       * the table; callers may run `fixTables` and retry.
+       * @example
+       * editor.commands.splitTableAtRow()
+       */
+      splitTableAtRow:
+        () =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const rect = selectedRect(state);
+          const tablePos = rect.tableStart - 1;
+          const tableNode = state.doc.nodeAt(tablePos);
+          if (!tableNode) return false;
+
+          const splitRow = rect.top;
+          if (splitRow <= 0 || splitRow >= tableNode.childCount) return false;
+
+          // Refuse if a vertically-merged cell straddles the boundary.
+          const map = TableMap.get(tableNode);
+          for (let col = 0; col < map.width; col++) {
+            const cellIndex = map.map[splitRow * map.width + col];
+            const cellRect = map.findCell(cellIndex);
+            if (cellRect.top < splitRow && cellRect.bottom > splitRow) return false;
+          }
+
+          if (dispatch) {
+            const firstRows = [];
+            const secondRows = [];
+            tableNode.forEach((row, _offset, index) => {
+              (index < splitRow ? firstRows : secondRows).push(row);
+            });
+            const schema = state.schema;
+            const firstTable = tableNode.type.create(tableNode.attrs, Fragment.fromArray(firstRows));
+            // Mint a fresh block id for the new (second) table so the two are distinct.
+            const secondAttrs = { ...tableNode.attrs, sdBlockId: uuidv4() };
+            const secondTable = tableNode.type.create(secondAttrs, Fragment.fromArray(secondRows));
+            const sep = createTableSeparatorParagraph(schema) || schema.nodes.paragraph.createAndFill();
+            const replacement = Fragment.fromArray(sep ? [firstTable, sep, secondTable] : [firstTable, secondTable]);
+            tr.replaceWith(tablePos, tablePos + tableNode.nodeSize, replacement);
+          }
+          return true;
+        },
+
+      /**
+       * Convert the current table to plain paragraphs.
+       * @category Command
+       * @param {string} [delimiter='\t'] - Joins the cell text of each row
+       * @returns {Function} Command
+       * @example
+       * editor.commands.convertTableToText('\t')
+       */
+      convertTableToText:
+        (delimiter = '\t') =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+          const delim = typeof delimiter === 'string' ? delimiter : '\t';
+
+          if (dispatch) {
+            const schema = state.schema;
+            const paragraphs = [];
+            table.node.forEach((row) => {
+              const cellTexts = [];
+              row.forEach((cell) => {
+                cellTexts.push(cell.textContent);
+              });
+              const line = cellTexts.join(delim);
+              const para = line.length
+                ? schema.nodes.paragraph.create(null, schema.text(line))
+                : schema.nodes.paragraph.createAndFill();
+              if (para) paragraphs.push(para);
+            });
+            if (!paragraphs.length) {
+              const empty = schema.nodes.paragraph.createAndFill();
+              if (empty) paragraphs.push(empty);
+            }
+            const replacement = Fragment.fromArray(paragraphs);
+            tr.replaceWith(table.pos, table.pos + table.node.nodeSize, replacement);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(table.pos + 1)));
+          }
+          return true;
+        },
+
+      /**
+       * Convert the selected paragraphs to a table.
+       * @category Command
+       * @param {string} [delimiter='\t'] - Splits each paragraph into cells
+       * @returns {Function} Command
+       * @example
+       * editor.commands.convertTextToTable('\t')
+       */
+      convertTextToTable:
+        (delimiter = '\t') =>
+        ({ state, tr, dispatch, editor }) => {
+          const delim = typeof delimiter === 'string' && delimiter.length ? delimiter : '\t';
+          const { $from, $to, from, to } = state.selection;
+          // Operate at the top level: gather the block range of paragraphs touched.
+          // Handle an AllSelection / doc-root selection (depth 0) by clamping to the
+          // top-level block boundaries around [from,to].
+          let startPos;
+          let endPos;
+          if ($from.depth >= 1 && $to.depth >= 1) {
+            startPos = $from.before(1);
+            endPos = $to.after(1);
+          } else {
+            const $start = state.doc.resolve(Math.min(from + 1, state.doc.content.size));
+            const $end = state.doc.resolve(Math.max(to - 1, 0));
+            if ($start.depth < 1 || $end.depth < 1) return false;
+            startPos = $start.before(1);
+            endPos = $end.after(1);
+          }
+
+          const rows = [];
+          let maxCols = 1;
+          state.doc.nodesBetween(startPos, endPos, (node, pos, parent) => {
+            if (parent !== state.doc || node.type.name !== 'paragraph') return;
+            const cells = node.textContent.split(delim);
+            maxCols = Math.max(maxCols, cells.length);
+            rows.push(cells);
+          });
+          if (!rows.length) return false;
+
+          if (dispatch) {
+            const schema = state.schema;
+            const widths = computeColumnWidths(editor, maxCols);
+            const rowNodes = rows.map((cells) => {
+              const cellNodes = [];
+              for (let c = 0; c < maxCols; c++) {
+                const text = cells[c] != null ? cells[c] : '';
+                const para = text.length
+                  ? schema.nodes.paragraph.create(null, schema.text(text))
+                  : schema.nodes.paragraph.createAndFill();
+                const cellAttrs = widths ? { colwidth: [widths[c]] } : {};
+                const cell = schema.nodes.tableCell.createChecked(cellAttrs, para);
+                cellNodes.push(cell);
+              }
+              return schema.nodes.tableRow.createChecked({ paraId: generateDocxHexId() }, cellNodes);
+            });
+            const resolved = normalizeNewTableAttrs(editor);
+            const tableAttrs = {
+              ...(resolved.tableStyleId ? { tableStyleId: resolved.tableStyleId } : {}),
+              ...(resolved.borders ? { borders: resolved.borders } : {}),
+              ...(resolved.tableProperties ? { tableProperties: resolved.tableProperties } : {}),
+              sdBlockId: uuidv4(),
+            };
+            const tableNode = schema.nodes.table.createChecked(tableAttrs, Fragment.fromArray(rowNodes));
+            tr.replaceWith(startPos, endPos, tableNode);
+            const selectionPos = getFirstTableCellTextPos(startPos, tableNode);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(selectionPos, tr.doc.content.size))));
+          }
+          return true;
+        },
+
+      /**
+       * Set the text-flow direction of the selected cell(s).
+       * @category Command
+       * @param {'btLr' | 'tbRl' | null} dir - OOXML text direction (or null to clear)
+       * @returns {Function} Command
+       * @note Basic CSS writing-mode lands now; vertical metrics / BiDi polish is Phase-7.
+       * Dual-writes the top-level `textDirection` attr (drives the cell's writing-mode
+       * render) AND `tableCellProperties.textDirection` (the nested key the `w:tcPr`
+       * decoder iterates → `<w:textDirection w:val="…">`), so it exports + round-trips
+       * through the existing `w:textDirection` translator. Unlike the prosemirror-tables
+       * `setCellAttr` (single top-level attr only), this walks the selected cells itself
+       * to land both shapes.
+       * @example
+       * editor.commands.setTextDirection('tbRl')
+       */
+      setTextDirection:
+        (dir) =>
+        ({ state, tr, dispatch }) => {
+          if (dir != null && !['btLr', 'tbRl'].includes(dir)) return false;
+          if (!isInTable(state)) return false;
+          const value = dir || null;
+          const rect = selectedRect(state);
+          const sel = state.selection;
+          // Collect the unique cell positions under the selection: the CellSelection
+          // rectangle when present, else the single cell containing the caret.
+          const cellPositions = [];
+          if (isCellSelection(sel)) {
+            const seen = new Set();
+            for (let row = rect.top; row < rect.bottom; row++) {
+              for (let col = rect.left; col < rect.right; col++) {
+                const cellIndex = rect.map.map[row * rect.map.width + col];
+                if (seen.has(cellIndex)) continue;
+                seen.add(cellIndex);
+                cellPositions.push(rect.tableStart + cellIndex);
+              }
+            }
+          } else {
+            const cell = cellAround(sel.$head);
+            if (!cell) return false;
+            cellPositions.push(cell.pos);
+          }
+          if (dispatch) {
+            cellPositions.forEach((pos) => {
+              const cell = tr.doc.nodeAt(pos);
+              if (!cell) return;
+              const nextProps = { ...(cell.attrs.tableCellProperties || {}) };
+              if (value) nextProps.textDirection = value;
+              else delete nextProps.textDirection;
+              tr.setNodeMarkup(pos, undefined, {
+                ...cell.attrs,
+                textDirection: value,
+                tableCellProperties: nextProps,
+              });
+            });
+          }
+          return true;
+        },
+
+      /**
+       * Set the table's auto-fit / layout mode.
+       * @category Command
+       * @param {'fixed' | 'contents' | 'window'} mode - AutoFit mode
+       * @returns {Function} Command
+       * @note `'fixed'` sets tableLayout:'fixed' AND clears any tableWidth stretch
+       * (Word's Fixed Column Width writes w:tblW type "auto" — columns drive the
+       * size again; the absent key is the importer's no-explicit-width shape).
+       * `'contents'`/`'window'` need live measurement; the intent attr lands now,
+       * the visual reflow is a Phase-7 paint. `'window'` also marks the table
+       * width to 100% (pct 5000).
+       * @example
+       * editor.commands.autoFitTable('fixed')
+       */
+      autoFitTable:
+        (mode) =>
+        ({ state, tr, dispatch }) => {
+          if (!isInTable(state)) return false;
+          if (!['fixed', 'contents', 'window'].includes(mode)) return false;
+          const table = resolveCommandTargetTable(state.selection);
+          if (!table) return false;
+
+          if (dispatch) {
+            const layout = mode === 'fixed' ? 'fixed' : 'autofit';
+            const nextProps = { ...(table.node.attrs.tableProperties || {}), tableLayout: layout };
+            if (mode === 'window') {
+              nextProps.tableWidth = { value: 5000, type: 'pct' };
+            } else if (mode === 'fixed') {
+              // Undo a previous AutoFit-Window 100% stretch (or any explicit table
+              // width): with the key absent, TableView.updateColumns computes
+              // convertSizeToCSS(null, 'auto') → null and un-sets style.width, so
+              // the table returns to its natural column-width-driven size.
+              delete nextProps.tableWidth;
+            }
+            tr.setNodeMarkup(table.pos, undefined, {
+              ...table.node.attrs,
+              tableLayout: layout,
+              tableProperties: nextProps,
+            });
+          }
           return true;
         },
     };
@@ -1728,4 +2439,38 @@ function getCurrentCellAttrs(state) {
   let cell = rect.table.nodeAt(pos);
   let attrs = copyCellAttrs(cell);
   return { rect, cell, attrs };
+}
+
+/**
+ * Resolve the absolute document positions + nodes of the table rows touched by
+ * the current selection. Used by the row-sizing commands (setRowHeight,
+ * distributeRowsEvenly). Returns `[{ pos, node }]` for each row in the selected
+ * row range (rect.top..rect.bottom). When `allWhenCaret` is true and the
+ * selection is a plain caret (single row), the whole table's rows are returned
+ * (Word's Distribute Rows targets the whole table from a caret).
+ *
+ * @private
+ * @param {Object} rect - Result of `selectedRect(state)`
+ * @param {import('prosemirror-state').Selection} selection
+ * @param {boolean} [allWhenCaret=false]
+ * @returns {Array<{ pos: number, node: import('prosemirror-model').Node }>}
+ */
+function getSelectedRowPositions(rect, selection, allWhenCaret = false) {
+  const tablePos = rect.tableStart - 1;
+  const tableNode = rect.table;
+  if (!tableNode) return [];
+
+  const isRange = selection instanceof CellSelection && rect.bottom - rect.top > 1;
+  const fromRow = isRange ? rect.top : allWhenCaret ? 0 : rect.top;
+  const toRow = isRange ? rect.bottom : allWhenCaret ? tableNode.childCount : rect.top + 1;
+
+  const out = [];
+  // Rows are direct children of the table; `offset` is each row's offset within
+  // the table node, so the row's absolute pos is tablePos + 1 + offset.
+  tableNode.forEach((row, offset, index) => {
+    if (index >= fromRow && index < toRow) {
+      out.push({ pos: tablePos + 1 + offset, node: row });
+    }
+  });
+  return out;
 }

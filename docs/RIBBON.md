@@ -320,30 +320,39 @@ tab galleries (themes, colors, fonts, style sets) via `WC.Design.snapshot()` /
 
 ## Runtime contextual tabs
 
-Contextual tabs (Word shows them only when relevant, e.g. **Header & Footer**) are
-injected at runtime rather than living in `WC.RIBBON`. Two methods on `WC.Ribbon`:
+Contextual tabs (Word shows them only when relevant, e.g. **Header & Footer**, the
+**Table Design/Layout** pair) are injected at runtime rather than living in
+`WC.RIBBON`. Two methods on `WC.Ribbon` (multi-tab since slice 6):
 
 ```js
-showContextualTab(def) {
-  if (this._ctxTab === def.id) { this.activate(def.id); return; }
-  this.hideContextualTab();                              // only one at a time
+showContextualTab(def, opts) {
+  // MULTIPLE contextual tabs can coexist: each injected id is tracked in _ctxTabs;
+  // _ctxPrev remembers the real (non-contextual) tab, saved on the FIRST inject only.
+  // opts.activate (default TRUE) controls auto-selection:
+  //   - Header & Footer passes no opts → tab is selected on show (enter-mode UX);
+  //   - the Table tabs pass { activate: false } → they appear PASSIVELY, like real
+  //     Word (the active tab never changes when the caret enters a table).
   // append a .contextual-tab chip + a new .ribbon-panel built from def.groups
-  const btn   = el('div', { class: 'ribbon-tab contextual-tab', text: def.name, dataset: { tab: def.id } });
+  const btn = el('div', { class: 'ribbon-tab contextual-tab', text: def.name, dataset: { tab: def.id } });
   …
   def.groups.forEach((group) => scroll.appendChild(this.renderGroup(def, group)));
-  this._ctxPrev = this.activeTab; this._ctxTab = def.id;
-  this.activate(def.id);                                 // auto-select it
 }
-hideContextualTab() {
-  // remove the chip + panel and re-activate the previously active tab
+hideContextualTab(id) {
+  // hide ONE tab by id, or ALL contextual tabs when called with no arg (the
+  // Header & Footer exit path). The previously-active tab is restored ONLY if
+  // the tab being removed was the active one — a tab the user picked manually
+  // stays put (Word behavior; the table caret-exit path relies on this).
 }
 ```
 
 The injected panel is built by the **same** `renderGroup` used for static tabs, so a
 contextual tab is just a tab definition object — no special rendering path.
 
-The only current caller is the Header & Footer feature
-(`src/renderer/js/header-footer.js`). Its `contextualTab()` returns the def:
+Callers: the Header & Footer feature (`header-footer.js`, single tab, auto-selected)
+and the PM-mode Table Tools (`table-tools-pm.js`, two passive tabs — **Table Design**
++ **Layout** — shown/hidden by `syncContextualTabs(inTable)` from the bridge
+state-sync as the caret enters/leaves a table). Header & Footer's `contextualTab()`
+returns the def:
 
 ```js
 contextualTab() {

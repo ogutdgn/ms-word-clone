@@ -51,12 +51,16 @@
   // ===================== Table dropdown =====================
   Insert.buildTable = function (rows, cols) {
     rows = Math.max(1, Math.min(1000, rows | 0)); cols = Math.max(1, Math.min(1000, cols | 0));
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { pm.insertTable({ rows, cols }); return; }
     let html = '<table><tbody>';
     for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td><br></td>'; html += '</tr>'; }
     html += '</tbody></table><p><br></p>';
     E().insertHTML(html);
   };
   Insert.convertTextToTable = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { WC.toast('Convert Text to Table is available in Table Tools (slice 6b)'); return; }
     const blocks = E().selectedBlocks();
     if (!blocks.length) { WC.toast('Select lines of text (tab or comma separated) to convert.'); return; }
     const rows = blocks.map((b) => (b.textContent || '').split(/\t|,/).map((s) => s.trim()));
@@ -296,6 +300,9 @@
 
   // ===================== Bookmark =====================
   Insert.bookmarkDialog = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { pm.captureSelection(); Insert._bookmarkDialogPM(pm); return; }
+    // ---- legacy arm (byte-identical to original) ----
     const name = el('input', { type: 'text', class: 'grow', placeholder: 'Bookmark name' });
     const listBox = el('div', { style: { border: '1px solid #c8c6c4', maxHeight: '140px', overflowY: 'auto', margin: '8px 0' } });
     function renderList() {
@@ -307,6 +314,30 @@
     renderList();
     WC.dialog({ title: 'Bookmark', width: '380px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '60px' } }), name]), listBox]), footer: [
       { label: 'Add', primary: true, onClick: () => { const n = name.value.trim().replace(/\s+/g, '_'); if (!n) return; E().focus(); E().restoreRange(); const sel = window.getSelection(); const dup = E().node.querySelector('[data-bookmark="' + n + '"]'); if (dup) dup.replaceWith(...dup.childNodes); /* move, don't duplicate the id */ const span = el('span', { dataset: { bookmark: n }, id: 'bm_' + n }); if (sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); try { r.surroundContents(span); } catch (e) { span.appendChild(r.extractContents()); r.insertNode(span); } } else { span.appendChild(document.createTextNode('​')); if (sel.rangeCount) sel.getRangeAt(0).insertNode(span); else E().node.appendChild(span); } E().dirty = true; WC.toast('Bookmark “' + n + '” added.'); } },
+      { label: 'Close' },
+    ] });
+  };
+  // M2: full PM bookmark dialog — lists, adds, goes-to, deletes, re-renders on mutation.
+  Insert._bookmarkDialogPM = function (pm) {
+    const name = el('input', { type: 'text', class: 'grow', placeholder: 'Bookmark name' });
+    const listBox = el('div', { style: { border: '1px solid #c8c6c4', maxHeight: '140px', overflowY: 'auto', margin: '8px 0' } });
+    function renderList() {
+      listBox.innerHTML = '';
+      const bms = pm.listBookmarks();
+      if (!bms.length) { listBox.appendChild(el('div', { style: { padding: '8px', color: '#888' }, text: 'No bookmarks yet.' })); return; }
+      bms.forEach((b) => {
+        const row = el('div', { style: { padding: '5px 8px', cursor: 'pointer', display: 'flex' } }, [
+          el('span', { style: { flex: 1 }, text: b.name }),
+          el('span', { style: { color: '#2B579A', marginRight: '8px' }, text: 'Go To', onclick: () => { pm.goToBookmark(b.name); } }),
+          el('span', { style: { color: '#c0392b' }, text: 'Delete', onclick: () => { pm.removeBookmark(b.name); renderList(); } }),
+        ]);
+        row.querySelector('span').addEventListener('click', () => { name.value = b.name; });
+        listBox.appendChild(row);
+      });
+    }
+    renderList();
+    WC.dialog({ title: 'Bookmark', width: '380px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '60px' } }), name]), listBox]), footer: [
+      { label: 'Add', primary: true, onClick: () => { const n = name.value.trim().replace(/\s+/g, '_'); if (!n) return; pm.withSelection(() => pm.insertBookmark({ name: n })); name.value = ''; renderList(); WC.toast('Bookmark “' + n + '” added.'); } },
       { label: 'Close' },
     ] });
   };
@@ -340,8 +371,8 @@
     const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(12,30px)', gap: '2px', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e1dfdd', padding: '4px' } });
     const recentRow = el('div', { style: { display: 'flex', gap: '2px', flexWrap: 'wrap', minHeight: '24px', marginTop: '4px' } });
     function pushRecent(ch) { const r = JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]').filter((x) => x !== ch); r.unshift(ch); sessionStorage.setItem('wc-recent-sym', JSON.stringify(r.slice(0, 16))); renderRecent(); }
-    function renderRecent() { recentRow.innerHTML = ''; (JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]')).forEach((ch) => { const c = el('div', { text: ch, style: { width: '24px', height: '24px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } }); c.addEventListener('click', () => { E().insertHTML(WC.escapeHtml(ch)); }); recentRow.appendChild(c); }); }
-    function render() { grid.innerHTML = ''; SUBSETS[subset.value].split(' ').forEach((ch) => { if (!ch) return; const c = el('div', { text: ch, style: { width: '30px', height: '30px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px' } }); c.addEventListener('mouseenter', () => c.style.background = 'var(--word-blue-tint)'); c.addEventListener('mouseleave', () => c.style.background = ''); c.addEventListener('click', () => { E().focus(); E().restoreRange(); E().insertHTML(WC.escapeHtml(ch)); pushRecent(ch); }); grid.appendChild(c); }); }
+    function renderRecent() { recentRow.innerHTML = ''; (JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]')).forEach((ch) => { const c = el('div', { text: ch, style: { width: '24px', height: '24px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } }); c.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertSymbol(ch); return; } E().insertHTML(WC.escapeHtml(ch)); }); recentRow.appendChild(c); }); }
+    function render() { grid.innerHTML = ''; SUBSETS[subset.value].split(' ').forEach((ch) => { if (!ch) return; const c = el('div', { text: ch, style: { width: '30px', height: '30px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px' } }); c.addEventListener('mouseenter', () => c.style.background = 'var(--word-blue-tint)'); c.addEventListener('mouseleave', () => c.style.background = ''); c.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertSymbol(ch); pushRecent(ch); return; } E().focus(); E().restoreRange(); E().insertHTML(WC.escapeHtml(ch)); pushRecent(ch); }); grid.appendChild(c); }); }
     subset.addEventListener('change', render); render(); renderRecent();
     E().saveRange();
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Subset:', style: { width: '60px' } }), subset]), grid, el('div', { style: { fontSize: '11px', color: '#666', marginTop: '8px' }, text: 'Recently used symbols:' }), recentRow]);

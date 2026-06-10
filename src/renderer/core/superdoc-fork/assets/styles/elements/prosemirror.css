@@ -201,6 +201,31 @@ https://github.com/ProseMirror/prosemirror-tables/blob/master/demo/index.html
   overflow-wrap: anywhere;
 }
 
+/* Table gridlines (fork addition, ms-word-clone slice 6 gridline fix, 2026-06-10 —
+   NOTICE.md). A table's OOXML insideH/insideV borders have no per-cell
+   representation in the live view: cells in the style-driven path carry no
+   `borders` attr, and the table renderDOM can only express the four physical
+   sides as table border CSS. The table node's `borders` attr handler
+   (extensions/table/table.js) publishes visible inside borders as the inherited
+   custom properties --wc-inside-h/--wc-inside-v; these rules paint INTERIOR cell
+   edges only (top edge of rows 2+, left edge of columns 2+), so the outer frame
+   stays table-owned — Word's inside/outside border split. Precedence: a cell
+   with an explicit `borders` attr renders an inline border-* style, which beats
+   these rules; borderless tables set no vars, and the `table` reset below stops
+   an outer table's vars from leaking into a nested table's cells. */
+.sd-editor-scoped .ProseMirror table {
+  --wc-inside-h: none;
+  --wc-inside-v: none;
+}
+.sd-editor-scoped .ProseMirror table tr:not(:first-child) > td,
+.sd-editor-scoped .ProseMirror table tr:not(:first-child) > th {
+  border-top: var(--wc-inside-h);
+}
+.sd-editor-scoped .ProseMirror table td:not(:first-child),
+.sd-editor-scoped .ProseMirror table th:not(:first-child) {
+  border-left: var(--wc-inside-v);
+}
+
 .sd-editor-scoped .ProseMirror td[data-placeholder],
 .sd-editor-scoped .ProseMirror th[data-placeholder] {
   padding: 0 !important;

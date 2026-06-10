@@ -143,6 +143,22 @@ export const TableHeader = Node.create({
         },
       },
 
+      /**
+       * @category Attribute
+       * @param {'btLr' | 'tbRl'} [textDirection] - Header-cell text flow direction (OOXML w:textDirection).
+       * Renders a basic CSS writing-mode; vertical metrics / BiDi polish deferred to Phase 7
+       * (fork edit, slice 6, 2026-06-09).
+       */
+      textDirection: {
+        default: null,
+        renderDOM({ textDirection }) {
+          if (!textDirection) return {};
+          if (textDirection === 'tbRl') return { style: 'writing-mode: vertical-rl' };
+          if (textDirection === 'btLr') return { style: 'writing-mode: vertical-lr' };
+          return {};
+        },
+      },
+
       widthType: {
         default: 'auto',
         rendered: false,
@@ -160,6 +176,16 @@ export const TableHeader = Node.create({
 
       /** @private - Keys from the cell's w:tcPr (exclude inherited from table style on export) */
       tableCellPropertiesInlineKeys: {
+        default: null,
+        rendered: false,
+      },
+
+      /**
+       * @private
+       * Provenance marker for a style-baked fill (fork addition, slice 6 T4, 2026-06-10).
+       * Mirrors tableCell.styleBakedBackground — see extensions/table-cell/table-cell.js.
+       */
+      styleBakedBackground: {
         default: null,
         rendered: false,
       },

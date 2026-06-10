@@ -7,6 +7,182 @@
 
 ---
 
+## 2026-06-10 — Slice 6 table-defect fix batch (user report → hunt → 5 fixes on PR #23)
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (PR #23, still unmerged — fixes pushed onto it).
+- **Phase:** **Phase 2 — slice 6 DONE (PR #23 + fix batch) → slice 7 (file-io) next.**
+- **State summary:** the user reported "some of the table things not working properly." A 4-agent
+  defect-hunt workflow (live-repro probes in the built app + code audit + real-Word fidelity compare
+  vs `.oracle-probes/slice6/` + style-minting research) found the real causes; 5 fix tasks executed
+  subagent-driven with per-step review:
+  - `fdcb7f6` **ribbon yank fixed** — contextual table tabs are now PASSIVE (caret enter/exit never
+    steals the active tab; user-chosen tab survives exit; `showContextualTab(def,{activate:false})`
+    + conditional restore in `hideContextualTab`; H&F byte-identical); Layout tab display label →
+    Word Mac's **'Layout'**.
+  - `72b270f` **table Center/Right alignment fixed** — TableView no longer clobbers `margin-left`
+    with the zero-indent default (geometry-proven: center 233/233, right 466/0; was always 0/466).
+  - `dd56a1a` **caret-cell shading parity** (Word shades the caret cell — fork `setCellBackground`
+    caret fallback; bridge gate removed) + **AutoFit Fixed now clears the Window stretch**.
+  - `61d84d9` **table styles work end-to-end** — minted REAL Word definitions (`TableGrid` authored
+    live via the oracle; `GridTable4-Accent1` from the s3 fixture, all 6 `w:tblStylePr` conditional
+    blocks byte-faithful) into `DEFAULT_LINKED_STYLES` → every export carries the definitions (closes
+    the Leg-C `w:tblStyle` drop); **apply now visibly bakes** (style-engine-resolved border frame +
+    firstRow fill via a non-rendered `styleBakedBackground` marker — user shading survives, exports
+    stay free of direct-formatting leaks); **dynamic honest style gallery** (`getTableStyles()` from
+    the runtime catalog, display names, phantom IDs dropped); `docx-inspect` gained
+    `tableStyles`/`tblStyleRefs`.
+  - `474291f` **direct-border precedence** (direct `w:tblBorders` beat the baked style frame across
+    save→reopen — importer-merge mirrored via the actual `_processTableBorders`) + user shading
+    clears the baked marker; `a23c868` **27 real Fluent icons** for the tbl* contextual-tab commands
+    (icon-map + regen; also fixed gen-icons.js's stale pre-Phase-1 output path).
+  - `d6a07e4` **"big box" fixed — fresh tables render cell GRIDLINES** (user re-report): the table
+    `borders` renderDOM emitted invalid `border-insideH/V` CSS (silently dropped) and style-driven
+    cells carry no renderable borders attr — **imported styled tables were big boxes too**. Render-only
+    fix: visible insideH/insideV publish as `--wc-inside-h/v` CSS vars on the table; prosemirror.css
+    paints INTERIOR cell edges only (outer stays frame-owned, Word's inside/outside split); explicit
+    per-cell borders still win; `deleteCellAndTableBorders` → no gridlines; export purity proven
+    (no `w:tcBorders`/`w:tblBorders` leak). PM **192/192** (+3).
+- **Gates (final, run by the coordinator):** **PM 192/192** (176 → +16 new regression tests incl. gridlines +
+  geometry + precedence + export-purity), legacy 257/257, smoke 9/9 ×2, docx 17/17.
+- **Verified working (hunt, no action needed):** row/col insert/delete, merge/split via CellSelection,
+  cell width, distribute columns, header toggles, text direction, context menu, dropdown flyouts,
+  convert-to-text, window-autofit.
+- **Recorded deferrals from the hunt (NOT fixed, by design):** Table Style Options checkboxes
+  (tblLook toggles — needs conditional-formatting render), full ~50-style gallery, Borders-group pen
+  controls/Border Painter, Height/Width spinner fields, View Gridlines/Draw/Eraser/Properties,
+  Cell Margins dialog (stub toast), AutoFit-Contents reflow, banded-row live rendering (exported
+  definitions carry it — real Word renders the full style), text-direction dropdown gallery,
+  Excel-Spreadsheet/Quick-Tables menu items (legacy carryover, absent in Word Mac).
+- **Blockers/notes:** a Word **live reopen re-check of the style fix is pending** — scripted opens
+  now hit a macOS "Grant File Access" prompt (and Word crashed/recovered during T4's attempt; left
+  clean) — artifact-level validation is strong (docx-inspect: definitions byte-faithful + ref +
+  conditionals intact); re-run interactively after granting file access. One process incident: a T2
+  reviewer subagent left the repo on the slice-5 branch (no data loss — everything was committed;
+  coordinator restored the branch and added a no-branch-switch rule to subsequent agent briefs).
+
+---
+
+## 2026-06-10 — Slice 6 Word oracle legs run + PR #23 opened
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (pushed) → **PR #23** open to `main`.
+- **Phase:** **Phase 2 — slice 6 DONE (PR up) → slice 7 (file-io) next.**
+- **State summary:** the slice-6 build is complete + all gates green (PM 176/176, legacy 257, smoke
+  9/9 ×2, docx 17 — see the BUILT entry below). Ran the **Word-dependent oracle legs** vs Word 16.77.1
+  (notes `docs/superpowers/plans/notes/2026-06-10-slice6-word-oracle.json`; probe
+  `scripts/slice6-legC-probe.js`):
+  - **Leg A reopen-in-Word — PASS** (the key test): real Word **accepted the clone's OOXML with NO
+    repair prompt**; hyperlink→`https://example.com` + 3×4 table + embedded image + paired bookmark all
+    survive Word's own round-trip (Word canonicalized rIds / image filename / `w:shd` — benign).
+  - **Leg C styled-table — PARTIAL:** `w:jc` (align) + `w:shd` (shading) + `w:gridSpan` (merge) survive;
+    **`w:tblStyle` DROPPED** — the clone emits the styleId *reference* but never writes the style
+    *definition* into `word/styles.xml`, so Word discards the orphaned reference (NEW recorded
+    deviation — same minting gap as slice-3 styles; follow-up = mint built-in table-style definitions).
+  - **Leg B Word-authored→clone — BLOCKED** by Word session quirks #24-26 (`make new document`
+    spawned spurious untitled windows + dangling refs; native authoring never saved). Open+save-as path
+    stayed healthy (legs A/C ran fine); only `make-new-document` was broken this session. Clone import
+    of tables/bookmarks is covered indirectly by Leg A's reverse evidence. Re-run in a fresh Word
+    session = minor follow-up.
+  - **UI Codex** (Task 12): partially captured by the user (Insert dialogs + Table Design tab
+    screenshots in `.oracle-probes/slice6/`, gitignored — see the UI-probe entry below); remaining
+    steps (A2 dialog, A5 bookmark, B-layout/autofit, context menu, text-direction) a follow-up.
+- **Done this session:** Word oracle legs A/C/B (`0bd3773`); **PR #23** opened with full body (what
+  flipped, fork edits NOTICE'd, oracle verdicts, gate counts, deviations + carry-overs).
+- **Carry-overs for slice 7 / merge:** (1) **mint built-in table-style definitions into `styles.xml`**
+  so applied table styles render in Word (closes the Leg-C `tblStyle` gap; slice-3-scale follow-up).
+  (2) Re-run Word oracle **leg B** + finish the **UI Codex** steps in a fresh Word session. (3) BOTH
+  `[0a]` D6 tests now on `newComment`/`tableOfContents` (slice 8/9 repoints). (4) slice-4 list-marker
+  leak still open.
+- **Blockers/notes:** none for the PR — Word accepted our OOXML cleanly (well-formed). Word left
+  RUNNING (never quit); 2 empty untitled artifacts (`Document2`/`Document4`) from the blocked leg-B
+  authoring were left open (PID-safety — not the user's named docs); the user may close them +
+  relaunch Word for the remaining UI Codex steps.
+
+---
+
+## 2026-06-10 — Slice 6 Word UI probe partially captured
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics`.
+- **Phase:** **Phase 2 — slice 6 DONE → slice 7 (file-io) next.**
+- **State summary:** ran the `.oracle-probes/slice6/CODEX-PROMPT.md` Word-for-Mac
+  computer-use probe. Captured real screenshots for the Insert Hyperlink dialog, Table grid,
+  Symbol dialog, Equation contextual editor, and Table Design contextual tab into
+  `.oracle-probes/slice6/shots/`; appended literal observations to `.oracle-probes/slice6/results.md`.
+  These oracle artifacts are gitignored.
+- **Done this session:** verified Computer Use can drive Word; saved `A1.png`, `A2-grid.png`,
+  `A3-dialog.png`, `A3-menu.png`, `A4.png`, and `B-design.png`; recorded exact visible controls for
+  those surfaces. Confirmed Mac Word exposes an Equation contextual editor with Unicode/LaTeX/Text,
+  Convert, 188-symbol gallery, and structure menus; confirmed Table Design exposes Table Style Options,
+  Table Styles, Shading, Border Styles, Pen Style/Weight/Color, Borders, and Border Painter.
+- **Next:** rerun the remaining slice-6 UI probe steps in a clean Word session with only one scratch
+  document open: A2 Insert Table dialog, A5 Bookmark dialog, B-design gallery/Shading/Borders
+  dropdowns, B-layout, B-autofit, C1 context menu, and C2 Text Direction.
+- **Blockers/notes:** Word repeatedly snapped focus among existing unsaved Word windows after modal
+  close/screenshot events, including an existing oracle-looking document. I stopped short of further
+  coordinate actions and did not close ambiguous unsaved windows to avoid touching user state.
+
+---
+
+## 2026-06-10 — Phase 2 slice 6 BUILT (insert-basics + full Table Tools on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (directly off `main` post slice-5 merge
+  [PR #22, `260e490`] — no stacked PRs; **PR to open next**, one PR for the whole slice per user).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 6 DONE → slice 7 (file-io) next.**
+- **State summary:** area **`insert-basics` FLIPPED** (registry `bridge/index.ts`) **and the
+  net-new full Word Table Tools built**. Insert primitives on PM via new **`bridge/insert.ts`**:
+  link (`setLink` mark + edit/Remove via `unsetLink`), image (`setImage`; `pickImage()` IPC reused —
+  no new IPC), page break (`insertPageBreak` hardBreak), blank page (two breaks), horizontal line
+  (`insertHorizontalRule` contentBlock), symbol (`insertContent`), **equation = styled Cambria-Math
+  italic text** (KNOWN DEVIATION — real OMML deferred; M4 clears mark-bleed), bookmark
+  (**paired `bookmarkStart`+`bookmarkEnd`**, B1) + list/goto/remove dialog. Table on PM via new
+  **`bridge/table.ts`**: insertion + the legacy 9 ops + **14 NOTICE'd fork table commands**
+  (`setTableStyle`/`setTableAlignment`/`setTableIndent`/`setCellWidth`/`setRowHeight`/`setCellMargins`/
+  `setCellBorders`/`distributeRows`/`distributeColumns`/`splitTableAtRow`/`convertTableToText`/
+  `convertTextToTable`/`setTextDirection`+attr/`autoFitTable` — all **export round-trip-verified** via
+  `[6b] EXPORT:` document.xml-grep tests). **Table Layout + Table Design contextual ribbon tabs**
+  (runtime-injected `{cmd,label,type}` dispatch via new `H.tbl*` handlers + dropdown flyouts;
+  **`ribbon.js` extended for multiple coexisting contextual tabs**, backward-compatible with Header &
+  Footer — 257 byte-identical) + a **PM table context menu** (scoped to `td/th`, native cell-selection
+  preserved). **Exotica carve-out:** 14 exotic cmds → new `insert-exotica` (slice 10),
+  `crossReference` → `references` (slice 9); 9 core insert cmds flip. `pmGuard` on legacy `WC.Table`
+  methods (B2). `Ctrl+K` `pmBlockedOr`-wrapped (same flip commit). D6 tests repointed
+  `link`→`newComment`, `table`→`tableOfContents`. New `scripts/docx-inspect.js` (unzip helper).
+  Gates: **PM 176/176** (130 + 46 `[6]`/`[6b]`), legacy 257/257, smoke 9/9 ×2, docx 17/17.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-09-phase2-slice-6-insert-basics.md`,
+  grounded by a 6-agent inventory + hardened by a 3-critic critique + author pre-verification — **4
+  blockers + 6 majors** applied; the biggest two [contextual-tab controls are `{cmd,label,type}`
+  cmd-dispatch NOT `onClick`; ribbon shows ONE contextual tab] caught by pre-verification after a
+  critic wrongly cleared them; executed subagent-driven with two-stage review per task, which caught
+  real bugs each task — a `__PM_TextSelection` global regression, an equation `false`-contract
+  violation, a modal leak, curly-quote contamination, a `tableInfo` fallback, and a **silent
+  export data-loss bug** [`setTableStyle`/`setTableIndent`/`setTextDirection` wrote only the top-level
+  attr, never the nested key the exporter reads — fixed via dual-write + export-grep regression tests]):
+  - `eb23de9` plan · `20a4fc3` red `[6]` tests + D6 repoint · `f8e76e3` docx-inspect helper
+  - `b40f36b` bridge insert · `5feefb9` bridge table (6a) · `6c0d81b` entry-point rewrites (+M2 bookmark dialog)
+  - `d2b3ffb` **THE FLIP** + Ctrl+K guard + exotica carve-out (149/149, carve-out machine-verified leak-free)
+  - `752e0e1` 14 fork table commands (+ export round-trip fix) · `d4074d7` bridge table extras
+  - `e2840f3` contextual tabs + PM context menu (ribbon.js multi-tab, 257 byte-identical) · `366aa66` leg-A oracle
+- **Oracle validation (spec §8.3):** **leg A HEADLESS — PASS** (`docx-inspect` of the clone's exported
+  `.docx`: hyperlink `rId7`→`https://example.com`; table 1×3rows×4cols; image embedded `word/media/
+  image-*.png` 70 bytes; bookmark paired start+end id `0` name `spot1`). Evidence:
+  `docs/superpowers/plans/notes/2026-06-10-slice6-legA-headless.json`. **DEFERRED to a Word-windowed
+  session:** the Word-dependent legs (leg-A reopen-in-real-Word fidelity; leg-B Word-authored doc →
+  `openDocx` import) + UI-fidelity Codex screenshots (Task 12 — needs user's Codex).
+- **KNOWN DEVIATIONS (recorded):** equation = styled text not OOXML Math; pagination-gated table
+  VISUALS land attrs-only (distribute-rows height, autofit window/contents reflow, repeat-header
+  render, text-direction BiDi metrics → Phase 7); `splitTableAtRow` refuses rowspan-straddle (records
+  deviation vs invalid doc); `tblCellMargins`/Table Properties dialog toast-deferred (Task 11.3);
+  contextual-tab buttons render icon-only (`tbl*` cmds aren't fluent icon keys); Excel-Spreadsheet /
+  Draw-Table degrade to plain `insertTable`; authored data-URL images get a fresh rId per export.
+- **Carry-overs for slice 7 (file-io):** (1) **Word-dependent oracle legs + UI Codex for slice 6
+  still to run** (relaunch Word windowed). (2) **BOTH `[0a]` D6 tests now on `newComment`/
+  `tableOfContents`** (review/references) — slice 7 is file-io (not a ribbon area), so it can LEAVE
+  them; slice 8/9 repoints when review/references flip. (3) Slice-4 Word→clone list-marker leak still
+  open. (4) Spec slice 7 = open html/txt/csv re-enabled; PM-converter round-trip suite replaces
+  `test_docx.js`; retire html-to-docx/mammoth/docx-utils for `.docx`.
+- **Blockers/notes:** none for the build/PR. Word oracle pending a user Word relaunch (windowed).
+
+---
+
 ## 2026-06-09 — Phase 2 slice 5 BUILT (find-replace on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-5-find-replace` (directly off `main` post slice-4 — no

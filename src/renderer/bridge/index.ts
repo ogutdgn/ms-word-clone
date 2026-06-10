@@ -5,6 +5,8 @@ import { legacyBoot } from './mode'
 import { installCommands } from './commands'
 import { installClipboard } from './clipboard'
 import { installSearch } from './search'
+import { installInsert } from './insert'
+import { installTable } from './table'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -26,7 +28,7 @@ let replacing = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace']) // slices 1-5
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics']) // slices 1-6
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -51,14 +53,28 @@ const AREA: Record<string, string> = {
   // editing/find (slice 5)
   find: 'find-replace', replace: 'find-replace',
   select: 'editing-misc', // slice 4 — spec row 4; was find-replace (ribbon-group adjacency accident, slice 0a)
-  // insert basics (slice 6)
+  // insert basics (slice 6) — these FLIP
   table: 'insert-basics', link: 'insert-basics', bookmark: 'insert-basics', pageBreak: 'insert-basics',
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
-  horizontalLine: 'insert-basics', pictures: 'insert-basics', onlinePictures: 'insert-basics',
-  screenshot: 'insert-basics', icons: 'insert-basics', smartart: 'insert-basics', chart: 'insert-basics',
-  onlineVideo: 'insert-basics', dropCap: 'insert-basics', wordart: 'insert-basics', textBox: 'insert-basics',
-  object: 'insert-basics', signatureLine: 'insert-basics', dateTime: 'insert-basics',
-  coverPage: 'insert-basics', quickParts: 'insert-basics', crossReference: 'insert-basics',
+  horizontalLine: 'insert-basics', pictures: 'insert-basics',
+  // Table Tools (Table Layout + Table Design contextual tabs, slice 6 Task 10) — mapped
+  // to insert-basics (FLIPPED) so the dispatch audit stays honest and they un-block.
+  tblInsertAbove: 'insert-basics', tblInsertBelow: 'insert-basics', tblInsertLeft: 'insert-basics',
+  tblInsertRight: 'insert-basics', tblDeleteRow: 'insert-basics', tblDeleteColumn: 'insert-basics',
+  tblDeleteTable: 'insert-basics', tblMerge: 'insert-basics', tblSplitCell: 'insert-basics',
+  tblSplitTable: 'insert-basics', tblDistRows: 'insert-basics', tblDistCols: 'insert-basics',
+  tblHeaderRow: 'insert-basics', tblHeaderCol: 'insert-basics', tblToText: 'insert-basics',
+  tblVAlignTop: 'insert-basics', tblVAlignMid: 'insert-basics', tblVAlignBottom: 'insert-basics',
+  tblTextDir: 'insert-basics', tblAlignLeft: 'insert-basics', tblAlignCenter: 'insert-basics',
+  tblAlignRight: 'insert-basics', tblCellMargins: 'insert-basics', tblStyles: 'insert-basics',
+  tblShading: 'insert-basics', tblBorders: 'insert-basics', tblAutoFit: 'insert-basics',
+  // insert exotica (slice 10) — STAY blocked (carved out of insert-basics in the slice-6 flip)
+  onlinePictures: 'insert-exotica', screenshot: 'insert-exotica', icons: 'insert-exotica',
+  smartart: 'insert-exotica', chart: 'insert-exotica', onlineVideo: 'insert-exotica',
+  dropCap: 'insert-exotica', wordart: 'insert-exotica', textBox: 'insert-exotica',
+  object: 'insert-exotica', signatureLine: 'insert-exotica', dateTime: 'insert-exotica',
+  coverPage: 'insert-exotica', quickParts: 'insert-exotica',
+  crossReference: 'references', // slice 9 (fork has the cross-reference extension)
   // review (slice 8)
   newComment: 'review', comment: 'review', delete: 'review', previous: 'review', next: 'review',
   showComments: 'review', trackChanges: 'review', accept: 'review', reject: 'review',
@@ -218,6 +234,27 @@ export function preinstallBridge() {
     clearFind: () => false,
     findCount: () => ({ total: 0, activeMatchIndex: -1 }),
     goTo: () => false,
+    // slice 6: insert-primitive pre-mount stubs (replaced by installInsert on mount)
+    insertLink: () => false, removeLink: () => false, insertImage: () => false,
+    insertBookmark: () => false, listBookmarks: () => [], goToBookmark: () => false,
+    removeBookmark: () => false, renameBookmark: () => false,
+    insertSymbol: () => false, insertEquation: () => false,
+    insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
+    // slice 6: table pre-mount stubs (replaced by installTable on mount)
+    insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,
+    tableDeleteRow: () => false, tableDeleteColumn: () => false, tableDeleteTable: () => false,
+    tableMerge: () => false, tableSplitCell: () => false,
+    tableToggleHeaderRow: () => false, tableToggleHeaderColumn: () => false,
+    tableSetCellShading: () => false, tableSetCellVAlign: () => false,
+    isInTable: () => false, tableInfo: () => ({ inTable: false }),
+    // slice 6b: net-new Table Tools verbs (replaced by installTable on mount)
+    tableSetStyle: () => false, getTableStyles: () => [], tableSetAlignment: () => false, tableSetIndent: () => false,
+    tableSetCellWidth: () => false, tableSetRowHeight: () => false,
+    tableSetCellMargins: () => false, tableSetCellBorders: () => false,
+    tableDistributeColumns: () => false, tableDistributeRows: () => false,
+    tableSplit: () => false, tableToText: () => false, textToTable: () => false,
+    tableSetTextDirection: () => false, tableAutoFit: () => false,
+    tableSelectFirstRowPair: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -248,7 +285,7 @@ export function installBridge(editor: AnyEditor) {
       }
     }, true)
   }
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor))
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

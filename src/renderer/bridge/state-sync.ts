@@ -153,6 +153,12 @@ export function installStateSync(editor: AnyEditor) {
     if (fpBtn) fpBtn.classList.toggle('toggled', fpArmed)
     const pmPage = document.getElementById('pm-editor')
     if (pmPage) pmPage.style.cursor = fpArmed ? 'copy' : ''
+    // slice 6: track whether the caret is inside a table (drives Table Tools contextual tabs).
+    // isInTable() is installed by installTable — optional-chain so pre-mount sync is safe.
+    const inTable = !!(w.WC?.PM?.isInTable?.())
+    st.inTable = inTable
+    // No-op until Stage F (table-tools-pm.js) ships syncContextualTabs — must not throw.
+    ;(window as any).WC?.TableToolsPM?.syncContextualTabs?.(inTable)
     w.WC?.StatusBar?.update?.()
     // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
     const can = (w.WC?.editor as any)?.can?.()

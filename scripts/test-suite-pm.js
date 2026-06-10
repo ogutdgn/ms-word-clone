@@ -111,7 +111,9 @@
   await t('[0a] dirty flag tracks PM edits', async () => {
     const d0 = PM().isDirty();
     v().dispatch(v().state.tr.insertText('x', 1));
-    for (let i = 0; i < 20 && !(PM().isDirty() && document.title.startsWith('•')); i++) await sleep(50);
+    // Poll generously: the title '•' is set on the rAF-coalesced state-sync path, so
+    // give it ample budget (slice-6 added a syncContextualTabs hook to that path).
+    for (let i = 0; i < 40 && !(PM().isDirty() && document.title.startsWith('•')); i++) await sleep(50);
     return d0 === false && PM().isDirty() === true && document.title.startsWith('•');
   });
   await t('[0a] WC.PM.cmd dispatches an engine command', () => {
@@ -157,15 +159,15 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // probe cmd lives in a STILL-UNFLIPPED area — repointed replace→link when
-    // find-replace flipped (slice 5): a replace probe would go vacuously green once
-    // find-replace is live; link keeps the test MEANINGFUL (insert-basics = slice 6).
-    window.WC.Commands.run({ cmd: 'link', label: 'Link' });
+    // probe lives in a STILL-UNFLIPPED area — repointed link→newComment when
+    // insert-basics flipped (slice 6): a link probe would go vacuously green once
+    // insert-basics is live; newComment (review, slice 8) keeps the test MEANINGFUL.
+    window.WC.Commands.run({ cmd: 'newComment', label: 'New Comment' });
     return document.querySelectorAll('.flyout').length === 0
-      && !document.querySelector('.modal-backdrop'); // link dialog stays closed
+      && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'table', type: 'dropdown' }, document.body);
+    window.WC.Commands.dropdown({ cmd: 'tableOfContents', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -1165,6 +1167,719 @@
     const replaceOpen = !!document.getElementById('find-pane');
     const p = document.getElementById('find-pane'); p && p.querySelector('.x') && p.querySelector('.x').click();
     return findOpen && replaceOpen;
+  });
+
+  // ---------- slice 6: insert-basics (link/image/bookmark/symbol/equation/break/hr + table insert) ----------
+  // Every insert is a REAL PM transaction. Assert on doc().toJSON() nodes/marks + round-trip,
+  // never on legacy #editor DOM.
+  await PM().newBlank(); await sleep(100);
+  const hasNode = (name) => { let f = false; doc().descendants((n) => { if (n.type.name === name) f = true; }); return f; };
+  const hasMark = (name) => { let f = false; doc().descendants((n) => { if (n.marks && n.marks.some((m) => m.type.name === name)) f = true; }); return f; };
+
+  await t('[6] insertLink applies a link mark with href over the display text', async () => {
+    setDoc('click here please');
+    selectText('click here'); await sleep(60);
+    PM().insertLink({ href: 'https://example.com', text: 'click here' }); await sleep(120);
+    if (!hasMark('link')) return 'no link mark';
+    let href = null; doc().descendants((n) => { (n.marks || []).forEach((m) => { if (m.type.name === 'link') href = m.attrs.href; }); });
+    return /example\.com/.test(href || '');
+  });
+  await t('[6] insertLink with new display text inserts that text + link', async () => {
+    setDoc('prefix '); selectText(' '); // collapsed-ish; rely on caret
+    // selectText(' ') leaves the space selected; insertLink is expected to overwrite it with 'Anthropic'.
+    // place caret at end, insert a link with explicit text
+    PM().insertLink({ href: 'https://anthropic.com', text: 'Anthropic' }); await sleep(120);
+    return doc().textContent.includes('Anthropic') && hasMark('link');
+  });
+  await t('[6] removeLink clears the link mark', async () => {
+    setDoc('linked word'); selectText('linked word');
+    PM().insertLink({ href: 'https://x.com', text: 'linked word' }); await sleep(80);
+    selectText('linked word'); PM().removeLink(); await sleep(80);
+    return !hasMark('link');
+  });
+  await t('[6] insertImage inserts an image node with the data-url src', async () => {
+    setDoc('photo: ');
+    const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    PM().insertImage({ src: px, alt: 'dot' }); await sleep(120);
+    let src = null; doc().descendants((n) => { if (n.type.name === 'image') src = n.attrs.src; });
+    return hasNode('image') && /^data:image\/png/.test(src || '');
+  });
+  await t('[6] insertBookmark wraps the selection in PAIRED start+end (same id)', async () => {
+    setDoc('mark this range'); selectText('this range'); await sleep(60);
+    PM().insertBookmark({ name: 'spot1' }); await sleep(120);
+    let startId = null, endId = null, name = null;
+    doc().descendants((n) => {
+      if (n.type.name === 'bookmarkStart') { startId = n.attrs.id; name = n.attrs.name; }
+      if (n.type.name === 'bookmarkEnd') endId = n.attrs.id;
+    });
+    return hasNode('bookmarkStart') && hasNode('bookmarkEnd') && startId != null && startId === endId && name === 'spot1';
+  });
+  await t('[6] listBookmarks returns inserted bookmarks; goToBookmark finds one', async () => {
+    setDoc('alpha beta gamma'); selectText('beta');
+    PM().insertBookmark({ name: 'bk_beta' }); await sleep(80);
+    const list = PM().listBookmarks();
+    const ok = Array.isArray(list) && list.some((b) => b.name === 'bk_beta');
+    return ok && PM().goToBookmark('bk_beta') === true;
+  });
+  await t('[6] removeBookmark deletes the pair', async () => {
+    setDoc('one two three'); selectText('two');
+    PM().insertBookmark({ name: 'gone' }); await sleep(80);
+    PM().removeBookmark('gone'); await sleep(80);
+    return !hasNode('bookmarkStart') && !hasNode('bookmarkEnd');
+  });
+  await t('[6] insertSymbol inserts the unicode character as text', async () => {
+    setDoc('temp ');
+    PM().insertSymbol('©'); await sleep(80);
+    return doc().textContent.includes('temp') && doc().textContent.includes('©');
+  });
+  await t('[6] insertEquation inserts styled Cambria Math italic text', async () => {
+    setDoc('eq: ');
+    PM().insertEquation('a² + b² = c²'); await sleep(120);
+    if (!doc().textContent.includes('a²')) return 'equation text missing';
+    let fam = null, ital = false;
+    doc().descendants((n) => { (n.marks || []).forEach((m) => { if (m.type.name === 'textStyle' && m.attrs.fontFamily) fam = m.attrs.fontFamily; if (m.type.name === 'italic') ital = true; }); });
+    return /Cambria Math/i.test(fam || '') && ital === true;
+  });
+  await t('[6] insertPageBreak inserts a hardBreak page-break node', async () => {
+    setDoc('before break');
+    PM().insertPageBreak(); await sleep(80);
+    let pb = false; doc().descendants((n) => { if (n.type.name === 'hardBreak' && (n.attrs.pageBreakType === 'page')) pb = true; });
+    return pb === true;
+  });
+  await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
+    setDoc('above line');
+    PM().insertHr(); await sleep(80);
+    let hr = false; doc().descendants((n) => { if (n.type.name === 'contentBlock' && n.attrs.horizontalRule) hr = true; });
+    return hr === true;
+  });
+  await t('[6] insertTable inserts a table with the requested rows×cols', async () => {
+    setDoc('table here');
+    PM().insertTable({ rows: 3, cols: 4 }); await sleep(120);
+    let rows = 0, cols = 0;
+    doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
+    return hasNode('table') && rows === 3 && cols === 4;
+  });
+  // ---- migrate the legacy 9 table ops (caret-in-table) ----
+  await t('[6] table addRow below grows the row count', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableAddRow('below'); await sleep(100);
+    let rows = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    return rows === 3;
+  });
+  await t('[6] table addColumn right grows each row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableAddColumn('right'); await sleep(100);
+    let cols = 0; doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
+    return cols === 3;
+  });
+  await t('[6] table deleteRow shrinks the row count', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(120);
+    PM().tableDeleteRow(); await sleep(100);
+    let rows = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
+    return rows === 2;
+  });
+  await t('[6] table deleteColumn shrinks each row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(120);
+    PM().tableDeleteColumn(); await sleep(100);
+    let cols = 99; doc().descendants((n) => { if (n.type.name === 'tableRow') cols = Math.min(cols, n.childCount); });
+    return cols === 2;
+  });
+  await t('[6] table deleteTable removes the table node', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableDeleteTable(); await sleep(100);
+    return !hasNode('table');
+  });
+  // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
+  // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
+  // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table
+  // ops that work off a plain caret-in-cell (insert/delete row+col, header toggle).
+  // (T3 fix: setCellBackground now ALSO works off a plain caret — Word parity; see the
+  // [6b] shading tests.)
+  await t('[6] table toggleHeaderRow converts the first row to header cells', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
+    PM().tableToggleHeaderRow(); await sleep(100);
+    let hasHeaderCell = false; doc().descendants((n) => { if (n.type.name === 'tableHeader') hasHeaderCell = true; });
+    return hasHeaderCell === true;
+  });
+  await t('[6] D6 flip: link dialog + table grid open in PM mode', async () => {
+    // inverse of the pre-flip D6 block — proves the registry flip reached dispatch.
+    window.WC.Commands.run({ cmd: 'link', label: 'Link' }); await sleep(80);
+    const linkOpen = !!document.querySelector('.modal-backdrop');
+    const bd = document.querySelector('.modal-backdrop');
+    if (bd) {
+      const cancel = Array.from(bd.querySelectorAll('button')).find((b) => /Cancel/.test(b.textContent));
+      if (cancel) cancel.click(); else bd.remove(); // never leak
+    }
+    await sleep(40);
+    window.WC.Commands.dropdown({ cmd: 'table', type: 'dropdown' }, document.body); await sleep(60);
+    const tableOpen = document.querySelectorAll('.flyout').length > 0;
+    window.WC.closeFlyouts();
+    return linkOpen && tableOpen;
+  });
+
+  // ---------- slice 6b: net-new fork table commands (Task 8 — ENGINE LEVEL) ----------
+  // These call editor.commands.<cmd>(...) DIRECTLY (no bridge wrapper / no ribbon UI yet —
+  // those land in Tasks 9/10). After insertTable the fork puts the caret in the first cell,
+  // so the cell/row-scoped commands (setCellAttr / selectedRect) work off that plain caret.
+  // Asserts read back the resulting node attr via doc().toJSON()/descendants.
+  const ecmd = (name, ...args) => window.WC.editor.commands[name](...args);
+  const tableAttr = (key) => { let v = undefined; doc().descendants((n) => { if (n.type.name === 'table' && v === undefined) v = n.attrs[key]; }); return v; };
+  const firstCellAttr = (key) => { let v = undefined; doc().descendants((n) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && v === undefined) v = n.attrs[key]; }); return v; };
+  const firstRowAttr = (key) => { let v = undefined; doc().descendants((n) => { if (n.type.name === 'tableRow' && v === undefined) v = n.attrs[key]; }); return v; };
+
+  await t('[6b] setTableStyle dual-writes tableStyleId + tableProperties.tableStyleId', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); await sleep(80);
+    const tp = tableAttr('tableProperties');
+    // The nested key is what the w:tblPr decoder reads → <w:tblStyle>; assert both.
+    return tableAttr('tableStyleId') === 'GridTable4-Accent1'
+      && !!tp && tp.tableStyleId === 'GridTable4-Accent1';
+  });
+  await t('[6b] setTableAlignment center sets table justification', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableAlignment', 'center'); await sleep(80);
+    return tableAttr('justification') === 'center';
+  });
+  await t('[6b] setTableIndent dual-writes tableIndent.width (px) + tableProperties.tableIndent (twips)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableIndent', 48); await sleep(80); // 48px → 720 twips
+    const ti = tableAttr('tableIndent');
+    const tp = tableAttr('tableProperties');
+    // Top-level keeps the px {width,type} shape; nested keeps the OOXML {value,type} twips shape.
+    return !!ti && ti.width === 48 && ti.type === 'dxa'
+      && !!tp && !!tp.tableIndent && tp.tableIndent.value === 720 && tp.tableIndent.type === 'dxa';
+  });
+  await t('[6b] setCellWidth writes colwidth on the caret column', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellWidth', 123); await sleep(80);
+    const cw = firstCellAttr('colwidth');
+    return Array.isArray(cw) && cw[0] === 123;
+  });
+  await t('[6b] setRowHeight writes rowHeight + tableRowProperties on the caret row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setRowHeight', 40, 'exact'); await sleep(80);
+    const rh = firstRowAttr('rowHeight');
+    const trp = firstRowAttr('tableRowProperties');
+    return rh === 40 && !!trp && trp.rowHeight && trp.rowHeight.value === 40 && trp.rowHeight.rule === 'exact';
+  });
+  await t('[6b] setCellMargins writes cellMargins on the caret cell', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellMargins', { top: 4, right: 8, bottom: 4, left: 8 }); await sleep(80);
+    const m = firstCellAttr('cellMargins');
+    return !!m && m.top === 4 && m.right === 8 && m.bottom === 4 && m.left === 8;
+  });
+  await t('[6b] setCellBorders writes borders on the caret cell', async () => {
+    // The fork's tableStyleNormalization plugin migrates attrs.borders → the
+    // canonical tableCellProperties.borders (and nulls attrs.borders), scaling
+    // the size to OOXML eighths — assert on the canonical landing place.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellBorders', { top: { val: 'single', color: '000000', size: 4 }, bottom: { val: 'single', color: '000000', size: 4 } }); await sleep(150);
+    const inline = firstCellAttr('borders');
+    const tcp = firstCellAttr('tableCellProperties');
+    const b = (inline && inline.top) ? inline : (tcp && tcp.borders);
+    return !!b && b.top && b.top.val === 'single';
+  });
+  await t('[6b] distributeColumnsEvenly writes an equal colwidth across cells', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    ecmd('distributeColumnsEvenly'); await sleep(80);
+    const widths = [];
+    doc().descendants((n) => { if (n.type.name === 'tableCell' && n.attrs.colwidth) widths.push(n.attrs.colwidth[0]); });
+    return widths.length >= 3 && widths.every((w) => w === widths[0] && w > 0);
+  });
+  await t('[6b] distributeRowsEvenly writes a rowHeight on the rows', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(150);
+    ecmd('distributeRowsEvenly'); await sleep(80);
+    let allHave = true, count = 0;
+    doc().descendants((n) => { if (n.type.name === 'tableRow') { count++; if (!n.attrs.rowHeight) allHave = false; } });
+    return count === 3 && allHave === true;
+  });
+  await t('[6b] setTextDirection dual-writes textDirection + tableCellProperties.textDirection', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTextDirection', 'tbRl'); await sleep(80);
+    const tcp = firstCellAttr('tableCellProperties');
+    // The nested key is what the w:tcPr decoder reads → <w:textDirection>; assert both.
+    return firstCellAttr('textDirection') === 'tbRl'
+      && !!tcp && tcp.textDirection === 'tbRl';
+  });
+  await t('[6b] autoFitTable fixed sets tableLayout fixed', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('autoFitTable', 'fixed'); await sleep(80);
+    const layout = tableAttr('tableLayout');
+    const tp = tableAttr('tableProperties');
+    return layout === 'fixed' && !!tp && tp.tableLayout === 'fixed';
+  });
+  await t('[6b] autoFitTable window marks 100% width', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('autoFitTable', 'window'); await sleep(80);
+    const tp = tableAttr('tableProperties');
+    return !!tp && tp.tableWidth && tp.tableWidth.value === 5000 && tp.tableWidth.type === 'pct';
+  });
+  await t('[6b] AutoFit Fixed undoes the Window stretch', async () => {
+    // T3 defect B: 'window' writes tableWidth {5000,'pct'} (renders width: calc(100% + …px)
+    // — TableView.updateColumns pct branch); a following 'fixed' must CLEAR that stretch
+    // (key absent = the importer's no-explicit-width shape; convertSizeToCSS(null,'auto')
+    // → null un-sets style.width) so columns drive the size again, like Word.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    const tbl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    ecmd('autoFitTable', 'window'); await sleep(150);
+    const w1 = tbl() ? tbl().style.width : 'no-table';
+    if (!/calc|100%/.test(w1)) return 'window did not stretch: style.width=' + JSON.stringify(w1);
+    ecmd('autoFitTable', 'fixed'); await sleep(150);
+    const w2 = tbl() ? tbl().style.width : 'no-table';
+    if (/calc|100%/.test(w2)) return 'stretch not cleared: style.width=' + JSON.stringify(w2);
+    const tp = tableAttr('tableProperties');
+    if (!tp || tp.tableLayout !== 'fixed') return 'tableProperties.tableLayout != fixed: ' + JSON.stringify(tp);
+    if (tp.tableWidth && tp.tableWidth.type === 'pct') return 'pct tableWidth still present: ' + JSON.stringify(tp.tableWidth);
+    return true;
+  });
+  await t('[6b] convertTableTotext replaces the table with paragraphs', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    let inserted = false; doc().descendants((n) => { if (n.type.name === 'table') inserted = true; });
+    if (!inserted) return 'table not inserted';
+    ecmd('convertTableToText', '\t'); await sleep(100);
+    let stillTable = false, paras = 0;
+    doc().descendants((n) => { if (n.type.name === 'table') stillTable = true; if (n.type.name === 'paragraph') paras++; });
+    return stillTable === false && paras >= 2;
+  });
+  await t('[6b] convertTextToTable builds a table from delimited paragraphs', async () => {
+    setDocs(['a\tb\tc', 'd\te\tf']); await sleep(100);
+    window.WC.editor.commands.selectAll(); await sleep(60);
+    ecmd('convertTextToTable', '\t'); await sleep(120);
+    let hasTable = false, rows = 0, cols = 0;
+    doc().descendants((n) => { if (n.type.name === 'table') hasTable = true; if (n.type.name === 'tableRow') { rows++; if (cols === 0) cols = n.childCount; } });
+    return hasTable && rows === 2 && cols === 3;
+  });
+  await t('[6b] splitTableAtRow splits into two tables at the caret row boundary', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(150);
+    // Move the caret into the SECOND row so the split boundary is row index 1.
+    let secondRowCellPos = null; let rowIdx = 0;
+    doc().descendants((n, pos) => { if (n.type.name === 'tableRow') { if (rowIdx === 1 && secondRowCellPos == null) secondRowCellPos = pos + 2; rowIdx++; } });
+    if (secondRowCellPos == null) return 'no second row';
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), secondRowCellPos)));
+    await sleep(60);
+    ecmd('splitTableAtRow'); await sleep(100);
+    let tables = 0; doc().descendants((n) => { if (n.type.name === 'table') tables++; });
+    return tables === 2;
+  });
+  await t('[6b] new table commands survive a docx round-trip (style + align)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); ecmd('setTableAlignment', 'center'); await sleep(80);
+    const bytes = await PM().exportDocxBytes();
+    return bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+  });
+
+  // Real export-XML assertions: the dual-write fix (Task 8 follow-up) made
+  // setTableStyle/setTableIndent/setTextDirection write the NESTED
+  // tableProperties/tableCellProperties keys the w:tblPr/w:tcPr decoders iterate.
+  // editor.exportDocx({ exportXmlOnly: true }) returns the raw word/document.xml
+  // string straight from the converter (no zip round-trip needed in the renderer),
+  // so we can grep the actual OOXML the file would carry. These FAIL if a command
+  // regresses back to writing only the top-level attr (the value would silently
+  // never reach <w:tblStyle>/<w:tblInd>/<w:textDirection>).
+  const exportDocumentXml = async () => {
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return typeof xml === 'string' ? xml : '';
+  };
+  // Build one table carrying style + indent + center align + cell borders, then
+  // (CellSelection on the first row) text direction, and inspect the bytes once.
+  const buildLoadedTableAndExport = async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1');
+    ecmd('setTableAlignment', 'center');
+    ecmd('setTableIndent', 48); // 48px → 720 twips (0.5in)
+    ecmd('setCellBorders', { top: { val: 'single', color: '000000', size: 4 }, bottom: { val: 'single', color: '000000', size: 4 } });
+    ecmd('setTextDirection', 'tbRl');
+    await sleep(120);
+    return exportDocumentXml();
+  };
+  await t('[6b] EXPORT: setTableStyle emits <w:tblStyle w:val=...> in document.xml', async () => {
+    const xml = await buildLoadedTableAndExport();
+    return /<w:tblStyle\b[^>]*w:val="GridTable4-Accent1"/.test(xml) || 'no <w:tblStyle> in: ' + xml.slice(xml.indexOf('<w:tblPr'), xml.indexOf('<w:tblPr') + 400);
+  });
+  await t('[6b] EXPORT: setTableIndent emits <w:tblInd w:w="720" w:type="dxa"> (48px → twips)', async () => {
+    const xml = await buildLoadedTableAndExport();
+    const m = xml.match(/<w:tblInd\b[^>]*\/?>/);
+    if (!m) return 'no <w:tblInd> in: ' + xml.slice(xml.indexOf('<w:tblPr'), xml.indexOf('<w:tblPr') + 400);
+    // 48px = 0.5in = 720 twips. Assert the exact sane twip value (catches the unit bug).
+    const wMatch = m[0].match(/w:w="(\d+)"/);
+    const typeOk = /w:type="dxa"/.test(m[0]);
+    return !!wMatch && Number(wMatch[1]) === 720 && typeOk || 'bad tblInd: ' + m[0];
+  });
+  await t('[6b] EXPORT: setTextDirection emits <w:textDirection w:val="tbRl"> in a w:tcPr', async () => {
+    const xml = await buildLoadedTableAndExport();
+    return /<w:textDirection\b[^>]*w:val="tbRl"/.test(xml) || 'no <w:textDirection> in document.xml';
+  });
+  await t('[6b] EXPORT: setCellBorders emits <w:tcBorders> + center align emits <w:jc w:val="center"> (regression guard)', async () => {
+    const xml = await buildLoadedTableAndExport();
+    const hasBorders = /<w:tcBorders\b/.test(xml);
+    const hasCenter = /<w:jc\b[^>]*w:val="center"/.test(xml);
+    return (hasBorders && hasCenter) || `borders=${hasBorders} center=${hasCenter}`;
+  });
+
+  // ---------- slice 6b (Task 9): bridge-layer WC.PM-routed tests ----------
+  // These exercise the same fork commands as above but through WC.PM.* wrappers,
+  // proving the index.ts stubs are replaced and calls reach the fork.
+  await t('[6b][bridge] WC.PM.tableSetStyle routes through bridge to setTableStyle', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.styleId === 'GridTable4-Accent1';
+  });
+  await t('[6b][bridge] WC.PM.tableSetAlignment routes through bridge to setTableAlignment', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetAlignment('right'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.alignment === 'right';
+  });
+
+  // ---------- slice 6b (T4): table styles end-to-end ----------
+  // The minted real-Word table-style definitions (TableGrid + GridTable4-Accent1,
+  // extracted from real Word 16.77.1 — tests/fixtures/oracle-word-s6-tablestyles.docx
+  // and oracle-word-s3-table.docx) must (a) land in the runtime styles catalog so
+  // the gallery is honest, (b) reach word/styles.xml on export so Word keeps the
+  // <w:tblStyle> reference (oracle Leg C failure), and (c) BAKE a visible change
+  // (table borders + first-row shading) at apply time — without stomping an
+  // explicit user-set cell background (Word: direct formatting beats table style).
+  await t('[6b] styles catalog contains minted table styles (getTableStyles)', async () => {
+    await PM().newBlank(); await sleep(100);
+    const list = PM().getTableStyles();
+    if (!Array.isArray(list)) return 'getTableStyles did not return an array';
+    const byId = Object.fromEntries(list.map((s) => [s.id, s.name]));
+    if (!byId['TableGrid']) return 'TableGrid missing from catalog: ' + JSON.stringify(list);
+    if (!byId['GridTable4-Accent1']) return 'GridTable4-Accent1 missing from catalog: ' + JSON.stringify(list);
+    if (!(byId['TableGrid'].length > 0 && byId['GridTable4-Accent1'].length > 0)) return 'empty display names: ' + JSON.stringify(list);
+    // TableNormal is semiHidden (Word does not list it in the gallery) — keep it out.
+    if (byId['TableNormal']) return 'semiHidden TableNormal leaked into the gallery list';
+    return true;
+  });
+  await t('[6b] EXPORT: minted table style definition reaches styles.xml', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(80);
+    // The exporter serializes converter.convertedXml['word/styles.xml'] back out;
+    // addDefaultStylesIfMissing mutates that in-memory catalog at parse time, so the
+    // definition being present HERE is what guarantees it reaches the saved file
+    // (renderer cannot unzip; the node-side re-check is scripts/docx-inspect.js
+    // `tableStyles`). Run a real export first so the assertion tracks the live path.
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500)) return 'export produced no bytes';
+    const styles = window.WC.editor.converter?.convertedXml?.['word/styles.xml'];
+    const els = (styles && styles.elements && styles.elements[0] && styles.elements[0].elements) || [];
+    const def = els.find((el) => el.name === 'w:style' && el.attributes && el.attributes['w:styleId'] === 'GridTable4-Accent1');
+    if (!def) return 'no GridTable4-Accent1 w:style in convertedXml styles.xml';
+    if (def.attributes['w:type'] !== 'table') return 'GridTable4-Accent1 minted with wrong type: ' + def.attributes['w:type'];
+    // The conditional blocks are what make header-row/banding render in Word — keep intact.
+    const stylePrs = (def.elements || []).filter((el) => el.name === 'w:tblStylePr');
+    if (stylePrs.length < 6) return 'tblStylePr conditional blocks missing (got ' + stylePrs.length + ', want 6)';
+    return true;
+  });
+  await t('[6b] tableSetStyle visibly changes the table (bake)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    const tblEl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tblEl()) return 'no table rendered';
+    const before = tblEl().outerHTML;
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(200);
+    const el = tblEl();
+    if (!el) return 'table lost after style apply';
+    if (el.outerHTML === before) return 'DOM unchanged after tableSetStyle';
+    // Be specific about WHAT changed: GridTable4-Accent1 base tblPr borders are
+    // single 4/8pt #8EAADB → computed border color rgb(142, 170, 219); the firstRow
+    // tblStylePr shades first-row cells #4472C4 → rgb(68, 114, 196).
+    const borderColor = getComputedStyle(el).borderTopColor;
+    if (borderColor !== 'rgb(142, 170, 219)') return 'table border not baked: borderTopColor=' + borderColor;
+    const firstCell = el.querySelector('tbody > tr > td, tbody > tr > th');
+    if (!firstCell) return 'no first-row cell';
+    const bg = getComputedStyle(firstCell).backgroundColor;
+    if (bg !== 'rgb(68, 114, 196)') return 'first-row shading not baked: backgroundColor=' + bg;
+    return true;
+  });
+  await t('[6b] tableSetStyle preserves an explicit user cell shading', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    // Caret sits in the FIRST cell after insertTable — shade it (user direct formatting),
+    // then apply the style. Word keeps direct shading over the style's firstRow fill.
+    PM().tableSetCellShading('#FFF2CC'); await sleep(80);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(150);
+    const bg = firstCellAttr('background');
+    if (!bg || String(bg.color).toUpperCase() !== 'FFF2CC') return 'user shading stomped: ' + JSON.stringify(bg);
+    // ...while an untouched first-row cell DOES get the style's firstRow fill.
+    let secondBg = null; let seen = 0;
+    doc().descendants((n) => {
+      if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') { seen++; if (seen === 2 && secondBg === null) secondBg = n.attrs.background; }
+    });
+    if (!secondBg || String(secondBg.color).toUpperCase() !== '4472C4') return 'sibling first-row cell not baked: ' + JSON.stringify(secondBg);
+    return true;
+  });
+  await t('[6b] direct table borders beat the baked style frame (Word precedence)', async () => {
+    // T4 review fix: a table with explicit DIRECT w:tblBorders (importable from Word
+    // docs; not UI-writable yet) keeps its direct frame when a style is applied — Word
+    // precedence. The importer merges `{ ...styleBorders, ...directBorders }` on reopen
+    // (tbl-translator.js), so an apply-time overwrite made the table change appearance
+    // across its own save cycle. Build the importer's two shapes directly in a
+    // transaction: OOXML eighth-points in tableProperties.borders + the px projection
+    // (_processTableBorders: 24 eighths = 3pt → 4px, '#'-prefixed color) in attrs.borders.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    let tablePos = -1, tableNode = null;
+    doc().descendants((n, pos) => { if (tablePos < 0 && n.type.name === 'table') { tablePos = pos; tableNode = n; } });
+    if (tablePos < 0) return 'no table';
+    const ooxml = {}, px = {};
+    for (const s of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+      ooxml[s] = { val: 'single', size: 24, space: 0, color: 'FF0000' };
+      px[s] = { color: '#FF0000', size: 4, val: 'single' };
+    }
+    v().dispatch(v().state.tr.setNodeMarkup(tablePos, undefined, {
+      ...tableNode.attrs,
+      borders: px,
+      tableProperties: { ...(tableNode.attrs.tableProperties || {}), borders: ooxml },
+    }));
+    await sleep(80);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); await sleep(120);
+    const b = tableAttr('borders');
+    if (!b || !b.top) return 'borders attr lost after style apply: ' + JSON.stringify(b);
+    if (String(b.top.color).toUpperCase() !== '#FF0000' || b.top.size !== 4)
+      return 'style frame stomped the direct border: ' + JSON.stringify(b.top);
+    if (tableAttr('tableStyleId') !== 'GridTable4-Accent1') return 'styleId not applied';
+    // Style CLEAR falls back to the direct projection, not {} — same merge on the way out.
+    ecmd('setTableStyle', null); await sleep(120);
+    const b2 = tableAttr('borders');
+    if (!b2 || !b2.top || String(b2.top.color).toUpperCase() !== '#FF0000')
+      return 'style clear wiped the direct borders: ' + JSON.stringify(b2);
+    return true;
+  });
+  // ---- gridlines: table-level insideH/insideV must PAINT (user defect: "just a big box") ----
+  // The table node's `borders` attr carries all six OOXML sides, but the renderDOM
+  // border-${key} emission is only valid CSS for the four physical sides — insideH/
+  // insideV produced `border-insideH:` (dropped) and NOTHING painted cell gridlines
+  // (cells carry no `borders` attr in the styled path; probe-verified the imported
+  // real-Word s3 fixture was a big box too). The render-only fix publishes the inside
+  // borders as inherited CSS vars (--wc-inside-h/--wc-inside-v) consumed by a
+  // stylesheet rule on INTERIOR cell edges (top of rows 2+, left of columns 2+) —
+  // outer edges stay table-frame-owned, exactly Word's inside/outside split.
+  const interiorCellBorders = () => {
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tbl) return null;
+    const rows = tbl.querySelectorAll('tbody > tr');
+    if (rows.length < 2) return null;
+    const cell = rows[1].querySelectorAll('td, th')[1]; // row 2, col 2: both edges interior
+    if (!cell) return null;
+    const cs = getComputedStyle(cell);
+    return {
+      top: { w: parseFloat(cs.borderTopWidth) || 0, style: cs.borderTopStyle },
+      left: { w: parseFloat(cs.borderLeftWidth) || 0, style: cs.borderLeftStyle },
+    };
+  };
+  await t('[6b] fresh table renders visible cell gridlines (Word parity)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    const b = interiorCellBorders();
+    if (!b) return 'no 3x3 table rendered';
+    if (!(b.top.w >= 1 && b.top.style === 'solid')) return 'no insideH gridline: border-top=' + b.top.w + 'px ' + b.top.style;
+    if (!(b.left.w >= 1 && b.left.style === 'solid')) return 'no insideV gridline: border-left=' + b.left.w + 'px ' + b.left.style;
+    return true;
+  });
+  await t('[6b] borderless table shows no gridlines', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    ecmd('deleteCellAndTableBorders'); await sleep(150);
+    const b = interiorCellBorders();
+    if (!b) return 'no 3x3 table rendered';
+    if (b.top.w !== 0 || b.left.w !== 0)
+      return 'gridlines painted on a borderless table: top=' + b.top.w + 'px ' + b.top.style + ' left=' + b.left.w + 'px ' + b.left.style;
+    return true;
+  });
+  await t('[6b] EXPORT purity: fresh table writes no direct w:tcBorders', async () => {
+    // Real Word style-driven tables carry NO per-cell w:tcBorders (the style
+    // definition in styles.xml owns the gridlines). The render-only gridline fix
+    // must not bake borders into cell attrs — the translate-table-cell legacy
+    // fallback would export them as direct formatting.
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
+    const xml = await exportDocumentXml();
+    if (!xml) return 'export produced no xml';
+    if (/<w:tcBorders\b/.test(xml)) return 'direct w:tcBorders leaked into document.xml';
+    if (/<w:tblBorders\b/.test(xml)) return 'direct w:tblBorders leaked into document.xml';
+    return true;
+  });
+  // ---- T2 geometry regression: alignment must MOVE the table, not just set attrs ----
+  // The fork's TableView.updateColumns used to write table.style.marginLeft from
+  // `tableIndent?.value ?? 0` UNCONDITIONALLY ('0px' when no indent exists), stomping
+  // the justification margins (`margin: 0 auto` / `margin-left: auto`) that
+  // updateTable() had just applied from renderDOM — center/right were visually inert.
+  // These measure real pixels against the .tableWrapper (the table's containing block).
+  const tableGeom = () => {
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tbl) return null;
+    const tr = tbl.getBoundingClientRect();
+    const wr = tbl.parentElement.getBoundingClientRect();
+    return { leftGap: tr.left - wr.left, rightGap: wr.right - tr.right };
+  };
+  // 80px columns keep the table well under the wrapper width so alignment has room to move it.
+  const insertNarrowTable = async () => {
+    setDoc('x'); ecmd('insertTable', { rows: 2, cols: 2, columnWidths: [80, 80] }); await sleep(150);
+  };
+  await t('[6b] tableSetAlignment center visibly centers the table (geometry)', async () => {
+    await insertNarrowTable();
+    if (!tableGeom()) return 'no table rendered';
+    if (!PM().tableSetAlignment('center')) return 'tableSetAlignment returned false';
+    await sleep(150);
+    const g = tableGeom();
+    if (!g) return 'table lost after align';
+    if (!(g.leftGap > 20)) return `still hard-left: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    if (!(Math.abs(g.leftGap - g.rightGap) < 40)) return `lopsided: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    return true;
+  });
+  await t('[6b] tableSetAlignment right hugs the right (geometry)', async () => {
+    await insertNarrowTable();
+    if (!tableGeom()) return 'no table rendered';
+    if (!PM().tableSetAlignment('right')) return 'tableSetAlignment returned false';
+    await sleep(150);
+    const g = tableGeom();
+    if (!g) return 'table lost after align';
+    if (!(g.rightGap < g.leftGap)) return `not right-aligned: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
+    if (!(g.rightGap < 40)) return `right gap too big: rightGap=${g.rightGap.toFixed(1)}`;
+    return true;
+  });
+  await t('[6b] tableSetIndent still indents (no regression after the margin gating)', async () => {
+    await insertNarrowTable();
+    const before = tableGeom();
+    if (!before) return 'no table rendered';
+    if (!PM().tableSetIndent(48)) return 'tableSetIndent returned false';
+    await sleep(150);
+    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    const ml = parseFloat(getComputedStyle(tbl).marginLeft);
+    const g = tableGeom();
+    const grew = g.leftGap - before.leftGap;
+    // 48px → 720 twips → back to 48px through convertSizeToCSS; tiny rounding slack only.
+    if (!(Math.abs(ml - 48) <= 2)) return `computed margin-left=${ml} (expected ~48)`;
+    if (!(grew > 30)) return `leftGap did not grow ~48: before=${before.leftGap.toFixed(1)} after=${g.leftGap.toFixed(1)}`;
+    return true;
+  });
+
+  await t('[6b][bridge] tableInfo returns rows/cols/styleId/alignment from live table node', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 4 }); await sleep(150);
+    PM().tableSetStyle('TableGrid'); await sleep(80);
+    const info = PM().tableInfo();
+    return info.inTable && info.rows === 3 && info.cols === 4 && info.styleId === 'TableGrid';
+  });
+  await t('[6b][bridge] B3: tableSelectFirstRowPair + tableMerge reduces first row cell count', async () => {
+    // Insert 2×3 table (2 rows, 3 cols), select first two cells of first row, merge.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    const selOk = PM().tableSelectFirstRowPair(); await sleep(80);
+    if (!selOk) return 'tableSelectFirstRowPair returned false';
+    const mergeOk = PM().tableMerge(); await sleep(80);
+    if (!mergeOk) return 'tableMerge returned false after CellSelection';
+    // After merge the first row has 2 cells (merged cell + remaining cell).
+    try {
+      // Navigate to the table node.
+      const sel = PM().getEditor().state.selection;
+      const from = sel.$from;
+      for (let d = from.depth; d > 0; d--) {
+        if (from.node(d).type.name === 'table') {
+          const firstRow = from.node(d).child(0);
+          return firstRow.childCount === 2 || `expected 2 cells, got ${firstRow.childCount}`;
+        }
+      }
+      return 'table node not found after merge';
+    } catch (e) {
+      return String(e);
+    }
+  });
+  await t('[6b] cell shading works with a plain caret (Word parity)', async () => {
+    // T3 defect A: Word shades the CARET cell when no cells are selected; the bridge
+    // used to refuse ('Select cells first' toast + false). setCellAttr is caret-safe
+    // (resolves the caret cell via selectionCell), so the fork now falls back to it.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    // Precondition: insertTable leaves a plain TextSelection in the first cell — not a
+    // CellSelection ($anchorCell is CellSelection-only; robust against minified names).
+    if (v().state.selection.$anchorCell) return 'precondition: expected a plain caret, got a CellSelection';
+    const toasts = [];
+    const realToast = window.WC.toast;
+    window.WC.toast = (msg, info) => { toasts.push(String(msg)); realToast.call(window.WC, msg, info); };
+    let ok;
+    try { ok = PM().tableSetCellShading('#FFE699'); } finally { window.WC.toast = realToast; }
+    await sleep(100);
+    if (toasts.some((m) => /select cells first/i.test(m))) return 'refused with toast: ' + toasts.join(' | ');
+    if (!ok) return 'tableSetCellShading returned false';
+    const bg = firstCellAttr('background');
+    return (!!bg && /^ffe699$/i.test(bg.color || '')) || 'background attr not set on caret cell: ' + JSON.stringify(bg);
+  });
+  await t('[6b] shading with a CellSelection still shades all selected cells', async () => {
+    // Regression guard for the caret fallback: the multi-cell path must keep working.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    if (!PM().tableSelectFirstRowPair()) return 'tableSelectFirstRowPair returned false';
+    await sleep(80);
+    if (!PM().tableSetCellShading('#FFE699')) return 'tableSetCellShading returned false';
+    await sleep(100);
+    let row = null; doc().descendants((n) => { if (!row && n.type.name === 'tableRow') row = n; });
+    if (!row || row.childCount < 3) return 'first row not found/intact';
+    const c0 = row.child(0).attrs.background, c1 = row.child(1).attrs.background, c2 = row.child(2).attrs.background;
+    const shaded = (c) => !!c && /^ffe699$/i.test(c.color || '');
+    if (!shaded(c0) || !shaded(c1)) return `selected cells not both shaded: c0=${JSON.stringify(c0)} c1=${JSON.stringify(c1)}`;
+    if (shaded(c2)) return 'unselected third cell was shaded too';
+    return true;
+  });
+
+  // ---- Table Layout + Table Design contextual ribbon tabs (Task 10) ----
+  await t('[6b] contextual Table tabs appear when caret is in a table', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    const layout = !!document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const design = !!document.querySelector('.contextual-tab[data-tab="table-design"]');
+    return PM().isInTable() === true && layout === true && design === true;
+  });
+  await t('[6b] a Table Layout tab control cmd dispatches (tblInsertBelow grows the row count)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    let before = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') before++; });
+    window.WC.Commands.run({ cmd: 'tblInsertBelow', label: 'Insert Below', type: 'button' }); await sleep(120);
+    let after = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') after++; });
+    return before === 2 && after === 3;
+  });
+  await t('[6b] leaving the table (caret outside) + sync hides BOTH contextual tabs', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    // guard: prove they are present first
+    if (!document.querySelector('.contextual-tab[data-tab="table-layout"]')) return 'tabs never appeared';
+    // insertTable leaves a trailing empty paragraph after the table; drop the caret
+    // into it (end of doc) so the selection is OUTSIDE the table, then re-sync.
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), doc().content.size - 1)));
+    await sleep(80);
+    if (PM().isInTable() !== false) return 'caret still reports in-table after moving to trailing paragraph';
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    const layoutGone = !document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const designGone = !document.querySelector('.contextual-tab[data-tab="table-design"]');
+    return layoutGone === true && designGone === true;
+  });
+  // Word fidelity (live-repro probe S1.x): contextual tabs are PASSIVE — entering or
+  // leaving a table must never change which ribbon tab is active. Real Word Mac shows
+  // 'Table Design' + 'Layout' without ever stealing the active tab
+  // (.oracle-probes/slice6/results.md, B-design).
+  await t('[6b] caret into a table does NOT steal the active ribbon tab', async () => {
+    setDoc('x'); await sleep(250); // state-sync tick hides any leftover contextual tabs
+    window.WC.Ribbon.activate('insert');
+    PM().insertTable({ rows: 2, cols: 2 }); await sleep(400); // rAF state-sync tick auto-shows tabs
+    const layout = !!document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const design = !!document.querySelector('.contextual-tab[data-tab="table-design"]');
+    // Panels too — a tab button without its body panel is a broken inject (the
+    // legacy H&F gate asserts the panel; keep the PM tabs honest the same way).
+    const layoutPanel = !!document.querySelector('.ribbon-panel[data-tab="table-layout"]');
+    const designPanel = !!document.querySelector('.ribbon-panel[data-tab="table-design"]');
+    const activeEl = document.querySelector('.ribbon-tab.active');
+    const active = activeEl && activeEl.dataset.tab;
+    if (!layout || !design) return `tabs missing: layout=${layout} design=${design}`;
+    if (!layoutPanel || !designPanel) return `panels missing: layout=${layoutPanel} design=${designPanel}`;
+    return active === 'insert' || `active tab stolen: expected 'insert', got '${active}'`;
+  });
+  await t('[6b] leaving a table preserves a user-chosen tab', async () => {
+    setDoc('x'); await sleep(250);
+    window.WC.Ribbon.activate('insert'); // the inject will record 'insert' as _ctxPrev
+    PM().insertTable({ rows: 2, cols: 2 }); await sleep(400);
+    if (!document.querySelector('.contextual-tab[data-tab="table-layout"]')) return 'tabs never appeared';
+    window.WC.Ribbon.activate('home'); // user explicitly picks Home while the caret is in the table
+    // Caret out: insertTable leaves a trailing empty paragraph after the table (end of doc).
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), doc().content.size - 1)));
+    await sleep(400);
+    if (PM().isInTable() !== false) return 'caret still reports in-table after moving out';
+    if (document.querySelector('.contextual-tab')) return 'contextual tabs still present after exit';
+    const activeEl = document.querySelector('.ribbon-tab.active');
+    const active = activeEl && activeEl.dataset.tab;
+    return active === 'home' || `expected 'home' to stay active, got '${active}' (jumped to stale prev)`;
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------

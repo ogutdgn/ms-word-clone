@@ -308,3 +308,45 @@ The expected pattern for a single feature (e.g. bold toggle) is:
    paragraph).
 4. Optionally run `roundtrip` to confirm Word can open/save the file without
    corruption.
+
+## Slice-6 unzip validation
+
+The AppleScript object model has **no verbs** for enumerating hyperlinks,
+bookmarks, tables, or inline images inside a document. All slice-6 leg-A
+round-trip assertions (links → `w:hyperlink`/rels, bookmarks →
+`w:bookmarkStart`/`w:bookmarkEnd`, tables → `w:tbl`/`w:tr`/`w:gridCol`, images
+→ `a:blip`/`word/media/`) operate directly on the unzipped OOXML rather than
+through the Word object model.
+
+**Tool:** `scripts/docx-inspect.js` — a Node CLI that unzips a `.docx` (using
+the repo's existing `jszip` dep) and prints a JSON summary:
+
+```bash
+node scripts/docx-inspect.js <path-to-docx>
+```
+
+Output shape:
+
+```json
+{
+  "hyperlinks":   ["rId1"],           // r:id values on <w:hyperlink> tags
+  "relTargets":   [{"id":"rId1","target":"https://…"}], // from document.xml.rels
+  "bookmarks":    [{"id":"0","name":"spot1"}],           // <w:bookmarkStart>
+  "bookmarkEnds": ["0"],                                 // <w:bookmarkEnd> ids
+  "tables":       1,                                     // count of <w:tbl>
+  "rows":         3,                                     // count of <w:tr>
+  "gridCols":     4,                                     // count of <w:gridCol>
+  "blips":        ["rId2"],                              // r:embed on <a:blip>
+  "media":        [{"name":"word/media/image1.png","bytes":1234}]
+}
+```
+
+**Attribute-order robustness (Critique M6):** OOXML attribute order is not
+guaranteed, so the extractor uses a two-step approach for every element: it
+first captures the full opening tag string, then pulls each attribute
+independently from within that string. This makes it work on both
+clone-generated and Word-authored `.docx` files.
+
+**Quirks #24–#26 still apply** for any subsequent object-model reads (e.g.
+text readback via `read-props`) on the same session — the session-health
+constraints are unchanged.

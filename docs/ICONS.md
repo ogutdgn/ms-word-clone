@@ -5,9 +5,9 @@ system has three layers, resolved in priority order by a single dispatcher,
 `WC.icon(cmd, size)`:
 
 1. **Fluent-first** — authentic Microsoft Fluent UI System icons, generated from
-   the `@fluentui/svg-icons` npm package into `src/renderer/js/icons-fluent.js`.
+   the `@fluentui/svg-icons` npm package into `src/renderer/public/js/icons-fluent.js`.
 2. **Hand-drawn** — monoline (Fluent-style) SVGs authored by hand in
-   `src/renderer/js/icons.js`.
+   `src/renderer/public/js/icons.js`.
 3. **Generic fallback** — a single placeholder glyph so every control renders
    *something*.
 
@@ -15,9 +15,9 @@ system has three layers, resolved in priority order by a single dispatcher,
 
 | File | Role |
 | --- | --- |
-| `src/renderer/js/icons.js` | The `WC.icon` dispatcher, hand-drawn icon set (`P`), command aliases (`ALIAS`), and the generic fallback (`_generic`). Source of truth, hand-edited. |
-| `src/renderer/js/icons-fluent.js` | **Auto-generated.** Defines `window.WC.FLUENT`, a map of `cmd -> inner SVG markup`. Do not hand-edit. |
-| `scripts/icon-map.json` | The 208-entry `cmd -> fluent icon name` mapping. **This is the file you edit to add or remap a Fluent icon.** |
+| `src/renderer/public/js/icons.js` | The `WC.icon` dispatcher, hand-drawn icon set (`P`), command aliases (`ALIAS`), and the generic fallback (`_generic`). Source of truth, hand-edited. |
+| `src/renderer/public/js/icons-fluent.js` | **Auto-generated.** Defines `window.WC.FLUENT`, a map of `cmd -> inner SVG markup`. Do not hand-edit. |
+| `scripts/icon-map.json` | The 235-entry `cmd -> fluent icon name` mapping. **This is the file you edit to add or remap a Fluent icon.** |
 | `scripts/gen-icons.js` | Build script that reads `icon-map.json`, pulls SVGs from `@fluentui/svg-icons`, and writes `icons-fluent.js`. |
 
 ## Load order
@@ -32,7 +32,7 @@ dispatcher, so `WC.FLUENT` exists by the time `WC.icon` is first called:
 
 ## The `WC.icon(cmd, size)` dispatcher
 
-Defined in `src/renderer/js/icons.js`. It resolves a command name to an SVG
+Defined in `src/renderer/public/js/icons.js`. It resolves a command name to an SVG
 string in three tiers:
 
 ```js
@@ -52,7 +52,7 @@ Resolution sequence for a given `cmd`:
 
 1. **Fluent** — if `WC.FLUENT[cmd]` exists, wrap its inner markup in a
    `fill="currentColor"` `<svg>` and return. This is the preferred path and
-   covers the 208 commands listed in `icon-map.json`.
+   covers the 235 commands listed in `icon-map.json`.
 2. **No command** — if `cmd` is falsy, return the generic placeholder.
 3. **Hand-drawn / alias** — otherwise pick a name via `ALIAS[cmd]` (a small
    alias table) or, if `P[cmd]` exists, the `cmd` itself; if neither matches,
@@ -97,7 +97,7 @@ aliases only matter for commands that aren't already covered by the Fluent layer
 
 ## The `@fluentui/svg-icons` mapping (`scripts/icon-map.json`)
 
-`scripts/icon-map.json` is a flat JSON object of **208** `cmd -> fluent icon
+`scripts/icon-map.json` is a flat JSON object of **235** `cmd -> fluent icon
 name` pairs. The key is the renderer command name (matching what `WC.icon` is
 called with); the value is a `@fluentui/svg-icons` base name (without the
 `_<size>_<variant>` suffix). Examples:
@@ -130,7 +130,7 @@ run it directly with `node scripts/gen-icons.js`). It:
 2. For each `cmd`, calls `load(fluentName)` to find an SVG file.
 3. Extracts and normalizes the inner markup with `inner(svg)`.
 4. Writes the result as `window.WC.FLUENT = {...}` to
-   `src/renderer/js/icons-fluent.js`.
+   `src/renderer/public/js/icons-fluent.js`.
 5. Logs how many icons were generated and lists any `MISSING` mappings (entries
    whose Fluent file couldn't be found in any variant).
 

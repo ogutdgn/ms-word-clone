@@ -210,6 +210,22 @@ export const TableCell = Node.create({
         },
       },
 
+      /**
+       * @category Attribute
+       * @param {'btLr' | 'tbRl'} [textDirection] - Cell text flow direction (OOXML w:textDirection).
+       * Renders a basic CSS writing-mode; vertical metrics / BiDi polish deferred to Phase 7
+       * (fork edit, slice 6, 2026-06-09).
+       */
+      textDirection: {
+        default: null,
+        renderDOM({ textDirection }) {
+          if (!textDirection) return {};
+          if (textDirection === 'tbRl') return { style: 'writing-mode: vertical-rl' };
+          if (textDirection === 'btLr') return { style: 'writing-mode: vertical-lr' };
+          return {};
+        },
+      },
+
       widthType: {
         default: 'auto',
         rendered: false,
@@ -246,6 +262,22 @@ export const TableCell = Node.create({
 
       /** @private - Keys from the cell's w:tcPr (exclude inherited from table style on export) */
       tableCellPropertiesInlineKeys: {
+        default: null,
+        rendered: false,
+      },
+
+      /**
+       * @private
+       * Provenance marker for a style-baked fill (fork addition, slice 6 T4, 2026-06-10).
+       * When `setTableStyle` bakes the style's firstRow w:tblStylePr fill into this
+       * cell's `background` attr, the hex (no '#') is recorded here. While
+       * `background.color === styleBakedBackground` the fill is STYLE-OWNED: a
+       * style re-apply/clear may replace it, and the exporter does NOT emit it as
+       * explicit `w:shd` (the style definition in styles.xml owns the look — same
+       * contract as `tableCellPropertiesInlineKeys`). A user shading (direct
+       * formatting) diverges from the marker and wins, like Word.
+       */
+      styleBakedBackground: {
         default: null,
         rendered: false,
       },

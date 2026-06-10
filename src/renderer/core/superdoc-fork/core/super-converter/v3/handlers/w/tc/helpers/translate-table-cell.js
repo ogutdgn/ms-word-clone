@@ -72,10 +72,20 @@ export function generateTableCellProperties(node) {
   }
 
   // Background
+  // Fork change (slice 6 T4, 2026-06-10): a fill that setTableStyle BAKED from the
+  // table style's firstRow w:tblStylePr (background.color === styleBakedBackground)
+  // is style-owned — do NOT emit it as explicit per-cell <w:shd> direct formatting.
+  // The minted style definition in word/styles.xml owns that look in Word (same
+  // export-suppression contract as tableCellPropertiesInlineKeys for inherited
+  // tcPr). A user-set shading never carries a matching marker and exports as before.
   const { background = {} } = attrs;
-  if (background?.color && tableCellProperties.shading?.fill !== background?.color) {
+  const isStyleBakedFill =
+    !!attrs.styleBakedBackground &&
+    !!background?.color &&
+    String(background.color).toUpperCase() === String(attrs.styleBakedBackground).toUpperCase();
+  if (background?.color && !isStyleBakedFill && tableCellProperties.shading?.fill !== background?.color) {
     tableCellProperties['shading'] = { fill: background.color };
-  } else if (!background?.color && tableCellProperties?.shading?.fill) {
+  } else if ((!background?.color || isStyleBakedFill) && tableCellProperties?.shading?.fill) {
     delete tableCellProperties.shading;
   }
 

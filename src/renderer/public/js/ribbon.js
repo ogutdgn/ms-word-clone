@@ -316,11 +316,23 @@
       this.body.classList.remove('collapsed');
     },
 
-    // Inject a contextual ribbon tab at runtime (e.g. Header & Footer), select it,
-    // and remove it on hide — mirroring Word's contextual tabs.
-    showContextualTab(def) {
-      if (this._ctxTab === def.id) { this.activate(def.id); return; }
-      this.hideContextualTab();
+    // Inject a contextual ribbon tab at runtime (Header & Footer = one tab;
+    // Table Tools = two coexisting tabs) and remove it on hide — mirroring Word's
+    // contextual tabs. Multiple tabs can be shown at once: each injected tab id is
+    // tracked in `_ctxTabs`; `_ctxTab` still points at the most recently shown one
+    // so existing single-tab callers behave unchanged. `_ctxPrev` records the LAST
+    // non-contextual tab so we can restore it once ALL contextual tabs are gone
+    // (Header & Footer's enter→exit cycle stays byte-identical).
+    // opts.activate (default TRUE — Header & Footer relies on the select-on-show
+    // behaviour): pass { activate: false } for PASSIVE tabs that must appear
+    // without stealing the active tab (real Word's table contextual tabs —
+    // .oracle-probes/slice6/results.md).
+    showContextualTab(def, opts) {
+      const activate = !opts || opts.activate !== false;
+      this._ctxTabs = this._ctxTabs || [];
+      if (this._ctxTabs.indexOf(def.id) !== -1) { if (activate) this.activate(def.id); this._ctxTab = def.id; return; }
+      // Remember the real (non-contextual) tab we came from, only on the FIRST inject.
+      if (this._ctxTabs.length === 0) this._ctxPrev = this.activeTab;
       const tabsRow = this.tabstrip.querySelector('.ribbon-tabs');
       const btn = el('div', { class: 'ribbon-tab contextual-tab', text: def.name, dataset: { tab: def.id } });
       btn.addEventListener('click', () => this.activate(def.id));
@@ -330,16 +342,43 @@
       def.groups.forEach((group) => scroll.appendChild(this.renderGroup(def, group)));
       panel.appendChild(scroll);
       this.body.appendChild(panel);
-      this._ctxPrev = this.activeTab; this._ctxTab = def.id;
-      this.activate(def.id);
+      this._ctxTabs.push(def.id);
+      this._ctxTab = def.id;
+      if (activate) this.activate(def.id);
     },
-    hideContextualTab() {
-      if (!this._ctxTab) return;
-      const id = this._ctxTab;
-      this.tabstrip.querySelectorAll('.contextual-tab[data-tab="' + id + '"]').forEach((t) => t.remove());
-      this.body.querySelectorAll('.ribbon-panel[data-tab="' + id + '"]').forEach((p) => p.remove());
-      const prev = this._ctxPrev || WC.RIBBON[0].id; this._ctxTab = null; this._ctxPrev = null;
-      this.activate(prev);
+    // hideContextualTab(id)  -> remove just that contextual tab (and re-activate a
+    //                           sensible neighbour). hideContextualTab() with NO id
+    //                           removes EVERY contextual tab (Header & Footer relies
+    //                           on this exact no-arg behaviour — the 257 gate asserts
+    //                           `!document.querySelector('.contextual-tab')` after exit).
+    hideContextualTab(id) {
+      this._ctxTabs = this._ctxTabs || [];
+      const ids = (id == null) ? this._ctxTabs.slice() : (this._ctxTabs.indexOf(id) !== -1 ? [id] : []);
+      if (!ids.length && id == null && !this._ctxTab) return;
+      ids.forEach((tid) => {
+        this.tabstrip.querySelectorAll('.contextual-tab[data-tab="' + tid + '"]').forEach((t) => t.remove());
+        this.body.querySelectorAll('.ribbon-panel[data-tab="' + tid + '"]').forEach((p) => p.remove());
+        const at = this._ctxTabs.indexOf(tid);
+        if (at !== -1) this._ctxTabs.splice(at, 1);
+      });
+      // Decide what to activate now: a remaining contextual tab, else the saved prev.
+      if (this._ctxTabs.length) {
+        const next = this._ctxTabs[this._ctxTabs.length - 1];
+        this._ctxTab = next;
+        // Only re-activate if the tab we just removed (or were on) is no longer present.
+        if (!this.tabstrip.querySelector('.ribbon-tab.active') || ids.indexOf(this.activeTab) !== -1) this.activate(next);
+      } else {
+        // ALL contextual tabs are gone. Word only changes the active tab when the
+        // disappearing tab WAS the active one — if the user explicitly picked a
+        // regular tab while a contextual tab was showing, leaving the context must
+        // NOT yank them back to the stale `_ctxPrev` (live-repro probe S1.5).
+        // Header & Footer's exit still restores: its contextual tab IS active when
+        // hideContextualTab() runs, so `ids` contains `this.activeTab`.
+        const prev = this._ctxPrev || WC.RIBBON[0].id;
+        const activeWasRemoved = ids.indexOf(this.activeTab) !== -1 || !this.tabstrip.querySelector('.ribbon-tab.active');
+        this._ctxTab = null; this._ctxPrev = null;
+        if (activeWasRemoved) this.activate(prev);
+      }
     },
 
     syncToggles(st) {

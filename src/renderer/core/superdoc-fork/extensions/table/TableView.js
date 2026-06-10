@@ -143,17 +143,42 @@ export function updateColumns(node, colgroup, table, _cellMinWidth) {
   // 1. The table is offset to the left by the margin (internal padding) of the first cell
   // 1b. This seems to be overridden when tableIndent is specified. TODO: identify the exact rules within the spec dictating the interaction between tableIndent and leading margin.
   // 2. If the table width is relative, it's increased by the left margin of the first cell plus the right margin of the last cell in the first row
-  const tableIndent = convertSizeToCSS(
-    node.attrs.tableProperties.tableIndent?.value ?? 0,
-    node.attrs.tableProperties.tableIndent?.type ?? 'dxa',
-  );
   const firstRowFirstCellPaddingLeftPx = firstRow?.firstChild?.attrs?.cellMargins?.left ?? 0;
   const firstRowLastCellPaddingRightPx = firstRow?.lastChild?.attrs?.cellMargins?.right ?? 0;
 
-  table.style.marginLeft = `${-firstRowFirstCellPaddingLeftPx}px`;
-  if (tableIndent !== null) {
-    table.style.marginLeft = tableIndent;
+  // margin-left ownership (slice 6 fix): only write margin-left here when the doc
+  // carries an EXPLICIT non-zero indent. The old code converted
+  // `tableIndent?.value ?? 0` unconditionally — for dxa that is always a string
+  // ('0px' with no indent, never null), so EVERY construct/update stomped the
+  // justification margins (`margin: 0 auto` center / `margin-left: auto` right)
+  // that updateTable() had just applied from the renderDOM attrs, leaving
+  // center/right alignment visually inert. The importer + setTableIndent
+  // dual-write two shapes: nested tableProperties.tableIndent {value: twips}
+  // (canonical) and top-level tableIndent {width: px} — honor both.
+  const rawIndentTwips = node.attrs.tableProperties?.tableIndent?.value;
+  const rawIndentPx = node.attrs.tableIndent?.width;
+  const justification = node.attrs.justification ?? node.attrs.tableProperties?.justification;
+  const isJustified = justification === 'center' || justification === 'right';
+
+  if (rawIndentTwips != null && rawIndentTwips !== 0) {
+    const tableIndent = convertSizeToCSS(rawIndentTwips, node.attrs.tableProperties?.tableIndent?.type ?? 'dxa');
+    if (tableIndent !== null) table.style.marginLeft = tableIndent;
+  } else if (rawIndentPx != null && rawIndentPx !== 0) {
+    table.style.marginLeft = `${rawIndentPx}px`;
+  } else if (!isJustified) {
+    // No explicit indent, no center/right justification: keep the legacy default
+    // (cell-padding offset, then the zero indent exactly as convertSizeToCSS
+    // renders it — preserves the pre-fix pixels for plain left tables).
+    table.style.marginLeft = `${-firstRowFirstCellPaddingLeftPx}px`;
+    const zeroIndent = convertSizeToCSS(0, node.attrs.tableProperties?.tableIndent?.type ?? 'dxa');
+    if (zeroIndent !== null) table.style.marginLeft = zeroIndent;
   }
+  // When justified with no explicit indent we deliberately do NOT touch
+  // margin-left: updateTable() rewrites table.style.cssText from the renderDOM
+  // attrs on every construct/update, so the justification margins are already in
+  // effect and any stale view-written margin-left was wiped by that rewrite.
+  // (Clearing via `table.style.marginLeft = ''` here would REMOVE the `auto`
+  // longhand the cssText just set and re-break centering.)
 
   // TODO: why is tableWidth undefined in src/tests/import-export/font-default-styles.test.js?
   if (node.attrs.tableProperties.tableWidth?.type === 'pct') {

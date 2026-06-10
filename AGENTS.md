@@ -19,19 +19,21 @@ first, then dive into the linked `docs/`.
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc`
-> npm dep, telemetry off). **Phase 2 slices 0a–4 are DONE** (merged to `main` via PRs #11–#15,
-> #17, #19 and #21): the PM core (`#pm-editor`) is now the **active visible editor** since slice 0a;
+> npm dep, telemetry off). **Phase 2 slices 0a–5 are DONE** (merged to `main` via PRs #11–#15,
+> #17, #19, #21 and #22): the PM core (`#pm-editor`) is now the **active visible editor** since slice 0a;
 > the legacy vanilla-JS `window.WC` editor boots only under the `--legacy` flag as a frozen
 > regression target. Flipped ribbon areas so far: **character** (slice 1), **paragraph +
 > lists** (slice 2 — incl. shading/borders, Word-native multilevel, the Paragraph dialog),
 > **styles** (slice 3 — gallery + PM-native hover live-preview, styles pane, caret-driven
-> gallery highlight, 4 minted built-in style defaults), and **clipboard + editing-misc**
+> gallery highlight, 4 minted built-in style defaults), **clipboard + editing-misc**
 > (slice 4 — cut/copy/paste via webContents IPC, paste-special dialog, Word-scope Format
-> Painter, select; Cmd+Shift+C/V chords), and **find-replace** (slice 5 — BUILT on branch
-> `feature/phase-2-slice-5-find-replace`, PR pending: the fork's decoration-based Search extension
-> replaces the destructive `.find-hit` rewrite; Match Case + Whole Words + Wildcards + Advanced
-> Find + Go To; oracle legs A/B PASS).
-> **Phase 2** continues wiring ribbon commands → PM transactions (slice 6: insert-basics).
+> Painter, select; Cmd+Shift+C/V chords), and **find-replace** (slice 5 — fork decoration-based
+> Search; Match Case + Whole Words + Wildcards + Advanced Find + Go To). **Slice 6 (insert-basics +
+> full Table Tools) is BUILT** on branch `feature/phase-2-slice-6-insert-basics`, **PR #23**: link/
+> image/page-break/hr/symbol/equation-as-styled-text/bookmark + table insertion + the 9 ops + 14
+> NOTICE'd fork table commands + Table Layout/Design contextual ribbon tabs + a PM table context menu;
+> oracle leg-A reopen-in-Word PASS.
+> **Phase 2** continues wiring ribbon commands → PM transactions (slice 7: file-io).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## What this is
