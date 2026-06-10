@@ -84,9 +84,21 @@
 > session path, wildcards forced case-sensitive (oracle A4). Oracle legs A 'QUX' clone→Word + B
 > 'alpha×4' Word→clone both PASS; zero decoration leak in saved docx. Gates: **PM 130/130**, legacy
 > 257, smoke 9/9 × 2, docx 17.
-> **Next: slice 6 — insert-basics** (brainstorm-lite → write-plan → execute). ⚠️ slice 6 must
-> repoint BOTH `[0a]` D6 tests (now on `link`/`table`) to a later-slice area, or invert them as the
-> insert-basics flip tests.
+>
+> **Slice 6 is DONE** (`feature/phase-2-slice-6-insert-basics`, PR pending): area
+> **`insert-basics` FLIPPED** + the **net-new full Table Tools** built — insert primitives (link/
+> image/page-break/blank-page/hr/symbol/equation-as-styled-text/bookmark-paired) via `bridge/insert.ts`;
+> table insertion + the 9 ops + **14 NOTICE'd fork table commands** (style/align/indent/size/margins/
+> borders/distribute/split/convert/text-direction/autofit — export round-trip-verified) via
+> `bridge/table.ts`; **Table Layout + Table Design contextual ribbon tabs** (runtime-injected
+> `{cmd,label,type}` via new `H.tbl*` handlers; `ribbon.js` extended for multiple contextual tabs,
+> Header & Footer byte-identical) + a PM table context menu; exotica carve-out (14 → `insert-exotica`,
+> `crossReference` → `references`); `Ctrl+K` guard; D6 tests repointed `link`→`newComment`,
+> `table`→`tableOfContents`. Headless leg-A oracle PASS (link/table/image/bookmark survive export —
+> docx-inspect). Gates: **PM 176/176**, legacy 257, smoke 9/9 × 2, docx 17.
+> **Next: slice 7 — file-io** (open html/txt/csv re-enabled; PM-converter round-trip suite replaces
+> `test_docx.js`). ⚠️ slice-6 follow-ups: the Word-dependent oracle legs + UI Codex still to run
+> (Word windowed); BOTH `[0a]` D6 tests now on `newComment`/`tableOfContents` (slice 8/9 repoints).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -107,6 +119,19 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-10 (Phase 2)
+- [x] Slice-6 **brainstorm-lite** — confirmed the insert entry-point inventory against real code (6-agent inventory workflow). Key findings: fork ships all insert-primitive + core table commands; **legacy app has NO Table Tools ribbon tab** (table editing was a 9-item right-click menu) → full Table Tools = net-new; equation has no fork `insertMath` (→ styled text); contextual tabs are runtime-injected. User scope decisions: **full Table Tools** + styled-text equation + exotica carve-out + UI-Codex when needed.
+- [x] Slice-6 **plan** written + 3-critic-hardened + author-pre-verified + committed (`eb23de9`) — 4 blockers + 6 majors (the two biggest — contextual-tab `{cmd,label,type}` dispatch not `onClick`; ribbon single-tab limit — caught by pre-verification after a critic wrongly cleared them).
+- [x] Slice-6 **red `[6]` tests** (19) + D6 repoint `link`→`newComment`, `table`→`tableOfContents` (`20a4fc3`); **docx-inspect** unzip helper (`f8e76e3`).
+- [x] Slice-6 **bridge insert.ts** (`b40f36b`) + **bridge table.ts** 6a (`5feefb9`) — insert primitives + table insertion + the 9 ops; review caught a `__PM_TextSelection` global regression + the equation `false`-contract.
+- [x] Slice-6 **entry-point rewrites** (`6c0d81b`) — PM branches in commands/dialogs/insert-features + the M2 PM bookmark dialog; legacy byte-identical.
+- [x] Slice-6 **THE FLIP** (`d2b3ffb`) — `FLIPPED += insert-basics` + exotica carve-out (machine-verified leak-free) + `Ctrl+K` guard + B2 `WC.Table` guard. 149/149.
+- [x] Slice-6 **14 fork table commands** (`752e0e1`) — style/align/indent/size/margins/borders/distribute/split/convert/text-direction/autofit; review found + fixed a **silent export data-loss bug** (top-level attr never reached the nested key the exporter reads) → dual-write + `[6b] EXPORT:` document.xml-grep regression tests.
+- [x] Slice-6 **bridge table extras** (`d4074d7`) — the 14 wrapper verbs + `tableSelectFirstRowPair` + B3 merge test.
+- [x] Slice-6 **contextual tabs + PM context menu** (`e2840f3`) — Table Layout/Design tabs (runtime `{cmd,label,type}` + new `H.tbl*` handlers + dropdown flyouts), `ribbon.js` multi-tab extension (Header & Footer byte-identical, 257 green), PM `td/th`-scoped context menu (native selection preserved).
+- [x] Slice-6 **headless leg-A oracle** (`366aa66`) — clone-exported `.docx` validated via `docx-inspect`: hyperlink rel → `https://example.com`, table 3×4, image embedded in `word/media`, bookmark paired start+end. **All four PASS.**
+- [x] **All five gates green: PM 176/176, legacy 257/257, smoke 9/9 ×2, docx 17/17.** Build complete; checkpoint this entry; PR + Word-dependent oracle legs + UI Codex next.
 
 ### 2026-06-09 (Phase 2)
 - [x] Slice-5 **brainstorm-lite** — confirmed the find/replace entry-point inventory against real code (`H.find`/`H.replace`→`D.findPane`; the legacy `.find-hit` TreeWalker; the fork **already ships** a decoration-based Search extension; ribbon `find` split + `replace` button; app.js Ctrl+F/H). User scope decision: **maximum** (Match Case + Whole Words + Wildcards + Advanced Find + all three Find-dropdown items).

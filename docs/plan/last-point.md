@@ -7,6 +7,67 @@
 
 ---
 
+## 2026-06-10 — Phase 2 slice 6 BUILT (insert-basics + full Table Tools on the PM engine)
+
+- **Branch:** `feature/phase-2-slice-6-insert-basics` (directly off `main` post slice-5 merge
+  [PR #22, `260e490`] — no stacked PRs; **PR to open next**, one PR for the whole slice per user).
+- **Phase:** **Phase 2 — Editing core behind the ribbon; slice 6 DONE → slice 7 (file-io) next.**
+- **State summary:** area **`insert-basics` FLIPPED** (registry `bridge/index.ts`) **and the
+  net-new full Word Table Tools built**. Insert primitives on PM via new **`bridge/insert.ts`**:
+  link (`setLink` mark + edit/Remove via `unsetLink`), image (`setImage`; `pickImage()` IPC reused —
+  no new IPC), page break (`insertPageBreak` hardBreak), blank page (two breaks), horizontal line
+  (`insertHorizontalRule` contentBlock), symbol (`insertContent`), **equation = styled Cambria-Math
+  italic text** (KNOWN DEVIATION — real OMML deferred; M4 clears mark-bleed), bookmark
+  (**paired `bookmarkStart`+`bookmarkEnd`**, B1) + list/goto/remove dialog. Table on PM via new
+  **`bridge/table.ts`**: insertion + the legacy 9 ops + **14 NOTICE'd fork table commands**
+  (`setTableStyle`/`setTableAlignment`/`setTableIndent`/`setCellWidth`/`setRowHeight`/`setCellMargins`/
+  `setCellBorders`/`distributeRows`/`distributeColumns`/`splitTableAtRow`/`convertTableToText`/
+  `convertTextToTable`/`setTextDirection`+attr/`autoFitTable` — all **export round-trip-verified** via
+  `[6b] EXPORT:` document.xml-grep tests). **Table Layout + Table Design contextual ribbon tabs**
+  (runtime-injected `{cmd,label,type}` dispatch via new `H.tbl*` handlers + dropdown flyouts;
+  **`ribbon.js` extended for multiple coexisting contextual tabs**, backward-compatible with Header &
+  Footer — 257 byte-identical) + a **PM table context menu** (scoped to `td/th`, native cell-selection
+  preserved). **Exotica carve-out:** 14 exotic cmds → new `insert-exotica` (slice 10),
+  `crossReference` → `references` (slice 9); 9 core insert cmds flip. `pmGuard` on legacy `WC.Table`
+  methods (B2). `Ctrl+K` `pmBlockedOr`-wrapped (same flip commit). D6 tests repointed
+  `link`→`newComment`, `table`→`tableOfContents`. New `scripts/docx-inspect.js` (unzip helper).
+  Gates: **PM 176/176** (130 + 46 `[6]`/`[6b]`), legacy 257/257, smoke 9/9 ×2, docx 17/17.
+- **Done this session** (plan `docs/superpowers/plans/2026-06-09-phase2-slice-6-insert-basics.md`,
+  grounded by a 6-agent inventory + hardened by a 3-critic critique + author pre-verification — **4
+  blockers + 6 majors** applied; the biggest two [contextual-tab controls are `{cmd,label,type}`
+  cmd-dispatch NOT `onClick`; ribbon shows ONE contextual tab] caught by pre-verification after a
+  critic wrongly cleared them; executed subagent-driven with two-stage review per task, which caught
+  real bugs each task — a `__PM_TextSelection` global regression, an equation `false`-contract
+  violation, a modal leak, curly-quote contamination, a `tableInfo` fallback, and a **silent
+  export data-loss bug** [`setTableStyle`/`setTableIndent`/`setTextDirection` wrote only the top-level
+  attr, never the nested key the exporter reads — fixed via dual-write + export-grep regression tests]):
+  - `eb23de9` plan · `20a4fc3` red `[6]` tests + D6 repoint · `f8e76e3` docx-inspect helper
+  - `b40f36b` bridge insert · `5feefb9` bridge table (6a) · `6c0d81b` entry-point rewrites (+M2 bookmark dialog)
+  - `d2b3ffb` **THE FLIP** + Ctrl+K guard + exotica carve-out (149/149, carve-out machine-verified leak-free)
+  - `752e0e1` 14 fork table commands (+ export round-trip fix) · `d4074d7` bridge table extras
+  - `e2840f3` contextual tabs + PM context menu (ribbon.js multi-tab, 257 byte-identical) · `366aa66` leg-A oracle
+- **Oracle validation (spec §8.3):** **leg A HEADLESS — PASS** (`docx-inspect` of the clone's exported
+  `.docx`: hyperlink `rId7`→`https://example.com`; table 1×3rows×4cols; image embedded `word/media/
+  image-*.png` 70 bytes; bookmark paired start+end id `0` name `spot1`). Evidence:
+  `docs/superpowers/plans/notes/2026-06-10-slice6-legA-headless.json`. **DEFERRED to a Word-windowed
+  session:** the Word-dependent legs (leg-A reopen-in-real-Word fidelity; leg-B Word-authored doc →
+  `openDocx` import) + UI-fidelity Codex screenshots (Task 12 — needs user's Codex).
+- **KNOWN DEVIATIONS (recorded):** equation = styled text not OOXML Math; pagination-gated table
+  VISUALS land attrs-only (distribute-rows height, autofit window/contents reflow, repeat-header
+  render, text-direction BiDi metrics → Phase 7); `splitTableAtRow` refuses rowspan-straddle (records
+  deviation vs invalid doc); `tblCellMargins`/Table Properties dialog toast-deferred (Task 11.3);
+  contextual-tab buttons render icon-only (`tbl*` cmds aren't fluent icon keys); Excel-Spreadsheet /
+  Draw-Table degrade to plain `insertTable`; authored data-URL images get a fresh rId per export.
+- **Carry-overs for slice 7 (file-io):** (1) **Word-dependent oracle legs + UI Codex for slice 6
+  still to run** (relaunch Word windowed). (2) **BOTH `[0a]` D6 tests now on `newComment`/
+  `tableOfContents`** (review/references) — slice 7 is file-io (not a ribbon area), so it can LEAVE
+  them; slice 8/9 repoints when review/references flip. (3) Slice-4 Word→clone list-marker leak still
+  open. (4) Spec slice 7 = open html/txt/csv re-enabled; PM-converter round-trip suite replaces
+  `test_docx.js`; retire html-to-docx/mammoth/docx-utils for `.docx`.
+- **Blockers/notes:** none for the build/PR. Word oracle pending a user Word relaunch (windowed).
+
+---
+
 ## 2026-06-09 — Phase 2 slice 5 BUILT (find-replace on the PM engine)
 
 - **Branch:** `feature/phase-2-slice-5-find-replace` (directly off `main` post slice-4 — no
