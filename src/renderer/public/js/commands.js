@@ -118,6 +118,62 @@
 
   // ---- Insert ----
   H.table = (c, node) => WC.Dialogs.insertTable();
+
+  // ---- Table Tools (Table Layout + Table Design contextual tabs, PM-only) ----
+  // These cmds live only on the runtime-injected contextual tabs (table-tools-pm.js),
+  // which only appear in PM mode. Each routes straight to a WC.PM table verb.
+  const TPM = () => (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+  H.tblInsertAbove = () => { const p = TPM(); if (p) p.tableAddRow('above'); };
+  H.tblInsertBelow = () => { const p = TPM(); if (p) p.tableAddRow('below'); };
+  H.tblInsertLeft = () => { const p = TPM(); if (p) p.tableAddColumn('left'); };
+  H.tblInsertRight = () => { const p = TPM(); if (p) p.tableAddColumn('right'); };
+  H.tblDeleteRow = () => { const p = TPM(); if (p) p.tableDeleteRow(); };
+  H.tblDeleteColumn = () => { const p = TPM(); if (p) p.tableDeleteColumn(); };
+  H.tblDeleteTable = () => { const p = TPM(); if (p) p.tableDeleteTable(); };
+  H.tblMerge = () => { const p = TPM(); if (p) p.tableMerge(); };
+  H.tblSplitCell = () => { const p = TPM(); if (p) p.tableSplitCell(); };
+  H.tblSplitTable = () => { const p = TPM(); if (p) p.tableSplit(); };
+  H.tblDistRows = () => { const p = TPM(); if (p) p.tableDistributeRows(); };
+  H.tblDistCols = () => { const p = TPM(); if (p) p.tableDistributeColumns(); };
+  H.tblHeaderRow = () => { const p = TPM(); if (p) p.tableToggleHeaderRow(); };
+  H.tblHeaderCol = () => { const p = TPM(); if (p) p.tableToggleHeaderColumn(); };
+  H.tblToText = () => { const p = TPM(); if (p) p.tableToText('\t'); };
+  H.tblVAlignTop = () => { const p = TPM(); if (p) p.tableSetCellVAlign('top'); };
+  H.tblVAlignMid = () => { const p = TPM(); if (p) p.tableSetCellVAlign('middle'); };
+  H.tblVAlignBottom = () => { const p = TPM(); if (p) p.tableSetCellVAlign('bottom'); };
+  H.tblTextDir = () => { const p = TPM(); if (p) p.tableSetTextDirection('tbRl'); };
+  H.tblAlignLeft = () => { const p = TPM(); if (p) p.tableSetAlignment('left'); };
+  H.tblAlignCenter = () => { const p = TPM(); if (p) p.tableSetAlignment('center'); };
+  H.tblAlignRight = () => { const p = TPM(); if (p) p.tableSetAlignment('right'); };
+  H.tblCellMargins = () => { WC.toast('Table cell margins dialog — not implemented in this slice.'); };
+  // Dropdown flyouts (style gallery / shading swatches / borders / autofit) — opened
+  // from the dropdown dispatch head below; the picked value routes to WC.PM.
+  H.tblStyles = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyHeader('Table Styles'));
+    [['Table Grid', 'TableGrid'], ['Grid Table 4 — Accent 1', 'GridTable4-Accent1'], ['Grid Table 5 Dark — Accent 2', 'GridTable5Dark-Accent2'], ['List Table 3 — Accent 3', 'ListTable3-Accent3']]
+      .forEach(([label, id]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableSetStyle(id); } })));
+  });
+  H.tblShading = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyHeader('Shading'));
+    const grid = el('div', { class: 'tbl-shade-grid', style: { padding: '4px' } });
+    ['#FFF2CC', '#DEEAF6', '#E2EFDA', '#FCE4D6', '#D9D9D9', 'transparent'].forEach((col) => {
+      const sw = el('div', { class: 'tbl-shade-sw', style: { width: '22px', height: '22px', margin: '3px', display: 'inline-block', background: col === 'transparent' ? '#fff' : col, border: '1px solid #ccc', cursor: 'pointer' } });
+      sw.addEventListener('click', () => { WC.closeFlyouts(); const p = TPM(); if (p) p.tableSetCellShading(col === 'transparent' ? '' : col); });
+      grid.appendChild(sw);
+    });
+    fly.appendChild(grid);
+  });
+  H.tblBorders = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyHeader('Borders'));
+    const B = () => ({ val: 'single', color: '000000', size: 4 });
+    fly.appendChild(WC.flyItem('All Borders', { onClick: () => { const p = TPM(); if (p) p.tableSetCellBorders({ top: B(), bottom: B(), left: B(), right: B() }); } }));
+    fly.appendChild(WC.flyItem('No Border', { onClick: () => { const p = TPM(); if (p) p.tableSetCellBorders({}); } }));
+  });
+  H.tblAutoFit = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyHeader('AutoFit'));
+    [['AutoFit Contents', 'contents'], ['AutoFit Window', 'window'], ['Fixed Column Width', 'fixed']]
+      .forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableAutoFit(mode); } })));
+  });
   H.pictures = async () => {
     const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
     const r = await window.wordAPI.pickImage();
@@ -917,6 +973,8 @@
       // Insert tab dropdowns / split arrows
       if (cmd === 'coverPage') return WC.Insert.coverPageMenu(node);
       if (cmd === 'table') return WC.Insert.tableMenu(node);
+      // Table Tools contextual-tab dropdowns (style gallery / shading / borders / autofit)
+      if (cmd === 'tblStyles' || cmd === 'tblShading' || cmd === 'tblBorders' || cmd === 'tblAutoFit') return H[cmd](control, node);
       if (cmd === 'pictures') return picturesMenu(node);
       if (cmd === 'shapes') return WC.Insert.shapesMenu(node);
       if (cmd === 'screenshot') return screenshotMenu(node);

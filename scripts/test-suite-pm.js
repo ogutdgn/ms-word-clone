@@ -111,7 +111,9 @@
   await t('[0a] dirty flag tracks PM edits', async () => {
     const d0 = PM().isDirty();
     v().dispatch(v().state.tr.insertText('x', 1));
-    for (let i = 0; i < 20 && !(PM().isDirty() && document.title.startsWith('•')); i++) await sleep(50);
+    // Poll generously: the title '•' is set on the rAF-coalesced state-sync path, so
+    // give it ample budget (slice-6 added a syncContextualTabs hook to that path).
+    for (let i = 0; i < 40 && !(PM().isDirty() && document.title.startsWith('•')); i++) await sleep(50);
     return d0 === false && PM().isDirty() === true && document.title.startsWith('•');
   });
   await t('[0a] WC.PM.cmd dispatches an engine command', () => {
@@ -1538,6 +1540,38 @@
     } catch (e) {
       return String(e);
     }
+  });
+
+  // ---- Table Layout + Table Design contextual ribbon tabs (Task 10) ----
+  await t('[6b] contextual Table tabs appear when caret is in a table', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    const layout = !!document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const design = !!document.querySelector('.contextual-tab[data-tab="table-design"]');
+    return PM().isInTable() === true && layout === true && design === true;
+  });
+  await t('[6b] a Table Layout tab control cmd dispatches (tblInsertBelow grows the row count)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    let before = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') before++; });
+    window.WC.Commands.run({ cmd: 'tblInsertBelow', label: 'Insert Below', type: 'button' }); await sleep(120);
+    let after = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') after++; });
+    return before === 2 && after === 3;
+  });
+  await t('[6b] leaving the table (caret outside) + sync hides BOTH contextual tabs', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    // guard: prove they are present first
+    if (!document.querySelector('.contextual-tab[data-tab="table-layout"]')) return 'tabs never appeared';
+    // insertTable leaves a trailing empty paragraph after the table; drop the caret
+    // into it (end of doc) so the selection is OUTSIDE the table, then re-sync.
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), doc().content.size - 1)));
+    await sleep(80);
+    if (PM().isInTable() !== false) return 'caret still reports in-table after moving to trailing paragraph';
+    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
+    const layoutGone = !document.querySelector('.contextual-tab[data-tab="table-layout"]');
+    const designGone = !document.querySelector('.contextual-tab[data-tab="table-design"]');
+    return layoutGone === true && designGone === true;
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------

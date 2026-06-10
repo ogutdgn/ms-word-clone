@@ -57,6 +57,17 @@ const AREA: Record<string, string> = {
   table: 'insert-basics', link: 'insert-basics', bookmark: 'insert-basics', pageBreak: 'insert-basics',
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
   horizontalLine: 'insert-basics', pictures: 'insert-basics',
+  // Table Tools (Table Layout + Table Design contextual tabs, slice 6 Task 10) — mapped
+  // to insert-basics (FLIPPED) so the dispatch audit stays honest and they un-block.
+  tblInsertAbove: 'insert-basics', tblInsertBelow: 'insert-basics', tblInsertLeft: 'insert-basics',
+  tblInsertRight: 'insert-basics', tblDeleteRow: 'insert-basics', tblDeleteColumn: 'insert-basics',
+  tblDeleteTable: 'insert-basics', tblMerge: 'insert-basics', tblSplitCell: 'insert-basics',
+  tblSplitTable: 'insert-basics', tblDistRows: 'insert-basics', tblDistCols: 'insert-basics',
+  tblHeaderRow: 'insert-basics', tblHeaderCol: 'insert-basics', tblToText: 'insert-basics',
+  tblVAlignTop: 'insert-basics', tblVAlignMid: 'insert-basics', tblVAlignBottom: 'insert-basics',
+  tblTextDir: 'insert-basics', tblAlignLeft: 'insert-basics', tblAlignCenter: 'insert-basics',
+  tblAlignRight: 'insert-basics', tblCellMargins: 'insert-basics', tblStyles: 'insert-basics',
+  tblShading: 'insert-basics', tblBorders: 'insert-basics', tblAutoFit: 'insert-basics',
   // insert exotica (slice 10) — STAY blocked (carved out of insert-basics in the slice-6 flip)
   onlinePictures: 'insert-exotica', screenshot: 'insert-exotica', icons: 'insert-exotica',
   smartart: 'insert-exotica', chart: 'insert-exotica', onlineVideo: 'insert-exotica',
