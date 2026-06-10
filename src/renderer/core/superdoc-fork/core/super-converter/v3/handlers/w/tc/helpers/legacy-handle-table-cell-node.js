@@ -90,6 +90,25 @@ export function handleTableCellNode({
   // TODO: Do we need other background attrs?
   if (background.color) attributes['background'] = background;
 
+  // Style firstRow fill (fork change, slice 6 T4, 2026-06-10): the referenced table
+  // style's w:tblStylePr[firstRow] w:tcPr w:shd previously never rendered (the live
+  // view has no conditional-cascade pass — Phase 7). Bake it into the first-row
+  // cell's `background` attr like the borders above, gated on tblLook firstRow and
+  // never overriding an explicit w:tcPr/w:tblPr shading. The provenance marker
+  // (styleBakedBackground) keeps it style-owned: the exporter suppresses it (no
+  // direct-formatting <w:shd> leak) and a later setTableStyle can replace it.
+  if (!background.color) {
+    const firstRowOn = tableProperties?.tblLook?.firstRow !== false;
+    const isFirstRow = table?.elements?.find((el) => el.name === 'w:tr') === row;
+    const styleFill = firstRowOn && isFirstRow
+      ? resolveShadingFillColor(referencedStyles?.firstRow?.tableCellProperties?.shading)
+      : null;
+    if (styleFill) {
+      attributes['background'] = { color: styleFill };
+      attributes['styleBakedBackground'] = styleFill;
+    }
+  }
+
   // Vertical Align
   const verticalAlign = tableCellProperties.vAlign;
   if (verticalAlign) attributes['verticalAlign'] = verticalAlign;

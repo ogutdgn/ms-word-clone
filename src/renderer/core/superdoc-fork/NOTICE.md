@@ -95,9 +95,12 @@ The following upstream packages are included in this directory tree:
   - `setTableStyle(styleId)` — DUAL-WRITES the top-level `tableStyleId` AND the nested
     `tableProperties.tableStyleId` (preserving the rest of `tableProperties`). The nested key is the
     one the `w:tblPr` decoder iterates, so the id exports as `<w:tblStyle w:val="…">` and round-trips
-    (verified via export-XML assertion). The style's border/shading visual cascade is a Phase-7 paint.
+    (verified via export-XML assertion).
     *(Fix follow-up: the original commit wrote only the top-level attr, so the id was silently dropped
     on save despite the comment claiming round-trip.)*
+    *(T4 follow-up, 2026-06-10: the apply now also BAKES the style's stable visuals — see the
+    dedicated "Table styles end-to-end" entry below; the original "visual cascade is a Phase-7
+    paint" deferral is narrowed to banding/conditional formats only.)*
   - `setTableAlignment('left'|'center'|'right')` — sets table `justification` (+ `tableProperties.justification`); exports `<w:jc>`.
   - `setTableIndent(px)` — DUAL-WRITES the top-level `tableIndent: { width:<px>, type:'dxa' }` (the px
     shape the fork's layout reads, matching the importer's `twipsToPixels` projection) AND the nested
@@ -160,6 +163,59 @@ The following upstream packages are included in this directory tree:
   `tableIndent.width` px shape) or, when the table is not center/right justified, the
   legacy cell-padding/zero-indent default — justification margins now take effect;
   explicit indents still apply (and win over justification when both are set).
+- **Table styles end-to-end (slice 6 T4, 2026-06-10):** table styles previously existed as a bare
+  attr write — the referenced definition never reached `word/styles.xml` (real Word DROPS an
+  orphaned `<w:tblStyle>` reference: slice-6 oracle Leg C) and nothing repainted in the clone.
+  Five coordinated fork changes:
+  - **Real-Word table-style definitions minted into `DEFAULT_LINKED_STYLES`**
+    (`core/super-converter/exporter-docx-defs.js`), added by the existing
+    `addDefaultStylesIfMissing` import hook (which is type-agnostic — no change needed):
+    `TableGrid` (extracted byte-faithfully from `tests/fixtures/oracle-word-s6-tablestyles.docx`,
+    a doc authored by REAL Word 16.77.1 via the AppleScript oracle for this task) and
+    `GridTable4-Accent1` (extracted from the real-Word slice-3 fixture
+    `tests/fixtures/oracle-word-s3-table.docx`), the latter with all six `w:tblStylePr`
+    conditional blocks intact (they are what makes Word render the header row / banding).
+    The two other ids the old hardcoded gallery offered (`GridTable5Dark-Accent2`,
+    `ListTable3-Accent3`) had NO definition anywhere and were dropped — the gallery is now
+    built dynamically from the runtime catalog (`WC.PM.getTableStyles()`), so it only offers
+    styles that genuinely exist in the saved file. (AppleScript `set style of table` cannot
+    instantiate those two latent styles, so no real-Word definition could be extracted for them.)
+  - **`resolveTableStyleVisuals(editor, styleId, tblLook?)` helper added**
+    (`extensions/table/tableHelpers/resolveTableStyleVisuals.js`): resolves a styleId from the
+    runtime catalog (`converter.translatedLinkedStyles`) through the style-engine cascade
+    primitives (`resolveTableProperties` for base `w:tblPr` borders down the basedOn chain;
+    `resolveTableCellProperties` for the `w:tblStylePr` conditional cascade) into the fork's
+    renderable shapes: the px `borders` table attr (importer projection) + the firstRow fill.
+    `setTableStyle` bakes both at apply time (table borders overwrite — no UI-reachable direct
+    writer exists for that attr; first-row cell `background` honoring `tblLook.firstRow`), and
+    `normalizeNewTableAttrs`'s style-resolved branch bakes the borders so newly inserted tables
+    keep their TableGrid outline (the upstream comment's "borders come from the style at render
+    time via `resolveTableProperties`" only ever existed in the layout-adapter, which the live PM
+    view does not use; once TableGrid is minted, style resolution flips from 'none' to
+    'builtin-fallback' and the old inline-fallback borders no longer apply). REMAINING DEFERRAL
+    (Phase 7): banded rows/columns and the other conditional formats (lastRow, firstCol/lastCol
+    run props, firstRow white-bold run props) are NOT baked — they would go stale on row/column
+    edits (Word recomputes them dynamically); the exported file carries the full definition, so
+    real Word renders the complete style. A row inserted above a baked first row also keeps the
+    baked fill until the style is re-applied (same staleness class).
+  - **`styleBakedBackground` provenance attr added** (default `null`, `rendered: false`) on
+    `tableCell` (`extensions/table-cell/table-cell.js`) and `tableHeader`
+    (`extensions/table-header/table-header.js`): records the hex a style bake wrote into
+    `background` so (a) a re-apply/clear can replace OUR fill while an explicit user-set shading
+    (direct formatting, which diverges from the marker) survives — Word precedence — and (b) the
+    exporter can tell the two apart. Non-breaking (no render output; absent on user-shaded cells).
+  - **Export suppression of style-baked fills**
+    (`core/super-converter/v3/handlers/w/tc/helpers/translate-table-cell.js`): a cell whose
+    `background.color` equals its `styleBakedBackground` is style-owned and emits NO explicit
+    per-cell `<w:shd>` (the minted definition in styles.xml owns the look in Word — same contract
+    as `tableCellPropertiesInlineKeys` for inherited tcPr). User shading exports unchanged.
+  - **Import-side firstRow fill bake**
+    (`core/super-converter/v3/handlers/w/tc/helpers/legacy-handle-table-cell-node.js`): the
+    referenced table style's `w:tblStylePr[firstRow]` `w:tcPr` `w:shd` is now baked into first-row
+    cell `background` attrs at import (gated on `tblLook.firstRow`, never overriding an explicit
+    `w:tcPr`/`w:tblPr` shading, marked with `styleBakedBackground`) — previously only the style's
+    borders/cellMargins were baked, so imported styled tables rendered the frame but lost the
+    header-row fill; this also makes the clone's own save→reopen visually stable.
 - **`textDirection` cell attr added (slice 6, 2026-06-09):** a new `textDirection` attribute (default
   `null`) on the `tableCell` (`extensions/table-cell/table-cell.js`) and `tableHeader`
   (`extensions/table-header/table-header.js`) nodes, rendering `writing-mode: vertical-rl` for `'tbRl'`

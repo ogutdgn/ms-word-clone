@@ -266,6 +266,32 @@ export function installTable(editor: AnyEditor) {
     }
   }
 
+  // T4: honest dynamic Table Styles gallery. Lists the w:type="table" styles from
+  // the RUNTIME catalog (converter.convertedXml['word/styles.xml'] — the same
+  // in-memory part the exporter serializes back out, so every id offered here is
+  // guaranteed to have a real definition in the saved file; the minted defaults
+  // land there via addDefaultStylesIfMissing at parse time). Display name = the
+  // definition's w:name w:val (e.g. 'Grid Table 4 Accent 1' — real Word writes no
+  // dash); apply uses the id. semiHidden styles (TableNormal) are excluded, like
+  // Word's gallery.
+  function getTableStyles(): Array<{ id: string; name: string }> {
+    try {
+      const styles = editor.converter?.convertedXml?.['word/styles.xml']
+      const els: any[] = styles?.elements?.[0]?.elements || []
+      return els
+        .filter((el: any) =>
+          el.name === 'w:style' &&
+          el.attributes?.['w:type'] === 'table' &&
+          el.attributes?.['w:styleId'] &&
+          !(el.elements || []).some((c: any) => c.name === 'w:semiHidden'))
+        .map((el: any) => ({
+          id: el.attributes['w:styleId'] as string,
+          name: ((el.elements || []).find((c: any) => c.name === 'w:name')?.attributes?.['w:val'] as string)
+            || (el.attributes['w:styleId'] as string),
+        }))
+    } catch { return [] }
+  }
+
   // Returns { inTable, rows, cols, styleId, alignment } for Table Tools tab state.
   // Falls back to { inTable: false } when not in a table (safe for pre-mount stubs).
   function tableInfo(): { inTable: boolean; rows?: number; cols?: number; styleId?: string | null; alignment?: string | null } {
@@ -308,6 +334,7 @@ export function installTable(editor: AnyEditor) {
     tableInfo,
     // 6b: net-new Table Tools verbs
     tableSetStyle,
+    getTableStyles,
     tableSetAlignment,
     tableSetIndent,
     tableSetCellWidth,

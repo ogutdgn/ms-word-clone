@@ -182,6 +182,7 @@ import { createTable } from './tableHelpers/createTable.js';
 import { createColGroup } from './tableHelpers/createColGroup.js';
 import { deleteTableWhenSelected } from './tableHelpers/deleteTableWhenSelected.js';
 import { normalizeNewTableAttrs } from './tableHelpers/normalizeNewTableAttrs.js';
+import { resolveTableStyleVisuals } from './tableHelpers/resolveTableStyleVisuals.js';
 import { computeColumnWidths } from './tableHelpers/computeColumnWidths.js';
 import { createTableBorders } from './tableHelpers/createTableBorders.js';
 import {
@@ -1548,17 +1549,26 @@ export const Table = Node.create({
        * @category Command
        * @param {string} styleId - Table style identifier (e.g. 'GridTable4-Accent1')
        * @returns {Function} Command
-       * @note Model/attr only — the visual cascade of the style's borders/shading
-       * is Phase-7 paint. Dual-writes the top-level `tableStyleId` (read by the
-       * fork's table layout) AND `tableProperties.tableStyleId` (the nested key the
-       * `w:tblPr` decoder iterates → `<w:tblStyle w:val="…">`), so the id exports +
+       * @note Dual-writes the top-level `tableStyleId` (read by the fork's table
+       * layout) AND `tableProperties.tableStyleId` (the nested key the `w:tblPr`
+       * decoder iterates → `<w:tblStyle w:val="…">`), so the id exports +
        * round-trips. Mirrors how `setTableAlignment` writes `tableProperties.justification`.
+       * @note Visual bake (slice 6 T4): resolves the style from the runtime catalog
+       * (resolveTableStyleVisuals) and bakes the STABLE subset into render attrs —
+       * the style's base w:tblPr borders into the table's px `borders` attr (render
+       * only; w:tblPr is decoded from `tableProperties`, so no direct-formatting
+       * leak into the export) and the firstRow w:tblStylePr fill into first-row cell
+       * `background` attrs. Baked fills are marked via `styleBakedBackground` so a
+       * re-apply can clear OUR fill while an explicit user-set shading (direct
+       * formatting) survives, exactly like Word. Banding / the remaining conditional
+       * formats are NOT baked (stale on row edits) — Phase-7 paint; the exported
+       * definition carries them so real Word renders the full style.
        * @example
        * editor.commands.setTableStyle('GridTable4-Accent1')
        */
       setTableStyle:
         (styleId) =>
-        ({ state, tr, dispatch }) => {
+        ({ state, tr, dispatch, editor }) => {
           if (!isInTable(state)) return false;
           const table = resolveCommandTargetTable(state.selection);
           if (!table) return false;
@@ -1567,11 +1577,52 @@ export const Table = Node.create({
             const nextProps = { ...(table.node.attrs.tableProperties || {}) };
             if (id) nextProps.tableStyleId = id;
             else delete nextProps.tableStyleId;
-            tr.setNodeMarkup(table.pos, undefined, {
+            const visuals = id ? resolveTableStyleVisuals(editor, id, nextProps.tblLook || null) : null;
+            const nextAttrs = {
               ...table.node.attrs,
               tableStyleId: id,
               tableProperties: nextProps,
-            });
+            };
+            // Bake table-level borders. The table `borders` attr has no UI-reachable
+            // direct-formatting writer (the Borders flyout writes CELL borders), so
+            // the style owns it: overwrite on apply, clear on style removal.
+            if (visuals) nextAttrs.borders = visuals.borders;
+            else if (!id) nextAttrs.borders = {};
+            tr.setNodeMarkup(table.pos, undefined, nextAttrs);
+
+            // Bake/clear first-row cell fills. Walk rows/cells computing absolute
+            // positions (tableStart = table.pos + 1; standard PM offset walk).
+            const tblLook = nextProps.tblLook;
+            const firstRowOn = !tblLook || tblLook.firstRow !== false;
+            const fill = firstRowOn && visuals ? visuals.firstRowFill : null;
+            let rowPos = table.pos + 1;
+            for (let r = 0; r < table.node.childCount; r++) {
+              const row = table.node.child(r);
+              let cellPos = rowPos + 1;
+              for (let c = 0; c < row.childCount; c++) {
+                const cell = row.child(c);
+                const baked = cell.attrs.styleBakedBackground || null;
+                const current = cell.attrs.background?.color || null;
+                const isUserOverride =
+                  current != null && (baked == null || String(current).toUpperCase() !== String(baked).toUpperCase());
+                if (!isUserOverride) {
+                  const nextFill = r === 0 ? fill : null;
+                  const changed = (current || null) !== (nextFill || null) || baked !== (nextFill || null);
+                  if (changed) {
+                    tr.setNodeMarkup(cellPos, undefined, {
+                      ...cell.attrs,
+                      background: nextFill ? { color: nextFill } : null,
+                      styleBakedBackground: nextFill || null,
+                    });
+                  }
+                } else if (baked != null) {
+                  // User overrode a previously baked fill — drop the stale marker.
+                  tr.setNodeMarkup(cellPos, undefined, { ...cell.attrs, styleBakedBackground: null });
+                }
+                cellPos += cell.nodeSize;
+              }
+              rowPos += row.nodeSize;
+            }
           }
           return true;
         },

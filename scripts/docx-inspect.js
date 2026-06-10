@@ -68,6 +68,7 @@ function extractTags(xml, elementName) {
 
   const documentXml = (await readEntry('word/document.xml')) || '';
   const rels = (await readEntry('word/_rels/document.xml.rels')) || '';
+  const stylesXml = (await readEntry('word/styles.xml')) || '';
 
   // Media files: collect name + byte size.
   const media = [];
@@ -138,6 +139,36 @@ function extractTags(xml, elementName) {
     .map((tag) => pullAttr(tag, 'r:embed'))
     .filter((id) => id !== null);
 
+  // --- table styles (slice 6 T4) --- attribute-order robust ---
+  // Word DROPS an orphaned <w:tblStyle> reference when its styleId has no
+  // w:style definition in word/styles.xml (oracle Leg C), so the oracle re-check
+  // needs to see which table-type styles a saved file actually DEFINES, plus the
+  // styles the document references. Two-step extraction like everything above:
+  // grab each full <w:style>…</w:style> block, then pull w:type/w:styleId from
+  // the opening tag and the w:name child independently.
+  const styleBlocks = Array.from(stylesXml.matchAll(/<w:style[\s>][\s\S]*?<\/w:style>/g)).map((m) => m[0]);
+  const tableStyles = styleBlocks
+    .map((block) => {
+      const openTag = block.match(/<w:style(?:\s[^>]*)?>/);
+      if (!openTag) return null;
+      if (pullAttr(openTag[0], 'w:type') !== 'table') return null;
+      const styleId = pullAttr(openTag[0], 'w:styleId');
+      if (styleId === null) return null;
+      const nameTags = extractTags(block, 'w:name');
+      const name = nameTags.length ? pullAttr(nameTags[0], 'w:val') : null;
+      const conditionalFormats = extractTags(block, 'w:tblStylePr')
+        .map((tag) => pullAttr(tag, 'w:type'))
+        .filter((t) => t !== null);
+      return { styleId, name, conditionalFormats };
+    })
+    .filter(Boolean);
+
+  // The <w:tblStyle> references document.xml carries (to cross-check against
+  // the definitions above — every ref should have a matching tableStyles entry).
+  const tblStyleRefs = extractTags(documentXml, 'w:tblStyle')
+    .map((tag) => pullAttr(tag, 'w:val'))
+    .filter((v) => v !== null);
+
   const out = {
     hyperlinks,
     relTargets,
@@ -148,6 +179,8 @@ function extractTags(xml, elementName) {
     gridCols,
     blips,
     media: mediaEntries,
+    tableStyles,
+    tblStyleRefs,
   };
 
   console.log(JSON.stringify(out, null, 2));

@@ -148,10 +148,21 @@
   H.tblCellMargins = () => { WC.toast('Table cell margins dialog — not implemented in this slice.'); };
   // Dropdown flyouts (style gallery / shading swatches / borders / autofit) — opened
   // from the dropdown dispatch head below; the picked value routes to WC.PM.
+  // T4: the gallery is built DYNAMICALLY from the runtime styles catalog
+  // (WC.PM.getTableStyles() — w:type="table" entries of the in-memory styles.xml,
+  // displaying each definition's w:name and applying its w:styleId). The old
+  // hardcoded 4-id list is gone: two of its ids (GridTable5Dark-Accent2,
+  // ListTable3-Accent3) had NO definition anywhere, so real Word dropped the
+  // orphaned <w:tblStyle> reference on open (slice-6 oracle Leg C).
   H.tblStyles = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyHeader('Table Styles'));
-    [['Table Grid', 'TableGrid'], ['Grid Table 4 — Accent 1', 'GridTable4-Accent1'], ['Grid Table 5 Dark — Accent 2', 'GridTable5Dark-Accent2'], ['List Table 3 — Accent 3', 'ListTable3-Accent3']]
-      .forEach(([label, id]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableSetStyle(id); } })));
+    const p = TPM();
+    const styles = (p && typeof p.getTableStyles === 'function') ? p.getTableStyles() : [];
+    if (!styles.length) {
+      fly.appendChild(WC.flyItem('No table styles available', { onClick: () => {} }));
+      return;
+    }
+    styles.forEach(({ id, name }) => fly.appendChild(WC.flyItem(name, { onClick: () => { const q = TPM(); if (q) q.tableSetStyle(id); } })));
   });
   H.tblShading = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyHeader('Shading'));

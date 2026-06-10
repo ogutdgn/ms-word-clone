@@ -10,6 +10,7 @@ import { readDefaultTableStyle, readSettingsRoot } from '../../../document-api-a
 import { readTranslatedLinkedStyles } from '../../../core/parts/adapters/styles-read.js';
 import { eighthPointsToPixels } from '../../../core/super-converter/helpers.js';
 import { cloneBorders, mapBorderSizes } from './border-utils.js';
+import { resolveTableStyleVisuals } from './resolveTableStyleVisuals.js';
 
 /**
  * @typedef {Object} NormalizedTableAttrs
@@ -73,8 +74,19 @@ export function normalizeNewTableAttrs(editor) {
     };
   }
 
+  // Bake the resolved style's renderable visuals into the new table's attrs
+  // (fork change, slice 6 T4, 2026-06-10): there is NO live render-time style
+  // cascade in this fork (the `resolveTableProperties` render path the upstream
+  // comment above refers to only exists in the layout-adapter, which the live PM
+  // view does not use). Once table styles are minted into the catalog
+  // (DEFAULT_LINKED_STYLES), resolution flips from 'none' to 'builtin-fallback'
+  // (TableGrid) — without this bake newly inserted tables would render
+  // borderless. Mirrors the importer's px `borders` projection.
+  const visuals = resolveTableStyleVisuals(editor, resolved.styleId);
+
   return {
     tableStyleId: resolved.styleId,
+    ...(visuals && Object.keys(visuals.borders).length ? { borders: visuals.borders } : {}),
     // Also include tableStyleId inside tableProperties so the exporter's
     // decodeProperties loop (which iterates Object.keys(tableProperties))
     // finds it and writes <w:tblStyle> into <w:tblPr>.

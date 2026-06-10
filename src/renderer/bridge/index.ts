@@ -248,7 +248,7 @@ export function preinstallBridge() {
     tableSetCellShading: () => false, tableSetCellVAlign: () => false,
     isInTable: () => false, tableInfo: () => ({ inTable: false }),
     // slice 6b: net-new Table Tools verbs (replaced by installTable on mount)
-    tableSetStyle: () => false, tableSetAlignment: () => false, tableSetIndent: () => false,
+    tableSetStyle: () => false, getTableStyles: () => [], tableSetAlignment: () => false, tableSetIndent: () => false,
     tableSetCellWidth: () => false, tableSetRowHeight: () => false,
     tableSetCellMargins: () => false, tableSetCellBorders: () => false,
     tableDistributeColumns: () => false, tableDistributeRows: () => false,

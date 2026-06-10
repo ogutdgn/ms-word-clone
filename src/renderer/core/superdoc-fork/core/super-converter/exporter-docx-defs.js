@@ -902,6 +902,533 @@ export const DEFAULT_LINKED_STYLES = {
       },
     ],
   },
+  // ---- Table styles minted from REAL Word 16.77.1 (slice 6 T4, 2026-06-10) ----
+  // Word DROPS an orphaned <w:tblStyle> reference when the styleId has no
+  // definition in word/styles.xml (slice-6 oracle Leg C), so the definitions
+  // must ship with the file. Sources (xml-js shape, byte-faithful):
+  //   TableGrid          — tests/fixtures/oracle-word-s6-tablestyles.docx (authored
+  //                        by real Word via the AppleScript oracle for this task)
+  //   GridTable4-Accent1 — tests/fixtures/oracle-word-s3-table.docx (real-Word
+  //                        slice-3 oracle fixture). The w:tblStylePr conditional
+  //                        blocks are kept INTACT — they are what makes Word render
+  //                        the header row / banding for this style.
+  TableGrid: {
+    type: 'element',
+    name: 'w:style',
+    attributes: {
+      'w:type': 'table',
+      'w:styleId': 'TableGrid',
+    },
+    elements: [
+      {
+        type: 'element',
+        name: 'w:name',
+        attributes: {
+          'w:val': 'Table Grid',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:basedOn',
+        attributes: {
+          'w:val': 'TableNormal',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:uiPriority',
+        attributes: {
+          'w:val': '39',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:rsid',
+        attributes: {
+          'w:val': '000A29C3',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:tblPr',
+        elements: [
+          {
+            type: 'element',
+            name: 'w:tblBorders',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:top',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:left',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:bottom',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:right',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:insideH',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:insideV',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': 'auto',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'GridTable4-Accent1': {
+    type: 'element',
+    name: 'w:style',
+    attributes: {
+      'w:type': 'table',
+      'w:styleId': 'GridTable4-Accent1',
+    },
+    elements: [
+      {
+        type: 'element',
+        name: 'w:name',
+        attributes: {
+          'w:val': 'Grid Table 4 Accent 1',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:basedOn',
+        attributes: {
+          'w:val': 'TableNormal',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:uiPriority',
+        attributes: {
+          'w:val': '49',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:rsid',
+        attributes: {
+          'w:val': '005B78FB',
+        },
+      },
+      {
+        type: 'element',
+        name: 'w:tblPr',
+        elements: [
+          {
+            type: 'element',
+            name: 'w:tblStyleRowBandSize',
+            attributes: {
+              'w:val': '1',
+            },
+          },
+          {
+            type: 'element',
+            name: 'w:tblStyleColBandSize',
+            attributes: {
+              'w:val': '1',
+            },
+          },
+          {
+            type: 'element',
+            name: 'w:tblBorders',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:top',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:left',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:bottom',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:right',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:insideH',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+              {
+                type: 'element',
+                name: 'w:insideV',
+                attributes: {
+                  'w:val': 'single',
+                  'w:sz': '4',
+                  'w:space': '0',
+                  'w:color': '8EAADB',
+                  'w:themeColor': 'accent1',
+                  'w:themeTint': '99',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'firstRow',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:rPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:b',
+              },
+              {
+                type: 'element',
+                name: 'w:bCs',
+              },
+              {
+                type: 'element',
+                name: 'w:color',
+                attributes: {
+                  'w:val': 'FFFFFF',
+                  'w:themeColor': 'background1',
+                },
+              },
+            ],
+          },
+          {
+            type: 'element',
+            name: 'w:tblPr',
+          },
+          {
+            type: 'element',
+            name: 'w:tcPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:tcBorders',
+                elements: [
+                  {
+                    type: 'element',
+                    name: 'w:top',
+                    attributes: {
+                      'w:val': 'single',
+                      'w:sz': '4',
+                      'w:space': '0',
+                      'w:color': '4472C4',
+                      'w:themeColor': 'accent1',
+                    },
+                  },
+                  {
+                    type: 'element',
+                    name: 'w:left',
+                    attributes: {
+                      'w:val': 'single',
+                      'w:sz': '4',
+                      'w:space': '0',
+                      'w:color': '4472C4',
+                      'w:themeColor': 'accent1',
+                    },
+                  },
+                  {
+                    type: 'element',
+                    name: 'w:bottom',
+                    attributes: {
+                      'w:val': 'single',
+                      'w:sz': '4',
+                      'w:space': '0',
+                      'w:color': '4472C4',
+                      'w:themeColor': 'accent1',
+                    },
+                  },
+                  {
+                    type: 'element',
+                    name: 'w:right',
+                    attributes: {
+                      'w:val': 'single',
+                      'w:sz': '4',
+                      'w:space': '0',
+                      'w:color': '4472C4',
+                      'w:themeColor': 'accent1',
+                    },
+                  },
+                  {
+                    type: 'element',
+                    name: 'w:insideH',
+                    attributes: {
+                      'w:val': 'nil',
+                    },
+                  },
+                  {
+                    type: 'element',
+                    name: 'w:insideV',
+                    attributes: {
+                      'w:val': 'nil',
+                    },
+                  },
+                ],
+              },
+              {
+                type: 'element',
+                name: 'w:shd',
+                attributes: {
+                  'w:val': 'clear',
+                  'w:color': 'auto',
+                  'w:fill': '4472C4',
+                  'w:themeFill': 'accent1',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'lastRow',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:rPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:b',
+              },
+              {
+                type: 'element',
+                name: 'w:bCs',
+              },
+            ],
+          },
+          {
+            type: 'element',
+            name: 'w:tblPr',
+          },
+          {
+            type: 'element',
+            name: 'w:tcPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:tcBorders',
+                elements: [
+                  {
+                    type: 'element',
+                    name: 'w:top',
+                    attributes: {
+                      'w:val': 'double',
+                      'w:sz': '4',
+                      'w:space': '0',
+                      'w:color': '4472C4',
+                      'w:themeColor': 'accent1',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'firstCol',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:rPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:b',
+              },
+              {
+                type: 'element',
+                name: 'w:bCs',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'lastCol',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:rPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:b',
+              },
+              {
+                type: 'element',
+                name: 'w:bCs',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'band1Vert',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:tblPr',
+          },
+          {
+            type: 'element',
+            name: 'w:tcPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:shd',
+                attributes: {
+                  'w:val': 'clear',
+                  'w:color': 'auto',
+                  'w:fill': 'D9E2F3',
+                  'w:themeFill': 'accent1',
+                  'w:themeFillTint': '33',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: 'element',
+        name: 'w:tblStylePr',
+        attributes: {
+          'w:type': 'band1Horz',
+        },
+        elements: [
+          {
+            type: 'element',
+            name: 'w:tblPr',
+          },
+          {
+            type: 'element',
+            name: 'w:tcPr',
+            elements: [
+              {
+                type: 'element',
+                name: 'w:shd',
+                attributes: {
+                  'w:val': 'clear',
+                  'w:color': 'auto',
+                  'w:fill': 'D9E2F3',
+                  'w:themeFill': 'accent1',
+                  'w:themeFillTint': '33',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 };
 
 export const COMMENTS_XML_DEF = {

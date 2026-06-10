@@ -1532,6 +1532,83 @@
     const info = PM().tableInfo();
     return info.inTable && info.alignment === 'right';
   });
+
+  // ---------- slice 6b (T4): table styles end-to-end ----------
+  // The minted real-Word table-style definitions (TableGrid + GridTable4-Accent1,
+  // extracted from real Word 16.77.1 — tests/fixtures/oracle-word-s6-tablestyles.docx
+  // and oracle-word-s3-table.docx) must (a) land in the runtime styles catalog so
+  // the gallery is honest, (b) reach word/styles.xml on export so Word keeps the
+  // <w:tblStyle> reference (oracle Leg C failure), and (c) BAKE a visible change
+  // (table borders + first-row shading) at apply time — without stomping an
+  // explicit user-set cell background (Word: direct formatting beats table style).
+  await t('[6b] styles catalog contains minted table styles (getTableStyles)', async () => {
+    await PM().newBlank(); await sleep(100);
+    const list = PM().getTableStyles();
+    if (!Array.isArray(list)) return 'getTableStyles did not return an array';
+    const byId = Object.fromEntries(list.map((s) => [s.id, s.name]));
+    if (!byId['TableGrid']) return 'TableGrid missing from catalog: ' + JSON.stringify(list);
+    if (!byId['GridTable4-Accent1']) return 'GridTable4-Accent1 missing from catalog: ' + JSON.stringify(list);
+    if (!(byId['TableGrid'].length > 0 && byId['GridTable4-Accent1'].length > 0)) return 'empty display names: ' + JSON.stringify(list);
+    // TableNormal is semiHidden (Word does not list it in the gallery) — keep it out.
+    if (byId['TableNormal']) return 'semiHidden TableNormal leaked into the gallery list';
+    return true;
+  });
+  await t('[6b] EXPORT: minted table style definition reaches styles.xml', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(80);
+    // The exporter serializes converter.convertedXml['word/styles.xml'] back out;
+    // addDefaultStylesIfMissing mutates that in-memory catalog at parse time, so the
+    // definition being present HERE is what guarantees it reaches the saved file
+    // (renderer cannot unzip; the node-side re-check is scripts/docx-inspect.js
+    // `tableStyles`). Run a real export first so the assertion tracks the live path.
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500)) return 'export produced no bytes';
+    const styles = window.WC.editor.converter?.convertedXml?.['word/styles.xml'];
+    const els = (styles && styles.elements && styles.elements[0] && styles.elements[0].elements) || [];
+    const def = els.find((el) => el.name === 'w:style' && el.attributes && el.attributes['w:styleId'] === 'GridTable4-Accent1');
+    if (!def) return 'no GridTable4-Accent1 w:style in convertedXml styles.xml';
+    if (def.attributes['w:type'] !== 'table') return 'GridTable4-Accent1 minted with wrong type: ' + def.attributes['w:type'];
+    // The conditional blocks are what make header-row/banding render in Word — keep intact.
+    const stylePrs = (def.elements || []).filter((el) => el.name === 'w:tblStylePr');
+    if (stylePrs.length < 6) return 'tblStylePr conditional blocks missing (got ' + stylePrs.length + ', want 6)';
+    return true;
+  });
+  await t('[6b] tableSetStyle visibly changes the table (bake)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    const tblEl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    if (!tblEl()) return 'no table rendered';
+    const before = tblEl().outerHTML;
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(200);
+    const el = tblEl();
+    if (!el) return 'table lost after style apply';
+    if (el.outerHTML === before) return 'DOM unchanged after tableSetStyle';
+    // Be specific about WHAT changed: GridTable4-Accent1 base tblPr borders are
+    // single 4/8pt #8EAADB → computed border color rgb(142, 170, 219); the firstRow
+    // tblStylePr shades first-row cells #4472C4 → rgb(68, 114, 196).
+    const borderColor = getComputedStyle(el).borderTopColor;
+    if (borderColor !== 'rgb(142, 170, 219)') return 'table border not baked: borderTopColor=' + borderColor;
+    const firstCell = el.querySelector('tbody > tr > td, tbody > tr > th');
+    if (!firstCell) return 'no first-row cell';
+    const bg = getComputedStyle(firstCell).backgroundColor;
+    if (bg !== 'rgb(68, 114, 196)') return 'first-row shading not baked: backgroundColor=' + bg;
+    return true;
+  });
+  await t('[6b] tableSetStyle preserves an explicit user cell shading', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    // Caret sits in the FIRST cell after insertTable — shade it (user direct formatting),
+    // then apply the style. Word keeps direct shading over the style's firstRow fill.
+    PM().tableSetCellShading('#FFF2CC'); await sleep(80);
+    PM().tableSetStyle('GridTable4-Accent1'); await sleep(150);
+    const bg = firstCellAttr('background');
+    if (!bg || String(bg.color).toUpperCase() !== 'FFF2CC') return 'user shading stomped: ' + JSON.stringify(bg);
+    // ...while an untouched first-row cell DOES get the style's firstRow fill.
+    let secondBg = null; let seen = 0;
+    doc().descendants((n) => {
+      if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') { seen++; if (seen === 2 && secondBg === null) secondBg = n.attrs.background; }
+    });
+    if (!secondBg || String(secondBg.color).toUpperCase() !== '4472C4') return 'sibling first-row cell not baked: ' + JSON.stringify(secondBg);
+    return true;
+  });
   // ---- T2 geometry regression: alignment must MOVE the table, not just set attrs ----
   // The fork's TableView.updateColumns used to write table.style.marginLeft from
   // `tableIndent?.value ?? 0` UNCONDITIONALLY ('0px' when no indent exists), stomping

@@ -268,6 +268,22 @@ export const TableCell = Node.create({
 
       /**
        * @private
+       * Provenance marker for a style-baked fill (fork addition, slice 6 T4, 2026-06-10).
+       * When `setTableStyle` bakes the style's firstRow w:tblStylePr fill into this
+       * cell's `background` attr, the hex (no '#') is recorded here. While
+       * `background.color === styleBakedBackground` the fill is STYLE-OWNED: a
+       * style re-apply/clear may replace it, and the exporter does NOT emit it as
+       * explicit `w:shd` (the style definition in styles.xml owns the look — same
+       * contract as `tableCellPropertiesInlineKeys`). A user shading (direct
+       * formatting) diverges from the marker and wins, like Word.
+       */
+      styleBakedBackground: {
+        default: null,
+        rendered: false,
+      },
+
+      /**
+       * @private
        * Cell-level structured document tag metadata (ECMA-376 §17.5.2.32, CT_SdtCell).
        * Set when the source OOXML wrapped this cell in `<w:sdt>`; reconstructed on export.
        * Shape: `{ scope: 'cell', sdtPr, sdtEndPr }`.
