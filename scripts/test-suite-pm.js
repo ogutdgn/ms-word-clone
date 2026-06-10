@@ -1314,6 +1314,187 @@
     return linkOpen && tableOpen;
   });
 
+  // ---------- slice 6b: net-new fork table commands (Task 8 — ENGINE LEVEL) ----------
+  // These call editor.commands.<cmd>(...) DIRECTLY (no bridge wrapper / no ribbon UI yet —
+  // those land in Tasks 9/10). After insertTable the fork puts the caret in the first cell,
+  // so the cell/row-scoped commands (setCellAttr / selectedRect) work off that plain caret.
+  // Asserts read back the resulting node attr via doc().toJSON()/descendants.
+  const ecmd = (name, ...args) => window.WC.editor.commands[name](...args);
+  const tableAttr = (key) => { let v = undefined; doc().descendants((n) => { if (n.type.name === 'table' && v === undefined) v = n.attrs[key]; }); return v; };
+  const firstCellAttr = (key) => { let v = undefined; doc().descendants((n) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && v === undefined) v = n.attrs[key]; }); return v; };
+  const firstRowAttr = (key) => { let v = undefined; doc().descendants((n) => { if (n.type.name === 'tableRow' && v === undefined) v = n.attrs[key]; }); return v; };
+
+  await t('[6b] setTableStyle dual-writes tableStyleId + tableProperties.tableStyleId', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); await sleep(80);
+    const tp = tableAttr('tableProperties');
+    // The nested key is what the w:tblPr decoder reads → <w:tblStyle>; assert both.
+    return tableAttr('tableStyleId') === 'GridTable4-Accent1'
+      && !!tp && tp.tableStyleId === 'GridTable4-Accent1';
+  });
+  await t('[6b] setTableAlignment center sets table justification', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableAlignment', 'center'); await sleep(80);
+    return tableAttr('justification') === 'center';
+  });
+  await t('[6b] setTableIndent dual-writes tableIndent.width (px) + tableProperties.tableIndent (twips)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableIndent', 48); await sleep(80); // 48px → 720 twips
+    const ti = tableAttr('tableIndent');
+    const tp = tableAttr('tableProperties');
+    // Top-level keeps the px {width,type} shape; nested keeps the OOXML {value,type} twips shape.
+    return !!ti && ti.width === 48 && ti.type === 'dxa'
+      && !!tp && !!tp.tableIndent && tp.tableIndent.value === 720 && tp.tableIndent.type === 'dxa';
+  });
+  await t('[6b] setCellWidth writes colwidth on the caret column', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellWidth', 123); await sleep(80);
+    const cw = firstCellAttr('colwidth');
+    return Array.isArray(cw) && cw[0] === 123;
+  });
+  await t('[6b] setRowHeight writes rowHeight + tableRowProperties on the caret row', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setRowHeight', 40, 'exact'); await sleep(80);
+    const rh = firstRowAttr('rowHeight');
+    const trp = firstRowAttr('tableRowProperties');
+    return rh === 40 && !!trp && trp.rowHeight && trp.rowHeight.value === 40 && trp.rowHeight.rule === 'exact';
+  });
+  await t('[6b] setCellMargins writes cellMargins on the caret cell', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellMargins', { top: 4, right: 8, bottom: 4, left: 8 }); await sleep(80);
+    const m = firstCellAttr('cellMargins');
+    return !!m && m.top === 4 && m.right === 8 && m.bottom === 4 && m.left === 8;
+  });
+  await t('[6b] setCellBorders writes borders on the caret cell', async () => {
+    // The fork's tableStyleNormalization plugin migrates attrs.borders → the
+    // canonical tableCellProperties.borders (and nulls attrs.borders), scaling
+    // the size to OOXML eighths — assert on the canonical landing place.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setCellBorders', { top: { val: 'single', color: '000000', size: 4 }, bottom: { val: 'single', color: '000000', size: 4 } }); await sleep(150);
+    const inline = firstCellAttr('borders');
+    const tcp = firstCellAttr('tableCellProperties');
+    const b = (inline && inline.top) ? inline : (tcp && tcp.borders);
+    return !!b && b.top && b.top.val === 'single';
+  });
+  await t('[6b] distributeColumnsEvenly writes an equal colwidth across cells', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    ecmd('distributeColumnsEvenly'); await sleep(80);
+    const widths = [];
+    doc().descendants((n) => { if (n.type.name === 'tableCell' && n.attrs.colwidth) widths.push(n.attrs.colwidth[0]); });
+    return widths.length >= 3 && widths.every((w) => w === widths[0] && w > 0);
+  });
+  await t('[6b] distributeRowsEvenly writes a rowHeight on the rows', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(150);
+    ecmd('distributeRowsEvenly'); await sleep(80);
+    let allHave = true, count = 0;
+    doc().descendants((n) => { if (n.type.name === 'tableRow') { count++; if (!n.attrs.rowHeight) allHave = false; } });
+    return count === 3 && allHave === true;
+  });
+  await t('[6b] setTextDirection dual-writes textDirection + tableCellProperties.textDirection', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTextDirection', 'tbRl'); await sleep(80);
+    const tcp = firstCellAttr('tableCellProperties');
+    // The nested key is what the w:tcPr decoder reads → <w:textDirection>; assert both.
+    return firstCellAttr('textDirection') === 'tbRl'
+      && !!tcp && tcp.textDirection === 'tbRl';
+  });
+  await t('[6b] autoFitTable fixed sets tableLayout fixed', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('autoFitTable', 'fixed'); await sleep(80);
+    const layout = tableAttr('tableLayout');
+    const tp = tableAttr('tableProperties');
+    return layout === 'fixed' && !!tp && tp.tableLayout === 'fixed';
+  });
+  await t('[6b] autoFitTable window marks 100% width', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('autoFitTable', 'window'); await sleep(80);
+    const tp = tableAttr('tableProperties');
+    return !!tp && tp.tableWidth && tp.tableWidth.value === 5000 && tp.tableWidth.type === 'pct';
+  });
+  await t('[6b] convertTableTotext replaces the table with paragraphs', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    let inserted = false; doc().descendants((n) => { if (n.type.name === 'table') inserted = true; });
+    if (!inserted) return 'table not inserted';
+    ecmd('convertTableToText', '\t'); await sleep(100);
+    let stillTable = false, paras = 0;
+    doc().descendants((n) => { if (n.type.name === 'table') stillTable = true; if (n.type.name === 'paragraph') paras++; });
+    return stillTable === false && paras >= 2;
+  });
+  await t('[6b] convertTextToTable builds a table from delimited paragraphs', async () => {
+    setDocs(['a\tb\tc', 'd\te\tf']); await sleep(100);
+    window.WC.editor.commands.selectAll(); await sleep(60);
+    ecmd('convertTextToTable', '\t'); await sleep(120);
+    let hasTable = false, rows = 0, cols = 0;
+    doc().descendants((n) => { if (n.type.name === 'table') hasTable = true; if (n.type.name === 'tableRow') { rows++; if (cols === 0) cols = n.childCount; } });
+    return hasTable && rows === 2 && cols === 3;
+  });
+  await t('[6b] splitTableAtRow splits into two tables at the caret row boundary', async () => {
+    setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(150);
+    // Move the caret into the SECOND row so the split boundary is row index 1.
+    let secondRowCellPos = null; let rowIdx = 0;
+    doc().descendants((n, pos) => { if (n.type.name === 'tableRow') { if (rowIdx === 1 && secondRowCellPos == null) secondRowCellPos = pos + 2; rowIdx++; } });
+    if (secondRowCellPos == null) return 'no second row';
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), secondRowCellPos)));
+    await sleep(60);
+    ecmd('splitTableAtRow'); await sleep(100);
+    let tables = 0; doc().descendants((n) => { if (n.type.name === 'table') tables++; });
+    return tables === 2;
+  });
+  await t('[6b] new table commands survive a docx round-trip (style + align)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1'); ecmd('setTableAlignment', 'center'); await sleep(80);
+    const bytes = await PM().exportDocxBytes();
+    return bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+  });
+
+  // Real export-XML assertions: the dual-write fix (Task 8 follow-up) made
+  // setTableStyle/setTableIndent/setTextDirection write the NESTED
+  // tableProperties/tableCellProperties keys the w:tblPr/w:tcPr decoders iterate.
+  // editor.exportDocx({ exportXmlOnly: true }) returns the raw word/document.xml
+  // string straight from the converter (no zip round-trip needed in the renderer),
+  // so we can grep the actual OOXML the file would carry. These FAIL if a command
+  // regresses back to writing only the top-level attr (the value would silently
+  // never reach <w:tblStyle>/<w:tblInd>/<w:textDirection>).
+  const exportDocumentXml = async () => {
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return typeof xml === 'string' ? xml : '';
+  };
+  // Build one table carrying style + indent + center align + cell borders, then
+  // (CellSelection on the first row) text direction, and inspect the bytes once.
+  const buildLoadedTableAndExport = async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    ecmd('setTableStyle', 'GridTable4-Accent1');
+    ecmd('setTableAlignment', 'center');
+    ecmd('setTableIndent', 48); // 48px → 720 twips (0.5in)
+    ecmd('setCellBorders', { top: { val: 'single', color: '000000', size: 4 }, bottom: { val: 'single', color: '000000', size: 4 } });
+    ecmd('setTextDirection', 'tbRl');
+    await sleep(120);
+    return exportDocumentXml();
+  };
+  await t('[6b] EXPORT: setTableStyle emits <w:tblStyle w:val=...> in document.xml', async () => {
+    const xml = await buildLoadedTableAndExport();
+    return /<w:tblStyle\b[^>]*w:val="GridTable4-Accent1"/.test(xml) || 'no <w:tblStyle> in: ' + xml.slice(xml.indexOf('<w:tblPr'), xml.indexOf('<w:tblPr') + 400);
+  });
+  await t('[6b] EXPORT: setTableIndent emits <w:tblInd w:w="720" w:type="dxa"> (48px → twips)', async () => {
+    const xml = await buildLoadedTableAndExport();
+    const m = xml.match(/<w:tblInd\b[^>]*\/?>/);
+    if (!m) return 'no <w:tblInd> in: ' + xml.slice(xml.indexOf('<w:tblPr'), xml.indexOf('<w:tblPr') + 400);
+    // 48px = 0.5in = 720 twips. Assert the exact sane twip value (catches the unit bug).
+    const wMatch = m[0].match(/w:w="(\d+)"/);
+    const typeOk = /w:type="dxa"/.test(m[0]);
+    return !!wMatch && Number(wMatch[1]) === 720 && typeOk || 'bad tblInd: ' + m[0];
+  });
+  await t('[6b] EXPORT: setTextDirection emits <w:textDirection w:val="tbRl"> in a w:tcPr', async () => {
+    const xml = await buildLoadedTableAndExport();
+    return /<w:textDirection\b[^>]*w:val="tbRl"/.test(xml) || 'no <w:textDirection> in document.xml';
+  });
+  await t('[6b] EXPORT: setCellBorders emits <w:tcBorders> + center align emits <w:jc w:val="center"> (regression guard)', async () => {
+    const xml = await buildLoadedTableAndExport();
+    const hasBorders = /<w:tcBorders\b/.test(xml);
+    const hasCenter = /<w:jc\b[^>]*w:val="center"/.test(xml);
+    return (hasBorders && hasCenter) || `borders=${hasBorders} center=${hasCenter}`;
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
     const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;

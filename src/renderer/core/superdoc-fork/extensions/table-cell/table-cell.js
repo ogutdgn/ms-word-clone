@@ -210,6 +210,22 @@ export const TableCell = Node.create({
         },
       },
 
+      /**
+       * @category Attribute
+       * @param {'btLr' | 'tbRl'} [textDirection] - Cell text flow direction (OOXML w:textDirection).
+       * Renders a basic CSS writing-mode; vertical metrics / BiDi polish deferred to Phase 7
+       * (fork edit, slice 6, 2026-06-09).
+       */
+      textDirection: {
+        default: null,
+        renderDOM({ textDirection }) {
+          if (!textDirection) return {};
+          if (textDirection === 'tbRl') return { style: 'writing-mode: vertical-rl' };
+          if (textDirection === 'btLr') return { style: 'writing-mode: vertical-lr' };
+          return {};
+        },
+      },
+
       widthType: {
         default: 'auto',
         rendered: false,
