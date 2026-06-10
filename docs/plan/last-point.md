@@ -35,7 +35,14 @@
     save→reopen — importer-merge mirrored via the actual `_processTableBorders`) + user shading
     clears the baked marker; `a23c868` **27 real Fluent icons** for the tbl* contextual-tab commands
     (icon-map + regen; also fixed gen-icons.js's stale pre-Phase-1 output path).
-- **Gates (final, run by the coordinator):** **PM 189/189** (176 → +13 new regression tests incl.
+  - `d6a07e4` **"big box" fixed — fresh tables render cell GRIDLINES** (user re-report): the table
+    `borders` renderDOM emitted invalid `border-insideH/V` CSS (silently dropped) and style-driven
+    cells carry no renderable borders attr — **imported styled tables were big boxes too**. Render-only
+    fix: visible insideH/insideV publish as `--wc-inside-h/v` CSS vars on the table; prosemirror.css
+    paints INTERIOR cell edges only (outer stays frame-owned, Word's inside/outside split); explicit
+    per-cell borders still win; `deleteCellAndTableBorders` → no gridlines; export purity proven
+    (no `w:tcBorders`/`w:tblBorders` leak). PM **192/192** (+3).
+- **Gates (final, run by the coordinator):** **PM 192/192** (176 → +16 new regression tests incl. gridlines +
   geometry + precedence + export-purity), legacy 257/257, smoke 9/9 ×2, docx 17/17.
 - **Verified working (hunt, no action needed):** row/col insert/delete, merge/split via CellSelection,
   cell width, distribute columns, header toggles, text direction, context menu, dropdown flyouts,
