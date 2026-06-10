@@ -21,18 +21,21 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
-> dep). **Phase 2 slices 0a–5 are DONE** (merged to `main` via PRs #11–#15, #17, #19, #21 and #22): the
-> PM core is the active visible editor; file IO, character formatting, **paragraph + lists**,
+> dep). **Phase 2 slices 0a–6 are DONE** (merged to `main` via PRs #11–#15, #17, #19, #21, #22 and
+> #23): the PM core is the active visible editor; file IO, character formatting, **paragraph + lists**,
 > **styles** (gallery + PM-native hover live-preview + pane + caret-driven gallery highlight),
 > **clipboard + editing-misc** (cut/copy/paste + paste-special + Word-scope Format Painter + select),
-> and **find-replace** (fork decoration-based Search — Match Case + Whole Words + Wildcards + Advanced
-> Find + Go To) are on the engine (oracle-validated against Word 16.77.1). **Slice 6 (insert-basics +
-> full Table Tools) is BUILT** (branch `feature/phase-2-slice-6-insert-basics`, **PR #23**): link/image/
-> page-break/hr/symbol/equation-as-styled-text/bookmark + table insertion + the 9 ops + 14 NOTICE'd fork
-> table commands + Table Layout/Design contextual ribbon tabs + a PM table context menu; oracle leg-A
-> reopen-in-Word PASS (Word accepts our OOXML). Flipped ribbon areas: `character`, `paragraph`, `lists`,
-> `styles`, `clipboard`, `editing-misc`, `find-replace`, `insert-basics`; the legacy app runs only under
-> `--legacy`. **Phase 2** continues with slice 7 (file-io). Exact state: [docs/plan/](docs/plan/).
+> **find-replace** (fork decoration-based Search — Match Case + Whole Words + Wildcards + Advanced
+> Find + Go To), and **insert-basics + full Table Tools** (slice 6 — link/image/page-break/hr/symbol/
+> equation-as-styled-text/bookmark + table insertion + the 9 ops + 14 NOTICE'd fork table commands +
+> Table Layout/Design contextual ribbon tabs + a PM table context menu + the table-defect fix batch:
+> passive contextual tabs, alignment geometry, caret-cell shading, minted real-Word table styles
+> end-to-end, direct-border precedence, cell gridlines; oracle leg-A reopen-in-Word PASS — Word
+> accepts our OOXML) are on the engine (oracle-validated against Word 16.77.1). Flipped ribbon areas:
+> `character`, `paragraph`, `lists`, `styles`, `clipboard`, `editing-misc`, `find-replace`,
+> `insert-basics`; the legacy app runs only under `--legacy`. **Phase 2 continues with slice 7
+> (file-io)** — html/txt/csv open/save on the PM engine + the PM-converter round-trip suite.
+> Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 
