@@ -6,6 +6,7 @@ import { installCommands } from './commands'
 import { installClipboard } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
+import { installTable } from './table'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -225,6 +226,13 @@ export function preinstallBridge() {
     removeBookmark: () => false, renameBookmark: () => false,
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
+    // slice 6: table pre-mount stubs (replaced by installTable on mount)
+    insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,
+    tableDeleteRow: () => false, tableDeleteColumn: () => false, tableDeleteTable: () => false,
+    tableMerge: () => false, tableSplitCell: () => false,
+    tableToggleHeaderRow: () => false, tableToggleHeaderColumn: () => false,
+    tableSetCellShading: () => false, tableSetCellVAlign: () => false,
+    isInTable: () => false, tableInfo: () => ({ inTable: false }),
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -255,7 +263,7 @@ export function installBridge(editor: AnyEditor) {
       }
     }, true)
   }
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor))
+  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
