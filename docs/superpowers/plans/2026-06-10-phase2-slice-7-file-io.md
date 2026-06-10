@@ -287,13 +287,20 @@ FAIL (red) and all 192 existing tests still pass.
       + '<p class="MsoListParagraphCxSpFirst" style="mso-list:l0 level1 lfo1">'
       + '<span style="mso-list:Ignore">1.<span style="font:7.0pt Times New Roman">&nbsp;&nbsp;</span></span>'
       + 'Alpha item</p></body></html>';
-    const okPaste = PM().pasteHTMLString(wordHtml); // bridge surface from Task 4 — red until then
+    const okPaste = await PM().pasteHTMLString(wordHtml); // bridge surface from Task 4 — red until then
     if (okPaste === false) return 'pasteHTMLString unavailable or refused';
-    const txt = window.WC.view.dom.textContent;
-    if (!/Alpha item/.test(txt)) return 'content missing: ' + txt.slice(0, 120);
-    return !/1\./.test(txt.replace(/\s+/g, ' '));
+    // Assert the MODEL, not the DOM (quality-review critical): a correctly reconstructed list
+    // renders a legit "1." marker as NODEVIEW CHROME in the DOM — the leak is a literal marker
+    // TEXT NODE in the model.
+    const modelText = window.WC.view.state.doc.textContent;
+    if (!/Alpha item/.test(modelText)) return 'content missing: ' + modelText.slice(0, 120);
+    return !/1\./.test(modelText.replace(/\s+/g, ' ')) || ('literal marker leaked into the model: ' + modelText.slice(0, 80));
   });
 ```
+  *(As landed in commit `860d753`, which also added: tsv 4-cell + csv 6-cell pins, diagnosable
+  state-pin returns, a try/finally spy restore, and `PM().setClean()` guards before every `[7]`/
+  `[0b]` `f.open` — saves can fail at the RED stage leaving the doc dirty, which would hang the
+  probe on the confirmDiscard modal.)*
   *(Executor note: the exact paste entry point is calibrated in Task 6's repro step — the test
   must drive the SAME path real paste uses (`editor.view.pasteHTML(html, pasteEvent(...))` via
   the bridge). If the repro shows the leak reproduces differently — e.g. comments DO survive
@@ -768,6 +775,10 @@ patch dead code for the product paste path. docx-paste's own comment strip is
   Word HTML leaks list markers; comment-form strip already existed; style-deref guard).
 - [ ] **Step 4:** `npm run build && npm run test:pm` → the `[4]` pin green; full suite green.
   Also re-run the Step-1 probe: form (b) now clean, form (a) still clean (no regression).
+  GREEN-STAGE CONTRACT (per the Task-1 quality review): the pin asserts the MODEL text only —
+  a rendered "1." list marker in the DOM is *legitimate nodeview chrome* when the engine
+  reconstructs the list from `mso-list:l0 level1 lfo1`; do NOT try to suppress it, and do not
+  weaken the model assertion to accommodate it.
 - [ ] **Step 5:** Commit: `fix(editor): Word list paste without conditional comments leaked literal markers (NOTICE'd)`.
 
 ---
