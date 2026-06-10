@@ -1428,6 +1428,9 @@ export const Table = Node.create({
        * Set background color for selected cells
        * @category Command
        * @param {string} value - Color value (hex with or without #)
+       * @note Word parity (slice 6 fix): with a plain caret inside a table (no
+       * CellSelection) Word shades the CARET cell — fall back to setCellAttr,
+       * which resolves the caret cell via prosemirror-tables' selectionCell.
        * @example
        * editor.commands.setCellBackground('#ff0000')
        * editor.commands.setCellBackground('ff0000')
@@ -1437,11 +1440,22 @@ export const Table = Node.create({
         ({ editor, commands, dispatch }) => {
           const { selection } = editor.state;
 
-          if (!isCellSelection(selection)) {
-            return false;
-          }
-
           const color = value?.startsWith('#') ? value.slice(1) : value;
+
+          if (!isCellSelection(selection)) {
+            // Caret fallback (Word parity): a TextSelection inside a table shades
+            // the caret cell. setCellAttr is caret-safe (selectionCell). Outside a
+            // table there is nothing to shade — keep returning false.
+            if (!isInTable(editor.state)) {
+              return false;
+            }
+
+            if (dispatch) {
+              return commands.setCellAttr('background', { color });
+            }
+
+            return true;
+          }
 
           if (dispatch) {
             return commands.setCellAttr('background', { color });
@@ -2061,9 +2075,12 @@ export const Table = Node.create({
        * @category Command
        * @param {'fixed' | 'contents' | 'window'} mode - AutoFit mode
        * @returns {Function} Command
-       * @note `'fixed'` sets tableLayout:'fixed' (works now). `'contents'`/`'window'`
-       * need live measurement; the intent attr lands now, the visual reflow is a
-       * Phase-7 paint. `'window'` also marks the table width to 100% (pct 5000).
+       * @note `'fixed'` sets tableLayout:'fixed' AND clears any tableWidth stretch
+       * (Word's Fixed Column Width writes w:tblW type "auto" — columns drive the
+       * size again; the absent key is the importer's no-explicit-width shape).
+       * `'contents'`/`'window'` need live measurement; the intent attr lands now,
+       * the visual reflow is a Phase-7 paint. `'window'` also marks the table
+       * width to 100% (pct 5000).
        * @example
        * editor.commands.autoFitTable('fixed')
        */
@@ -2080,6 +2097,12 @@ export const Table = Node.create({
             const nextProps = { ...(table.node.attrs.tableProperties || {}), tableLayout: layout };
             if (mode === 'window') {
               nextProps.tableWidth = { value: 5000, type: 'pct' };
+            } else if (mode === 'fixed') {
+              // Undo a previous AutoFit-Window 100% stretch (or any explicit table
+              // width): with the key absent, TableView.updateColumns computes
+              // convertSizeToCSS(null, 'auto') → null and un-sets style.width, so
+              // the table returns to its natural column-width-driven size.
+              delete nextProps.tableWidth;
             }
             tr.setNodeMarkup(table.pos, undefined, {
               ...table.node.attrs,

@@ -135,12 +135,20 @@ The following upstream packages are included in this directory tree:
     `<w:textDirection w:val="…">` and round-trips (verified via export-XML assertion). Basic CSS
     writing-mode lands now; vertical metrics / BiDi polish is Phase-7. *(Fix follow-up: the original
     commit wrote only the top-level attr, so the direction was silently dropped on save.)*
-  - `autoFitTable('fixed'|'contents'|'window')` — `'fixed'` sets `tableLayout:'fixed'` (works now);
-    `'contents'`/`'window'` set the layout intent (`autofit`) + `'window'` marks width 100% (pct
-    5000); the live-measurement reflow is a Phase-7 paint.
+  - `autoFitTable('fixed'|'contents'|'window')` — `'fixed'` sets `tableLayout:'fixed'` AND deletes
+    `tableProperties.tableWidth` (T3 fix, 2026-06-10: a previous `'window'` 100% stretch — or any
+    explicit table width — is cleared; the absent key is the importer's no-explicit-width shape and
+    Word's Fixed Column Width writes `w:tblW` type `auto`, so the table returns to its natural
+    column-width-driven size); `'contents'`/`'window'` set the layout intent (`autofit`) +
+    `'window'` marks width 100% (pct 5000); the live-measurement reflow is a Phase-7 paint.
   - Private helper `getSelectedRowPositions(rect, selection, allWhenCaret?)` added (bottom of
     table.js) to resolve the absolute positions of the rows in the current selection for the
     row-sizing commands.
+  - `setCellBackground` caret fallback (T3 fix, 2026-06-10) — Word parity: upstream hard-returned
+    `false` on a non-CellSelection; with a plain caret inside a table it now falls back to the
+    caret-safe `setCellAttr('background', { color })` (prosemirror-tables resolves the caret cell
+    via `selectionCell`), shading the caret cell like Word. The CellSelection multi-cell path and
+    the hex normalization (strip leading `#`) are unchanged; outside a table it still returns false.
 - **TableView margin-left write gated on an explicit indent (slice 6 fix, 2026-06-10):**
   `extensions/table/TableView.js` `updateColumns()` no longer unconditionally overwrites
   `table.style.marginLeft` from a zero indent (`tableIndent?.value ?? 0` always produced

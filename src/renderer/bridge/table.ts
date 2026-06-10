@@ -8,10 +8,11 @@
 //   setCellAttr: safe to use via editor.commands.X() directly.
 // - insertTable: safe to chain (does not internally chain).
 //
-// M1 (Critique-hardened): mergeCells (prosemirror-tables originalMergeCells) and
-// setCellBackground BOTH require a CellSelection — they return false silently on a plain
-// TextSelection. Bridge tableMerge()/tableSetCellShading() detect non-CellSelection and
-// toast "Select cells first" + return false rather than silently no-op.
+// M1 (Critique-hardened): mergeCells (prosemirror-tables originalMergeCells) requires a
+// CellSelection — it returns false silently on a plain TextSelection. Bridge tableMerge()
+// detects non-CellSelection and toasts "Select cells first" + returns false rather than
+// silently no-op. setCellBackground is NOT gated (T3 fix): the fork falls back to the
+// caret-safe setCellAttr path when the caret sits in a table — Word shades the caret cell.
 
 import { isCellSelection } from '@extensions/table/tableHelpers/isCellSelection.js'
 
@@ -21,7 +22,7 @@ export function installTable(editor: AnyEditor) {
   // Restore PM focus after each verb (same invariant as commands.ts / insert.ts).
   function refocus() { editor.view?.focus() }
 
-  // Guard: require a CellSelection before running merge/shading commands.
+  // Guard: require a CellSelection before running merge (merge genuinely needs 2+ cells).
   // Uses the fork's isCellSelection helper (instanceof CellSelection). prosemirror-tables
   // is deduped to a single copy by Vite, so instanceof is reliable across the bundle.
   const requireCellSel = (title: string, body: string): boolean => {
@@ -104,8 +105,10 @@ export function installTable(editor: AnyEditor) {
   }
 
   function tableSetCellShading(color: string): boolean {
-    // M1: setCellBackground requires a CellSelection. Detect and toast.
-    if (!requireCellSel('Select cells first', 'Select one or more cells to apply shading — click and drag across cells in the table.')) return false
+    // No CellSelection gate (T3 fix, Word parity): with a plain caret in a cell the
+    // fork's setCellBackground falls back to setCellAttr (shades the caret cell, like
+    // Word). A CellSelection still shades every selected cell. Outside a table the
+    // fork returns false.
     const ok = editor.commands.setCellBackground(color)
     refocus()
     return ok !== false

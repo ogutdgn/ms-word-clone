@@ -1290,10 +1290,12 @@
     PM().tableDeleteTable(); await sleep(100);
     return !hasNode('table');
   });
-  // NOTE (Critique B3): mergeCells/setCellBackground need a CellSelection, whose test helper
+  // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table
   // ops that work off a plain caret-in-cell (insert/delete row+col, header toggle).
+  // (T3 fix: setCellBackground now ALSO works off a plain caret — Word parity; see the
+  // [6b] shading tests.)
   await t('[6] table toggleHeaderRow converts the first row to header cells', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
     PM().tableToggleHeaderRow(); await sleep(100);
@@ -1412,6 +1414,24 @@
     ecmd('autoFitTable', 'window'); await sleep(80);
     const tp = tableAttr('tableProperties');
     return !!tp && tp.tableWidth && tp.tableWidth.value === 5000 && tp.tableWidth.type === 'pct';
+  });
+  await t('[6b] AutoFit Fixed undoes the Window stretch', async () => {
+    // T3 defect B: 'window' writes tableWidth {5000,'pct'} (renders width: calc(100% + …px)
+    // — TableView.updateColumns pct branch); a following 'fixed' must CLEAR that stretch
+    // (key absent = the importer's no-explicit-width shape; convertSizeToCSS(null,'auto')
+    // → null un-sets style.width) so columns drive the size again, like Word.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    const tbl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
+    ecmd('autoFitTable', 'window'); await sleep(150);
+    const w1 = tbl() ? tbl().style.width : 'no-table';
+    if (!/calc|100%/.test(w1)) return 'window did not stretch: style.width=' + JSON.stringify(w1);
+    ecmd('autoFitTable', 'fixed'); await sleep(150);
+    const w2 = tbl() ? tbl().style.width : 'no-table';
+    if (/calc|100%/.test(w2)) return 'stretch not cleared: style.width=' + JSON.stringify(w2);
+    const tp = tableAttr('tableProperties');
+    if (!tp || tp.tableLayout !== 'fixed') return 'tableProperties.tableLayout != fixed: ' + JSON.stringify(tp);
+    if (tp.tableWidth && tp.tableWidth.type === 'pct') return 'pct tableWidth still present: ' + JSON.stringify(tp.tableWidth);
+    return true;
   });
   await t('[6b] convertTableTotext replaces the table with paragraphs', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
@@ -1595,6 +1615,40 @@
     } catch (e) {
       return String(e);
     }
+  });
+  await t('[6b] cell shading works with a plain caret (Word parity)', async () => {
+    // T3 defect A: Word shades the CARET cell when no cells are selected; the bridge
+    // used to refuse ('Select cells first' toast + false). setCellAttr is caret-safe
+    // (resolves the caret cell via selectionCell), so the fork now falls back to it.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    // Precondition: insertTable leaves a plain TextSelection in the first cell — not a
+    // CellSelection ($anchorCell is CellSelection-only; robust against minified names).
+    if (v().state.selection.$anchorCell) return 'precondition: expected a plain caret, got a CellSelection';
+    const toasts = [];
+    const realToast = window.WC.toast;
+    window.WC.toast = (msg, info) => { toasts.push(String(msg)); realToast.call(window.WC, msg, info); };
+    let ok;
+    try { ok = PM().tableSetCellShading('#FFE699'); } finally { window.WC.toast = realToast; }
+    await sleep(100);
+    if (toasts.some((m) => /select cells first/i.test(m))) return 'refused with toast: ' + toasts.join(' | ');
+    if (!ok) return 'tableSetCellShading returned false';
+    const bg = firstCellAttr('background');
+    return (!!bg && /^ffe699$/i.test(bg.color || '')) || 'background attr not set on caret cell: ' + JSON.stringify(bg);
+  });
+  await t('[6b] shading with a CellSelection still shades all selected cells', async () => {
+    // Regression guard for the caret fallback: the multi-cell path must keep working.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    if (!PM().tableSelectFirstRowPair()) return 'tableSelectFirstRowPair returned false';
+    await sleep(80);
+    if (!PM().tableSetCellShading('#FFE699')) return 'tableSetCellShading returned false';
+    await sleep(100);
+    let row = null; doc().descendants((n) => { if (!row && n.type.name === 'tableRow') row = n; });
+    if (!row || row.childCount < 3) return 'first row not found/intact';
+    const c0 = row.child(0).attrs.background, c1 = row.child(1).attrs.background, c2 = row.child(2).attrs.background;
+    const shaded = (c) => !!c && /^ffe699$/i.test(c.color || '');
+    if (!shaded(c0) || !shaded(c1)) return `selected cells not both shaded: c0=${JSON.stringify(c0)} c1=${JSON.stringify(c1)}`;
+    if (shaded(c2)) return 'unselected third cell was shaded too';
+    return true;
   });
 
   // ---- Table Layout + Table Design contextual ribbon tabs (Task 10) ----
