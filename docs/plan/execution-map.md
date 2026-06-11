@@ -102,9 +102,21 @@
 > direct-border precedence), 27 real Fluent icons, and **fresh/imported tables now render cell
 > gridlines** (the "big box" fix — inside borders paint via CSS vars, export-pure).
 > Gates: **PM 192/192**, legacy 257, smoke 9/9 × 2, docx 17.
-> **Next: slice 7 — file-io** (open html/txt/csv re-enabled; PM-converter round-trip suite replaces
-> `test_docx.js`). ⚠️ slice-6 follow-ups: the Word-dependent oracle legs + UI Codex still to run
-> (Word windowed); BOTH `[0a]` D6 tests now on `newComment`/`tableOfContents` (slice 8/9 repoints).
+>
+> **Slice 7 is DONE** (`feature/phase-2-slice-7-file-io`, PR #24 pending): **file-io on the PM
+> engine** — open docx/html/htm/txt/**csv-as-table** (recorded deviation; csv opens UNSAVED per
+> §5.3) + save/Save As docx/html/txt (two-phase `doc:askSavePath`; `doc:saveAsBytes` removed);
+> imports rebuild the editor from the blank template + the fork's `html` constructor option
+> (stay docx-exportable); degraded imports recover to a blank PM editor + `Files` unbinds via
+> `PM.lastImportBlanked()`. **Gate transition (D7.6):** new **`test:roundtrip`** (27 checks,
+> real-Word fixtures) is THE docx gate; `test_docx.js` demoted to the frozen legacy-converter
+> gate (retires at slice 11). Slice-4 list-marker leak FIXED in fork `handleDocxPaste`
+> (tag-early/remove-late, NOTICE'd). Oracle legs A–D PASS/recorded vs Word 16.77.1 — driven
+> directly via computer-use MCP (first slice; slice-6 table-style reopen recheck closed).
+> Gates (six): **PM 206/206**, legacy 257, smoke 9/9 × 2, docx 17, **roundtrip 27/0**.
+> **Next: slice 8 — review** (comments on fork ranges + existing pane, track changes,
+> language/proofing re-points). ⚠️ slice-8 must repoint the `[0a]` D6 run-block test off
+> `newComment`; slice-6 UI-Codex steps remain open (now feasible via computer use).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -125,6 +137,42 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-10/11 (Phase 2 — slice 7)
+- [x] Post-merge routine: PR #23 merge verified (`6ca5679`); gates re-verified ON `main`
+  (PM 192/192 after an idle re-run — 5 initial fails were load-flake from concurrent agents);
+  CLAUDE/AGENTS/plan banners advanced (`343387f`); branch cut.
+- [x] Slice-7 **brainstorm-lite** — file-io inventory verified against real code (3-agent sweep +
+  author verification). Keys: the fork constructor takes `options.html` in docx mode
+  (`createDocFromHTML` composes with the blank-template converter context); legacy opened csv as
+  a BLANK doc (csv-as-table = net-new, user-directed); `stripHtmlStyles` = semantic import;
+  `getHTML({unflattenLists})` + `textBetween`; docx-inspect is CLI-only.
+- [x] Slice-7 **plan** written + 4-critic-hardened (31 findings; 4 unique blockers incl. the
+  wrong-paste-pipeline aim and the `[7]` confirmDiscard suite hang) + author pre-verification
+  (caught the contextBridge spy non-writability independently) + committed (`a50bfc4`, `964b395`).
+- [x] Slice-7 **red `[7]` tests** (13) + `[0b]` rewrites + `[4]` leak pin (`860d753`) — review
+  caught the DOM-vs-model pin defect + a red-stage modal hang; 205/192/13.
+- [x] Slice-7 **`test:roundtrip` lands FIRST** (`1384831`) — driver+probe, 27 checks, six-gate
+  docs + spec §8.1 dated amendment; review hardened stale-artifact deletion + negation pin.
+- [x] Slice-7 **IPC** (`f6572dc`) — openBytes filters + `doc:saveTextFile` + `doc:askSavePath`
+  (htm→html normalize; extensionless append + GTK overwrite guard).
+- [x] Slice-7 **bridge legs** (`cbecba8`) — file-content.ts, `extra.html`+`onContentError`
+  threading, contentError blank-recovery, `openHtml/openText/openCsv/pasteHTMLString`,
+  io `getHTML`/`getText` (both break leaves); probe-verified html→table→exportDocx BEFORE the
+  suite; review fixed the `Math.max` spread + comment contracts.
+- [x] Slice-7 **THE FLIP** (`f545429`) — files.js blocks removed; open routing; save legs;
+  two-phase saveAs; mode-aware backstage copy; `saveAsBytes` removed; review closed the
+  `lastImportBlanked` data-loss vector (+ csv-name, toasts, escapeHtml reuse). 206/205/1.
+- [x] Slice-7 **leak fix** (`ae92a36`) — repro confirmed all three forms; fork `handleDocxPaste`
+  tag-early/remove-late strip + style-deref guard (NOTICE'd); spec review adjudicated the
+  divergence as strictly better (early strip would regress list starts). **PM 206/206.**
+- [x] **All six gates green: PM 206/206, legacy 257/257, smoke 9/9 ×2, docx 17/17,
+  roundtrip 27/0.**
+- [x] Slice-7 **oracle legs A–D** (`73fdd22`) — driven via word-oracle.js + **computer-use MCP**
+  (first slice; Grant-File-Access prompt cleared interactively): A docx round-trip PASS (no
+  repair; structural identity; slice-6 recheck CLOSED), B html PASS (semantic deviations
+  recorded), C csv deviation evidence (real Word = raw delimited text), D txt PASS.
+- [x] Slice-7 **docs scoping** (`5e9a3cb`) + checkpoint; **PR #24 next**.
 
 ### 2026-06-10 (Phase 2)
 - [x] Slice-6 **Word UI Codex probe partially captured** via `.oracle-probes/slice6/CODEX-PROMPT.md`
