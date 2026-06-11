@@ -2148,6 +2148,27 @@
   // or later getComments() counts go stale. Pre-bridge (getComments missing) this
   // is a no-op by construction, so no raw fork deleteComment ever fires.
   const commentsReset = () => { try { if (typeof PM().getComments !== 'function') return; for (const c of PM().getComments()) { try { PM().cmd('deleteComment', c.id); } catch (e) {} } } catch (e) {} };
+  // Visible-truth probe for the A3 view modes: the fork's Original/Final views
+  // hide tracked runs via decoration classes + display:none CSS (the doc and
+  // its DOM text stay intact -- textContent ignores CSS hiding by design).
+  // True when `needle` exists in the rendered DOM AND every occurrence sits
+  // inside a css-hidden (display:none) container under the PM view.
+  const insertHiddenByCss = (needle) => {
+    const walker = document.createTreeWalker(v().dom, NodeFilter.SHOW_TEXT);
+    let found = false;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.includes(needle)) continue;
+      found = true;
+      let el = n.parentElement;
+      let hidden = false;
+      while (el && el !== v().dom) {
+        if (getComputedStyle(el).display === 'none') { hidden = true; break; }
+        el = el.parentElement;
+      }
+      if (!hidden) return false;
+    }
+    return found;
+  };
   // Re-locate needle WITHOUT moving the selection (selectText also selects).
   const findRange = (needle) => {
     let found = null;
@@ -2398,7 +2419,12 @@
       let f = PM().reviewState().engineFlags;
       if (!f) return 'reviewState().engineFlags missing (red)';
       if (f.onlyOriginalShown !== true || f.onlyModifiedShown !== false) return 'original engineFlags wrong: ' + JSON.stringify(f);
-      if (v().dom.textContent.includes('VMODE')) return 'view=original still renders the tracked insert';
+      // Visible-truth probe: the fork hides tracked inserts via the decoration
+      // class 'track-insert-dec hidden' + display:none CSS -- textContent is
+      // DOM-structural and IGNORES css hiding, so assert the computed style of
+      // the node that contains the insert text (same assertion strength: the
+      // user must not SEE the insert in Original view).
+      if (!insertHiddenByCss('VMODE')) return 'view=original still renders the tracked insert (no display:none container)';
       // combo <-> engine sync: the displayForReview input must FOLLOW the engine
       // (the A6 seed pin below only covers the boot default).
       const ent = window.WC.Ribbon.controlIndex.displayForReview;
@@ -2420,6 +2446,7 @@
       f = PM().reviewState().engineFlags || {};
       if (f.onlyOriginalShown !== false || f.onlyModifiedShown !== false) return 'all engineFlags wrong (both must be false): ' + JSON.stringify(f);
       if (!v().dom.textContent.includes('VMODE')) return 'view=all does not render the tracked insert';
+      if (insertHiddenByCss('VMODE')) return 'view=all still css-hides the tracked insert';
       // A3: view modes are plugin/presentation state -- NEVER doc mutations.
       return norm8() === before || 'view switching mutated the doc';
     } finally {
@@ -2443,7 +2470,7 @@
       const f = PM().reviewState().engineFlags;
       if (!f) return 'reviewState().engineFlags missing (red)';
       if (f.onlyOriginalShown !== true) return 'engine not in original mode: ' + JSON.stringify(f);
-      if (v().dom.textContent.includes('VINS')) return 'view=original still renders the tracked insert';
+      if (!insertHiddenByCss('VINS')) return 'view=original still renders the tracked insert (no display:none container)';
       const xml = await exportDocumentXml();
       return /<w:ins\b/.test(xml) || 'no <w:ins> in document.xml while viewing Original';
     } finally {
