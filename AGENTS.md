@@ -164,9 +164,10 @@ safe pattern.
 
 ## Critical gotchas (learned the hard way)
 
-- **docx export:** `html-to-docx` needs **full integer margins** (top/right/bottom/
-  left/header/footer/gutter) or it emits `w:header="undefined"` and **real Word
-  rejects the file** (mammoth/LibreOffice tolerate it — only real Word catches it).
+- **docx export (`--legacy` mode only since slice 7):** `html-to-docx` needs **full
+  integer margins** (top/right/bottom/left/header/footer/gutter) or it emits
+  `w:header="undefined"` and **real Word rejects the file** (mammoth/LibreOffice
+  tolerate it — only real Word catches it). The PM engine never touches this path.
 - **insertHTML strips attributes:** `execCommand('insertHTML')` with `styleWithCSS`
   drops `class`/`data-*` on some elements — use `WC.Editor.insertNodeHTML(html)`
   for anything that must keep attributes (merge fields, comment anchors).

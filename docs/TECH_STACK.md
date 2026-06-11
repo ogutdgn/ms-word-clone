@@ -9,8 +9,8 @@ This document describes the technologies, runtime, and third-party libraries tha
 | Desktop shell | Electron | `^31.7.6` | `package.json` (devDependency) |
 | Main process | Node.js (bundled with Electron) | — | `src/main/main.js` |
 | Renderer | Vanilla JS, no bundler, classic `<script>` tags | — | `src/renderer/index.html` |
-| DOCX import | `mammoth` | `^1.8.0` | `package.json`, `src/main/main.js` |
-| DOCX export | `html-to-docx` | `^1.8.0` | `package.json`, `src/main/main.js` |
+| DOCX import (**legacy mode only** since slice 7) | `mammoth` | `^1.8.0` | `package.json`, `src/main/main.js` |
+| DOCX export (**legacy mode only** since slice 7) | `html-to-docx` | `^1.8.0` | `package.json`, `src/main/main.js` |
 | HTML sanitize | `dompurify` | `^3.4.7` | `package.json`, `src/renderer/vendor/purify.min.js` |
 | Office icons | `@fluentui/svg-icons` | `^1.1.328` | `package.json`, `scripts/gen-icons.js` (build-time) |
 | ZIP (tooling) | `jszip` | `^3.10.1` | `package.json`, `scripts/test_docx.js` |
@@ -85,6 +85,12 @@ The single concession is the **`vendor/` folder**: DOMPurify ships as a pre-buil
 ## Libraries and what each is for
 
 ### `mammoth` (`^1.8.0`) — DOCX import
+
+> **Legacy-mode only since Phase 2 slice 7:** the default (PM) engine never touches
+> mammoth/html-to-docx/docx-utils — `.docx` converts renderer-side in the vendored fork
+> (`doc:openBytes`/`doc:saveBytes`), and html/txt/csv IO is renderer-side too
+> (`doc:saveTextFile` + the bridge import legs). These libraries serve only the frozen
+> `--legacy` app and are removed with it at slice 11.
 
 Used in the **main process** to convert opened `.docx` files into HTML for the `contenteditable` editor. It is lazy-required on first use to keep startup fast:
 
