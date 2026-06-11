@@ -290,22 +290,53 @@
 
   await t('[1] in-view Mod-Z does not double-fire (engine handles it once)', async () => {
     setDoc('double fire probe'); selectText('double');
+    // Doc snapshot MODULO sdBlockRev: the fork's block-revision stamp advances
+    // on every doc-changing transaction INCLUDING the undo itself (probe
+    // evidence 2026-06-11: post-undo doc differed from pre-bold by exactly
+    // sdBlockRev 2->3, nothing else) — it is history-exempt metadata, so
+    // byte-equality is asserted on everything BUT it.
+    const normDoc = () => JSON.stringify(v().state.doc.toJSON(), (k, val) => (k === 'sdBlockRev' ? undefined : val));
+    const preBold = normDoc();
     run('bold'); await sleep(50);
-    // Capture doc size before: if app.js handler fired it would call pm.cmd('undo')
-    // (an explicit, trusted call), reverting the bold AND potentially the setDoc.
-    // The guard must prevent that; only the PM keymap path (untrusted event, likely
-    // ignored by PM) or nothing should happen.
     const sizeBefore = v().state.doc.content.size;
-    const textBefore = v().dom.textContent;
     window.WC.view.focus();
-    // Synthetic (untrusted) keydown on the focused element inside the PM view.
-    // Our app.js guard sees: WC.PM.active && view.dom.contains(activeElement) && mod && k==='z' → return.
-    // So app.js stands down. The PM keymap itself may or may not handle untrusted events.
-    // Either way the doc must NOT change via the app.js path.
-    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    if (!window.WC.view.dom.contains(document.activeElement)) return 'focus did not land in the PM view';
+    // The regression this test pins: app.js's keydown handler firing its undo
+    // (pm.cmd('undo'), app.js:70) IN ADDITION to the PM keymap. The guard
+    // (app.js:108-109) must stand down when focus is inside the view. The
+    // LOAD-BEARING assertion is a spy on WC.PM.cmd — the app.js path goes
+    // through it, the PM keymap path never does — because defaultPrevented
+    // alone cannot tell the two apart (a regressed app.js also preventDefaults).
+    const calls = [];
+    const orig = window.WC.PM.cmd;
+    window.WC.PM.cmd = function (...args) { calls.push(args[0]); return orig.apply(this, args); };
+    let consumed;
+    try {
+      // Synthetic (untrusted) ctrlKey keydown inside the PM view. PLATFORM
+      // FORK: prosemirror-keymap normalizes Mod- to Meta- on macOS and Ctrl-
+      // elsewhere (prosemirror-keymap dist normalizeKeyName mac branch; the
+      // fork binds Mod-z in extensions/history/history.js). So on macOS this
+      // event matches NOTHING (doc must stay untouched), while on Windows the
+      // PM keymap consumes it and performs exactly ONE undo: the bold reverts
+      // and the doc returns byte-identical to its pre-bold state (un-bolding
+      // heals the run-node split, so content.size legitimately shrinks).
+      const ev = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+      consumed = !document.activeElement.dispatchEvent(ev);
+    } finally { window.WC.PM.cmd = orig; }
     await sleep(80);
-    // Assert the guard stood down: doc content unchanged (no double- or single-fire from app.js).
-    return v().state.doc.content.size === sizeBefore && /double fire probe/.test(v().dom.textContent);
+    if (calls.length) return 'app.js handler fired ' + JSON.stringify(calls) + ' — the in-view guard regressed';
+    if (!/double fire probe/.test(v().dom.textContent)) return 'text gone: undo over-fired';
+    if (consumed) {
+      // Engine handled it exactly once: no bold mark anywhere (doc-wide scan —
+      // a partial-split survivor must not pass vacuously) and the doc is
+      // byte-identical to the pre-bold snapshot (nothing else reverted).
+      let anyBold = false;
+      doc().descendants((n) => { if (n.marks && n.marks.some((m) => m.type.name === 'bold')) anyBold = true; });
+      if (anyBold) return 'bold survived a consumed Mod-Z';
+      return normDoc() === preBold || 'doc !== pre-bold state after the single undo';
+    }
+    // Not consumed (macOS): nothing may have touched the doc at all.
+    return v().state.doc.content.size === sizeBefore || 'doc changed though event was not consumed';
   });
 
   await t('[1] imported negation run reports bold=false (converter attrs)', async () => {
