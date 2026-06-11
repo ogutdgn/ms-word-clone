@@ -36,8 +36,10 @@ export interface ReviewState {
 }
 
 export interface RevisionRow { id: string; author: string; type: 'insert' | 'delete' | 'format' | 'comment'; text: string }
-export interface CommentReply { author: string; text: string }
-export interface CommentRow { id: string; author: string; text: string; resolved: boolean; active: boolean; replies: CommentReply[] }
+// `date` = entity-store createdTime (epoch ms; null when absent) — the cards UI
+// renders it in Word's "June 11, 2026 at 5:22 AM" format (task 4 / parity C3).
+export interface CommentReply { id: string; author: string; text: string; date: number | null }
+export interface CommentRow { id: string; importedId: string | null; author: string; text: string; date: number | null; resolved: boolean; active: boolean; replies: CommentReply[] }
 
 const REVISION_TYPE: Record<string, RevisionRow['type']> = {
   [TrackInsertMarkName]: 'insert',
@@ -139,13 +141,20 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
     const roots = real.filter((it) => !it.parentCommentId)
     return roots.map((it) => ({
       id: String(it.id),
+      importedId: it.importedId != null ? String(it.importedId) : null,
       author: String(it.creatorName ?? ''),
       text: String(it.text ?? ''),
+      date: typeof it.createdTime === 'number' ? it.createdTime : null,
       resolved: it.status === 'resolved',
       active: active != null && (active === it.id || active === it.importedId),
       replies: real
         .filter((r) => r.parentCommentId === it.id)
-        .map((r) => ({ author: String(r.creatorName ?? ''), text: String(r.text ?? '') })),
+        .map((r) => ({
+          id: String(r.id),
+          author: String(r.creatorName ?? ''),
+          text: String(r.text ?? ''),
+          date: typeof r.createdTime === 'number' ? r.createdTime : null,
+        })),
     }))
   }
 
@@ -232,6 +241,18 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
     if (!id) return false
     try {
       const r = editor.doc.comments.patch({ commentId: String(id), status: 'resolved' })
+      refocus()
+      return r?.success === true
+    } catch { return false }
+  }
+
+  // SHADOWS the raw fork editComment (event-only — A2): the Document API patch
+  // runs the command AND updates the entity store, so the edit survives export.
+  // Consumed by the cards UI's inline edit pencil (task 4 / parity C3).
+  function editComment(id: string, text: string): boolean {
+    if (!id || typeof text !== 'string' || !text.trim()) return false
+    try {
+      const r = editor.doc.comments.patch({ commentId: String(id), text })
       refocus()
       return r?.success === true
     } catch { return false }
@@ -345,6 +366,7 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
     nextChange, prevChange,
     addComment: (text: string) => addComment(text),
     replyComment: (id: string, text: string) => replyComment(id, text),
+    editComment: (id: string, text: string) => editComment(id, text),
     resolveComment: (id: string) => resolveComment(id),
     deleteComment: (id: string) => deleteComment(id),
     setActiveComment: (id: string | null) => setActiveComment(id),

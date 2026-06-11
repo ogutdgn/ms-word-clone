@@ -1,0 +1,163 @@
+/* ===========================================================================
+   comments-pm.css -- slice 8 task 4 (D8.3): PM comments UI
+   (contextual margin cards + composer + glyphs + the Comments list pane).
+   Every rule is either gated under body.pm-active or scoped to wc- ids/classes
+   that only the PM bridge module (comments-ui.ts) creates, so --legacy renders
+   are untouched. Structure/anatomy mirrors Word for Windows 16.0 (dark-theme
+   captures .oracle-probes/slice8/word-ref/01-06) re-skinned with the clone's
+   light M365 tokens (base.css).
+   =========================================================================== */
+
+/* Anchor context for the margin overlay (PM mode only -- the absolutely
+   positioned legacy #editor is already body.pm-active-hidden, see editor.css). */
+body.pm-active #pages { position: relative; }
+
+/* Word shifts the page left to make room for contextual cards (captures 01-02):
+   reserving a right gutter on the centered flex canvas reproduces the shift. */
+body.pm-active #workarea.wc-comments-gutter #canvas { padding-right: 356px; }
+
+/* Margin overlay: an absolute column hugging the page's right edge. It scrolls
+   and zoom-scales with #pages; the overlay itself never intercepts the mouse. */
+#wc-comments-overlay {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 340px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* Collapsed thread glyph (C7) -- sits inside the page's right margin. */
+.wc-cc-glyph {
+  position: absolute;
+  left: -44px;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: var(--page);
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  color: var(--word-blue);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+  cursor: pointer;
+  padding: 0;
+}
+.wc-cc-glyph:hover { background: var(--word-blue-tint); }
+.wc-cc-glyph.active { border-color: var(--word-blue); background: var(--word-blue-tint); }
+
+/* Comment / composer card (C1/C3) */
+.wc-cc-card {
+  position: absolute;
+  left: 12px;
+  width: 304px;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: #1f1f1f;
+}
+.wc-cc-card.active { border-color: var(--word-blue); box-shadow: 0 2px 10px rgba(43, 87, 154, 0.22); }
+.wc-cc-card.resolved { opacity: 0.6; }
+
+.wc-cc-entry.wc-cc-reply { margin: 10px 0 0 24px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+
+.wc-cc-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.wc-cc-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--word-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex: none;
+}
+.wc-cc-author { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-cc-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+
+.wc-cc-iconbtn {
+  width: 24px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 2px;
+  color: var(--icon);
+  cursor: pointer;
+  padding: 0;
+}
+.wc-cc-iconbtn:hover { background: var(--btn-hover); }
+.wc-cc-iconbtn[disabled] { opacity: 0.4; cursor: default; }
+.wc-cc-iconbtn[disabled]:hover { background: none; }
+
+/* Like chip (C4): plain icon when unliked, blue icon + count when liked. */
+.wc-cc-like.on { color: var(--word-blue); width: auto; padding: 0 5px; gap: 3px; }
+.wc-cc-likecount { font-size: 11px; font-weight: 600; }
+
+.wc-cc-text {
+  margin: 6px 0 0 32px;
+  user-select: text;
+  cursor: text;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+.wc-cc-time { margin: 4px 0 0 32px; color: var(--group-label); font-size: 11px; }
+
+.wc-cc-input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--btn-border);
+  border-radius: 3px;
+  padding: 5px 7px;
+  font-family: inherit;
+  font-size: 12.5px;
+  resize: none;
+  outline: none;
+  background: #fff;
+  color: #1f1f1f;
+  user-select: text;
+}
+.wc-cc-input:focus { border-color: var(--word-blue); }
+.wc-cc-tip { margin-top: 5px; color: var(--group-label); font-size: 11px; }
+.wc-cc-foot { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
+.wc-cc-foot .wc-cc-iconbtn { width: 28px; height: 24px; border: 1px solid transparent; }
+.wc-cc-foot .wc-cc-iconbtn:hover { border-color: var(--btn-border); }
+.wc-cc-post { color: var(--word-blue); }
+.wc-cc-post[disabled] { color: var(--icon); }
+
+/* List pane (C10) -- legacy taskpane shell + the comments toolbar row. */
+#wc-comments-pane { width: 344px; z-index: 45; }
+#wc-comments-pane .wc-cmp-headbtns { display: flex; align-items: center; gap: 2px; }
+.wc-cmp-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; }
+.wc-cmp-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background: #fff;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wc-cmp-new:hover { background: var(--btn-hover); }
+.wc-cmp-count { margin-left: auto; color: var(--group-label); font-size: 12px; }
+.wc-cmp-empty { color: #888; padding: 12px 4px; font-size: 13px; }
+#wc-comments-pane .wc-cc-card { position: static; width: auto; margin-bottom: 10px; }
+#wc-comments-pane.collapsed .tp-body,
+#wc-comments-pane.collapsed .wc-cmp-toolbar { display: none; }
+#wc-comments-pane.collapsed { bottom: auto; }

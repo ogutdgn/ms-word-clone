@@ -8,6 +8,7 @@ import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
+import { installCommentsUI } from './comments-ui'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -387,6 +388,10 @@ export function installBridge(editor: AnyEditor) {
     return !!ed.view.pasteHTML(html, pasteEvent({ 'text/html': html, 'text/plain': '' }))
   }
   installStateSync(editor)
+  // slice 8 task 4: comments cards/composer/pane chrome. AFTER the legacyBoot
+  // early-return above, so the UI module never runs (and its DOM never exists)
+  // under --legacy (D8.3 PM-only constraint).
+  installCommentsUI(editor)
   installFocusGuards()
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
