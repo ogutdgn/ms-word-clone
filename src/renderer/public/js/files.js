@@ -25,6 +25,11 @@
       return html;
     },
 
+    wrapHtml(body) {
+      const title = WC.escapeHtml((this.name || 'Document').replace(/\.[^.]+$/, ''));
+      return '<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>' + title + '</title></head>\n<body>' + body + '</body></html>';
+    },
+
     async confirmDiscard() {
       if (!this.isDirty()) return true;
       return new Promise((resolve) => {
@@ -78,13 +83,38 @@
         if (!(await this.confirmDiscard())) return;
         const r = await window.wordAPI.openBytes(presetPath);
         if (!r || !r.ok) { if (r && r.error) WC.toast('Could not open file', r.error); return; }
-        if (!/\.docx$/i.test(r.path)) { WC.toast("Opening non-docx files isn't on the new engine yet", 'Use --legacy for html/txt/csv (returns in slice 7)'); return; }
-        const ok = await WC.PM.openDocx(r.bytes);
-        if (!ok) { WC.toast('Could not open file', 'The new engine failed to import it'); return; }
-        // Invariant (spec §5.3): in PM mode `path` only ever points at a file the PM doc represents —
-        // assigned ONLY after openDocx succeeded.
-        this.path = r.path; this.name = r.name || 'Document'; this.format = 'docx';
-        this.updateTitle(); WC.Backstage.close(); WC.toast('Opened ' + this.name);
+        const ext = (r.path.match(/\.([^.\\/]+)$/) || [, ''])[1].toLowerCase();
+        let ok = false;
+        if (ext === 'docx') ok = await WC.PM.openDocx(r.bytes);
+        else if (ext === 'html' || ext === 'htm' || ext === 'txt' || ext === 'csv' || ext === 'tsv') {
+          let text = new TextDecoder('utf-8').decode(r.bytes);
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          if (ext === 'html' || ext === 'htm') ok = await WC.PM.openHtml(text);
+          else if (ext === 'txt') ok = await WC.PM.openText(text);
+          else ok = await WC.PM.openCsv(text);
+        } else {
+          WC.toast('Unsupported file type on the new engine', ext ? 'Use --legacy for .' + ext + ' files' : "Files without an extension aren't supported");
+          return;
+        }
+        if (!ok) {
+          if (WC.PM.lastImportBlanked && WC.PM.lastImportBlanked()) {
+            // The failed import replaced the doc with a fresh blank — the old binding no longer
+            // represents what's on screen (spec §5.3): unbind so Ctrl+S can't blank the old file.
+            this.path = null; this.name = 'Document1'; this.format = 'docx'; this.updateTitle();
+          }
+          WC.toast('Could not open file', 'The new engine failed to import it');
+          return;
+        }
+        // Invariant (spec §5.3): `path` only re-points after a successful import — and only at a
+        // file the PM doc can be saved back into. A csv imports as a TABLE (not re-writable as
+        // csv), so it opens as an UNSAVED document: Save routes to Save As.
+        if (ext === 'csv' || ext === 'tsv') {
+          this.path = null; this.name = r.name || 'Document'; this.format = 'docx';
+        } else {
+          this.path = r.path; this.name = r.name || 'Document';
+          this.format = ext === 'docx' ? 'docx' : (ext === 'txt' ? 'text' : 'html');
+        }
+        this.updateTitle(); WC.Backstage.close(); WC.toast('Opened ' + (r.name || this.name));
         return;
       }
       if (!presetPath && !(await this.confirmDiscard())) return;
@@ -100,14 +130,18 @@
 
     async save() {
       if (WC.PM && WC.PM.active) {
-        if (this.format && this.format !== 'docx') {
-          WC.toast("Saving as " + this.format + " isn't on the new engine yet", 'Use --legacy for html/txt saves (returns in slice 7)');
-          return { ok: false };
-        }
         if (!this.path) return this.saveAs();
         try {
-          const bytes = await WC.PM.exportDocxBytes();
-          const r = await window.wordAPI.saveBytes({ filePath: this.path, bytes });
+          let r;
+          if (this.format === 'html') {
+            r = await window.wordAPI.saveTextFile({ filePath: this.path, content: this.wrapHtml(WC.PM.getHTML()) });
+          } else if (this.format === 'text') {
+            r = await window.wordAPI.saveTextFile({ filePath: this.path, content: WC.PM.getText() });
+          } else {
+            // format domain is gated to docx|html|text by open()/saveAs(); a future fourth value must NOT silently take this docx leg
+            const bytes = await WC.PM.exportDocxBytes();
+            r = await window.wordAPI.saveBytes({ filePath: this.path, bytes });
+          }
           if (r && r.ok) { this.setClean(); WC.toast('Saved ' + r.name); }
           else WC.toast('Save failed', r && r.error); // title dot intentionally stays — the doc IS still dirty
           return r;
@@ -124,9 +158,29 @@
     async saveAs() {
       if (WC.PM && WC.PM.active) {
         try {
-          const bytes = await WC.PM.exportDocxBytes();
-          const r = await window.wordAPI.saveAsBytes({ bytes, suggestedName: (this.name || 'Document1').replace(/\.[^.]+$/, '') + '.docx' });
-          if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = 'docx'; this.setClean(); WC.toast('Saved ' + r.name); }
+          const stem = (this.name || 'Document1').replace(/\.[^.]+$/, '');
+          const defExt = this.format === 'html' ? 'html' : this.format === 'text' ? 'txt' : 'docx';
+          const pick = await window.wordAPI.askSavePath({ suggestedName: stem + '.' + defExt });
+          if (pick && pick.error) WC.toast('Save As failed', pick.error);
+          if (!pick || !pick.ok) return pick || { ok: false };
+          let r, fmt;
+          if (pick.ext === 'html' || pick.ext === 'htm') {
+            fmt = 'html';
+            r = await window.wordAPI.saveTextFile({ filePath: pick.filePath, content: this.wrapHtml(WC.PM.getHTML()) });
+          } else if (pick.ext === 'txt') {
+            fmt = 'text';
+            r = await window.wordAPI.saveTextFile({ filePath: pick.filePath, content: WC.PM.getText() });
+          } else if (pick.ext === 'docx') {
+            fmt = 'docx';
+            const bytes = await WC.PM.exportDocxBytes();
+            r = await window.wordAPI.saveBytes({ filePath: pick.filePath, bytes });
+          } else {
+            // Never write docx zip bytes into an arbitrary typed extension (e.g. foo.csv).
+            WC.toast('Unsupported save format', '.' + pick.ext + ' — choose Word Document, Web Page or Plain Text');
+            return { ok: false };
+          }
+          // path/name/format mutate ONLY on a confirmed write (spec §5.3).
+          if (r && r.ok) { this.path = r.path; this.name = r.name; this.format = fmt; this.setClean(); WC.toast('Saved ' + r.name); }
           else if (r && r.error) WC.toast('Save failed', r.error);
           return r;
         } catch (e) { const msg = (e && e.message) || String(e); WC.toast('Save failed', msg); return { ok: false, error: msg }; }

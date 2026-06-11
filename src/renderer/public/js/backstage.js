@@ -92,7 +92,7 @@
       this.content.appendChild(el('h1', { text: 'Open' }));
       const browse = el('div', { class: 'bs-action' }, [
         el('span', { class: 'bic', html: WC.icon('blankPage', 28) }),
-        el('div', { class: 'btxt' }, [el('div', { class: 'bt', text: 'Browse' }), el('div', { class: 'bd', text: 'Open a .docx, .html, .txt or .rtf file from this PC' })]),
+        el('div', { class: 'btxt' }, [el('div', { class: 'bt', text: 'Browse' }), el('div', { class: 'bd', text: (WC.PM && WC.PM.active) ? 'Open a .docx, .html, .txt or .csv file from this PC' : 'Open a .docx, .html, .txt or .rtf file from this PC' })]),
       ]);
       browse.addEventListener('click', () => WC.Files.open());
       this.content.appendChild(browse);

@@ -25,6 +25,11 @@ let painterEscInstalled = false
 // Concurrency guard: replaceEditor must not overlap itself (concurrent Open/New
 // clicks must not race — second call is refused while first is in flight).
 let replacing = false
+// Set when the html contentErr recovery replaced the live doc with a fresh BLANK
+// editor (replaceEditor returned false but the old doc is GONE). Consumers
+// (files.js) must unbind path/name/format in that case — keeping the old binding
+// would let Ctrl+S write a blank over the old file (spec §5.3 data loss).
+let lastImportBlanked = false
 
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
@@ -140,6 +145,9 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
   // Concurrency guard: refuse a second concurrent call (e.g. double-click Open).
   if (replacing) return false
   replacing = true
+  // Reset AFTER the mutex check: a refused concurrent call must not clobber the
+  // flag a consumer is about to read.
+  lastImportBlanked = false
   const w = window as any
   // Wire a freshly-constructed editor into the chrome — shared by the normal and
   // the contentError-recovery paths so both get the identical seam.
@@ -194,6 +202,7 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
         // return false so the caller never binds a path to the degraded blank.
         try { next?.destroy?.() } catch { /* degraded editor teardown is best-effort */ }
         mountEl.innerHTML = ''
+        lastImportBlanked = true // the old doc is gone — caller must unbind its file state
         wire(constructPmEditor(mountEl, parsed))
         return false
       }
@@ -252,6 +261,7 @@ export function preinstallBridge() {
     openHtml: async () => false,
     openText: async () => false,
     openCsv: async () => false,
+    lastImportBlanked: () => false,
     pasteHTMLString: () => false,
     stylePreviewEnter: () => false,
     stylePreviewLeave: () => {},
@@ -347,6 +357,8 @@ export function installBridge(editor: AnyEditor) {
     const table = csvToTableHtml(text)
     return table ? replaceEditor(blankArrayBuffer(), { html: table }) : Promise.resolve(false)
   }
+  // CONSTRAINT: consumers (files.js) must unbind path/name/format when a failed import replaced the doc with a blank.
+  PM.lastImportBlanked = () => lastImportBlanked
   // [4] pin + paste-path probes drive the REAL paste route (view.pasteHTML).
   PM.pasteHTMLString = (html: string) => {
     const ed = current

@@ -24,7 +24,6 @@ contextBridge.exposeInMainWorld('wordAPI', {
 
   // Phase 2 bytes channels (PM core: renderer-side .docx converter)
   saveBytes: (payload) => ipcRenderer.invoke('doc:saveBytes', payload),
-  saveAsBytes: (payload) => ipcRenderer.invoke('doc:saveAsBytes', payload),
   openBytes: (presetPath) => ipcRenderer.invoke('doc:openBytes', presetPath),
   saveTextFile: (payload) => ipcRenderer.invoke('doc:saveTextFile', payload),
   askSavePath: (payload) => ipcRenderer.invoke('doc:askSavePath', payload),

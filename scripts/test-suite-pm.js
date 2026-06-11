@@ -2045,6 +2045,13 @@
     const ok2 = await PM().openDocx(bytes);
     return ok2 === true && /roundtrip via html import/.test(window.WC.view.dom.textContent);
   });
+  await t('[7] lastImportBlanked stays false through successful imports (surface pin)', async () => {
+    if (typeof PM().lastImportBlanked !== 'function') return 'surface missing';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    const ok = await PM().openHtml('<p>blank-flag steady state</p>');
+    if (ok !== true) return 'openHtml failed';
+    return PM().lastImportBlanked() === false;
+  });
   await t('[7] failed save leaves dirty flag + path/format untouched (continuity pin — green both stages)', async () => {
     // Replaces the failed-save invariant coverage the deleted '[0b] non-docx save blocked' test
     // carried. Pre-slice: blocked-save returns ok:false; post-slice: the write to a nonexistent

@@ -430,24 +430,6 @@ ipcMain.handle('doc:saveBytes', async (_evt, { filePath, bytes }) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-ipcMain.handle('doc:saveAsBytes', async (_evt, { bytes, suggestedName }) => {
-  try {
-    const res = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save As',
-      defaultPath: suggestedName || 'Document1.docx',
-      // docx-only: the PM bytes ARE a docx zip — offering .html/.txt here would
-      // write zip bytes into a text file (spec §5.3).
-      filters: [{ name: 'Word Document', extensions: ['docx'] }],
-    });
-    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
-    const buf = Buffer.from(bytes);
-    if (!buf.length) return { ok: false, error: 'Empty document data (export failed?)' };
-    await fsp.writeFile(res.filePath, buf);
-    await pushRecentFile(res.filePath);
-    return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: 'docx' };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
-});
-
 ipcMain.handle('doc:openBytes', async (_evt, presetPath) => {
   try {
     let filePath = presetPath;
