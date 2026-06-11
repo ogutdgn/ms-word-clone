@@ -1,6 +1,7 @@
 # Phase 2 — Slice 8: review (comments · track changes · proofing) on the PM engine
 
-- **Status:** DRAFT → critique-hardened → executing
+- **Status:** CRITIQUE-HARDENED (3-critic workflow 2026-06-11, 18 verdicts: 1 blocker,
+  6 amendments, 4 info, 7 confirmed-ok — §5) → executing
 - **Branch:** `feature/phase-2-slice-8-review` (off `completion-driven-agent-loop`; PR back into it — NEVER `main`)
 - **Spec:** `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md` §9.1 row 8 + §8.3/§8.4
 - **Parity contract:** `.oracle-probes/slice8/parity.md` (50 items, all `[ ]`, captured live vs Word for Windows 16.0 2026-06-11; evidence `word-ref/01–32.png`)
@@ -143,6 +144,91 @@
 - **K9:** prosemirror-history vs fork tracking: does undo of a tracked insert
   remove the mark+text atomically (history event grouping with appendTransaction
   steps)? Red test T22 shape depends on it.
+
+## 5. CRITIQUE AMENDMENTS (binding; supersede conflicting text above)
+
+**A1 (K7 BLOCKER) — gen.js is broken for the regroup.** There is no `npm run gen`;
+the command is `node scripts/gen.js`, and gen.js:99 still writes to the dead
+pre-Phase-1 path `src/renderer/js/ribbon-data.js` (ENOENT crash; the live file is
+`src/renderer/public/js/ribbon-data.js`). Task-3 step 0: fix gen.js's output path,
+run with ZERO raw-research edits, and require a CLEAN DIFF vs the checked-in file
+before any review-tab JSON edit. gen.js also rewrites docs/NOT_IMPLEMENTED.md,
+docs/research/visual-spec.md and tech-notes.md with stale pre-pivot text
+(gen.js:106,134,145,155) — diff-review those side effects deliberately or scope
+gen.js to ribbon-data only.
+
+**A2 (K1+K3+store-drift) — comments MUST go through the Document API.** Raw
+`editor.commands.addComment` only marks the selection and EMITS content
+(`commentsUpdate` event, default no-op Editor.ts:754); `addCommentReply`/edit are
+event-only; `resolveComment` never stamps isDone; and export reads
+`converter.comments` — which raw commands never write — while the commentRange
+decode DROPS anchors with no matching store entry. In-session comments created via
+raw commands export to NOTHING. Bridge drives `editor.doc.comments.*`
+(comments-wrappers.ts:1720-1739: add/edit/reply/resolve/reopen/remove/setActive/
+goTo/get/list — lazily available on our plain editor, no Vue/ydoc) which runs the
+command AND upserts the entity store + isDone/resolvedTime. Undo reconciliation
+(`reconcileCommentEntityStoreWithAnchors`) also lives only on that path. Bridge
+`getComments()`/revision counts filter `trackedChange === true` projection rows;
+card geometry consumes the plugin's `comment-positions` + `commentsUpdate` events.
+ALSO: `addComment` hard-requires a non-collapsed selection → bridge expands
+caret→word first (Word parity); set a REAL author identity in create-editor.ts
+(currently `{name:'local'}` → stamped as w:author/w:initials and shown on cards).
+
+**A3 (showFinal) — D8.2 mapping is fork-native ×3, CSS ×1:** All Markup =
+`disableTrackChangesShowOriginal` (resets BOTH view flags); Original =
+`enableTrackChangesShowOriginal`; **No Markup = `enableTrackChangesShowFinal`**
+(track-changes.js:551-571 — exists; drop the planned `review-none` CSS); Simple
+Markup = `enableTrackChangesShowFinal` + clone-owned changed-line bars/balloon
+chrome (`review-simple` class). Red tests assert the PLUGIN flags
+(`TrackChangesBasePluginKey.getState` onlyOriginalShown/onlyModifiedShown), not
+container classes. Exports are view-mode-independent (verified; isFinalDoc is a
+separate explicit export arg — exists for save-as-final, do not rebuild).
+
+**A4 (cmd ids) — gen.js derives cmd from the LABEL** (gen.js:62, no override).
+To rename cmds (deleteComment/previousComment/nextComment/previousChange/
+nextChange) while keeping Word-faithful labels: extend gen.js with an optional
+per-control `"cmd"` override field (`cmd: c.cmd ? c.cmd : camel(c.label)`).
+Add the Tracking-group dialog launcher to `Commands.launcher` + LAUNCHER_AREA_CMD
+(commands.js:1099-1113) or it lands on notImplemented un-D6-blocked. Add icon-map
+entries + `node scripts/gen-icons.js` for previousChange/nextChange/filterMarkup
+(icons.js ALIAS already covers deleteComment/previousComment/nextComment).
+Red test pins group-specific nav (Comments Prev/Next ≠ Changes Prev/Next — the
+current shared-cmd heuristic at commands.js:785-787 is a known infidelity).
+
+**A5 (AREA completeness) — these review-tab cmds are NOT D6-blocked today** and
+silently drive the hidden legacy editor in PM mode: displayForReview, showMarkup,
+reviewingPane, compare, checkAccessibility, restrictEditing, translate, readAloud,
+editor, spellingGrammar (bridge/index.ts:85-87 lacks them; isBlocked returns false
+for unmapped cmds). Task 2 enumerates EVERY post-regroup review-tab cmd into AREA
+(or deliberately app-level with a PM-aware handler, like wordCount). Add a
+self-enforcing `[8]` audit test: walk WC.RIBBON's review tab and assert every
+doc-touching control's cmd is AREA-mapped.
+
+**A6 (state-sync) — do NOT extend the shared TOGGLE_MAP** for trackChanges: in
+--legacy mode syncToggles would read `!!undefined` and clobber the legacy latch
+(review-tools.js:24-25) — a silent regression the frozen gate misses. Use the
+format-painter DIRECT-POKE pattern (state-sync.ts:149-155, controlIndex +
+classList) — PM-only by construction. Seed the displayForReview combo input to
+"All Markup" (non-font combos render empty, ribbon.js:184).
+
+**A7 (red-test facts):** mark names live in `extensions/track-changes/constants.js`
+(NOT const.js): 'trackInsert'/'trackDelete'/'trackFormat'. Tracked DELETE keeps
+the text and ADDS the mark — assert mark presence, not text removal. trackFormat
+fires only for TrackedFormatMarkNames = [bold, italic, strike, underline,
+textStyle, highlight, link] (constants.js:9). Undo of a tracked insert is ATOMIC
+(dispatchTransaction rewrite, single history event — assert final doc state after
+undo, not per-character). Both `[0a]` D6 guards converge on `tableOfContents`
+after the repoint but exercise distinct dispatch heads (run:950 / dropdown:959) —
+both stay.
+
+**A8 (legacy survival):** every renamed/regrouped review cmd's H.* handler keeps a
+working legacy else-branch (PMA pattern → WC.Review/WC.Comments) — the frozen gate
+calls WC.Review.* directly and won't catch dead legacy ribbon buttons; run
+test:legacy after the regroup commit + a manual --legacy review-tab smoke.
+
+**Oracle watch-items (info):** w:del wrapper on non-text atoms lacks author/date
+(track-change-helpers.js:115-127); tracked deletions across field chars normalize
+to stay conformant — check both in leg A if exercised.
 
 ## 4. Definition of done (spec §8.4 + loop contract)
 
