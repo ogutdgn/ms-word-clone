@@ -1,0 +1,49 @@
+{
+  "session": "2026-06-10/11 slice-7 file-io oracle validation",
+  "word": "Microsoft Word for Mac 16.77.1 (user-launched, windowed; never quit; PID-safe closes only)",
+  "method": "scripts/oracle/word-oracle.js (AppleScript object model) + computer-use MCP (visual verification: dialogs, rendering, prompts) — first slice validated with direct screen control instead of Codex handoff",
+  "artifacts": ".oracle-probes/slice7/ (repo-rooted; Word sandbox cannot open /tmp — README quirk)",
+  "legs": {
+    "A_docx_roundtrip": {
+      "verdict": "PASS",
+      "artifact": "wc-s7-rt.docx (tests/fixtures/oracle-word-s6-tablestyles.docx -> PM.openDocx -> exportDocxBytes)",
+      "evidence": [
+        "real Word opened it with NO repair prompt (oracle read-props exit 0; 21 paragraphs, table-cell \\r\\u0007 markers as expected for the all-table fixture)",
+        "docx-inspect structural identity vs source: tables 3, rows 6, gridCols 6, tblStyleRefs [TableGrid] preserved; round-trip additionally carries the minted GridTable4-Accent1 definition with all 6 conditionalFormats (slice-6 minting fix working as designed)",
+        "visual: TableGrid tables render with grid borders; contextual Table Design/Layout tabs activate (Word recognizes real tables)",
+        "the macOS 'Grant File Access' sandbox prompt that blocked the slice-6 recheck was cleared interactively via computer use (one-time grant for the artifact)"
+      ],
+      "also_satisfies": "slice-6 carry-over: table-style fix (61d84d9) reopen-in-Word visual recheck"
+    },
+    "B_html_export": {
+      "verdict": "PASS (semantic fidelity per D7.10)",
+      "artifact": "wc-s7-export.html (PM.openHtml styled doc -> Files.save html leg)",
+      "evidence": [
+        "Word opened the .html cleanly: 20 words; bold run renders bold; ul renders as real bullets; 2x2 table renders bordered with all four cell texts",
+        "deviation recorded: headings export as styled paragraphs (model styleId does not map back to <h1> in getHTML's DOM serialization) — heading TEXT survives, tag semantics do not",
+        "deviation recorded: engine-internal data-sd-block-id/data-run attributes appear in the exported html (Word ignores them; cosmetic)"
+      ]
+    },
+    "C_csv_real_word_behavior": {
+      "verdict": "DEVIATION EVIDENCE RECORDED (for D7.3)",
+      "artifact": "wc-s7-data.csv (RFC-4180 with quoted comma + escaped quotes)",
+      "evidence": [
+        "real Word opens .csv behind a 'File Conversion' encoding dialog and renders it as RAW DELIMITED PLAIN TEXT (Courier New 10.5; quotes/commas/escapes literal; 3 lines; NO table)",
+        "the clone imports csv as a parsed PM table (user-directed, net-new — the legacy app loaded csv as a BLANK doc) and opens it as an UNSAVED document (path=null) since the table form cannot be written back to csv (spec 5.3)"
+      ]
+    },
+    "D_txt_export": {
+      "verdict": "PASS",
+      "artifact": "wc-s7-export.txt (Files.save text leg; doc.textBetween with lineBreak+hardBreak as newlines)",
+      "evidence": [
+        "Word's File Conversion preview + import show all 8 model lines byte-faithful: heading text, body, both list items, all four table cells (one per line — textBetween block-separator semantics; Word's own txt export would tab-separate cells: recorded fidelity note)"
+      ]
+    }
+  },
+  "slice6_carryovers": {
+    "table_style_visual_recheck": "CLOSED via leg A (same artifact class; no repair; renders)",
+    "word_authored_to_openDocx": "covered continuously by test:roundtrip (negation-run/s3/s6 fixtures are Word-authored and import via PM.openDocx in every gate run)",
+    "ui_codex_steps": "still open (A2 Insert-Table dialog, A5 Bookmark, B-layout/autofit, C1/C2) — now feasible via computer use directly; not slice-7 scope, not PR-blocking"
+  },
+  "session_health": "Word left RUNNING with zero document windows; only our four artifacts were opened and closed (by cmd+W on saved docs / oracle name-verified close); the user's prior unsaved Document1 was already closed before this session's legs and was never touched"
+}
