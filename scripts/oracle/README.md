@@ -1,3 +1,15 @@
+# scripts/oracle — real-Word oracles for Phase 2 fidelity validation
+
+| Platform | Oracle | Mechanism |
+|---|---|---|
+| macOS | `word-oracle.js` (this README's main body) | AppleScript object model via `osascript` |
+| Windows | `word-oracle-win.ps1` (see **Windows oracle** section at the end) | `Word.Application` COM via PowerShell |
+
+Both implement the **same verbs with the same JSON output shapes** — consumers
+work unchanged across platforms. Slices 1–7 were validated against Word for Mac
+16.77.1; from slice 8 onward the parity reference is **Word for Windows** (the
+loop's Step-0 note in `docs/loop/loop.md`).
+
 # scripts/oracle/word-oracle.js
 
 macOS Microsoft Word oracle for Phase 2 per-feature fidelity validation.
@@ -350,3 +362,100 @@ clone-generated and Word-authored `.docx` files.
 **Quirks #24–#26 still apply** for any subsequent object-model reads (e.g.
 text readback via `read-props`) on the same session — the session-health
 constraints are unchanged.
+
+---
+
+# Windows oracle — `word-oracle-win.ps1`
+
+The Windows COM port of `word-oracle.js` (Step 0 of the completion-driven loop,
+2026-06-11). Same five verbs, same JSON shapes, same exit codes (2 = usage,
+1 = runtime error), `--out` writes **BOM-free UTF-8** (Node `JSON.parse`-safe).
+
+## Requirements
+
+- Microsoft Word for Windows (verified against **Word 16.0**, Microsoft 365,
+  English Office on Windows 11).
+- Windows PowerShell 5.1+ (`powershell.exe -File` runs STA by default — required).
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/oracle/word-oracle-win.ps1 read-props <abs.docx> [--out r.json]
+#                                                  read-word-props <abs.docx> <paraIdx> [wordIdx] [--out r.json]
+#                                                  read-para-props <abs.docx> [--out r.json]
+#                                                  read-style-props <abs.docx> [--out r.json]
+#                                                  roundtrip <in.docx> <out.docx>
+```
+
+## Windows quirks (all verified live, 2026-06-11)
+
+1. **No sandboxed shells.** Out-of-proc DCOM activation (`New-Object -ComObject
+   Word.Application`) hangs indefinitely from a sandboxed shell. Run unsandboxed.
+2. **Foreground shells only.** In this machine's agent harness, BACKGROUNDED
+   PowerShell tasks wedge inside Word's save pipeline: every COM call up to
+   `SaveAs2` works, then `SaveAs2` never returns — with NO dialog (verified by
+   enumerating the hung instance's windows) and regardless of output path
+   (OneDrive and `C:\tmp` both wedge). The identical foreground call saves
+   instantly — including to OneDrive-synced repo paths. Keep oracle commands
+   short so the harness does not auto-background them.
+3. **Fresh-instance PID safety (stronger than Mac).** `New-Object` always
+   creates a NEW hidden WINWORD process — it never attaches to the user's
+   running Word, so user documents are physically unreachable. The script tags
+   its own instance's hidden window caption with a GUID to learn its PID
+   (no PID-set diff races); cleanup closes only our documents, quits only our
+   instance, and falls back to killing only that provably-ours PID.
+4. **Orphan recovery without touching the user's Word:** if a wedged client
+   leaves a hidden WINWORD behind, attach to that specific instance through its
+   own window (`OpusApp` → `_WwG` child → `AccessibleObjectFromWindow`
+   OBJID_NATIVEOM → `.Application`) and `Quit()` it gracefully. Never
+   `taskkill /IM WINWORD` — the user's instance dies too.
+5. **`DocumentN` numbering is machine-global,** not per-instance: a fresh
+   instance's first `Documents.Add()` can be "Document7". Never identify
+   documents (or instances) by that number.
+6. **Built-in style names are localized** in COM (`Styles.Item("Grid Table 4 -
+   Accent 1")`, `"Table Grid"` — verified on English Office). On a localized
+   Office, use the localized display names; assignment is by name string.
+7. **Mixed formatting reads as `9999999`** (wdUndefined), not "missing value":
+   the port maps it to `false` (bold/italic), `null` (fontSize) — same observable
+   values as the Mac oracle's mixed-paragraph collapses.
+8. **PowerShell 5.1 pipes re-encode with a BOM** — never pipe oracle stdout into
+   `node -e 'JSON.parse(...)'`; use `--out <file>` (BOM-free) and read the file.
+9. **Table-cell paragraphs read with `\r` cell markers** in `text` —
+   identical to the Mac oracle's reports on table fixtures.
+
+## Fixture regeneration — `author-fixtures-win.ps1`
+
+`tests/fixtures/oracle-word-s3-table.docx` and
+`tests/fixtures/oracle-word-s6-tablestyles.docx` are **gitignored real-Word
+fixtures** required by `npm run test:roundtrip`. On a fresh machine, regenerate
+them with `powershell -NoProfile -ExecutionPolicy Bypass -File
+scripts/oracle/author-fixtures-win.ps1` (foreground, unsandboxed — quirks 1–2).
+Shapes verified identical to the Mac-authored originals via `docx-inspect`:
+s3 = one 3×4 table styled GridTable4-Accent1 (full 6-block conditionalFormats);
+s6 = three 2×2 TableGrid tables (6 rows / 6 gridCols, 3 separate `<w:tbl>`).
+
+## Popup/flyout capture — `capture-popups.ps1`
+
+Office flyouts, menus, and dialogs are separate top-level windows (`Net UI Tool
+Window` / `NUIDialog`) that a main-window screenshot misses. For the per-slice
+Word-side spec capture, `capture-popups.ps1 -ProcessName WINWORD -OutPrefix
+<path-prefix>` PrintWindow-captures every visible top-level window of a process
+(size-filtered, title-skippable) — one PNG per window.
+
+## Windows output-vocabulary notes (critique-hardened)
+
+- **Mixed formatting sentinels:** COM `wdUndefined` (9999999) maps to the same
+  observable values the Mac wire shows for collapsed mixed formatting —
+  `bold`/`italic` → `false`, `fontSize` → `null`, and `underlineRaw` → the
+  literal string `"false"` (so the documented boolean rule
+  `underline = raw ≠ "underline none" ∧ raw ≠ "false"` is the SAME code in
+  both oracles).
+- **Verified vocabulary:** only `left/center/right/justify` (alignment),
+  `underline none/single/words/double`, and the six line-spacing rules are
+  Mac-verified. The longer Windows maps (decorated underlines, `justify med`/
+  `justify hi`) follow the sdef/COM constant naming pattern and are
+  best-effort — if a Mac report ever disagrees, pin the Mac token and fix the
+  Windows map.
+- **Unknown-enum fallbacks** emit synthetic tokens (`enum<N>`, `underline
+  enum<N>`, `line space enum<N>`) that Mac output never contains; for
+  `lineSpacingRule` the normalized field falls back to the RAW string exactly
+  like the Mac oracle. Treat any synthetic token in a report as "extend the
+  map".
