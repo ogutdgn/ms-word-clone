@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-06-11 (later) — Slice 8 IN PROGRESS: Word-side spec capture DONE
+
+- **Branch:** `completion-driven-agent-loop` (slice branch not yet cut — capture phase is
+  read-only on the clone side).
+- **Phase:** Phase 2 — loop iteration 2, slice 8 (review), per-slice step 2 of 9 done.
+- **Word-side spec captured live** (Word for Windows 16.0, Document8 sample left OPEN in
+  the user's Word instance — our window, safe to close with Don't Save anytime):
+  **32 evidence PNGs** in `.oracle-probes/slice8/word-ref/` + the **50-item parity
+  checklist `.oracle-probes/slice8/parity.md`** (all `[ ]`; 6 noted Word-side states
+  still to capture during the inner loop). Headline findings for the plan:
+  (1) modern ribbon REGROUPS review: a **Markup** group (display combo + Filter All
+  Markup + Show Markup + Reviewing Pane + dialog launcher) and **Tracking** holds
+  Accept/Reject/Prev/Next — the clone's researched classic layout must be restructured;
+  (2) comments are CONTEXTUAL CARDS (composer card, threads, timestamps, reactions 👍,
+  Contextual|List view switch, panes share the right dock with a switcher rail);
+  (3) Delete menu has a 4th item "Delete All Resolved Comments";
+  (4) Track Changes ▾ = For Everyone | Just Mine | Lock Tracking (password dialog);
+  (5) Show Markup has NO Comments item; Balloons submenu default = "Show Only
+  Formatting in Balloons"; unchecking Insertions and Deletions live-hides inline marks;
+  (6) Reviewing Pane counts COMMENTS as revisions ("7 revisions" = 3 comments + 4 edits);
+  (7) accept/reject auto-advance verified live (7→6→5 revisions); enablement semantics
+  pinned (Accept This Change disabled off-change; All-Shown disabled unfiltered);
+  (8) Track Changes Options + Advanced dialogs fully captured (markup rendering spec);
+  (9) toggling Track Changes flips the chrome mode pill Editing→Reviewing;
+  (10) Editor/Translate/Thesaurus-definitions are sign-in/cloud (class B degradation).
+- **Windows-quirk note for computer use:** "Windows Input Experience" (TextInputHost)
+  can WEDGE the OS foreground and block all MCP clicks (frontmost check). Graceful fix
+  that works: a REAL `SendInput` click on the target window's title bar via PowerShell
+  (unsandboxed, foreground) — never kill TextInputHost (denied + unnecessary).
+- **Next within slice 8:** cut `feature/phase-2-slice-8-review` → critique-hardened plan
+  (fork track-changes/comment extensions per the inventory in this entry's sibling
+  below) → red `[8]` tests → bridge/review.ts + ribbon regroup → flip `review` area →
+  gates → inner loop vs the parity checklist → oracle legs → PR into the loop branch.
+
+---
+
 ## 2026-06-11 — Loop Step 0 DONE: Windows environment replication (gates + COM oracle port)
 
 - **Branch:** `completion-driven-agent-loop` (committed directly — Step 0 is loop
