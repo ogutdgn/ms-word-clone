@@ -53,7 +53,10 @@ function buildTab(tab) {
         const isLauncher = /dialog box launcher/i.test(tip);
         const ctrl = {
           id: uniqueId(`${tabSlug}.${gSlug}.${slug(c.label)}`),
-          cmd: camel(c.label),
+          // A4 (slice 8): optional per-control "cmd" override — labels stay
+          // Word-faithful while cmd ids stay unique (e.g. Comments "Previous" →
+          // previousComment vs Tracking "Previous" → previousChange).
+          cmd: c.cmd ? c.cmd : camel(c.label),
           label: decode(c.label),
           type: c.type || 'button',
           tooltip: tip || undefined,

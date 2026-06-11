@@ -82,10 +82,16 @@ const AREA: Record<string, string> = {
   object: 'insert-exotica', signatureLine: 'insert-exotica', dateTime: 'insert-exotica',
   coverPage: 'insert-exotica', quickParts: 'insert-exotica',
   crossReference: 'references', // slice 9 (fork has the cross-reference extension)
-  // review (slice 8)
-  newComment: 'review', comment: 'review', delete: 'review', previous: 'review', next: 'review',
+  // review (slice 8) — task 3 regroup (D8.1/A4): the old label-derived ids
+  // delete/previous/next are GONE from the ribbon; the per-control cmd overrides
+  // (deleteComment/previousComment/nextComment/previousChange/nextChange/
+  // filterMarkup/spellingGrammar) are the live ids.
+  newComment: 'review', comment: 'review', deleteComment: 'review',
+  previousComment: 'review', nextComment: 'review',
+  previousChange: 'review', nextChange: 'review',
   showComments: 'review', trackChanges: 'review', accept: 'review', reject: 'review',
   thesaurus: 'review', language: 'review',
+  spellingGrammar: 'review', filterMarkup: 'review',
   // review (slice 8, A5): the rest of the tab's doc-touching cmds — unmapped they were
   // NOT D6-blocked (isBlocked returns false) and silently drove the hidden legacy editor.
   // App-level by design (never mapped): wordCount, blockAuthors, linkedNotes.

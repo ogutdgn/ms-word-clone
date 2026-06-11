@@ -1786,6 +1786,17 @@
                     "feasible": "partial"
                   },
                   {
+                    "label": "Spelling and Grammar",
+                    "cmd": "spellingGrammar",
+                    "type": "split",
+                    "tooltip": "Check the spelling and grammar of text in the document.",
+                    "items": [
+                      "Spelling",
+                      "Spelling and Grammar"
+                    ],
+                    "feasible": "partial"
+                  },
+                  {
                     "label": "Thesaurus",
                     "type": "button",
                     "shortcut": "Shift+F7",
@@ -1838,7 +1849,8 @@
                     "tooltip": "Easily translate selected text or your whole document into a different language using Microsoft Translator.",
                     "items": [
                       "Translate Selection",
-                      "Translate Document"
+                      "Translate Document",
+                      "Translator Preferences..."
                     ],
                     "feasible": "partial"
                   },
@@ -1860,54 +1872,52 @@
                   {
                     "label": "New Comment",
                     "type": "button",
+                    "shortcut": "Ctrl+Alt+M",
                     "tooltip": "Add a note about this part of the document. Select the content you want to comment on, then click here.",
                     "feasible": "yes"
                   },
                   {
                     "label": "Delete",
+                    "cmd": "deleteComment",
                     "type": "split",
                     "tooltip": "Delete the selected comment, or delete all comments in the document.",
                     "items": [
                       "Delete",
                       "Delete All Comments Shown",
-                      "Delete All Comments in Document"
+                      "Delete All Comments in Document",
+                      "Delete All Resolved Comments"
                     ],
                     "feasible": "yes"
                   },
                   {
                     "label": "Previous",
+                    "cmd": "previousComment",
                     "type": "button",
                     "tooltip": "Jump to the previous comment in the document.",
                     "feasible": "yes"
                   },
                   {
                     "label": "Next",
+                    "cmd": "nextComment",
                     "type": "button",
                     "tooltip": "Jump to the next comment in the document.",
                     "feasible": "yes"
                   },
                   {
                     "label": "Show Comments",
-                    "type": "toggle",
-                    "tooltip": "Choose to see all comments inline alongside the text, or show them in a contextual pane.",
+                    "type": "dropdown",
+                    "tooltip": "Choose to see all comments contextually alongside the text, or show them in a list pane.",
+                    "items": [
+                      "Contextual",
+                      "List"
+                    ],
                     "feasible": "yes"
                   }
                 ]
               },
               {
-                "name": "Tracking",
+                "name": "Markup",
                 "controls": [
-                  {
-                    "label": "Track Changes",
-                    "type": "split",
-                    "shortcut": "Ctrl+Shift+E",
-                    "tooltip": "Keep track of all the changes made to the document, including insertions, deletions, and formatting changes.",
-                    "items": [
-                      "Track Changes",
-                      "Lock Tracking..."
-                    ],
-                    "feasible": "partial"
-                  },
                   {
                     "label": "Display for Review",
                     "type": "combo",
@@ -1921,18 +1931,23 @@
                     "feasible": "partial"
                   },
                   {
+                    "label": "Filter All Markup",
+                    "cmd": "filterMarkup",
+                    "type": "button",
+                    "tooltip": "Filter the markup shown in the document.",
+                    "feasible": "partial"
+                  },
+                  {
                     "label": "Show Markup",
                     "type": "dropdown",
-                    "tooltip": "Choose what kind of markup to show in your document, such as comments, insertions and deletions, formatting, and which reviewers to display.",
+                    "tooltip": "Choose what kind of markup to show in your document, such as insertions and deletions, formatting, and which reviewers to display.",
                     "items": [
-                      "Comments",
                       "Insertions and Deletions",
                       "Formatting",
                       "Balloons",
                       "Specific People",
                       "Highlight Updates",
-                      "Other Authors",
-                      "Reviewing Pane"
+                      "Other Authors"
                     ],
                     "feasible": "partial"
                   },
@@ -1941,16 +1956,34 @@
                     "type": "split",
                     "tooltip": "Show revisions in a separate window, vertically or horizontally. This is a handy way to make sure that all tracked changes have been removed from your document.",
                     "items": [
-                      "Reviewing Pane Vertical",
-                      "Reviewing Pane Horizontal"
+                      "Reviewing Pane Vertical...",
+                      "Reviewing Pane Horizontal..."
                     ],
+                    "feasible": "partial"
+                  },
+                  {
+                    "label": "Track Changes Options",
+                    "type": "button",
+                    "tooltip": "Dialog Box Launcher: opens the Track Changes Options dialog.",
                     "feasible": "partial"
                   }
                 ]
               },
               {
-                "name": "Changes",
+                "name": "Tracking",
                 "controls": [
+                  {
+                    "label": "Track Changes",
+                    "type": "split",
+                    "shortcut": "Ctrl+Shift+E",
+                    "tooltip": "Keep track of all the changes made to the document, including insertions, deletions, and formatting changes.",
+                    "items": [
+                      "For Everyone",
+                      "Just Mine",
+                      "Lock Tracking"
+                    ],
+                    "feasible": "partial"
+                  },
                   {
                     "label": "Accept",
                     "type": "split",
@@ -1970,7 +2003,7 @@
                     "tooltip": "Reject this change and move to the next one. Use the dropdown to reject all changes or reject all and stop tracking.",
                     "items": [
                       "Reject and Move to Next",
-                      "Reject This Change",
+                      "Reject Change",
                       "Reject All Changes Shown",
                       "Reject All Changes",
                       "Reject All Changes and Stop Tracking"
@@ -1979,12 +2012,14 @@
                   },
                   {
                     "label": "Previous",
+                    "cmd": "previousChange",
                     "type": "button",
                     "tooltip": "Jump to the previous tracked change in the document so you can accept or reject it.",
                     "feasible": "partial"
                   },
                   {
                     "label": "Next",
+                    "cmd": "nextChange",
                     "type": "button",
                     "tooltip": "Jump to the next tracked change in the document so you can accept or reject it.",
                     "feasible": "partial"
@@ -1999,8 +2034,9 @@
                     "type": "dropdown",
                     "tooltip": "Compare or combine multiple versions of a document.",
                     "items": [
-                      "Compare... (Compare two versions of a document — legal blackline)",
-                      "Combine... (Combine revisions from multiple authors into a single document)"
+                      "Compare...",
+                      "Combine...",
+                      "Show Source Documents"
                     ],
                     "feasible": "no"
                   }
@@ -2028,19 +2064,8 @@
                 "controls": [
                   {
                     "label": "Hide Ink",
-                    "type": "toggle",
+                    "type": "dropdown",
                     "tooltip": "Hide or show ink annotations in the document. (Appears when the document contains ink or on touch/pen-enabled devices.)",
-                    "feasible": "no"
-                  }
-                ]
-              },
-              {
-                "name": "OneNote",
-                "controls": [
-                  {
-                    "label": "Linked Notes",
-                    "type": "button",
-                    "tooltip": "Take notes in OneNote and link them to the part of the document you're working on. (Appears when OneNote integration is available.)",
                     "feasible": "no"
                   }
                 ]

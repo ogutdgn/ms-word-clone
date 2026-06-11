@@ -214,7 +214,15 @@
   H.dropCap = () => dropCap();
   H.equation = () => WC.Dialogs.equation();
   H.comment = (c, node) => WC.Commands.run({ cmd: 'newComment' });
-  H.newComment = () => WC.Comments && WC.Comments.add();
+  // PM branch: the contextual composer card (slice-8 task 4) owns text entry —
+  // pm.cmd('addComment') with empty text is WRONG (A2: comments need real content).
+  // Until WC.CommentsUI lands, the PM branch is a guarded no-op (review is D6-blocked
+  // pre-flip, and the flip [task 7] lands after the composer [task 4]).
+  H.newComment = () => {
+    const pm = PMA();
+    if (pm) { if (WC.CommentsUI && WC.CommentsUI.compose) WC.CommentsUI.compose(); return; }
+    WC.Comments && WC.Comments.add();
+  };
 
   // ---- Insert tab ----
   H.coverPage = (c, node) => WC.Insert.coverPageMenu(node);
@@ -284,9 +292,17 @@
 
   // ---- Review ----
   H.wordCount = () => WC.Dialogs.wordCount();
-  H.readAloud = () => toggleReadAloud();
-  H.spellingGrammar = () => runSpellCheck();
-  H.trackChanges = () => WC.Review.setTrackChanges();
+  H.readAloud = () => toggleReadAloud(); // PM read-aloud (per-word decorations) lands in slice-8 task 6
+  H.spellingGrammar = () => runSpellCheck(); // PM proofing pane lands in slice-8 task 6
+  H.trackChanges = () => { const pm = PMA(); pm ? pm.cmd('toggleTrackChanges') : WC.Review.setTrackChanges(); };
+  // Lock Tracking (D8.7): the password dialog + bridge lock flag land in task 6.
+  // TODO(slice-8 task 6): route to WC.Dialogs.lockTracking() + a bridge 'lockTracking'
+  // cmd; until then the PM branch falls back to the plain toggle (recorded interim).
+  H.trackChangesLock = () => {
+    const pm = PMA();
+    if (pm) { pm.cmd('toggleTrackChanges'); return; }
+    WC.toast('Lock Tracking needs a password — not implemented.');
+  };
 
   // ---- Layout ----
   H.margins = (c, node) => marginsMenu(node);
@@ -761,7 +777,7 @@
   // ---- Review tab ----
   H.thesaurus = () => WC.Review.thesaurus();
   H.checkAccessibility = () => WC.Review.checkAccessibility();
-  H.translate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Translate Selection', { onClick: () => WC.toast('Translation needs a cloud translator — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md') })); fly.appendChild(WC.flyItem('Translate Document', { onClick: () => WC.toast('Translation needs a cloud translator — not available.') })); });
+  H.translate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Translate Selection', { onClick: () => WC.toast('Translation needs a cloud translator — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md') })); fly.appendChild(WC.flyItem('Translate Document', { onClick: () => WC.toast('Translation needs a cloud translator — not available.') })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Translator Preferences…', { onClick: () => WC.toast('Translator preferences require the cloud translator service — not available.') })); });
   H.language = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyItem('Set Proofing Language…', { onClick: () => languageDialog() }));
     fly.appendChild(WC.flyItem('Language Preferences…', { onClick: () => languageDialog() }));
@@ -782,33 +798,121 @@
       { label: 'Cancel' },
     ] });
   }
-  H.delete = (c, node) => WC.Review.deleteComment();
-  H.previous = () => { if (WC.Review.revisions().length) WC.Review.prevChange(); else WC.Review.prevComment(); };
-  H.next = () => { if (WC.Review.revisions().length) WC.Review.nextChange(); else WC.Review.nextComment(); };
-  H.showComments = (c, node) => { WC.Review.showComments(); if (node) node.classList.toggle('toggled'); };
-  H.showMarkup = (c, node) => WC.flyout(node, (fly) => {
-    const mk = WC.Review.markup;
-    const item = (label, key, onToggle) => {
-      const it = WC.flyItem((mk[key] ? '✓ ' : '   ') + label, { onClick: () => { mk[key] = !mk[key]; onToggle(mk[key]); WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node); } });
-      return it;
+  // ---- Comments group (A4 renamed cmds — every handler keeps a WORKING legacy branch, A8) ----
+  // PM: delete the ACTIVE thread (caret/nav-selected), else the first thread —
+  // Word disables the button with no comments; enablement polish lands with task 4's UI.
+  H.deleteComment = () => {
+    const pm = PMA();
+    if (pm) { const rows = pm.getComments(); const hit = rows.find((r) => r.active) || rows[0]; if (hit) pm.cmd('deleteComment', hit.id); return; }
+    WC.Review.deleteComment();
+  };
+  H.previousComment = () => { const pm = PMA(); pm ? pm.cmd('prevComment') : WC.Review.prevComment(); };
+  H.nextComment = () => { const pm = PMA(); pm ? pm.cmd('nextComment') : WC.Review.nextComment(); };
+  // Show Comments ▾ (parity C10): Contextual | List. The card/pane UI lands in task 4 —
+  // the PM branch latches the chosen view on a WC-level flag the task-4 UI will consume
+  // (no bridge 'setCommentsView' cmd exists yet); legacy keeps the pane toggle.
+  H.showComments = (c, node) => WC.flyout(node, (fly) => {
+    const pm = PMA();
+    const mode = WC.commentsViewMode || 'contextual';
+    const pick = (m) => {
+      if (PMA()) { WC.commentsViewMode = m; return; } // consumed by the task-4 comments UI
+      WC.Review.showComments();
     };
-    fly.appendChild(item('Comments', 'comments', (on) => { E().node.classList.toggle('hide-comments', !on); const p = document.getElementById('comments-pane'); if (p) p.hidden = !on; }));
-    fly.appendChild(item('Insertions and Deletions', 'inserts', (on) => WC.Review.setDisplayMode(on ? 'all' : 'none')));
-    fly.appendChild(item('Formatting', 'formatting', () => {}));
-    fly.appendChild(WC.flySep());
-    fly.appendChild(item('Balloons', 'balloons', (on) => E().node.classList.toggle('review-balloons', on)));
-    fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Specific People', { onClick: () => WC.toast('All reviewers shown (single-author clone).') }));
-    fly.appendChild(WC.flyItem('Reviewing Pane', { onClick: () => WC.Review.reviewingPane() }));
+    fly.appendChild(WC.flyItem((mode === 'contextual' ? '✓ ' : '   ') + 'Contextual', { onClick: () => pick('contextual') }));
+    fly.appendChild(WC.flyItem((mode === 'list' ? '✓ ' : '   ') + 'List', { onClick: () => pick('list') }));
+    if (!pm) { fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Toggle Comments Pane', { onClick: () => WC.Review.showComments() })); }
   });
-  H.reviewingPane = () => WC.Review.reviewingPane();
-  H.accept = (c, node) => WC.Review.acceptOne();
-  H.reject = (c, node) => WC.Review.rejectOne();
-  H.compare = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Compare…', { onClick: () => WC.Review.compare('compare') })); fly.appendChild(WC.flyItem('Combine…', { onClick: () => WC.Review.compare('combine') })); });
+  // ---- Markup group ----
+  // PM-side Show Markup latches (T9/T10). Rendering effects (hiding ins/del inline,
+  // balloon modes, changed-line bars) land in task 5 — the menu must exist + latch now.
+  const pmMarkup = { insDel: true, formatting: true, balloons: 'formatting' };
+  H.showMarkup = (c, node) => {
+    const pm = PMA();
+    if (pm) {
+      return WC.flyout(node, (fly) => {
+        const reopen = () => WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node);
+        const check = (on, label) => (on ? '✓ ' : '   ') + label;
+        fly.appendChild(WC.flyItem(check(pmMarkup.insDel, 'Insertions and Deletions'), { onClick: () => { pmMarkup.insDel = !pmMarkup.insDel; document.getElementById('pm-editor').classList.toggle('pm-hide-insdel', !pmMarkup.insDel); reopen(); } }));
+        fly.appendChild(WC.flyItem(check(pmMarkup.formatting, 'Formatting'), { onClick: () => { pmMarkup.formatting = !pmMarkup.formatting; reopen(); } }));
+        const balloons = WC.flyItem('Balloons', { onClick: () => WC.flyout(node, (sub) => {
+          const bal = (label, m) => sub.appendChild(WC.flyItem(check(pmMarkup.balloons === m, label), { onClick: () => { pmMarkup.balloons = m; } }));
+          bal('Show Revisions in Balloons', 'revisions');
+          bal('Show All Revisions Inline', 'inline');
+          bal('Show Only Formatting in Balloons', 'formatting');
+        }) });
+        balloons.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
+        fly.appendChild(balloons);
+        const people = WC.flyItem('Specific People', { onClick: () => WC.flyout(node, (sub) => {
+          sub.appendChild(WC.flyItem('✓ All Reviewers', { onClick: () => {} }));
+        }) });
+        people.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
+        fly.appendChild(people);
+        fly.appendChild(WC.flyItem('Highlight Updates', { disabled: true }));
+        fly.appendChild(WC.flyItem('Other Authors', { disabled: true }));
+      });
+    }
+    // legacy menu kept verbatim (frozen --legacy gate exercises it)
+    WC.flyout(node, (fly) => {
+      const mk = WC.Review.markup;
+      const item = (label, key, onToggle) => {
+        const it = WC.flyItem((mk[key] ? '✓ ' : '   ') + label, { onClick: () => { mk[key] = !mk[key]; onToggle(mk[key]); WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node); } });
+        return it;
+      };
+      fly.appendChild(item('Comments', 'comments', (on) => { E().node.classList.toggle('hide-comments', !on); const p = document.getElementById('comments-pane'); if (p) p.hidden = !on; }));
+      fly.appendChild(item('Insertions and Deletions', 'inserts', (on) => WC.Review.setDisplayMode(on ? 'all' : 'none')));
+      fly.appendChild(item('Formatting', 'formatting', () => {}));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(item('Balloons', 'balloons', (on) => E().node.classList.toggle('review-balloons', on)));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Specific People', { onClick: () => WC.toast('All reviewers shown (single-author clone).') }));
+      fly.appendChild(WC.flyItem('Reviewing Pane', { onClick: () => WC.Review.reviewingPane() }));
+    });
+  };
+  // Filter All Markup (parity R1): real Word opens a markup-filter menu (capture
+  // pending). Interim routing: the Show Markup menu IS the filter set we have —
+  // task 5 replaces this with the captured filter menu.
+  H.filterMarkup = (c, node) => H.showMarkup(c, node || (WC.Ribbon.controlIndex.filterMarkup && WC.Ribbon.controlIndex.filterMarkup.node) || document.body);
+  // PM branch: minimal Revisions pane fed by the bridge provider (T11 shape:
+  // author · type label · content + live count). Task 5 re-skins it into Word's
+  // left-dock revision list; legacy keeps its own pane.
+  H.reviewingPane = () => {
+    const pm = PMA();
+    if (!pm) { WC.Review.reviewingPane(); return; }
+    let pane = document.getElementById('review-pane');
+    if (pane) { pane.remove(); return; }
+    pane = el('div', { class: 'taskpane', id: 'review-pane' });
+    const rows = pm.getRevisions();
+    const verb = { insert: 'Inserted', delete: 'Deleted', format: 'Formatted', comment: 'Commented' };
+    pane.appendChild(el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: rows.length + ' revision' + (rows.length === 1 ? '' : 's') }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]));
+    const body = el('div', { class: 'tp-body' });
+    if (!rows.length) body.appendChild(el('div', { style: { color: '#888', padding: '10px' }, text: 'No revisions.' }));
+    rows.forEach((r) => body.appendChild(el('div', { class: 'tp-result' }, [
+      el('div', { style: { fontWeight: '600', fontSize: '12px' }, text: (r.author || 'Author') + ' ' + (verb[r.type] || 'Changed') }),
+      el('div', { style: { fontSize: '12px', color: '#444' }, text: r.text || '' }),
+    ])));
+    pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+  };
+  // ---- Tracking group ----
+  // Word's main Accept/Reject buttons ACCEPT-AND-ADVANCE (parity T14); with the
+  // caret on no change they jump to the first one without applying (T16) — the
+  // bare cmd returns false in that case and the chained nextChange supplies the
+  // jump. "Accept This Change" (menu item) stays the bare non-advancing cmd.
+  H.accept = () => { const pm = PMA(); if (pm) { pm.cmd('acceptChange'); pm.cmd('nextChange'); } else WC.Review.acceptOne(); };
+  H.reject = () => { const pm = PMA(); if (pm) { pm.cmd('rejectChange'); pm.cmd('nextChange'); } else WC.Review.rejectOne(); };
+  H.previousChange = () => { const pm = PMA(); pm ? pm.cmd('prevChange') : WC.Review.prevChange(); };
+  H.nextChange = () => { const pm = PMA(); pm ? pm.cmd('nextChange') : WC.Review.nextChange(); };
+  H.compare = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Compare…', { onClick: () => WC.Review.compare('compare') })); fly.appendChild(WC.flyItem('Combine…', { onClick: () => WC.Review.compare('combine') })); fly.appendChild(WC.flyItem('Show Source Documents', { disabled: true })); });
   H.blockAuthors = () => WC.toast('Block Authors requires cloud co-authoring — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
   H.restrictEditing = () => WC.Review.restrictEditing();
-  H.hideInk = (c, node) => { WC.Review.hideInk(); if (node) node.classList.toggle('toggled'); };
-  H.linkedNotes = () => WC.toast('Linked Notes (OneNote) requires the OneNote service — not available.', 'See docs/NOT_IMPLEMENTED.md');
+  // Hide Ink ▾ (parity X4 — Word menu capture pending; ink layer is the legacy/slice-10
+  // Draw canvas). PM branch latches a container class; legacy keeps the layer toggle.
+  H.hideInk = (c, node) => {
+    const pm = PMA();
+    if (pm) { document.getElementById('pm-editor').classList.toggle('pm-hide-ink'); }
+    else WC.Review.hideInk();
+    if (node) node.classList.toggle('toggled');
+  };
 
   // ---- View tab ----
   H.outline = () => { E().setView('outline'); WC.StatusBar && WC.StatusBar.setActiveView && WC.StatusBar.setActiveView('print'); WC.toast('Outline view'); };
@@ -1030,13 +1134,53 @@
       // Mailings tab
       if (cmd === 'startMailMerge' || cmd === 'selectRecipients' || cmd === 'insertMergeField' || cmd === 'rules' || cmd === 'finishMerge') return H[cmd](control, node);
       // Review tab
-      if (cmd === 'translate' || cmd === 'language' || cmd === 'showMarkup' || cmd === 'compare') return H[cmd](control, node);
-      if (cmd === 'trackChanges') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem((WC.Review.trackOn ? '✓ ' : '') + 'Track Changes', { onClick: () => WC.Review.setTrackChanges() })); fly.appendChild(WC.flyItem('Lock Tracking…', { onClick: () => WC.toast('Lock Tracking needs a password — not implemented.') })); });
-      if (cmd === 'accept') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Accept and Move to Next', { onClick: () => WC.Review.acceptOne() })); fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.acceptNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } })); fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => WC.Review.acceptAll() })); });
-      if (cmd === 'reject') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reject and Move to Next', { onClick: () => WC.Review.rejectOne() })); fly.appendChild(WC.flyItem('Reject This Change', { onClick: () => { const n = WC.Review.currentRevision(); if (n) { WC.Review.rejectNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } })); fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => WC.Review.rejectAll() })); });
-      if (cmd === 'delete') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Delete', { onClick: () => WC.Review.deleteComment() })); fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => WC.Review.deleteAllComments() })); });
-      if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reviewing Pane Vertical', { onClick: () => WC.Review.reviewingPane() })); fly.appendChild(WC.flyItem('Reviewing Pane Horizontal', { onClick: () => WC.Review.reviewingPane() })); });
+      if (cmd === 'translate' || cmd === 'language' || cmd === 'showMarkup' || cmd === 'compare' || cmd === 'showComments') return H[cmd](control, node);
+      // Spelling and Grammar split ▾ (parity P3): Spelling | ✓Spelling and Grammar.
+      // Both routes open the spelling flow until the task-6 proofing pane lands.
+      if (cmd === 'spellingGrammar') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('   Spelling', { onClick: () => H.spellingGrammar() })); fly.appendChild(WC.flyItem('✓ Spelling and Grammar', { onClick: () => H.spellingGrammar() })); });
+      // Track Changes ▾ (parity T2/D8.7): For Everyone | Just Mine | Lock Tracking.
+      // Just Mine === For Everyone in this single-author clone (recorded note).
+      if (cmd === 'trackChanges') {
+        const tcOn = (WC.PM && WC.PM.active) ? !!(WC.PM.reviewState && WC.PM.reviewState().tracking) : WC.Review.trackOn;
+        return WC.flyout(node, (fly) => {
+          fly.appendChild(WC.flyItem((tcOn ? '✓ ' : '   ') + 'For Everyone', { onClick: () => H.trackChanges() }));
+          fly.appendChild(WC.flyItem((tcOn ? '✓ ' : '   ') + 'Just Mine', { onClick: () => H.trackChanges() }));
+          fly.appendChild(WC.flyItem('Lock Tracking', { onClick: () => H.trackChangesLock() }));
+        });
+      }
+      // Accept/Reject ▾ (parity T12/T13). "All Changes Shown" is DISABLED while
+      // no markup filter is active — exactly Word's unfiltered state (T12) and
+      // the same treatment as C8's "Delete All Comments Shown"; task-5 filters
+      // enable it.
+      if (cmd === 'accept') return WC.flyout(node, (fly) => {
+        const pm = PMA();
+        fly.appendChild(WC.flyItem('Accept and Move to Next', { onClick: () => H.accept() }));
+        fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { if (pm) { pm.cmd('acceptChange'); return; } const n = WC.Review.currentRevision(); if (n) { WC.Review.acceptNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } }));
+        fly.appendChild(WC.flyItem('Accept All Changes Shown', { disabled: true }));
+        fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => { const p = PMA(); p ? p.cmd('acceptAll') : WC.Review.acceptAll(); } }));
+        fly.appendChild(WC.flyItem('Accept All Changes and Stop Tracking', { onClick: () => { const p = PMA(); if (p) { p.cmd('acceptAll'); p.cmd('disableTrackChanges'); } else { WC.Review.acceptAll(); WC.Review.setTrackChanges(false); } } }));
+      });
+      if (cmd === 'reject') return WC.flyout(node, (fly) => {
+        const pm = PMA();
+        fly.appendChild(WC.flyItem('Reject and Move to Next', { onClick: () => H.reject() }));
+        fly.appendChild(WC.flyItem('Reject Change', { onClick: () => { if (pm) { pm.cmd('rejectChange'); return; } const n = WC.Review.currentRevision(); if (n) { WC.Review.rejectNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } }));
+        fly.appendChild(WC.flyItem('Reject All Changes Shown', { disabled: true }));
+        fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => { const p = PMA(); p ? p.cmd('rejectAll') : WC.Review.rejectAll(); } }));
+        fly.appendChild(WC.flyItem('Reject All Changes and Stop Tracking', { onClick: () => { const p = PMA(); if (p) { p.cmd('rejectAll'); p.cmd('disableTrackChanges'); } else { WC.Review.rejectAll(); WC.Review.setTrackChanges(false); } } }));
+      });
+      // Delete ▾ (parity C8). "Shown" stays disabled until markup/comment filters
+      // exist (task 4+, Word disables it un-filtered too).
+      if (cmd === 'deleteComment') return WC.flyout(node, (fly) => {
+        const pm = PMA();
+        fly.appendChild(WC.flyItem('Delete', { onClick: () => H.deleteComment() }));
+        fly.appendChild(WC.flyItem('Delete All Comments Shown', { disabled: true }));
+        fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => { if (pm) { pm.getComments().forEach((r) => pm.cmd('deleteComment', r.id)); return; } WC.Review.deleteAllComments(); } }));
+        fly.appendChild(WC.flyItem('Delete All Resolved Comments', { onClick: () => { if (pm) { pm.getComments().filter((r) => r.resolved).forEach((r) => pm.cmd('deleteComment', r.id)); return; } E().node.querySelectorAll('.wc-comment-anchor.resolved').forEach((a) => a.replaceWith(...a.childNodes)); } }));
+      });
+      if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reviewing Pane Vertical…', { onClick: () => H.reviewingPane() })); fly.appendChild(WC.flyItem('Reviewing Pane Horizontal…', { onClick: () => H.reviewingPane() })); });
       if (cmd === 'checkAccessibility') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Check Accessibility', { onClick: () => WC.Review.checkAccessibility() })); });
+      // Hide Ink ▾ (parity X4 — Word menu capture pending): single toggle item.
+      if (cmd === 'hideInk') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Hide Ink', { onClick: () => H.hideInk(control, WC.Ribbon.controlIndex.hideInk && WC.Ribbon.controlIndex.hideInk.node) })); });
       // View tab
       if (cmd === 'switchWindows' || cmd === 'macros') return H[cmd](control, node);
       // generic: list items as menu entries
@@ -1058,7 +1202,7 @@
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.label || c.cmd)); return; }
       if (c.cmd === 'font') openFontList(combo);
       else if (c.cmd === 'fontSize') openSizeList(combo);
-      else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.Review.setDisplayMode(m); input.value = l; } }))); });
+      else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { const pm = PMA(); pm ? pm.cmd('setReviewView', m) : WC.Review.setDisplayMode(m); input.value = l; } }))); });
     },
 
     applyStyle(name) {
@@ -1099,7 +1243,7 @@
     launcher(groupId, control, node) {
       WC.closeFlyouts(); WC.hideTip();
       if (WC.PM && WC.PM.active) {
-        const LAUNCHER_AREA_CMD = { font: 'font', paragraph: 'alignLeft', styles: 'stylesGallery' }; // clipboard pane = app-level, allowed
+        const LAUNCHER_AREA_CMD = { font: 'font', paragraph: 'alignLeft', styles: 'stylesGallery', markup: 'trackChanges' }; // clipboard pane = app-level, allowed
         const probe = LAUNCHER_AREA_CMD[groupId];
         if (probe && WC.PM.isBlocked(probe)) { WC.PM.notifyBlocked(groupId + ' settings'); return; }
       }
@@ -1108,6 +1252,10 @@
         font: () => (WC.Dialogs.font ? WC.Dialogs.font() : WC.notImplemented('Font dialog')),
         paragraph: () => WC.Dialogs.paragraph(),
         styles: () => WC.Dialogs.stylesPane(),
+        // Markup launcher → Track Changes Options dialog (parity T18). The dialog
+        // itself lands in task 6 — until then route to the Show Markup menu, whose
+        // toggles are the dialog's "Show" group (recorded interim).
+        markup: () => (WC.Dialogs.trackChangesOptions ? WC.Dialogs.trackChangesOptions() : H.showMarkup({ cmd: 'showMarkup', label: 'Show Markup' }, node)),
       };
       if (map[groupId]) map[groupId]();
       else WC.notImplemented((control && control.label) || (groupId + ' settings'));
