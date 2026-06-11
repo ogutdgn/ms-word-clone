@@ -20,6 +20,21 @@ export function installIo(editor: AnyEditor) {
     return new Uint8Array(await blob.arrayBuffer())
   }
 
+  // slice 7: html save leg — serialized body html (DOMSerializer, Editor.ts:3438).
+  function getHTML(): string {
+    // unflattenLists: Word-shaped nested <ul>/<ol> in the exported file.
+    return editor.getHTML({ unflattenLists: true })
+  }
+
+  // slice 7: text save leg — plain model text, paragraph-separated by '\n'.
+  function getText(): string {
+    const doc = editor.state.doc
+    // BOTH break leaves: the fork parses <br>/Shift+Enter as `lineBreak` and the page-break
+    // span as `hardBreak` — dropping lineBreak would concatenate soft-wrapped words.
+    return doc.textBetween(0, doc.content.size, '\n', (leaf: any) =>
+      (leaf?.type?.name === 'lineBreak' || leaf?.type?.name === 'hardBreak') ? '\n' : '')
+  }
+
   function counts() {
     const dom = editor.view?.dom as HTMLElement | undefined
     const text: string = dom?.innerText || ''
@@ -41,6 +56,8 @@ export function installIo(editor: AnyEditor) {
     isDirty: () => dirty,
     setClean: () => { dirty = false; w.WC?.Files?.updateTitle?.() },
     exportDocxBytes,
+    getHTML,
+    getText,
     counts,
   }
 }

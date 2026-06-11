@@ -41,6 +41,14 @@ the test count, and the MS Word COM-oracle validation notes.
 > per-tab `*_TAB.md` docs reflect what actually ships. Use those docs, not the raw
 > feasibility tags, as the source of truth for status.
 
+**File IO (Backstage, not a ribbon tab)** — on the default PM engine (since Phase 2
+slice 7): open `.docx` (fork converter), `.html`/`.htm` (semantic import), `.txt`
+(line-per-paragraph), `.csv`/`.tsv` (imported as a real table — a recorded deviation:
+real Word opens csv as delimited plain text; a csv import opens as an *unsaved* document
+since the table form can't be written back); save/Save As `.docx`, `.html`, `.txt`;
+PDF export. `.md`/`.rtf` open only under `--legacy`. Oracle-validated vs Word 16.77.1
+(slice-7 legs A–D).
+
 ## What "works" means here — two layers of verification
 
 There are two distinct claims this project makes, documented separately:

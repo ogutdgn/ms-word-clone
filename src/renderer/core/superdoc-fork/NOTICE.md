@@ -261,6 +261,19 @@ The following upstream packages are included in this directory tree:
   (`extensions/table-header/table-header.js`) nodes, rendering `writing-mode: vertical-rl` for `'tbRl'`
   and `vertical-lr` for `'btLr'`. Non-breaking (default null → no render output unless set); powers
   `setTextDirection`. Full BiDi/vertical metrics deferred to Phase 7.
+- **Word paste without conditional comments leaked literal list markers (slice 7, 2026-06-10):**
+  `handleDocxPaste` (`core/inputRules/docx-paste/docx-paste.js`) only stripped Word list-marker
+  runs wrapped in `<!--[if !supportLists]-->…<!--[endif]-->` comments
+  (`extractAndRemoveConditionalPrefix`), but Chromium's clipboard sanitizer strips conditional
+  comments — sanitized Word HTML carries the bare marker run (`style="mso-list:Ignore"`), which
+  parsed into the model as literal text ("1.Alpha item", the slice-4 recorded leak). Fix: tag
+  `mso-list:Ignore` runs up front with `data-mso-list-ignore` while the style attribute is
+  still raw (the per-item `style.setProperty` calls re-serialize it and drop unknown `mso-*`
+  entries) and remove them after the per-item pass, so the marker text still feeds list-start/punctuation detection and
+  comment-wrapped runs keep going through the existing strip unchanged. Also guarded the
+  unconditional `tempDiv.querySelector('style').innerHTML` deref — Word HTML without a
+  `<style>` block threw a TypeError and aborted the whole paste; it now resolves to `''` and
+  the paste proceeds with inline/default styles.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

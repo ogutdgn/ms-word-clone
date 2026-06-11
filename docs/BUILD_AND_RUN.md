@@ -198,9 +198,25 @@ npm run build && npx electron . --no-sandbox --disable-gpu \
 
 ---
 
-## The `.docx` round-trip test (standalone, no Electron)
+## The `.docx` round-trip tests
 
-`scripts/test_docx.js` runs in plain Node and validates the file pipeline end-to-end:
+**Six gate suites since slice 7:** `test:legacy`, `test:pm`, `test:smoke`,
+`test:smoke:legacy`, `test:roundtrip`, `test:docx` — run all six before committing.
+
+**`npm run test:roundtrip` — the PM-converter docx gate (since slice 7).**
+`scripts/test-roundtrip-pm.js` spawns Electron with the renderer probe
+`scripts/test-roundtrip-pm-probe.js` and runs docx → PM → docx per fixture on the
+fork converter (import, zip export to `/tmp/wc-rt-*.docx`, `exportXmlOnly` grep
+invariants, re-import + zip-level asserts via `scripts/docx-inspect.js`). See
+[docs/TESTING.md](TESTING.md) §2a and decision D7.6 there.
+
+```bash
+npm run build && npm run test:roundtrip
+```
+
+**`node scripts/test_docx.js` — the frozen legacy-converter gate** (guards the
+`--legacy` mammoth/html-to-docx path; retires with legacy at slice 11). Runs in
+plain Node and validates the legacy file pipeline end-to-end:
 HTML → DOCX (html-to-docx) → HTML (mammoth), with an **OOXML regression guard**.
 
 ```bash
@@ -322,8 +338,9 @@ npm start -- --win=1280x800 --start-maximized
 npm start -- --shot=/tmp/word.png
 npm run build && npx electron . --shot-evalfile=scripts/test-suite.js --probe-out=/tmp/results.json
 
-# File-pipeline tests (plain Node, no Electron)
-node scripts/test_docx.js                   # HTML->DOCX->HTML round trip + OOXML guard
+# File-pipeline tests
+npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
+node scripts/test_docx.js                   # frozen legacy-converter gate (--legacy html-to-docx; retires at slice 11)
 node scripts/export_ref.js                  # emit .docx into the COM probe dir
 node scripts/analyze_import.js <word.docx>  # import-fidelity report
 

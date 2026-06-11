@@ -34,6 +34,18 @@ export const handleDocxPaste = (html, editor, view) => {
   tempDiv.innerHTML = cleanedHtml;
   tempDiv.querySelectorAll('[data-sd-block-id]').forEach((node) => node.removeAttribute('data-sd-block-id'));
 
+  // Chromium's clipboard sanitizer strips conditional comments, so the <!--[if !supportLists]-->
+  // wrapper can be gone by the time Word HTML reaches us — but Word also marks the marker run
+  // itself with style="mso-list:Ignore". Tag those runs NOW, while the style attribute is still
+  // raw — the style.setProperty calls in the per-item pass below re-serialize the attribute and
+  // drop unknown mso-* entries. The tagged runs are removed after that pass (the marker text
+  // feeds list-start/punctuation detection first); the comment-wrapped form keeps being handled
+  // per item by extractAndRemoveConditionalPrefix. (fork edit, slice 7, 2026-06-10 — the
+  // slice-4 marker-leak fix.)
+  tempDiv.querySelectorAll('[style*="mso-list"]').forEach((el) => {
+    if (/mso-list\s*:\s*ignore/i.test(el.getAttribute('style') || '')) el.setAttribute('data-mso-list-ignore', 'true');
+  });
+
   const data = tempDiv.querySelectorAll('p, li, ' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `h${n}`).join(', '));
 
   const startMap = {};
@@ -48,7 +60,8 @@ export const handleDocxPaste = (html, editor, view) => {
 
     const styleAttr = item.getAttribute('style') || '';
     const msoListMatch = styleAttr.match(/mso-list:\s*l(\d+)\s+level(\d+)\s+lfo(\d+)/);
-    const css = tempDiv.querySelector('style').innerHTML;
+    // Guarded: clipboard-sanitized Word HTML may arrive without a <style> block.
+    const css = tempDiv.querySelector('style')?.innerHTML || '';
     const normalStyles = extractParagraphStyles(css, '.MsoNormal');
     let styleId = item.getAttribute('class');
     let charStyles = {};
@@ -179,6 +192,13 @@ export const handleDocxPaste = (html, editor, view) => {
     // Strip literal prefix inside conditional span
     extractAndRemoveConditionalPrefix(item);
   });
+
+  // Remove the clipboard-sanitized (comment-less) marker runs tagged above. Runs AFTER the
+  // per-item pass — the literal marker text ("1.") feeds list-start detection there — and is a
+  // no-op for runs that were still comment-wrapped (extractAndRemoveConditionalPrefix already
+  // removed those). MUST stay above transformWordLists/DOMParser.parse below — without this
+  // removal the marker run parses into the model as literal text. (fork edit, slice 7, 2026-06-10)
+  tempDiv.querySelectorAll('[data-mso-list-ignore]').forEach((el) => el.remove());
 
   transformWordLists(tempDiv, editor);
   let doc = DOMParser.fromSchema(editor.schema).parse(tempDiv);

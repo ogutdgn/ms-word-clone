@@ -7,6 +7,75 @@
 
 ---
 
+## 2026-06-10/11 — Phase 2 slice 7 BUILT (file-io on the PM engine) + oracle legs A–D
+
+- **Branch:** `feature/phase-2-slice-7-file-io` (10 commits, directly off `main` post
+  slice-6 merge [PR #23, `6ca5679`] — no stacked PRs; **PR #24 to open next**).
+- **Phase:** **Phase 2 — slice 7 DONE → slice 8 (review) next.**
+- **State summary:** non-docx file IO is back on the PM engine — the two slice-0b blocks are
+  GONE. **Open:** docx (fork converter, unchanged) + `.html/.htm` (semantic import) + `.txt`
+  (line-per-paragraph) + `.csv/.tsv` (**imported as a real PM table** — recorded deviation:
+  real Word opens csv as delimited plain text; csv opens as an UNSAVED doc, path=null, since
+  the table form can't be written back — §5.3). **Save/Save As:** docx (bytes, unchanged) +
+  html (`PM.getHTML({unflattenLists})` + `Files.wrapHtml`) + txt (`PM.getText`, lineBreak AND
+  hardBreak → `\n`); Save As is **two-phase** (`doc:askSavePath` dialog-only → renderer
+  exports → `doc:saveBytes`/`doc:saveTextFile`; unknown typed exts refused; `doc:saveAsBytes`
+  removed end-to-end). **Architecture:** imports rebuild the editor from the **blank template
+  + the fork constructor's `html` option** (converter context intact → everything stays
+  docx-exportable); a degraded import (fork `contentError`) recovers to a blank PM editor,
+  returns false, and `Files` UNBINDS path/name/format via the new `PM.lastImportBlanked()`
+  (closes a Ctrl+S-writes-blank-over-old-file data-loss vector found in review). New
+  `bridge/file-content.ts` (RFC-4180 `parseCsv`/`csvToTableHtml`/`textToParagraphHtml`).
+  **Gate transition (D7.6):** new **`test:roundtrip`** (driver + probe; 27 checks over 4
+  real-Word fixtures incl. the s6 tblStyle minting pin) is THE docx gate; `test_docx.js`
+  (17) demoted to the frozen legacy-converter gate (retires with legacy at slice 11; spec
+  §8.1 carries a dated amendment). **Slice-4 leak FIXED:** clipboard-sanitized Word HTML
+  (comments stripped by Chromium) leaked literal list markers — fixed in the fork's
+  `handleDocxPaste` (tag-early/remove-late `mso-list:Ignore` strip so list-START detection
+  still reads the marker; + style-deref guard; NOTICE'd).
+- **Gates (six now): PM 206/206** (192 → +13 `[7]` +1 `[4]` pin −2 +1 `[0b]` rewrites +
+  1 blank-flag pin), legacy 257/257, smoke 9/9 ×2, docx 17/17, **roundtrip 27/0**.
+- **Oracle (spec §8.3) vs Word 16.77.1 — first slice validated via computer-use MCP directly**
+  (no Codex handoff; verdicts `docs/superpowers/plans/notes/2026-06-10-slice7-oracle.json`,
+  artifacts `.oracle-probes/slice7/`): **leg A docx round-trip PASS** (no repair prompt;
+  docx-inspect structural identity + minted GridTable4-Accent1 carried; **also closes the
+  slice-6 table-style reopen recheck** — the macOS Grant-File-Access prompt was cleared
+  interactively); **leg B html export PASS** (bold/bullets/table render; deviations: headings
+  export as styled paragraphs, `data-sd-*` attrs leak); **leg C csv evidence** (real Word =
+  File-Conversion dialog + raw delimited text → our table import is the documented
+  deviation); **leg D txt PASS** (8/8 lines byte-faithful).
+- **Done this session** (plan `docs/superpowers/plans/2026-06-10-phase2-slice-7-file-io.md`,
+  hardened by a 4-critic critique workflow — 31 findings, 4 unique blockers applied
+  [the `[7]`-block confirmDiscard suite hang; the leak fix aimed at the wrong paste pipeline
+  — word-html routes to `handleDocxPaste` in docx mode; a phantom `<w:i>` grep on
+  negation-run; docx-inspect is CLI-only] — plus author pre-verification that independently
+  caught the contextBridge non-writability of a planned spy and verified the critics'
+  riskiest claims; executed subagent-driven with two-stage review per task, which caught
+  real bugs again: the DOM-vs-model assertion in the `[4]` pin, a red-stage dirty-modal
+  hang, stale-artifact gate-lying in the roundtrip driver, the contentError binding hazard,
+  `lineBreak` dropped from `getText`, the `Math.max` spread limit):
+  - `a50bfc4` plan · `964b395` plan sync · `860d753` red tests (205/192/13)
+  - `1384831` **test:roundtrip lands FIRST** (spec §8.1) + six-gate docs + spec amendment
+  - `f6572dc` IPC channels · `cbecba8` bridge legs · `f545429` **THE FLIP** (blocks removed)
+  - `ae92a36` fork leak fix (NOTICE'd) · `73fdd22` oracle verdicts · `5e9a3cb` docs scoping
+- **KNOWN DEVIATIONS (recorded):** csv-as-table (vs Word's plain text — user-directed);
+  html import/export semantic (styles stripped but alignment; headings → styled paragraphs
+  on export; `data-sd-*` attrs leak); `.md/.rtf` legacy-only (fork `markdown` option noted
+  as a cheap future leg); txt export = one block per line (Word tab-separates table cells);
+  page-break exports as `\n`; phantom recents carried forward (push precedes import
+  verdict); failed import lands on a blank doc (consented via confirmDiscard).
+- **Carry-overs for slice 8 (review):** (1) BOTH `[0a]` D6 tests still on
+  `newComment`/`tableOfContents` — slice 8 repoints `newComment`. (2) slice-6 UI-Codex
+  steps still open (A2/A5/B-layout/autofit/C1/C2) — now feasible directly via computer use.
+  (3) Recorded follow-ups from review: no automated pin on the contentError recovery branch
+  (probe-only); `onContentError` lifetime asymmetry between html- and docx-seeded editors;
+  `warnOnUnsupportedContent` not threaded (silent lossy html imports); `[0a] dirty flag`
+  test flakes rarely on slow boots (re-run clears it).
+- **Blockers/notes:** none for the PR. Word left RUNNING (never quit), zero documents open,
+  user state untouched; Word now holds a file-access grant for `.oracle-probes/slice7/`.
+
+---
+
 ## 2026-06-10 — Slice 6 table-defect fix batch (user report → hunt → 5 fixes on PR #23)
 
 - **Branch:** `feature/phase-2-slice-6-insert-basics` (PR #23, still unmerged — fixes pushed onto it).

@@ -415,8 +415,9 @@ ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer,
 });
 
 // ---------------------------------------------------------------------------
-// IPC: Phase 2 bytes channels — the PM core produces/consumes whole .docx
-// bytes in the renderer (fork converter); main is a dumb byte writer/reader.
+// IPC: Phase 2 PM file-io channels — bytes + text writers and the Save As
+// dialog half; serialization stays renderer-side (renderer-side .docx
+// converter + html/txt serializers).
 // ---------------------------------------------------------------------------
 ipcMain.handle('doc:saveBytes', async (_evt, { filePath, bytes }) => {
   try {
@@ -429,24 +430,6 @@ ipcMain.handle('doc:saveBytes', async (_evt, { filePath, bytes }) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-ipcMain.handle('doc:saveAsBytes', async (_evt, { bytes, suggestedName }) => {
-  try {
-    const res = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save As',
-      defaultPath: suggestedName || 'Document1.docx',
-      // docx-only: the PM bytes ARE a docx zip — offering .html/.txt here would
-      // write zip bytes into a text file (spec §5.3).
-      filters: [{ name: 'Word Document', extensions: ['docx'] }],
-    });
-    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
-    const buf = Buffer.from(bytes);
-    if (!buf.length) return { ok: false, error: 'Empty document data (export failed?)' };
-    await fsp.writeFile(res.filePath, buf);
-    await pushRecentFile(res.filePath);
-    return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: 'docx' };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
-});
-
 ipcMain.handle('doc:openBytes', async (_evt, presetPath) => {
   try {
     let filePath = presetPath;
@@ -454,7 +437,13 @@ ipcMain.handle('doc:openBytes', async (_evt, presetPath) => {
       const res = await dialog.showOpenDialog(mainWindow, {
         title: 'Open',
         properties: ['openFile'],
-        filters: [{ name: 'Word Documents', extensions: ['docx'] }], // PM core opens .docx; other formats return in slice 7
+        filters: [
+          { name: 'All Supported', extensions: ['docx', 'html', 'htm', 'txt', 'csv', 'tsv'] },
+          { name: 'Word Documents', extensions: ['docx'] },
+          { name: 'Web Page', extensions: ['html', 'htm'] },
+          { name: 'Plain Text', extensions: ['txt'] },
+          { name: 'Data Source (CSV/TSV)', extensions: ['csv', 'tsv'] },
+        ], // slice 7: the PM engine imports html/txt/csv renderer-side (bytes stay raw here)
       });
       if (res.canceled || !res.filePaths[0]) return { ok: false, canceled: true };
       filePath = res.filePaths[0];
@@ -462,6 +451,51 @@ ipcMain.handle('doc:openBytes', async (_evt, presetPath) => {
     const buf = await fsp.readFile(filePath);
     await pushRecentFile(filePath);
     return { ok: true, path: filePath, name: path.basename(filePath), bytes: buf };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+// slice 7: dumb utf8 writer for PM html/txt saves — serialization lives renderer-side (§5.3).
+ipcMain.handle('doc:saveTextFile', async (_evt, { filePath, content }) => {
+  try {
+    if (!filePath) return { ok: false, error: 'No path' };
+    if (typeof content !== 'string') return { ok: false, error: 'No content' };
+    await fsp.writeFile(filePath, content, 'utf8');
+    await pushRecentFile(filePath);
+    return { ok: true, path: filePath, name: path.basename(filePath) };
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+// slice 7: dialog-only half of the two-phase PM Save As (renderer exports per chosen ext).
+ipcMain.handle('doc:askSavePath', async (_evt, { suggestedName }) => {
+  try {
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save As',
+      defaultPath: suggestedName || 'Document1.docx',
+      filters: [
+        { name: 'Word Document', extensions: ['docx'] },
+        { name: 'Web Page', extensions: ['html'] },
+        { name: 'Plain Text', extensions: ['txt'] },
+      ],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    let filePath = res.filePath;
+    let ext = path.extname(filePath).replace('.', '').toLowerCase();
+    if (ext === 'htm') ext = 'html'; // canonical contract: the renderer's format switch keys on 'html'
+    // Word always appends the chosen type's extension — an extensionless typed name gets .docx
+    // (otherwise Files.open would later refuse the very file we created).
+    if (!ext) {
+      ext = 'docx'; filePath += '.docx';
+      // GTK-only edge: the dialog's overwrite prompt covered the extensionless name, not the
+      // appended one (macOS/Windows append before their own prompt — this can't fire there).
+      if (fs.existsSync(filePath)) {
+        const { response } = await dialog.showMessageBox(mainWindow, {
+          type: 'warning', buttons: ['Replace', 'Cancel'], defaultId: 1,
+          message: `"${path.basename(filePath)}" already exists. Do you want to replace it?`,
+        });
+        if (response !== 0) return { ok: false, canceled: true };
+      }
+    }
+    return { ok: true, filePath, ext };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 

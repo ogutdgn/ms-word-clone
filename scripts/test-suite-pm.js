@@ -986,6 +986,26 @@
     window.WC.closeFlyouts();
     return pasteOpen && selOpen;
   });
+  await t('[4] Word list paste without conditional comments does not leak the literal marker', async () => {
+    // Chromium's clipboard sanitizer strips <!--[if !supportLists]--> comments; Word marks the
+    // marker run style="mso-list:Ignore" — that form must be stripped too (slice-4 leak).
+    // Minimal <style> block included: real Word clipboard HTML always carries one, and the
+    // docx-paste pipeline unconditionally derefs querySelector('style').innerHTML.
+    setDoc('');
+    const wordHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><style>'
+      + '.MsoListParagraphCxSpFirst{margin:0in;} @list l0:level1{mso-level-text:"%1.";}'
+      + '</style></head><body>'
+      + '<p class="MsoListParagraphCxSpFirst" style="mso-list:l0 level1 lfo1">'
+      + '<span style="mso-list:Ignore">1.<span style="font:7.0pt Times New Roman">&nbsp;&nbsp;</span></span>'
+      + 'Alpha item</p></body></html>';
+    const okPaste = await PM().pasteHTMLString(wordHtml); // bridge surface lands in a later task — red until then
+    if (okPaste === false) return 'pasteHTMLString unavailable or refused';
+    // Assert the MODEL, not the DOM: a reconstructed list renders a legit "1." marker as nodeview
+    // chrome — the leak is a literal marker TEXT NODE in the model.
+    const modelText = window.WC.view.state.doc.textContent;
+    if (!/Alpha item/.test(modelText)) return 'content missing: ' + modelText.slice(0, 120);
+    return !/1\./.test(modelText.replace(/\s+/g, ' ')) || ('literal marker leaked into the model: ' + modelText.slice(0, 80));
+  });
 
   // ---------- slice 5: find-replace (decoration-based search + replace + options) ----------
   // These tests drive the fork Search extension through the WC.PM.search surface (Task 4)
@@ -1882,15 +1902,172 @@
     return active === 'home' || `expected 'home' to stay active, got '${active}' (jumped to stale prev)`;
   });
 
-  // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
-  await t('[0b] non-docx format save is blocked in PM mode (path/format untouched)', async () => {
-    const f = window.WC.Files; const p0 = f.path; const fmt0 = f.format;
-    f.format = 'html';
-    const r = await f.save();
-    const blocked = !!r && r.ok === false;
-    f.format = fmt0;
-    return blocked && f.path === p0;
+  // ---------- slice 7: file-io (html/txt/csv on the PM engine — these replace the live document) ----------
+  // CRITICAL: Files.open awaits confirmDiscard(), which opens a MODAL when the doc is dirty — a
+  // dirty doc here would hang the whole probe (no JSON, suite never exits). The last [6b] test
+  // leaves the doc dirty, so this block MUST start clean, and every f.open below carries its own
+  // PM().setClean() guard — keep the guard adjacent when reordering.
+  await PM().newBlank(); await sleep(100);
+
+  const writeTextFixture = async (filePath, content) => {
+    const w = await window.wordAPI.saveBytes({ filePath, bytes: new TextEncoder().encode(content) });
+    return w && w.ok;
+  };
+  const fileText = async (filePath) => {
+    const r = await window.wordAPI.openBytes(filePath);
+    if (!r || !r.ok) return null;
+    let s = new TextDecoder('utf-8').decode(r.bytes);
+    if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+    return s;
+  };
+
+  await t('[7] wordAPI exposes the slice-7 channels (saveTextFile + askSavePath)', async () => {
+    return typeof window.wordAPI.saveTextFile === 'function' && typeof window.wordAPI.askSavePath === 'function';
   });
+  await t('[7] open .html imports headings/bold/list onto the engine (path+format bound)', async () => {
+    const f = window.WC.Files;
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>x</title></head><body>'
+      + '<h1>Imported Title</h1><p>plain with <strong>bold word</strong></p><ul><li>item one</li><li>item two</li></ul>'
+      + '</body></html>';
+    if (!(await writeTextFixture('/tmp/wc-pm-import.html', html))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-import.html');
+    const txt = window.WC.view.dom.textContent;
+    if (!/Imported Title/.test(txt) || !/bold word/.test(txt) || !/item two/.test(txt)) return 'content missing: ' + txt.slice(0, 120);
+    const json = JSON.stringify(window.WC.view.state.doc.toJSON());
+    if (!/"type":"bold"/.test(json)) return 'bold mark lost';
+    return f.path === '/tmp/wc-pm-import.html' && f.format === 'html';
+  });
+  await t('[7] open .txt imports line-per-paragraph (BOM + CRLF safe)', async () => {
+    const f = window.WC.Files;
+    // \ufeff escapes, never raw BOM bytes in source
+    if (!(await writeTextFixture('/tmp/wc-pm-import.txt', '\ufeffline one\r\nline two\r\n\r\nline four'))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-import.txt');
+    const txt = window.WC.view.dom.textContent;
+    if (/\ufeff/.test(txt)) return 'BOM leaked into the doc';
+    if (!/line one/.test(txt) || !/line two/.test(txt) || !/line four/.test(txt)) return 'lines missing: ' + txt.slice(0, 120);
+    return f.path === '/tmp/wc-pm-import.txt' && f.format === 'text';
+  });
+  await t('[7] open .csv imports an RFC-4180 table (quoted comma survives, dims right)', async () => {
+    const f = window.WC.Files;
+    if (!(await writeTextFixture('/tmp/wc-pm-import.csv', 'name,note\n"Smith, John",hello\nplain,"say ""hi"""\n'))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-import.csv');
+    const json = window.WC.view.state.doc.toJSON();
+    const tables = (JSON.stringify(json).match(/"type":"table"/g) || []).length;
+    if (tables !== 1) return 'expected 1 table, got ' + tables;
+    const txt = window.WC.view.dom.textContent;
+    if (!/Smith, John/.test(txt)) return 'quoted comma broke: ' + txt.slice(0, 120);
+    if (!/say "hi"/.test(txt)) return 'escaped quote broke: ' + txt.slice(0, 120);
+    const rows = (JSON.stringify(json).match(/"type":"tableRow"/g) || []).length;
+    const cells = (JSON.stringify(json).match(/"type":"tableCell"/g) || []).length;
+    if (cells !== 6) return 'expected 6 cells (2 cols x 3 rows), got ' + cells;
+    return rows === 3;
+  });
+  await t('[7] csv import is an UNSAVED document (path null, format docx, name from stem)', async () => {
+    const f = window.WC.Files;
+    if (!(await writeTextFixture('/tmp/wc-pm-import2.csv', 'a,b\n1,2\n'))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-import2.csv');
+    return (f.path === null && f.format === 'docx' && /wc-pm-import2/.test(f.name))
+      || ('state wrong: path=' + f.path + ' fmt=' + f.format + ' name=' + f.name);
+  });
+  await t('[7] open .tsv imports a table (tab delimiter sniffed)', async () => {
+    const f = window.WC.Files;
+    if (!(await writeTextFixture('/tmp/wc-pm-import.tsv', 'alpha\tbravo\ncharlie\tdelta\n'))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-import.tsv');
+    const json = JSON.stringify(window.WC.view.state.doc.toJSON());
+    if (!/"type":"table"/.test(json)) return 'no table imported';
+    const cells = (json.match(/"type":"tableCell"/g) || []).length;
+    if (cells !== 4) return 'expected 4 cells (2x2 tab-sniffed), got ' + cells;
+    return /charlie/.test(window.WC.view.dom.textContent) || 'cell payload missing';
+  });
+  await t('[7] save format html writes a re-importable .html file + cleans the dirty flag', async () => {
+    const f = window.WC.Files;
+    setDoc('html save payload');
+    f.path = '/tmp/wc-pm-save.html'; f.name = 'wc-pm-save.html'; f.format = 'html';
+    const r = await f.save();
+    if (!r || !r.ok) return 'save: ' + JSON.stringify(r);
+    const cleanAfterSave = PM().isDirty() === false;
+    const s = await fileText('/tmp/wc-pm-save.html');
+    if (!s || !/<!DOCTYPE html>/i.test(s) || !/html save payload/.test(s)) return 'file content wrong: ' + String(s).slice(0, 120);
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-save.html');
+    return cleanAfterSave && /html save payload/.test(window.WC.view.dom.textContent);
+  });
+  await t('[7] save format text writes the model text (multi-paragraph → newline-separated)', async () => {
+    const f = window.WC.Files;
+    // Two real paragraphs via the txt import leg itself (already covered above), then save back.
+    if (!(await writeTextFixture('/tmp/wc-pm-twolines.txt', 'first line\nsecond line'))) return 'fixture write failed';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-twolines.txt');
+    f.path = '/tmp/wc-pm-save.txt'; f.name = 'wc-pm-save.txt'; f.format = 'text';
+    const r = await f.save();
+    if (!r || !r.ok) return 'save: ' + JSON.stringify(r);
+    const s = await fileText('/tmp/wc-pm-save.txt');
+    if (!s) return 'file unreadable';
+    if (!/first line/.test(s) || !/second line/.test(s)) return 'lines missing: ' + s.slice(0, 80);
+    if (!/first line\n+second line/.test(s)) return 'newline separator missing: ' + JSON.stringify(s.slice(0, 40));
+    return !/[<>]/.test(s);
+  });
+  await t('[7] PM html save serializes via PM.getHTML (never the legacy payload path)', async () => {
+    // contextBridge-exposed properties are NOT reliably writable — spy the PLAIN bridge object
+    // instead. Proving Files.save(format html) pulls content from the PM serializer IS the
+    // contract: the legacy doc:save path would write the stale offscreen legacy doc.
+    const f = window.WC.Files;
+    setDoc('isolation probe');
+    f.path = '/tmp/wc-pm-iso.html'; f.name = 'wc-pm-iso.html'; f.format = 'html';
+    const orig = window.WC.PM.getHTML; let pmCalls = 0;
+    window.WC.PM.getHTML = function () { pmCalls++; return orig.call(window.WC.PM); };
+    let r;
+    try { r = await f.save(); } finally { window.WC.PM.getHTML = orig; }
+    if (!r || r.ok !== true) return 'save failed: ' + JSON.stringify(r);
+    const s = await fileText('/tmp/wc-pm-iso.html');
+    return pmCalls >= 1 && !!s && /isolation probe/.test(s);
+  });
+  await t('[7] PM.getHTML returns serialized body html (no engine chrome)', async () => {
+    setDoc('serializer probe');
+    const h = PM().getHTML();
+    return typeof h === 'string' && /serializer probe/.test(h) && !/ProseMirror/.test(h);
+  });
+  await t('[7] PM.getText returns plain model text', async () => {
+    setDoc('text probe body');
+    const s = PM().getText();
+    return s.trim() === 'text probe body';
+  });
+  await t('[7] openHtml→exportDocx round-trip stays a valid zip (converter context intact)', async () => {
+    const ok = await PM().openHtml('<p>roundtrip via html import</p>');
+    if (ok !== true) return 'openHtml failed';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    const ok2 = await PM().openDocx(bytes);
+    return ok2 === true && /roundtrip via html import/.test(window.WC.view.dom.textContent);
+  });
+  await t('[7] lastImportBlanked stays false through successful imports (surface pin)', async () => {
+    if (typeof PM().lastImportBlanked !== 'function') return 'surface missing';
+    PM().setClean(); // saves can fail at the red stage — never risk the confirmDiscard modal in the harness
+    const ok = await PM().openHtml('<p>blank-flag steady state</p>');
+    if (ok !== true) return 'openHtml failed';
+    return PM().lastImportBlanked() === false;
+  });
+  await t('[7] failed save leaves dirty flag + path/format untouched (continuity pin — green both stages)', async () => {
+    // Replaces the failed-save invariant coverage the deleted '[0b] non-docx save blocked' test
+    // carried. Pre-slice: blocked-save returns ok:false; post-slice: the write to a nonexistent
+    // dir fails. Both must leave state untouched.
+    const f = window.WC.Files;
+    setDoc('failed save probe');
+    const p0 = '/nonexistent-dir-wc-s7/x.html';
+    f.path = p0; f.name = 'x.html'; f.format = 'html';
+    const r = await f.save();
+    const stateHeld = r && r.ok !== true && f.path === p0 && f.format === 'html' && PM().isDirty() === true;
+    const detail = 'ok=' + (r && r.ok) + ' path=' + f.path + ' fmt=' + f.format + ' dirty=' + PM().isDirty();
+    f.path = null; f.name = 'Document1'; f.format = 'docx'; PM().setClean(); // restore for [0b]
+    return stateHeld || ('state moved: ' + detail);
+  });
+
+  // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
     const bytes = await PM().exportDocxBytes();
     return bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b;
@@ -1905,12 +2082,14 @@
     const ok = await PM().openDocx(r.bytes);
     return ok === true && /roundtrip payload text/.test(window.WC.view.dom.textContent);
   });
-  await t('[0b] Files.open with non-docx preset refuses before touching the engine', async () => {
+  await t('[0b] unsupported extension open refuses before touching the engine', async () => {
     const f = window.WC.Files; const p0 = f.path;
     const before = window.WC.view.state.doc.content.size;
-    const w1 = await window.wordAPI.saveBytes({ filePath: '/tmp/wc-pm-junk.txt', bytes: new Uint8Array([104, 105]) });
+    const enc = new TextEncoder().encode('# not supported on PM\n');
+    const w1 = await window.wordAPI.saveBytes({ filePath: '/tmp/wc-pm-note.md', bytes: enc });
     if (!w1 || !w1.ok) return 'setup failed: ' + (w1 && w1.error);
-    await f.open('/tmp/wc-pm-junk.txt');
+    PM().setClean(); // saves can fail upstream — never risk the confirmDiscard modal in the harness
+    await f.open('/tmp/wc-pm-note.md');
     return f.path === p0 && window.WC.view.state.doc.content.size === before;
   });
   await t('[0b] failed import leaves Files.path unchanged', async () => {

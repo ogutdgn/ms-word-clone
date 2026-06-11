@@ -76,7 +76,9 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
    Word via AppleScript and supersedes the WSL COM oracle.
 2. **Every fix ships a regression test.** PM-mode features go in `scripts/test-suite-pm.js`;
    `scripts/test-suite.js` is **frozen** (legacy gate, run under `--legacy`) until legacy
-   retirement. Run both suites + `scripts/test_docx.js` (17 tests) before committing.
+   retirement. Run all **six gates** before committing: `test:legacy`, `test:pm`,
+   `test:smoke`, `test:smoke:legacy`, `test:roundtrip` (the PM-converter docx gate), and
+   `test:docx` (frozen legacy-converter gate; retires with legacy at slice 11).
 3. **Commits:** follow `.claude/skills/commit-style/SKILL.md` —
    `type(scope): summary`, a what/why body, explicit `git add <path>`, and **no
    `Co-Authored-By`/AI trailer**. Branch for non-trivial work; PR for
@@ -96,5 +98,6 @@ npm start -- --legacy                       # run in legacy mode
 npm run build && npm run test:legacy        # frozen legacy gate (257) — runs under --legacy
 npm run build && npm run test:pm            # PM functional suite (grows per slice)
 npm run build && npm run test:smoke && npm run test:smoke:legacy  # 9 + 9
-npm run test:docx                           # docx round-trip (17)
+npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
+npm run test:docx                           # frozen legacy-converter gate (--legacy html-to-docx; retires at slice 11)
 ```

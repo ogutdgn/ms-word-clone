@@ -7,9 +7,20 @@ against a live Chromium DOM, and (where ground truth matters) is checked against
 
 There are three layers:
 
-1. **In-renderer functional harness** — `scripts/test-suite.js` (257 tests). Runs the real command dispatcher and asserts on the resulting DOM/state.
-2. **`.docx` round-trip suite** — `scripts/test_docx.js` (17 content checks + 2 OOXML regression guards). Pure Node, no Electron.
-3. **Real-Word COM oracle differential tests** — `*_probe.ps1` / `oracle.ps1` scripts that drive the user's installed Word and emit ground-truth JSON under `docs/research/`.
+1. **In-renderer functional harness** — `scripts/test-suite.js` (257 tests, frozen legacy gate run under `--legacy`) and `scripts/test-suite-pm.js` (the PM functional suite, grows per slice). Runs the real command dispatcher and asserts on the resulting DOM/state.
+2. **docx suites** — `scripts/test-roundtrip-pm.js` (+ its renderer probe `scripts/test-roundtrip-pm-probe.js`): the **PM-converter docx round-trip suite, THE product docx gate** since slice 7 (`npm run test:roundtrip`); and `scripts/test_docx.js` (17 content checks + 2 OOXML regression guards — the frozen legacy-converter gate; pure Node, no Electron).
+3. **Real-Word COM oracle differential tests** — `*_probe.ps1` / `oracle.ps1` scripts that drive the user's installed Word and emit ground-truth JSON under `docs/research/`. (On the current macOS box: `scripts/oracle/word-oracle.js` via AppleScript.)
+
+**Gate suites (six, since slice 7):** `test:legacy` (257), `test:pm`, `test:smoke` (9),
+`test:smoke:legacy` (9), `test:roundtrip` (the PM-converter docx gate), and `test:docx`
+(17, frozen legacy-converter gate). Run all six before committing.
+
+> **Decision D7.6 (gate transition, slice 7):** `test_docx.js` (17) is KEPT but demoted to
+> the frozen *legacy-converter gate* (guards `--legacy`'s mammoth/html-to-docx path; retires
+> with legacy at slice 11, per spec §8.2's "legacy tests retire only with their legacy
+> implementation"). The NEW `test:roundtrip` PM-converter suite takes over as THE product
+> docx gate — the spec's "replaces / retired at slice 7" wording is honored as a ROLE
+> transfer; the script lives on frozen. Gates become SIX.
 
 ---
 
@@ -169,11 +180,32 @@ state.
 
 ---
 
-## 2. `.docx` round-trip suite
+## 2. `.docx` suites
+
+### 2a. PM-converter round-trip suite (`npm run test:roundtrip`) — THE docx gate
+
+`scripts/test-roundtrip-pm.js` (Node driver) spawns Electron with the renderer
+probe `scripts/test-roundtrip-pm-probe.js` and judges only from the probe JSON
+(`/tmp/wc-roundtrip.json`). Per fixture (`negation-run`, `basic-list`,
+`oracle-word-s3-table`, `oracle-word-s6-tablestyles`) it runs the full
+docx → PM → docx cycle on the fork converter: `PM().openDocx(bytes)` import,
+`exportDocxBytes()` zip export saved to `/tmp/wc-rt-<name>.docx`,
+`exportDocx({ exportXmlOnly: true })` grep invariants (re-derived from each
+fixture's actual `word/document.xml`), and a re-import of the exported file —
+plus a text-survival cross-check and zip-level asserts via the
+`scripts/docx-inspect.js` CLI (s3: `tables >= 1`; s6: every `w:tblStyle` ref has
+a matching definition in `word/styles.xml` — the slice-6 minting-fix pin).
+
+```bash
+npm run build && npm run test:roundtrip    # read the RESULT: line; exit 1 on any failure
+```
+
+### 2b. Legacy `.docx` round-trip suite (frozen legacy-converter gate)
 
 `scripts/test_docx.js` is a plain Node script (no Electron) that proves the
-file pipeline survives a full round trip and, critically, that the emitted
-OOXML is openable by **real** Microsoft Word.
+**legacy** (`--legacy` mammoth/html-to-docx) file pipeline survives a full round
+trip and, critically, that the emitted OOXML is openable by **real** Microsoft
+Word. Frozen per D7.6 above; retires with legacy at slice 11.
 
 **Run command:**
 
@@ -302,7 +334,10 @@ npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=sc
 jq .summary /tmp/results.json
 jq '.results[] | select(.pass==false)' /tmp/results.json   # show failures
 
-# .docx round-trip + OOXML guards (read the RESULT: line; exit≠0 on guard fail)
+# PM-converter docx round-trip — THE docx gate (read the RESULT: line; exit≠0 on fail)
+npm run build && npm run test:roundtrip
+
+# legacy .docx round-trip + OOXML guards — frozen legacy-converter gate (retires at slice 11)
 node scripts/test_docx.js
 
 # ProseMirror smoke test (9 assertions) → /tmp/smoke.json

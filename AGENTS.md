@@ -76,8 +76,11 @@ src/renderer/public/    LEGACY app, served VERBATIM by Vite (static, untransform
                         00-netlog.js (no-network guard for the smoke test)
   styles/               base.css (page geometry vars), editor.css, ribbon.css, …
   vendor/               purify.min.js
-scripts/                test-suite.js (257 in-renderer QA), test_docx.js (17 docx), smoke-pm.js
-                        (9 PM-core smoke), gen-icons.js, gen.js, gen-fixture.js
+scripts/                test-suite.js (257 in-renderer QA), test-suite-pm.js (PM functional suite),
+                        test-roundtrip-pm.js + test-roundtrip-pm-probe.js (PM-converter docx
+                        round-trip — THE docx gate), test_docx.js (17 — frozen legacy-converter
+                        gate, retires at slice 11), smoke-pm.js (9 PM-core smoke), gen-icons.js,
+                        gen.js, gen-fixture.js
 out/                    electron-vite build output (gitignored): out/{main,preload,renderer}
 docs/                   the documentation set (below)
 .claude/skills/commit-style/   the commit convention (follow it for every commit)
@@ -124,7 +127,10 @@ DISPLAY=:0 npx electron . --probe-out=/tmp/results.json \
   --shot-evalfile=scripts/test-suite.js --shot-delay=800
 node -e "const r=require('/tmp/results.json');console.log(r.summary)"
 
-# docx round-trip suite (9 tests)
+# PM-converter docx round-trip (THE docx gate) — needs a build first
+npm run build && npm run test:roundtrip
+
+# frozen legacy-converter gate (--legacy html-to-docx; retires at slice 11)
 node scripts/test_docx.js
 
 # headless screenshot + arbitrary probe (CSP blocks page eval -> use a file)
@@ -158,9 +164,10 @@ safe pattern.
 
 ## Critical gotchas (learned the hard way)
 
-- **docx export:** `html-to-docx` needs **full integer margins** (top/right/bottom/
-  left/header/footer/gutter) or it emits `w:header="undefined"` and **real Word
-  rejects the file** (mammoth/LibreOffice tolerate it — only real Word catches it).
+- **docx export (`--legacy` mode only since slice 7):** `html-to-docx` needs **full
+  integer margins** (top/right/bottom/left/header/footer/gutter) or it emits
+  `w:header="undefined"` and **real Word rejects the file** (mammoth/LibreOffice
+  tolerate it — only real Word catches it). The PM engine never touches this path.
 - **insertHTML strips attributes:** `execCommand('insertHTML')` with `styleWithCSS`
   drops `class`/`data-*` on some elements — use `WC.Editor.insertNodeHTML(html)`
   for anything that must keep attributes (merge fields, comment anchors).

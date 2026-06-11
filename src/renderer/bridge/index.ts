@@ -3,7 +3,7 @@
 // NEVER reassign window.WC or window.WC.Editor (main.ts invariant).
 import { legacyBoot } from './mode'
 import { installCommands } from './commands'
-import { installClipboard } from './clipboard'
+import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
@@ -15,6 +15,7 @@ import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { toQueryState } from './state-sync'
 import { parseDocx, constructPmEditor } from './create-editor'
 import { blankArrayBuffer } from '@/core/fixture'
+import { textToParagraphHtml, csvToTableHtml } from './file-content'
 
 type AnyEditor = any
 let current: AnyEditor = null
@@ -24,6 +25,11 @@ let painterEscInstalled = false
 // Concurrency guard: replaceEditor must not overlap itself (concurrent Open/New
 // clicks must not race — second call is refused while first is in flight).
 let replacing = false
+// Set when the html contentErr recovery replaced the live doc with a fresh BLANK
+// editor (replaceEditor returned false but the old doc is GONE). Consumers
+// (files.js) must unbind path/name/format in that case — keeping the old binding
+// would let Ctrl+S write a blank over the old file (spec §5.3 data loss).
+let lastImportBlanked = false
 
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
@@ -132,15 +138,36 @@ function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.ha
 //             Failure class: constructor error on valid parsed data (rare).
 //             The mount may already be empty at this point; call failBridge to
 //             un-flip to the legacy world + toast, then return false.
-async function replaceEditor(source: ArrayBuffer): Promise<boolean> {
+// slice 7: `extra.html` rides the docx constructor leg — the converter context
+// comes from the parsed (blank-template) docx while the doc body initializes from
+// HTML via createDocFromHTML, so non-docx imports stay fully docx-exportable.
+async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Promise<boolean> {
   // Concurrency guard: refuse a second concurrent call (e.g. double-click Open).
   if (replacing) return false
   replacing = true
+  // Reset AFTER the mutex check: a refused concurrent call must not clobber the
+  // flag a consumer is about to read.
+  lastImportBlanked = false
   const w = window as any
+  // Wire a freshly-constructed editor into the chrome — shared by the normal and
+  // the contentError-recovery paths so both get the identical seam.
+  const wire = (next: AnyEditor) => {
+    // Transaction-seam attach: references w.WC.pm only — safe before WC.view/WC.editor assignment.
+    next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
+    // installBridge sets current = editor first; assign WC.view/WC.editor AFTER
+    // so current and WC.editor never disagree.
+    installBridge(next)
+    w.WC.view = next.view
+    w.WC.editor = next
+    w.WC.PM.setClean()
+  }
   try {
     // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
     // the live editor untouched (spec §5.3 invariant).
     // Failure class: corrupt/invalid input → live editor untouched, return false.
+    // Cheap guard (slice 7): an html import with no markup at all is refused here,
+    // before any teardown.
+    if (extra && (!extra.html || !extra.html.trim())) return false
     const bytes = new Uint8Array(source)
     if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) return false
     const mountEl = document.getElementById('pm-editor') as HTMLElement | null
@@ -153,15 +180,33 @@ async function replaceEditor(source: ArrayBuffer): Promise<boolean> {
     try {
       try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
       mountEl.innerHTML = ''
-      const next = constructPmEditor(mountEl, parsed)
-      // Transaction-seam attach: references w.WC.pm only — safe before WC.view/WC.editor assignment.
-      next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
-      // installBridge sets current = editor first; assign WC.view/WC.editor AFTER
-      // so current and WC.editor never disagree.
-      installBridge(next)
-      w.WC.view = next.view
-      w.WC.editor = next
-      w.WC.PM.setClean()
+      let contentErr = false
+      const next = constructPmEditor(
+        mountEl,
+        parsed,
+        // CONSTRAINT: the plain-docx leg must NOT get an onContentError override —
+        // it relies on the fork's default RETHROW reaching the phase-2 catch →
+        // failBridge; overriding it would let a docx contentError degrade to a
+        // blank doc and return true (a §5.3 path-binding violation).
+        extra ? { html: extra.html, onContentError: () => { contentErr = true } } : undefined,
+      )
+      if (extra?.html && contentErr) {
+        // CONSTRAINT: a garbage html import degrades to BLANK only because our
+        // onContentError override swallows the error — Editor#generatePmData
+        // catches the createDocFromHTML failure and emits 'contentError', whose
+        // fork-DEFAULT handler rethrows (Editor.ts:750-752); the override turns
+        // that into a silent blank + flag. Without this detection the caller
+        // (files.js) would bind a path to a doc the file does not represent
+        // (§5.3 data loss). Recover by constructing a plain blank editor from the
+        // already-parsed template (keeps PM mode alive instead of failBridge) and
+        // return false so the caller never binds a path to the degraded blank.
+        try { next?.destroy?.() } catch { /* degraded editor teardown is best-effort */ }
+        mountEl.innerHTML = ''
+        lastImportBlanked = true // the old doc is gone — caller must unbind its file state
+        wire(constructPmEditor(mountEl, parsed))
+        return false
+      }
+      wire(next)
       return true
     } catch (e) {
       // Phase-2 failure: mount may be empty, old editor already destroyed.
@@ -206,10 +251,18 @@ export function preinstallBridge() {
     isDirty: () => false,
     setClean: () => {},
     counts: () => ({ words: 0, chars: 0, charsNoSpace: 0, paras: 0, lines: 1, pages: 1, selWords: 0 }),
+    getHTML: () => '', // slice 7 pre-mount stub (replaced by installIo on mount)
+    getText: () => '', // slice 7 pre-mount stub (replaced by installIo on mount)
     captureSelection: () => {},
     withSelection: (fn: () => void) => fn(),
     openDocx: async () => false, // pre-mount stub — replaced by installBridge
     newBlank: async () => false, // pre-mount stub — replaced by installBridge
+    // slice 7: file-io pre-mount stubs (replaced by installBridge on mount)
+    openHtml: async () => false,
+    openText: async () => false,
+    openCsv: async () => false,
+    lastImportBlanked: () => false,
+    pasteHTMLString: () => false,
     stylePreviewEnter: () => false,
     stylePreviewLeave: () => {},
     stylePreviewCommitRestore: () => {},
@@ -296,6 +349,22 @@ export function installBridge(editor: AnyEditor) {
     return replaceEditor(buf as ArrayBuffer)
   }
   PM.newBlank = () => replaceEditor(blankArrayBuffer())
+  // slice 7: non-docx imports ride the blank-template + html constructor leg
+  // (see replaceEditor) — the result stays docx-exportable.
+  PM.openHtml = (html: string) => replaceEditor(blankArrayBuffer(), { html })
+  PM.openText = (text: string) => replaceEditor(blankArrayBuffer(), { html: textToParagraphHtml(text) })
+  PM.openCsv = (text: string) => {
+    const table = csvToTableHtml(text)
+    return table ? replaceEditor(blankArrayBuffer(), { html: table }) : Promise.resolve(false)
+  }
+  // CONSTRAINT: consumers (files.js) must unbind path/name/format when a failed import replaced the doc with a blank.
+  PM.lastImportBlanked = () => lastImportBlanked
+  // [4] pin + paste-path probes drive the REAL paste route (view.pasteHTML).
+  PM.pasteHTMLString = (html: string) => {
+    const ed = current
+    if (!ed?.view) return false
+    return !!ed.view.pasteHTML(html, pasteEvent({ 'text/html': html, 'text/plain': '' }))
+  }
   installStateSync(editor)
   installFocusGuards()
   PM.ready = true
