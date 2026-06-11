@@ -114,9 +114,20 @@
 > (tag-early/remove-late, NOTICE'd). Oracle legs A–D PASS/recorded vs Word 16.77.1 — driven
 > directly via computer-use MCP (first slice; slice-6 table-style reopen recheck closed).
 > Gates (six): **PM 206/206**, legacy 257, smoke 9/9 × 2, docx 17, **roundtrip 27/0**.
+>
+> **Loop Step 0 is DONE (2026-06-11):** the completion-driven loop (`docs/loop/loop.md`) now
+> runs on the user's **Windows** machine — computer-use permissions granted up front (Word +
+> File Explorer + Electron, full tier + clipboard + system combos); all six gates green on
+> Windows (one Mac-vacuous PM test spy-hardened); the **Windows COM oracle**
+> (`scripts/oracle/word-oracle-win.ps1`) ported, live-validated, critique-hardened; the two
+> gitignored real-Word roundtrip fixtures re-authored (`author-fixtures-win.ps1`). From
+> slice 8 the parity reference is **Word for Windows 16.0** (slices 1–7 stay validated vs
+> Word for Mac 16.77.1).
 > **Next: slice 8 — review** (comments on fork ranges + existing pane, track changes,
-> language/proofing re-points). ⚠️ slice-8 must repoint the `[0a]` D6 run-block test off
-> `newComment`; slice-6 UI-Codex steps remain open (now feasible via computer use).
+> language/proofing re-points) — one slice per loop iteration, PR into
+> `completion-driven-agent-loop` (NEVER `main`). ⚠️ slice-8 must repoint the `[0a]` D6
+> run-block test off `newComment`; slice-6 UI-Codex steps remain open (now feasible via
+> computer use).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -137,6 +148,27 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-11 (Completion-driven loop — Step 0: Windows replication)
+- [x] **Permissions up front (ONE request flow):** Word + File Explorer + Electron (clone)
+  at full tier + clipboardRead/Write + systemKeyCombos — no mid-loop prompts remain.
+- [x] **Toolchain:** npm install + build; npm `/tmp` probe aliases verified working AS-IS
+  (`C:\tmp` exists).
+- [x] **Six gates green on Windows:** legacy 257/257 · PM 206/206 · smoke 9/9 ×2 · docx 17/17
+  · roundtrip 27/0.
+- [x] **`[1]` Mod-Z test platform fix** — was Mac-vacuous (Mod-z = Meta-z there); probe-driven
+  root-cause (defaultPrevented + sdBlockRev evidence); critique caught the first rewrite as a
+  weakening; final form spies `WC.PM.cmd` (the app.js path) + doc-equality-modulo-sdBlockRev.
+- [x] **Windows COM oracle port** (`word-oracle-win.ps1`): 5 verbs live-validated vs Word 16.0;
+  critique-hardened (20 findings: exit-2 validation, kill-time PID re-verify, --out splice,
+  LiteralPath, $PWD resolution, UTF-8 stdout, vocabulary parity incl. underlineRaw "false").
+- [x] **COM runtime rules discovered + documented:** unsandboxed-only (DCOM hang), FOREGROUND-only
+  (backgrounded shells wedge in SaveAs2 — OneDrive exonerated), machine-global DocumentN,
+  per-instance OM attach for orphan recovery. README Windows section written.
+- [x] **Fixtures re-authored on real Windows Word** (`author-fixtures-win.ps1` committed;
+  docx-inspect-verified identical shapes) — unblocked `test:roundtrip` on this machine;
+  `capture-popups.ps1` committed for slice spec-captures.
+- [x] **Checkpoint + commits + push** on `completion-driven-agent-loop`; next iteration = slice 8.
 
 ### 2026-06-10/11 (Phase 2 — slice 7)
 - [x] Post-merge routine: PR #23 merge verified (`6ca5679`); gates re-verified ON `main`

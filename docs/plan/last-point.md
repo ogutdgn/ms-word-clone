@@ -7,6 +7,100 @@
 
 ---
 
+## 2026-06-11 — Loop Step 0 DONE: Windows environment replication (gates + COM oracle port)
+
+- **Branch:** `completion-driven-agent-loop` (committed directly — Step 0 is loop
+  infrastructure, not a slice; per `docs/loop/loop.md` §Step 0).
+- **Phase:** **Phase 2 — completion-driven loop; Step 0 (Windows replication) DONE → slice 8
+  (review) next.** The loop now runs on the user's **Windows 11** machine (Word for
+  **Windows 16.0**, Microsoft 365, English Office); the Mac oracle/docs stay intact.
+- **Computer-use permissions (user-mandated, up front, ONE TIME):** granted at **full tier**
+  for **Word** (`winword.exe`), **File Explorer**, and the clone (**Electron**,
+  `node_modules\electron\dist\electron.exe` — resolves by the literal name `electron.exe`
+  while `npm start` is running), plus **clipboardRead + clipboardWrite + systemKeyCombos**.
+  No mid-loop permission prompts remain.
+- **All six gates GREEN on Windows:** legacy **257/257**, PM **206/206**, smoke **9/9 ×2**,
+  docx **17/17**, roundtrip **27/0**. npm aliases work AS-IS (`/tmp/...` probe paths resolve
+  to `C:\tmp`, which exists on this machine — no alias edits).
+- **One PM test was Mac-vacuous and is now spy-hardened** (`[1] in-view Mod-Z does not
+  double-fire`): prosemirror-keymap binds Mod-z to **Meta-z on macOS but Ctrl-z on Windows**,
+  so the old synthetic ctrlKey event matched nothing on Mac (vacuous pass) and legitimately
+  fired ONE engine undo on Windows (probe evidence: defaultPrevented=true; bold reverted;
+  doc returned to the pre-bold state except `sdBlockRev` 2→3 — the fork's history-exempt
+  block-revision stamp; un-bolding heals the run-node split so content.size legitimately
+  shrinks 23→21). Critique caught that branching on defaultPrevented alone was a WEAKENING
+  (a regressed app.js also preventDefaults); the rewritten test spies on **`WC.PM.cmd`**
+  (the app.js undo path — the PM keymap never goes through it) as the load-bearing
+  cross-platform assertion + asserts doc-equality-modulo-sdBlockRev after the consumed undo.
+- **Windows COM oracle PORTED + live-validated** (`scripts/oracle/word-oracle-win.ps1`):
+  all 5 verbs (`read-props`/`read-word-props`/`read-para-props`/`read-style-props`/
+  `roundtrip`) validated against real Word 16.0 on the repo fixtures — same JSON shapes as
+  the Mac oracle (COM ints → Mac enum-string vocabulary; mixed/wdUndefined → `false`/`null`/
+  `"false"` sentinels; BOM-free `--out`). Usage errors exit 2 WITHOUT spawning Word;
+  roundtrip writes verified into the repo (`.oracle-probes/step0/s3-roundtrip.docx`,
+  structurally identical per docx-inspect). Critique-hardened (3-critic workflow, 20
+  findings): non-throwing arg validation, kill-time PID re-verification (name+StartTime),
+  index-spliced `--out`, LiteralPath, $PWD-consistent path resolution, stdout UTF-8.
+- **WINDOWS COM QUIRKS (the hard-won rules — also in `scripts/oracle/README.md`):**
+  (1) **sandboxed shells hang at COM activation** (DCOM) — run unsandboxed;
+  (2) **backgrounded shells wedge inside `SaveAs2`** (no dialog exists — verified by window
+  enumeration; OneDrive paths exonerated — foreground saves to them work instantly) — run
+  Word COM in SHORT FOREGROUND commands only;
+  (3) `DocumentN` numbering is **machine-global** across instances — never identify
+  documents/instances by it (an early misread of taskbar windows as ours stemmed from this);
+  (4) orphan recovery: attach to a specific hidden instance via its own window
+  (`OpusApp`→`_WwG`→`AccessibleObjectFromWindow` OBJID_NATIVEOM) and `Quit()` it gracefully —
+  never `taskkill /IM WINWORD`. The user's Word (their own instance with an AutoRecovered
+  doc + 3 blank docs, running since 6/10) was NEVER touched; all automation orphans from the
+  hang investigation were quit via their own OM.
+- **Roundtrip fixtures re-authored on Windows** (`scripts/oracle/author-fixtures-win.ps1`,
+  new — the gitignored `tests/fixtures/oracle-word-s3-table.docx` + `oracle-word-s6-tablestyles.docx`
+  existed only on the Mac): shapes verified IDENTICAL to the originals via docx-inspect
+  (s3 = 1 table GridTable4-Accent1 + 6 conditionalFormats; s6 = 3 TableGrid tables, 6 rows /
+  6 gridCols). `capture-popups.ps1` (PrintWindow capture of Office flyout/dialog windows —
+  prior-art leftover) committed for the per-slice Word-side spec captures.
+- **Reference-target note (loop.md Step-0 #4):** slices 1–7 were oracle-validated vs
+  **Word for Mac 16.77.1**; from slice 8 onward the parity reference is **Word for Windows
+  16.0 on this machine**. No retroactive re-validation of 1–7 unless a regression surfaces.
+- **Done this session:** permissions; npm install/build; six gates (incl. the Mod-Z fix +
+  fixture regeneration); oracle port + live validation + critique pass; README Windows
+  section; this checkpoint. package-lock.json committed once (Windows npm normalization —
+  stops perpetual re-dirtying; this machine is now the permanent dev box).
+- **Blockers/notes:** none. User's Word untouched and still running. Word now holds recents
+  entries for the fixture/probe files (same accepted side effect as the Mac sessions).
+
+### Next slice definition (slice 8 — review)
+
+- **Goal:** flip area **`review`** onto the PM engine — **comments** (new/reply/resolve/
+  delete/navigate + the pane), **track changes** (toggle, show-markup rendering,
+  accept/reject + navigation), **proofing re-points** (spelling/grammar toggles, language,
+  word count) — Word-parity verified side-by-side vs **Windows Word** under computer use.
+- **Spec:** `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md` §9.1 review
+  rows (+ §8.3 oracle protocol). Procedure: `docs/loop/loop.md` §Per-slice (Word-side spec
+  capture FIRST → parity checklist in `.oracle-probes/slice8/parity.md` → critique-hardened
+  plan → red-first subagent execution → six gates → execute↔compare↔fix inner loop → oracle
+  legs via `word-oracle-win.ps1` → PR into `completion-driven-agent-loop`).
+- **Known entry points:** the fork VENDORS review infrastructure — comments plugin +
+  **`extensions/track-changes/`** (incl. `review-model/` with mark-metadata, story-locator,
+  canonical change types) — leverage, don't rebuild. Legacy review pane/UI under
+  `src/renderer/public/js/` (`WC.RIBBON` review tab: 212-control inventory). `H.newComment`
+  currently a D6 block target.
+- **Carry-overs INTO slice 8:** (1) repoint the `[0a]` D6 run-block test off `newComment`
+  (slice-6 note — `tableOfContents` repoints at slice 9); (2) slice-6 UI-Codex leftover
+  probes (A2 Insert-Table dialog / A5 Bookmark / B-layout/autofit / C1/C2) fold into the
+  computer-use parity passes; (3) recorded follow-ups: contentError recovery automation,
+  `onContentError` lifetime asymmetry, `warnOnUnsupportedContent` threading; (4) oracle
+  vocabulary beyond the Mac-verified core (decorated underlines, justify med/hi) is
+  best-effort — pin from a Mac report if one ever disagrees; (5) `Cmd+Shift+C` arms Format
+  Painter (slice 4) — Windows Word uses Ctrl+Shift+C for COPY FORMATTING too; re-check the
+  comment-shortcut story (Windows Word: new comment = Ctrl+Alt+M) during spec capture.
+- **Risks:** track-changes is the largest fork surface so far (marks + decorations + UI);
+  Windows Word's MODERN comments pane (contextual cards, anchors) is visually rich —
+  capture the real UI first and scope honestly against the deferrals ledger classes;
+  suites flake under load — run gates idle.
+
+---
+
 ## 2026-06-10/11 — Phase 2 slice 7 BUILT (file-io on the PM engine) + oracle legs A–D
 
 - **Branch:** `feature/phase-2-slice-7-file-io` (10 commits, directly off `main` post
