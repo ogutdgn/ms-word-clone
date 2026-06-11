@@ -823,19 +823,22 @@
     if (!pm) { fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Toggle Comments Pane', { onClick: () => WC.Review.showComments() })); }
   });
   // ---- Markup group ----
-  // PM-side Show Markup latches (T9/T10). Rendering effects (hiding ins/del inline,
-  // balloon modes, changed-line bars) land in task 5 — the menu must exist + latch now.
+  // PM-side Show Markup latches (T9/T10). Render effects (task 5): insDel/formatting
+  // toggle #pm-editor classes consumed by track-chrome-pm.css, and every latch flip
+  // nudges the bars/balloons chrome (track-chrome.ts reads WC.pmMarkup).
   const pmMarkup = { insDel: true, formatting: true, balloons: 'formatting' };
+  WC.pmMarkup = pmMarkup; // task 5: track-chrome.ts reads the latches at render time
+  const chromeRefresh = () => { if (WC.TrackChrome && WC.TrackChrome.refresh) WC.TrackChrome.refresh(); };
   H.showMarkup = (c, node) => {
     const pm = PMA();
     if (pm) {
       return WC.flyout(node, (fly) => {
         const reopen = () => WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node);
         const check = (on, label) => (on ? '✓ ' : '   ') + label;
-        fly.appendChild(WC.flyItem(check(pmMarkup.insDel, 'Insertions and Deletions'), { onClick: () => { pmMarkup.insDel = !pmMarkup.insDel; document.getElementById('pm-editor').classList.toggle('pm-hide-insdel', !pmMarkup.insDel); reopen(); } }));
-        fly.appendChild(WC.flyItem(check(pmMarkup.formatting, 'Formatting'), { onClick: () => { pmMarkup.formatting = !pmMarkup.formatting; reopen(); } }));
+        fly.appendChild(WC.flyItem(check(pmMarkup.insDel, 'Insertions and Deletions'), { onClick: () => { pmMarkup.insDel = !pmMarkup.insDel; document.getElementById('pm-editor').classList.toggle('pm-hide-insdel', !pmMarkup.insDel); chromeRefresh(); reopen(); } }));
+        fly.appendChild(WC.flyItem(check(pmMarkup.formatting, 'Formatting'), { onClick: () => { pmMarkup.formatting = !pmMarkup.formatting; document.getElementById('pm-editor').classList.toggle('pm-hide-format', !pmMarkup.formatting); chromeRefresh(); reopen(); } }));
         const balloons = WC.flyItem('Balloons', { onClick: () => WC.flyout(node, (sub) => {
-          const bal = (label, m) => sub.appendChild(WC.flyItem(check(pmMarkup.balloons === m, label), { onClick: () => { pmMarkup.balloons = m; } }));
+          const bal = (label, m) => sub.appendChild(WC.flyItem(check(pmMarkup.balloons === m, label), { onClick: () => { pmMarkup.balloons = m; chromeRefresh(); } }));
           bal('Show Revisions in Balloons', 'revisions');
           bal('Show All Revisions Inline', 'inline');
           bal('Show Only Formatting in Balloons', 'formatting');
@@ -872,26 +875,14 @@
   // pending). Interim routing: the Show Markup menu IS the filter set we have —
   // task 5 replaces this with the captured filter menu.
   H.filterMarkup = (c, node) => H.showMarkup(c, node || (WC.Ribbon.controlIndex.filterMarkup && WC.Ribbon.controlIndex.filterMarkup.node) || document.body);
-  // PM branch: minimal Revisions pane fed by the bridge provider (T11 shape:
-  // author · type label · content + live count). Task 5 re-skins it into Word's
-  // left-dock revision list; legacy keeps its own pane.
+  // PM branch (task 5): the Word-anatomy Revisions pane lives in track-chrome.ts
+  // (D8.4/T11 -- live count, collapse chevron, refresh, entry-click navigation).
+  // The main button toggles the pane in its last-used orientation; the split menu
+  // (Commands.dropdown 'reviewingPane') picks Vertical/Horizontal explicitly.
   H.reviewingPane = () => {
     const pm = PMA();
     if (!pm) { WC.Review.reviewingPane(); return; }
-    let pane = document.getElementById('review-pane');
-    if (pane) { pane.remove(); return; }
-    pane = el('div', { class: 'taskpane', id: 'review-pane' });
-    const rows = pm.getRevisions();
-    const verb = { insert: 'Inserted', delete: 'Deleted', format: 'Formatted', comment: 'Commented' };
-    pane.appendChild(el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: rows.length + ' revision' + (rows.length === 1 ? '' : 's') }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]));
-    const body = el('div', { class: 'tp-body' });
-    if (!rows.length) body.appendChild(el('div', { style: { color: '#888', padding: '10px' }, text: 'No revisions.' }));
-    rows.forEach((r) => body.appendChild(el('div', { class: 'tp-result' }, [
-      el('div', { style: { fontWeight: '600', fontSize: '12px' }, text: (r.author || 'Author') + ' ' + (verb[r.type] || 'Changed') }),
-      el('div', { style: { fontSize: '12px', color: '#444' }, text: r.text || '' }),
-    ])));
-    pane.appendChild(body);
-    document.getElementById('workarea').appendChild(pane);
+    if (WC.TrackChrome) WC.TrackChrome.togglePane();
   };
   // ---- Tracking group ----
   // Word's main Accept/Reject buttons ACCEPT-AND-ADVANCE (parity T14); with the
@@ -1177,7 +1168,13 @@
         fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => { if (pm) { pm.getComments().forEach((r) => pm.cmd('deleteComment', r.id)); return; } WC.Review.deleteAllComments(); } }));
         fly.appendChild(WC.flyItem('Delete All Resolved Comments', { onClick: () => { if (pm) { pm.getComments().filter((r) => r.resolved).forEach((r) => pm.cmd('deleteComment', r.id)); return; } E().node.querySelectorAll('.wc-comment-anchor.resolved').forEach((a) => a.replaceWith(...a.childNodes)); } }));
       });
-      if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Reviewing Pane Vertical…', { onClick: () => H.reviewingPane() })); fly.appendChild(WC.flyItem('Reviewing Pane Horizontal…', { onClick: () => H.reviewingPane() })); });
+      // Reviewing Pane split menu (T11): PM picks the dock explicitly (Horizontal =
+      // the same pane bottom-docked); legacy keeps its single pane toggle.
+      if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => {
+        const pm = PMA();
+        fly.appendChild(WC.flyItem('Reviewing Pane Vertical…', { onClick: () => { if (pm && WC.TrackChrome) WC.TrackChrome.showPane('vertical'); else H.reviewingPane(); } }));
+        fly.appendChild(WC.flyItem('Reviewing Pane Horizontal…', { onClick: () => { if (pm && WC.TrackChrome) WC.TrackChrome.showPane('horizontal'); else H.reviewingPane(); } }));
+      });
       if (cmd === 'checkAccessibility') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Check Accessibility', { onClick: () => WC.Review.checkAccessibility() })); });
       // Hide Ink ▾ (parity X4 — Word menu capture pending): single toggle item.
       if (cmd === 'hideInk') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Hide Ink', { onClick: () => H.hideInk(control, WC.Ribbon.controlIndex.hideInk && WC.Ribbon.controlIndex.hideInk.node) })); });

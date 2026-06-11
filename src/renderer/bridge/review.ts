@@ -35,7 +35,12 @@ export interface ReviewState {
   activeCommentId: string | null
 }
 
-export interface RevisionRow { id: string; author: string; type: 'insert' | 'delete' | 'format' | 'comment'; text: string }
+// `pos` = document position of the revision's range start (task 5, additive):
+// the Revisions pane uses it for entry-click navigation (T11).
+export interface RevisionRow { id: string; author: string; type: 'insert' | 'delete' | 'format' | 'comment'; text: string; pos: number }
+// Task 5 (additive): chrome consumers (changed-line bars T7 + format balloons T6)
+// need full document ranges plus the trackFormat before/after diff description.
+export interface ChangeRangeRow { id: string; type: 'insert' | 'delete' | 'format'; author: string; from: number; to: number; text: string; description: string }
 // `date` = entity-store createdTime (epoch ms; null when absent) — the cards UI
 // renders it in Word's "June 11, 2026 at 5:22 AM" format (task 4 / parity C3).
 export interface CommentReply { id: string; author: string; text: string; date: number | null }
@@ -45,6 +50,56 @@ const REVISION_TYPE: Record<string, RevisionRow['type']> = {
   [TrackInsertMarkName]: 'insert',
   [TrackDeleteMarkName]: 'delete',
   [TrackFormatMarkName]: 'format',
+}
+
+// ---- T6: Word-style 'Formatted: <description>' from a trackFormat mark ----
+// The mark stores before/after as [{ type, attrs }] arrays (addMarkStep ->
+// review-model compiler); track-format.js renderDOM JSON-stringifies them, so a
+// string form is tolerated too (parseFormatList precedent). Labels mirror real
+// Word's revision descriptions ("Font: Bold" -- capture word-ref/07/14).
+// [added-label, removed-label] per TrackedFormatMarkNames (constants.js).
+const FORMAT_LABELS: Record<string, [string, string]> = {
+  bold: ['Font: Bold', 'Font: Not Bold'],
+  italic: ['Font: Italic', 'Font: Not Italic'],
+  underline: ['Underline', 'No underline'],
+  strike: ['Strikethrough', 'Not Strikethrough'],
+  highlight: ['Highlight', 'No highlight'],
+  link: ['Hyperlink', 'Not Hyperlink'],
+}
+
+function asFormatList(x: unknown): Array<{ type: string; attrs: any }> {
+  let list: any = x
+  if (typeof list === 'string') { try { list = JSON.parse(list) } catch { return [] } }
+  if (!Array.isArray(list)) return []
+  return list.filter((f) => f && typeof f.type === 'string')
+}
+
+// textStyle is attr-bearing (fontFamily/fontSize/color) -- describe what changed.
+function describeTextStyle(attrs: any): string[] {
+  const out: string[] = []
+  if (attrs?.fontFamily) out.push('Font: ' + String(attrs.fontFamily).split(',')[0].replace(/['"]/g, '').trim())
+  if (attrs?.fontSize) out.push('Font: ' + String(attrs.fontSize).replace(/pt$/, ' pt').trim())
+  if (attrs?.color) out.push('Font color')
+  return out.length ? out : ['Font']
+}
+
+export function describeFormatChange(markAttrs: any): string {
+  const before = asFormatList(markAttrs?.before)
+  const after = asFormatList(markAttrs?.after)
+  const beforeTypes = new Set(before.map((f) => f.type))
+  const afterTypes = new Set(after.map((f) => f.type))
+  const parts: string[] = []
+  for (const f of after) {
+    if (f.type === 'textStyle') { parts.push(...describeTextStyle(f.attrs)); continue }
+    const lab = FORMAT_LABELS[f.type]
+    if (lab && !beforeTypes.has(f.type)) parts.push(lab[0])
+  }
+  for (const f of before) {
+    if (f.type === 'textStyle') continue // revert-to-prior attrs: the after walk covers the visible state
+    const lab = FORMAT_LABELS[f.type]
+    if (lab && !afterTypes.has(f.type)) parts.push(lab[1])
+  }
+  return parts.length ? Array.from(new Set(parts)).join(', ') : 'Formatted'
 }
 
 export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args: unknown[]) => boolean) {
@@ -86,7 +141,9 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
   }
 
   // ---- tracked-change ranges: one row per contiguous same-id, same-type range ----
-  type ChangeRange = { id: string; type: string; author: string; from: number; to: number; text: string }
+  // `attrs` = the first segment's mark attrs (same id => same attrs); the format
+  // balloons read before/after from it (task 5, T6).
+  type ChangeRange = { id: string; type: string; author: string; from: number; to: number; text: string; attrs: any }
   function changeRanges(): ChangeRange[] {
     let entries: Array<{ mark: any; node?: any; from: number; to: number }> = []
     try { entries = getTrackChanges(editor.state) || [] } catch { /* state not readable */ }
@@ -99,10 +156,25 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
         last.to = Math.max(last.to, to)
         last.text += text
       } else {
-        ranges.push({ id, type: mark.type.name, author: String(mark.attrs?.author ?? ''), from, to, text })
+        ranges.push({ id, type: mark.type.name, author: String(mark.attrs?.author ?? ''), from, to, text, attrs: mark.attrs })
       }
     }
     return ranges
+  }
+
+  // Chrome provider (task 5): changed-line bars (T7) + format balloons (T6)
+  // consume full ranges; description is pre-derived so the DOM module never
+  // touches mark internals.
+  function getChangeRanges(): ChangeRangeRow[] {
+    return changeRanges().map((c) => ({
+      id: c.id,
+      type: (REVISION_TYPE[c.type] ?? 'format') as ChangeRangeRow['type'],
+      author: c.author,
+      from: c.from,
+      to: c.to,
+      text: c.text,
+      description: c.type === TrackFormatMarkName ? describeFormatChange(c.attrs) : '',
+    }))
   }
 
   // ---- comment anchors in document order (marks; commentRangeStart for resolved) ----
@@ -159,18 +231,25 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
   }
 
   // Reviewing-pane provider (D8.4/T11): tracked changes + comment threads merged
-  // in document order.
+  // in document order. Format rows carry the Word-style DESCRIPTION as content
+  // (capture word-ref/14: "Ogut, Dogan Formatted" / "Font: Bold"), and every row
+  // keeps `pos` for entry-click navigation (task 5, additive).
   function getRevisions(): RevisionRow[] {
-    const rows: Array<RevisionRow & { pos: number }> = []
+    const rows: RevisionRow[] = []
     for (const c of changeRanges()) {
-      rows.push({ id: c.id, author: c.author, type: REVISION_TYPE[c.type] ?? 'format', text: c.text, pos: c.from })
+      const type = REVISION_TYPE[c.type] ?? 'format'
+      rows.push({
+        id: c.id, author: c.author, type,
+        text: c.type === TrackFormatMarkName ? describeFormatChange(c.attrs) : c.text,
+        pos: c.from,
+      })
     }
     const anchorPos = new Map(commentAnchors().map((a) => [a.id, a.from]))
     for (const c of getComments()) {
       rows.push({ id: c.id, author: c.author, type: 'comment', text: c.text, pos: anchorPos.get(c.id) ?? Number.MAX_SAFE_INTEGER })
     }
     rows.sort((a, b) => a.pos - b.pos)
-    return rows.map(({ pos: _pos, ...row }) => row)
+    return rows
   }
 
   // ---- caret helpers ----
@@ -379,5 +458,5 @@ export function installReview(editor: AnyEditor, baseCmd: (name: string, ...args
     return baseCmd(name, ...args)
   }
 
-  return { cmd, reviewState, setReviewView, getRevisions, getComments }
+  return { cmd, reviewState, setReviewView, getRevisions, getComments, getChangeRanges }
 }

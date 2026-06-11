@@ -9,6 +9,7 @@ import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
 import { installCommentsUI } from './comments-ui'
+import { installTrackChrome } from './track-chrome'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -326,6 +327,7 @@ export function preinstallBridge() {
     reviewState: () => ({ tracking: false, view: 'all', engineFlags: { onlyOriginalShown: false, onlyModifiedShown: false }, activeCommentId: null }),
     getRevisions: () => [],
     getComments: () => [],
+    getChangeRanges: () => [], // slice 8 task 5: bars/balloons chrome provider
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -392,6 +394,9 @@ export function installBridge(editor: AnyEditor) {
   // early-return above, so the UI module never runs (and its DOM never exists)
   // under --legacy (D8.3 PM-only constraint).
   installCommentsUI(editor)
+  // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
+  // Revisions pane). Same PM-only-by-construction placement as comments-ui.
+  installTrackChrome(editor)
   installFocusGuards()
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
