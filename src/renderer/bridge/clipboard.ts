@@ -4,20 +4,21 @@
 // view.pasteHTML / setImage so every insertion is a normal PM transaction.
 type AnyEditor = any
 
+// view.pasteText/pasteHTML synthesize a bare `new ClipboardEvent('paste')` whose
+// clipboardData is null — but the fork's InputRule handlePaste reads
+// event.clipboardData.getData(...) and would throw. Hand it a real ClipboardEvent
+// carrying a populated DataTransfer so the fork paste pipeline runs normally.
+// Exported (slice 7): PM.pasteHTMLString in index.ts drives the same paste route.
+export const pasteEvent = (data: Record<string, string>): ClipboardEvent => {
+  const dt = new DataTransfer()
+  for (const k in data) dt.setData(k, data[k])
+  return new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })
+}
+
 export function installClipboard(editor: AnyEditor) {
   const api = () => (window as any).wordAPI?.clipboard
 
   const focusView = () => { try { editor.view.focus() } catch { /* view gone */ } }
-
-  // view.pasteText/pasteHTML synthesize a bare `new ClipboardEvent('paste')` whose
-  // clipboardData is null — but the fork's InputRule handlePaste reads
-  // event.clipboardData.getData(...) and would throw. Hand it a real ClipboardEvent
-  // carrying a populated DataTransfer so the fork paste pipeline runs normally.
-  const pasteEvent = (data: Record<string, string>): ClipboardEvent => {
-    const dt = new DataTransfer()
-    for (const k in data) dt.setData(k, data[k])
-    return new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })
-  }
 
   async function cutSelection(): Promise<boolean> {
     focusView(); await api()?.cut(); return true

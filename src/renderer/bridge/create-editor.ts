@@ -16,13 +16,25 @@ export async function parseDocx(source: ArrayBuffer): Promise<ParsedDocx> {
   return { docx, mediaFiles, fonts }
 }
 
-export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx) {
+// slice 7: non-docx imports thread initial html through the docx constructor leg.
+// onContentError matters because Editor#generatePmData catches a constructor-internal
+// parse failure and emits 'contentError' (Editor.ts:2847-2851) — and the fork's
+// DEFAULT handler RETHROWS it (Editor.ts:750-752: `({ error }) => { throw error; }`).
+// Our override replaces that rethrow with a silent blank doc + flag, so
+// replaceEditor can detect the degradation and recover in-PM instead of unwinding.
+export type ExtraContent = { html?: string; onContentError?: () => void }
+
+export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extra?: ExtraContent) {
   return new (Editor as any)({
     element: mountEl,
     mode: 'docx',
     content: parsed.docx,
     mediaFiles: parsed.mediaFiles,
     fonts: parsed.fonts,
+    // slice 7: when set, the doc initializes from HTML via createDocFromHTML while the
+    // converter keeps the (blank-template) docx context — the doc stays docx-exportable.
+    ...(extra?.html ? { html: extra.html } : {}),
+    ...(extra?.onContentError ? { onContentError: extra.onContentError } : {}),
     extensions: getStarterExtensions(),
     user: { name: 'local', email: '' },
     isDebug: false,
