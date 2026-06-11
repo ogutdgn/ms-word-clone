@@ -36,7 +36,11 @@ export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extr
     ...(extra?.html ? { html: extra.html } : {}),
     ...(extra?.onContentError ? { onContentError: extra.onContentError } : {}),
     extensions: getStarterExtensions(),
-    user: { name: 'local', email: '' },
+    // slice 8 (A2): a REAL display identity — stamped as w:author/w:initials on tracked
+    // changes and as creatorName on comment cards (legacy parity: review-tools/comments
+    // used "Word User"). The oracle compares the author FLOW (stamp → card → docx →
+    // reimport) against real Word, where the name comes from the signed-in account.
+    user: { name: 'Word User', email: '' },
     isDebug: false,
     telemetry: { enabled: false },
   })

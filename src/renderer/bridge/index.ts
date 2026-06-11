@@ -7,6 +7,7 @@ import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
+import { installReview } from './review'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -85,6 +86,12 @@ const AREA: Record<string, string> = {
   newComment: 'review', comment: 'review', delete: 'review', previous: 'review', next: 'review',
   showComments: 'review', trackChanges: 'review', accept: 'review', reject: 'review',
   thesaurus: 'review', language: 'review',
+  // review (slice 8, A5): the rest of the tab's doc-touching cmds — unmapped they were
+  // NOT D6-blocked (isBlocked returns false) and silently drove the hidden legacy editor.
+  // App-level by design (never mapped): wordCount, blockAuthors, linkedNotes.
+  editor: 'review', readAloud: 'review', checkAccessibility: 'review', translate: 'review',
+  displayForReview: 'review', showMarkup: 'review', reviewingPane: 'review', compare: 'review',
+  restrictEditing: 'review', hideInk: 'review',
   // references (slice 9)
   tableOfContents: 'references', addText: 'references', updateTable: 'references',
   insertFootnote: 'references', insertEndnote: 'references', nextFootnote: 'references',
@@ -308,6 +315,10 @@ export function preinstallBridge() {
     tableSplit: () => false, tableToText: () => false, textToTable: () => false,
     tableSetTextDirection: () => false, tableAutoFit: () => false,
     tableSelectFirstRowPair: () => false,
+    // slice 8: review pre-mount stubs (replaced by installReview on mount)
+    reviewState: () => ({ tracking: false, view: 'all', engineFlags: { onlyOriginalShown: false, onlyModifiedShown: false }, activeCommentId: null }),
+    getRevisions: () => [],
+    getComments: () => [],
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -338,7 +349,11 @@ export function installBridge(editor: AnyEditor) {
       }
     }, true)
   }
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor))
+  // installReview goes LAST: its cmd head SHADOWS the raw fork command names it owns
+  // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
+  // falls through to installCommands' cmd for everything else.
+  const commands = installCommands(editor)
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

@@ -8,6 +8,11 @@ import { STYLE_ID_TO_NAME } from './style-names'
 
 type AnyEditor = any
 
+// slice 8: bridge review-view name → the Word-faithful Display for Review combo label.
+const REVIEW_VIEW_LABELS: Record<string, string> = {
+  all: 'All Markup', simple: 'Simple Markup', none: 'No Markup', original: 'Original',
+}
+
 export function headParagraph(editor: AnyEditor): { node: any; pos: number } | null {
   try {
     const $from = editor.state.selection.$from
@@ -153,6 +158,21 @@ export function installStateSync(editor: AnyEditor) {
     if (fpBtn) fpBtn.classList.toggle('toggled', fpArmed)
     const pmPage = document.getElementById('pm-editor')
     if (pmPage) pmPage.style.cursor = fpArmed ? 'copy' : ''
+    // slice 8 (A6): Track Changes latch + Display-for-Review combo via the format-painter
+    // DIRECT-POKE pattern — PM-only by construction. NEVER the shared TOGGLE_MAP: under
+    // --legacy, syncToggles would read !!undefined and clobber the legacy latch
+    // (review-tools.js:24-25). The combo seed also lives here: ribbon.js renders non-font
+    // combos with an EMPTY input, and the first sync tick (installStateSync's trailing
+    // schedule()) seeds Word's default "All Markup".
+    const rev = w.WC?.PM?.reviewState?.()
+    if (rev) {
+      const tcBtn = w.WC?.Ribbon?.controlIndex?.trackChanges?.node
+      if (tcBtn) tcBtn.classList.toggle('toggled', rev.tracking === true)
+      const dfr = w.WC?.Ribbon?.controlIndex?.displayForReview
+      if (dfr?.input && document.activeElement !== dfr.input) {
+        dfr.input.value = REVIEW_VIEW_LABELS[rev.view] || 'All Markup'
+      }
+    }
     // slice 6: track whether the caret is inside a table (drives Table Tools contextual tabs).
     // isInTable() is installed by installTable — optional-chain so pre-mount sync is safe.
     const inTable = !!(w.WC?.PM?.isInTable?.())
