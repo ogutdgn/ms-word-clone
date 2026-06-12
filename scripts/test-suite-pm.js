@@ -728,35 +728,52 @@
     selectText('plain'); await sleep(50);
     return b1 && PM().getState().block === 'Normal';
   });
-  await t('[3] hover preview applies live; mouse-leave restores doc + dirty + history', async () => {
+  await t('[3] PM mode: hovering a style cell does NOT change the doc (click-only)', async () => {
+    // Product decision (2026-06-12): no hover Live Preview in PM mode — the user
+    // wants styles to change ONLY on click. Hover must be a complete no-op.
     setDoc('preview probe text'); selectText('preview probe text');
-    await sleep(550); // close the history group so the assert below is clean
-    PM().setClean();
+    await sleep(550); PM().setClean();
     const before = JSON.stringify(doc().toJSON());
     const cell = cellFor('Heading 1');
     cell.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     await sleep(50);
-    const during = paraAttrs('preview').paragraphProperties?.styleId === 'Heading1';
+    const unchangedOnHover = JSON.stringify(doc().toJSON()) === before && PM().isDirty() === false;
     cell.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-    await sleep(50);
-    // The editor-state asserts are the desync canaries: a view-only restore
-    // (raw view.updateState) would pass the doc() check but desync editor._state
-    // (Editor.ts:607) — assert BOTH copies restored and identical.
-    return during
-      && JSON.stringify(doc().toJSON()) === before
-      && JSON.stringify(window.WC.editor.state.doc.toJSON()) === before
-      && window.WC.editor.state === window.WC.view.state
-      && PM().isDirty() === false;
+    await sleep(30);
+    // ...and a real CLICK still applies (the action moved to click).
+    cell.click(); await sleep(80);
+    const appliedOnClick = paraAttrs('preview').paragraphProperties?.styleId === 'Heading1';
+    return (unchangedOnHover && appliedOnClick) || ('hoverNoOp=' + unchangedOnHover + ' clickApplies=' + appliedOnClick);
   });
-  await t('[3] preview then click commits as ONE undo step', async () => {
+  await t('[3] gallery click applies as ONE undo step', async () => {
     setDoc('commit probe text'); selectText('commit probe text');
-    await sleep(550); // close the history group — undo must revert ONLY the commit
+    await sleep(550); // close the history group — undo must revert ONLY the click apply
     const cell = cellFor('Heading 2');
-    cell.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); await sleep(50);
     cell.click(); await sleep(80);
     const applied = paraAttrs('commit').paragraphProperties?.styleId === 'Heading2';
     PM().cmd('undo'); await sleep(50);
     return applied && paraAttrs('commit').paragraphProperties?.styleId == null;
+  });
+  await t('[fix] no selection: clicking a style restyles ONLY the caret paragraph', async () => {
+    // User spec: caret in a paragraph, no selection → click restyles that
+    // paragraph (the "current line"), never the whole document.
+    setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
+    let pos = null, s = -1;
+    doc().descendants((n, p) => { if (n.type.name === 'paragraph') { s++; if (s === 1) pos = p + 1; } return pos == null; });
+    window.WC.editor.commands.setTextSelection({ from: pos, to: pos }); // collapsed caret in para 2
+    cellFor('Heading 1').click(); await sleep(120);
+    const ids = []; doc().descendants((n) => { if (n.type.name === 'paragraph') ids.push(n.attrs?.paragraphProperties?.styleId || null); });
+    return JSON.stringify(ids) === JSON.stringify([null, 'Heading1', null]) || ('styleIds=' + JSON.stringify(ids) + ' (expected only para 2)');
+  });
+  await t('[fix] with a selection: clicking a style restyles ONLY the selected paragraphs', async () => {
+    setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
+    // select across paras 1–2 only
+    let p1 = null, p2 = null, s = -1;
+    doc().descendants((n, p) => { if (n.type.name === 'paragraph') { s++; if (s === 0) p1 = p + 1; if (s === 1) p2 = p + 3; } return true; });
+    window.WC.editor.commands.setTextSelection({ from: p1, to: p2 });
+    cellFor('Heading 2').click(); await sleep(120);
+    const ids = []; doc().descendants((n) => { if (n.type.name === 'paragraph') ids.push(n.attrs?.paragraphProperties?.styleId || null); });
+    return JSON.stringify(ids) === JSON.stringify(['Heading2', 'Heading2', null]) || ('styleIds=' + JSON.stringify(ids) + ' (expected paras 1–2 only)');
   });
   await t('[3] Ctrl+Alt+2 applies Heading 2 in PM mode', async () => {
     setDoc('kbd heading probe'); selectText('kbd heading probe');
@@ -2819,6 +2836,45 @@
     const m = markNames('HYG8');
     return !m.some((x) => x.startsWith('trackInsert:'))
       || 'tracking still ON after the hygiene reset (fork disableTrackChanges renamed?): ' + m.join(' ');
+  });
+
+  // ---------- bugfix: page-region click places the caret (Word behavior) ----------
+  await t('[fix] clicking the empty area below the last paragraph places the caret', async () => {
+    setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
+    // park the caret at the very start so a successful move is unambiguous
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    v().dom.blur(); await sleep(20);
+    const page = document.getElementById('pm-editor');
+    const prose = page.querySelector('.ProseMirror');
+    const lastP = Array.from(prose.querySelectorAll('p')).pop();
+    const lr = lastP.getBoundingClientRect();
+    const pr = page.getBoundingClientRect();
+    // a point BELOW the last paragraph but inside the page sheet (the bottom margin)
+    const x = pr.left + pr.width / 2;
+    const y = Math.min(lr.bottom + 30, pr.bottom - 6);
+    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    await sleep(40);
+    const sel = v().state.selection;
+    // the caret must have left the start and the view must hold focus
+    const lastStart = (() => { let s = -1, pos = null; v().state.doc.descendants((n, p) => { if (n.type.name === 'paragraph') { s++; if (s === 2) pos = p; } return true; }); return pos; })();
+    if (!v().hasFocus()) return 'view did not take focus after the page-margin click';
+    return sel.from >= lastStart || ('caret landed at ' + sel.from + ', expected inside the last paragraph (>= ' + lastStart + ')');
+  });
+
+  await t('[fix] clicking the left margin beside a paragraph places the caret in it', async () => {
+    setDocs(['Alpha paragraph one.', 'Beta paragraph two.']);
+    window.WC.editor.commands.setTextSelection({ from: v().state.doc.content.size - 1, to: v().state.doc.content.size - 1 });
+    const page = document.getElementById('pm-editor');
+    const firstP = page.querySelector('.ProseMirror p');
+    const fr = firstP.getBoundingClientRect();
+    const pr = page.getBoundingClientRect();
+    // left-margin band, vertically aligned with the first paragraph
+    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: pr.left + 6, clientY: fr.top + fr.height / 2 }));
+    await sleep(40);
+    const sel = v().state.selection;
+    // first paragraph spans [1, firstP end). caret should land within it.
+    const firstEnd = firstP.textContent.length + 1;
+    return (sel.from >= 1 && sel.from <= firstEnd) || ('caret landed at ' + sel.from + ', expected within the first paragraph [1,' + firstEnd + ']');
   });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
