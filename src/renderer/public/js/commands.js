@@ -292,15 +292,22 @@
 
   // ---- Review ----
   H.wordCount = () => WC.Dialogs.wordCount();
-  H.readAloud = () => toggleReadAloud(); // PM read-aloud (per-word decorations) lands in slice-8 task 6
-  H.spellingGrammar = () => runSpellCheck(); // PM proofing pane lands in slice-8 task 6
-  H.trackChanges = () => { const pm = PMA(); pm ? pm.cmd('toggleTrackChanges') : WC.Review.setTrackChanges(); };
-  // Lock Tracking (D8.7): the password dialog + bridge lock flag land in task 6.
-  // TODO(slice-8 task 6): route to WC.Dialogs.lockTracking() + a bridge 'lockTracking'
-  // cmd; until then the PM branch falls back to the plain toggle (recorded interim).
+  H.readAloud = () => toggleReadAloud(); // PM branch reads the PM doc + per-word ::highlight (task 6)
+  // P3: the Spelling and Grammar BUTTON opens the Editor/spelling flow (modern Word);
+  // the squiggle toggle lives in the Editor pane + the Language dialog.
+  H.spellingGrammar = () => { const pm = PMA(); pm ? WC.Dialogs.editorPane() : runSpellCheck(); };
+  // T1/T3: the toggle respects the D8.7 lock — Word disables turning tracking off
+  // while locked ("not a security feature": a UI gate, not crypto).
+  H.trackChanges = () => {
+    const pm = PMA();
+    if (!pm) { WC.Review.setTrackChanges(); return; }
+    if (WC.pmTrackLock && WC.pmTrackLock.locked) { WC.toast('Track Changes is locked.', 'Lock Tracking (with the password) to turn it off.'); return; }
+    pm.cmd('toggleTrackChanges');
+  };
+  // D8.7 Lock Tracking: dialog-driven (lock → password pair; re-invoke → unlock).
   H.trackChangesLock = () => {
     const pm = PMA();
-    if (pm) { pm.cmd('toggleTrackChanges'); return; }
+    if (pm) { WC.Dialogs.lockTracking(); return; }
     WC.toast('Lock Tracking needs a password — not implemented.');
   };
 
@@ -775,26 +782,189 @@
   H.finishMerge = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Edit Individual Documents…', { onClick: () => WC.Mail.finishMerge('edit') })); fly.appendChild(WC.flyItem('Print Documents…', { onClick: () => WC.Mail.finishMerge('print') })); fly.appendChild(WC.flyItem('Send Email Messages…', { onClick: () => WC.Mail.finishMerge('email') })); });
 
   // ---- Review tab ----
-  H.thesaurus = () => WC.Review.thesaurus();
-  H.checkAccessibility = () => WC.Review.checkAccessibility();
+  H.thesaurus = () => { const pm = PMA(); pm ? pmThesaurus() : WC.Review.thesaurus(); };
+  H.checkAccessibility = () => { const pm = PMA(); pm ? pmAccessibility() : WC.Review.checkAccessibility(); };
+
+  // PM word-at-caret (or selection text) + its document range. Mirrors the
+  // review.ts expandCaretToWord walk: run-node boundaries add PM tokens without
+  // text chars, so climb to the TEXTBLOCK and walk per-character positions.
+  function pmWordAtCaret() {
+    const pm = PMA(); if (!pm) return null;
+    const state = pm.getEditor().state;
+    if (!state.selection.empty) {
+      const from = state.selection.from; const to = state.selection.to;
+      return { word: state.doc.textBetween(from, to, ' ', ' ').trim(), from, to };
+    }
+    const caret = state.selection.from;
+    const $pos = state.doc.resolve(caret);
+    let depth = $pos.depth;
+    while (depth > 0 && !$pos.node(depth).isTextblock) depth--;
+    if (!$pos.node(depth).isTextblock) return null;
+    const chars = [];
+    state.doc.nodesBetween($pos.start(depth), $pos.end(depth), (node, pos) => {
+      if (node.isText && node.text) { for (let i = 0; i < node.text.length; i++) chars.push({ ch: node.text[i], pos: pos + i }); }
+      return true;
+    });
+    const isWord = (ch) => /[\p{L}\p{N}_]/u.test(ch);
+    let idx = chars.findIndex((c) => c.pos >= caret);
+    if (idx < 0) idx = chars.length;
+    let a = idx; let b = idx;
+    while (a > 0 && isWord(chars[a - 1].ch)) a--;
+    while (b < chars.length && isWord(chars[b].ch)) b++;
+    if (a === b) return null;
+    return { word: chars.slice(a, b).map((c) => c.ch).join(''), from: chars[a].pos, to: chars[b - 1].pos + 1 };
+  }
+
+  // P2: Thesaurus pane — Word's right-dock anatomy (search box + grouped results +
+  // language combo). Definitions are sign-in-gated in real Word → omitted (class B).
+  // A pick REPLACES the looked-up range through the engine.
+  function pmThesaurus() {
+    const hit = pmWordAtCaret();
+    showPmThesaurus(hit ? hit.word : '', hit);
+  }
+  function showPmThesaurus(word, range) {
+    let pane = document.getElementById('thes-pane'); if (pane) pane.remove();
+    document.querySelectorAll('.taskpane.right').forEach((p) => p.remove()); // C11 dock share
+    pane = el('div', { class: 'taskpane right', id: 'thes-pane' });
+    pane.appendChild(el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Thesaurus' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]));
+    const body = el('div', { class: 'tp-body' });
+    const search = el('input', { type: 'text', class: 'grow', value: word || '', placeholder: 'Type a word to look up' });
+    const results = el('div', {});
+    const lookup = (w) => {
+      results.innerHTML = '';
+      w = (w || '').trim();
+      if (!w) return;
+      const syns = WC.Review.THES[w.toLowerCase()];
+      results.appendChild(el('div', { style: { fontWeight: '600', margin: '8px 0 4px' }, text: w }));
+      if (!syns) { results.appendChild(el('div', { style: { color: '#888', padding: '6px 0' }, text: 'No synonyms for “' + w + '” in the built-in thesaurus.' })); return; }
+      results.appendChild(el('div', { style: { fontSize: '11px', color: '#666', marginBottom: '4px' }, text: 'Synonyms' }));
+      syns.forEach((s) => {
+        const row = el('div', { class: 'tp-result', text: s, style: { cursor: 'pointer' } });
+        row.title = 'Insert “' + s + '”';
+        row.addEventListener('click', () => {
+          const pm = PMA(); if (!pm) return;
+          const ed = pm.getEditor();
+          const r = range || pmWordAtCaret();
+          if (r) ed.view.dispatch(ed.state.tr.insertText(s, r.from, r.to));
+          else ed.view.dispatch(ed.state.tr.insertText(s));
+          ed.view.focus();
+          range = null; // the replaced range is gone — further picks insert at caret
+        });
+        results.appendChild(row);
+      });
+    };
+    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { range = null; lookup(search.value); } });
+    body.appendChild(el('div', { class: 'row' }, [search]));
+    body.appendChild(results);
+    // Word's pane carries a proofing-language combo at the bottom.
+    body.appendChild(el('div', { style: { borderTop: '1px solid #e1dfdd', marginTop: '10px', paddingTop: '6px' } }, [
+      el('select', { class: 'grow' }, [el('option', { text: 'English (United States)' })]),
+    ]));
+    pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+    lookup(word);
+  }
+
+  // P6: Accessibility Assistant — engine-model checks (NOT the legacy h1/img DOM:
+  // PM headings are styled paragraphs) rendered in Word's category-card layout.
+  function pmAccessibility() {
+    const pm = PMA(); if (!pm) return;
+    const doc = pm.getEditor().state.doc;
+    const media = []; const tables = []; const structure = []; const access = [];
+    let imgN = 0; let tableN = 0; let headingFound = false; let unclearLink = false;
+    doc.descendants((node, pos) => {
+      if (node.type.name === 'image') { imgN++; if (!node.attrs || !node.attrs.alt || node.attrs.alt === 'Uploaded picture') media.push('Missing alt text — Picture ' + imgN); }
+      if (node.type.name === 'table') {
+        tableN++;
+        let hasHeader = false;
+        const firstRow = node.firstChild;
+        if (firstRow) firstRow.forEach((cell) => { if (cell.type.name === 'tableHeader') hasHeader = true; });
+        if (!hasHeader) tables.push('Missing table header — Table ' + tableN);
+      }
+      if (node.isTextblock && node.attrs && /^Heading[1-9]$|^Title$/.test(String(node.attrs.styleId || ''))) headingFound = true;
+      if (node.isText && node.text && !unclearLink) {
+        const lm = (node.marks || []).find((m) => m.type.name === 'link');
+        if (lm && lm.attrs && lm.attrs.href && node.text.trim() === String(lm.attrs.href).trim()) { unclearLink = true; structure.push('Unclear hyperlink text'); }
+      }
+      return true;
+    });
+    if (!headingFound && doc.textContent.trim()) structure.push('No headings in document');
+    const total = media.length + tables.length + structure.length + access.length;
+    let pane = document.getElementById('a11y-pane'); if (pane) pane.remove();
+    document.querySelectorAll('.taskpane.right').forEach((p) => p.remove());
+    pane = el('div', { class: 'taskpane right', id: 'a11y-pane' });
+    pane.appendChild(el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Accessibility Assistant' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]));
+    const body = el('div', { class: 'tp-body' });
+    body.appendChild(el('div', {
+      style: { background: total ? '#FDF3F4' : '#F1FAF1', border: '1px solid ' + (total ? '#F3D6D8' : '#D5E8D5'), borderRadius: '4px', padding: '10px', marginBottom: '10px', fontWeight: '600', color: total ? '#A4262C' : '#107C10' },
+      text: total ? total + ' issue' + (total > 1 ? 's' : '') + ' found' : 'Looks good! No issues found.',
+    }));
+    const card = (title, items) => {
+      const c = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px 10px', marginBottom: '8px' } });
+      c.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontWeight: '600', fontSize: '12px' } }, [
+        el('span', { text: title }),
+        el('span', { text: items.length ? String(items.length) : '✓', style: { color: items.length ? '#A4262C' : '#107C10' } }),
+      ]));
+      items.forEach((it) => c.appendChild(el('div', { class: 'tp-result', text: it, style: { fontSize: '12px' } })));
+      return c;
+    };
+    body.appendChild(card('Color and Contrast', []));
+    body.appendChild(card('Media and Illustrations', media));
+    body.appendChild(card('Tables', tables));
+    body.appendChild(card('Document Structure', structure));
+    body.appendChild(card('Document Access', access));
+    body.appendChild(el('div', { style: { fontSize: '11px', color: '#666', marginTop: '6px' }, text: 'Checks run locally on the document model.' }));
+    pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+    return total;
+  }
   H.translate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Translate Selection', { onClick: () => WC.toast('Translation needs a cloud translator — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md') })); fly.appendChild(WC.flyItem('Translate Document', { onClick: () => WC.toast('Translation needs a cloud translator — not available.') })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Translator Preferences…', { onClick: () => WC.toast('Translator preferences require the cloud translator service — not available.') })); });
   H.language = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyItem('Set Proofing Language…', { onClick: () => languageDialog() }));
     fly.appendChild(WC.flyItem('Language Preferences…', { onClick: () => languageDialog() }));
   });
+  // Applies the proofing language to the ACTIVE editing surface (PM view DOM in PM
+  // mode — drives the OS spellchecker locale + squiggle gating). Doc-level only:
+  // per-run w:lang isn't on the fork command surface (recorded deviation, ledger C).
+  WC.setProofingLanguage = (code, noCheck) => {
+    const pm = PMA();
+    const node = pm ? pm.getEditor().view.dom : E().node;
+    node.setAttribute('lang', code);
+    node.setAttribute('spellcheck', noCheck ? 'false' : 'true');
+    return node.getAttribute('lang') === code;
+  };
+  // P9: the Word Language dialog — scope radios, language list (en-US first),
+  // no-proof + detect checkboxes, Set As Default.
   function languageDialog() {
-    const langs = [['English (United States)', 'en'], ['English (United Kingdom)', 'en-GB'], ['French (France)', 'fr'], ['German (Germany)', 'de'], ['Spanish (Spain)', 'es'], ['Turkish', 'tr']];
-    const cur = E().node.getAttribute('lang') || 'en';
-    const list = el('select', { size: '6', style: { width: '100%' } }, langs.map(([l, code]) => el('option', { text: l, value: code, selected: code === cur ? 'selected' : undefined })));
-    const noCheck = el('input', { type: 'checkbox' });
-    const asDefault = el('input', { type: 'checkbox' });
+    const pm = PMA();
+    const langs = [['English (United States)', 'en-US'], ['English (United Kingdom)', 'en-GB'], ['French (France)', 'fr-FR'], ['German (Germany)', 'de-DE'], ['Spanish (Spain)', 'es-ES'], ['Italian (Italy)', 'it-IT'], ['Portuguese (Brazil)', 'pt-BR'], ['Turkish', 'tr-TR'], ['Dutch (Netherlands)', 'nl-NL'], ['Japanese', 'ja-JP']];
+    const node = pm ? pm.getEditor().view.dom : E().node;
+    let defLang = 'en-US';
+    try { defLang = localStorage.getItem('wc-default-lang') || 'en-US'; } catch (e) { /* default stands */ }
+    const cur = node.getAttribute('lang') || defLang;
+    const hasSel = pm ? !pm.getEditor().state.selection.empty : !(window.getSelection() || { isCollapsed: true }).isCollapsed;
+    const rSel = el('input', { type: 'radio', name: 'wcLangScope' });
+    const rDoc = el('input', { type: 'radio', name: 'wcLangScope', checked: 'checked' });
+    if (!hasSel) rSel.disabled = true;
+    const list = el('select', { size: '7', style: { width: '100%' } }, langs.map(([l, code]) => el('option', { text: l, value: code, selected: code === cur ? 'selected' : undefined })));
+    const noCheck = el('input', { type: 'checkbox', checked: node.getAttribute('spellcheck') === 'false' ? 'checked' : null });
+    const detect = el('input', { type: 'checkbox', checked: 'checked' });
     const body = el('div', {}, [
-      el('div', { text: 'Mark selected text as:' }), list,
-      el('div', { class: 'row', style: { marginTop: '8px' } }, [el('label', {}, [noCheck, el('span', { text: ' Do not check spelling or grammar' })])]),
-      el('div', { class: 'row' }, [el('label', {}, [asDefault, el('span', { text: ' Set as default for all new documents' })])]),
+      el('div', { class: 'row', style: { gap: '14px' } }, [
+        el('span', { text: 'Change proofing language for:' }),
+        el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', opacity: hasSel ? '1' : '.55' } }, [rSel, el('span', { text: 'Selected text' })]),
+        el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center' } }, [rDoc, el('span', { text: 'Current Document' })]),
+      ]),
+      list,
+      el('div', { class: 'row', style: { marginTop: '8px' } }, [el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center' } }, [noCheck, el('span', { text: 'Do not check spelling or grammar' })])]),
+      el('div', { class: 'row' }, [el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center' } }, [detect, el('span', { text: 'Detect language automatically' })])]),
     ]);
     WC.dialog({ title: 'Language', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { E().node.setAttribute('lang', list.value); E().node.setAttribute('spellcheck', noCheck.checked ? 'false' : 'true'); WC.toast('Proofing language: ' + list.options[list.selectedIndex].text + (noCheck.checked ? ' (spelling/grammar off)' : '')); } },
+      { label: 'Set As Default', onClick: () => { try { localStorage.setItem('wc-default-lang', list.value); } catch (e) { /* storage unavailable */ } WC.toast('Default proofing language: ' + list.options[list.selectedIndex].text); return true; } },
+      { label: 'OK', primary: true, onClick: () => {
+        WC.setProofingLanguage(list.value, noCheck.checked);
+        WC.toast('Proofing language: ' + list.options[list.selectedIndex].text + (noCheck.checked ? ' (spelling/grammar off)' : ''));
+      } },
       { label: 'Cancel' },
     ] });
   }
@@ -893,9 +1063,17 @@
   H.reject = () => { const pm = PMA(); if (pm) { pm.cmd('rejectChange'); pm.cmd('nextChange'); } else WC.Review.rejectOne(); };
   H.previousChange = () => { const pm = PMA(); pm ? pm.cmd('prevChange') : WC.Review.prevChange(); };
   H.nextChange = () => { const pm = PMA(); pm ? pm.cmd('nextChange') : WC.Review.nextChange(); };
-  H.compare = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Compare…', { onClick: () => WC.Review.compare('compare') })); fly.appendChild(WC.flyItem('Combine…', { onClick: () => WC.Review.compare('combine') })); fly.appendChild(WC.flyItem('Show Source Documents', { disabled: true })); });
+  // X1/X2: PM routes to the parity Compare dialog (real tracked-changes diff);
+  // legacy keeps the old textarea dialog (A8 — the frozen gate exercises it).
+  H.compare = (c, node) => WC.flyout(node, (fly) => {
+    const go = (mode) => { const pm = PMA(); pm ? WC.Dialogs.compareDocuments(mode) : WC.Review.compare(mode); };
+    fly.appendChild(WC.flyItem('Compare…', { onClick: () => go('compare') }));
+    fly.appendChild(WC.flyItem('Combine…', { onClick: () => go('combine') }));
+    fly.appendChild(WC.flyItem('Show Source Documents', { disabled: true }));
+  });
   H.blockAuthors = () => WC.toast('Block Authors requires cloud co-authoring — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
-  H.restrictEditing = () => WC.Review.restrictEditing();
+  // X3: PM opens the Restrict Editing pane (enforcement = engine setEditable).
+  H.restrictEditing = () => { const pm = PMA(); pm ? WC.Dialogs.restrictEditingPane() : WC.Review.restrictEditing(); };
   // Hide Ink ▾ (parity X4 — Word menu capture pending; ink layer is the legacy/slice-10
   // Draw canvas). PM branch latches a container class; legacy keeps the layer toggle.
   H.hideInk = (c, node) => {
@@ -1133,10 +1311,11 @@
       // Just Mine === For Everyone in this single-author clone (recorded note).
       if (cmd === 'trackChanges') {
         const tcOn = (WC.PM && WC.PM.active) ? !!(WC.PM.reviewState && WC.PM.reviewState().tracking) : WC.Review.trackOn;
+        const locked = !!(WC.pmTrackLock && WC.pmTrackLock.locked);
         return WC.flyout(node, (fly) => {
           fly.appendChild(WC.flyItem((tcOn ? '✓ ' : '   ') + 'For Everyone', { onClick: () => H.trackChanges() }));
           fly.appendChild(WC.flyItem((tcOn ? '✓ ' : '   ') + 'Just Mine', { onClick: () => H.trackChanges() }));
-          fly.appendChild(WC.flyItem('Lock Tracking', { onClick: () => H.trackChangesLock() }));
+          fly.appendChild(WC.flyItem((locked ? '✓ ' : '   ') + 'Lock Tracking', { onClick: () => H.trackChangesLock() }));
         });
       }
       // Accept/Reject ▾ (parity T12/T13). "All Changes Shown" is DISABLED while
@@ -1802,13 +1981,61 @@
     showReadAloudBar();
     speakReadAloud();
   }
+  // PM read-aloud source (P5): text from the CARET (Word reads from the caret; a
+  // selection reads just the selection) + a textOffset→PM-position map so the
+  // utterance's word-boundary events can paint a per-word ::highlight. Block
+  // boundaries cost 2 PM tokens but only the '\n' we append — the map carries
+  // per-segment absolute positions, so the drift never accumulates.
+  let raMap = null; let raText = '';
+  function pmReadAloudSource() {
+    const pm = PMA(); if (!pm) return null;
+    const state = pm.getEditor().state;
+    const start = state.selection.from;
+    const end = state.selection.empty ? state.doc.content.size : state.selection.to;
+    let text = ''; const map = []; let sawBlock = false;
+    state.doc.nodesBetween(start, end, (node, pos) => {
+      if (node.isTextblock) { if (sawBlock && text && !text.endsWith('\n')) text += '\n'; sawBlock = true; return true; }
+      if (node.isText && node.text) {
+        const s = Math.max(pos, start); const e = Math.min(pos + node.text.length, end);
+        if (e > s) { map.push({ t0: text.length, t1: text.length + (e - s), pm: s }); text += node.text.slice(s - pos, e - pos); }
+      }
+      return true;
+    });
+    return { text: text.slice(0, 8000), map };
+  }
+  function raHighlight(ci, len) {
+    const pm = PMA();
+    if (!pm || !raMap || typeof Highlight === 'undefined' || !CSS.highlights) return;
+    const seg = raMap.find((s) => ci >= s.t0 && ci < s.t1);
+    if (!seg) return; // boundary landed on a block separator
+    if (!len) { const m = /^[^\s]+/.exec(raText.slice(ci)); len = m ? m[0].length : 1; }
+    const from = seg.pm + (ci - seg.t0);
+    const to = Math.min(from + len, seg.pm + (seg.t1 - seg.t0));
+    try {
+      const view = pm.getEditor().view;
+      const a = view.domAtPos(from); const b = view.domAtPos(to);
+      const range = document.createRange();
+      range.setStart(a.node, a.offset); range.setEnd(b.node, b.offset);
+      CSS.highlights.set('wc-read-aloud', new Highlight(range));
+      const elx = a.node.nodeType === 3 ? a.node.parentElement : a.node;
+      if (elx && elx.scrollIntoView) elx.scrollIntoView({ block: 'nearest' });
+    } catch (e) { /* the highlight is cosmetic — never break playback */ }
+  }
+  function raClearHighlight() { try { if (CSS.highlights) CSS.highlights.delete('wc-read-aloud'); } catch (e) { /* unsupported */ } }
   function speakReadAloud() {
     speechSynthesis.cancel();
-    const sel = window.getSelection();
-    const text = (sel && !sel.isCollapsed ? sel.toString() : E().node.innerText).slice(0, 8000);
+    const pmSrc = pmReadAloudSource();
+    let text;
+    if (pmSrc) { text = pmSrc.text; raMap = pmSrc.map; raText = text; }
+    else {
+      const sel = window.getSelection();
+      text = (sel && !sel.isCollapsed ? sel.toString() : E().node.innerText).slice(0, 8000);
+      raMap = null;
+    }
     const u = new SpeechSynthesisUtterance(text);
     u.rate = readAloudRate;
-    u.onend = () => { speaking = false; const bar = document.getElementById('read-aloud-bar'); if (bar) { const pb = bar.querySelector('.ra-play'); if (pb) pb.textContent = '▶'; } };
+    u.onboundary = (ev) => { if (ev.name === 'word') raHighlight(ev.charIndex, ev.charLength); };
+    u.onend = () => { speaking = false; raClearHighlight(); const bar = document.getElementById('read-aloud-bar'); if (bar) { const pb = bar.querySelector('.ra-play'); if (pb) pb.textContent = '▶'; } };
     speechSynthesis.speak(u); speaking = true; raPaused = false;
   }
   let readAloudRate = 1;
@@ -1833,11 +2060,14 @@
     bar.appendChild(el('span', { class: 'ra-sep' })); bar.appendChild(close);
     document.getElementById('app').appendChild(bar);
   }
-  function closeReadAloud() { speechSynthesis.cancel(); speaking = false; raPaused = false; const bar = document.getElementById('read-aloud-bar'); if (bar) bar.remove(); }
+  function closeReadAloud() { speechSynthesis.cancel(); speaking = false; raPaused = false; raClearHighlight(); const bar = document.getElementById('read-aloud-bar'); if (bar) bar.remove(); }
   WC.closeReadAloud = closeReadAloud;
   function runSpellCheck() {
-    E().node.setAttribute('spellcheck', E().node.getAttribute('spellcheck') === 'false' ? 'true' : 'false');
-    WC.toast('Spell check ' + (E().node.getAttribute('spellcheck') === 'true' ? 'on (red squiggles via the OS)' : 'off') + '. The Editor pane (suggestions UI) is not implemented.');
+    const pm = PMA();
+    const node = pm ? pm.getEditor().view.dom : E().node;
+    node.setAttribute('spellcheck', node.getAttribute('spellcheck') === 'false' ? 'true' : 'false');
+    const on = node.getAttribute('spellcheck') !== 'false';
+    WC.toast('Spell check ' + (on ? 'on (red squiggles via the OS spellchecker)' : 'off') + '.', 'Open the Editor pane for suggestions.');
   }
 
   WC.Commands = Commands;

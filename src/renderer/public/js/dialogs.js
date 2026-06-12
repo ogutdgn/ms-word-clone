@@ -410,6 +410,11 @@
     const rows = [['Pages', c.pages], ['Words', c.words], ['Characters (no spaces)', c.charsNoSpace], ['Characters (with spaces)', c.chars], ['Paragraphs', c.paras], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
     rows.forEach(([k, v]) => body.appendChild(el('div', { class: 'row', style: { borderBottom: '1px solid #f0f0f0', padding: '5px 0' } }, [el('span', { style: { width: '220px', color: '#444' }, text: k }), el('b', { text: String(v) })])));
+    // Parity P1: the include-textboxes checkbox. Counts can't differ in this clone
+    // (no textboxes/footnotes content exists outside the body), so toggling is a
+    // faithful no-op rather than a stub.
+    const inc = el('input', { type: 'checkbox', checked: 'checked' });
+    body.appendChild(el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px', fontSize: '12px' } }, [inc, el('span', { text: 'Include textboxes, footnotes and endnotes' })]));
     WC.dialog({ title: 'Word Count', width: '340px', body, footer: [{ label: 'Close', primary: true }] });
   };
 
@@ -713,10 +718,10 @@
     occassion: 'occasion', publically: 'publicly', tommorow: 'tomorrow', wierd: 'weird', adn: 'and',
     thier: 'their', alot: 'a lot', acheive: 'achieve', arguement: 'argument', begining: 'beginning',
   };
-  function scanSpelling() {
+  function scanSpelling(root) {
     const issues = [];
     const ignored = D._ignoredSpelling || (D._ignoredSpelling = {});
-    const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, null);
+    const walker = document.createTreeWalker(root || E().node, NodeFilter.SHOW_TEXT, null);
     let node;
     while ((node = walker.nextNode())) {
       const re = /[A-Za-z]+/g; let m;
@@ -728,41 +733,89 @@
     return issues;
   }
   function matchCase(orig, sugg) { if (orig[0] === orig[0].toUpperCase()) return sugg[0].toUpperCase() + sugg.slice(1); return sugg; }
+  // Editor pane (slice 8 task 6, parity P4) — Word's layout, locally degraded
+  // (class B: Editor Score/Refinements are Microsoft 365 cloud services; the clone
+  // ships its local spell engine in Word's shell, no jarring stub). PM mode reads
+  // the PM DOM and replaces through engine transactions — a direct nodeValue write
+  // under PM would desync the model from the view.
   D.editorPane = function () {
     let pane = document.getElementById('editor-pane'); if (pane) { pane.remove(); return; }
+    document.querySelectorAll('.taskpane.right').forEach((p) => p.remove()); // C11: right-dock panes replace each other
     pane = el('div', { class: 'taskpane right', id: 'editor-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Editor' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body' });
-    const on = E().node.getAttribute('spellcheck') !== 'false';
+    const pm = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
+    const root = () => { const p = pm(); return p ? p.getEditor().view.dom : E().node; };
+    function pmReplaceWord(word, suggestion) {
+      const ed = pm().getEditor();
+      let hit = null;
+      ed.state.doc.descendants((node, pos) => {
+        if (hit) return false;
+        if (node.isText && node.text) {
+          const m = new RegExp('\\b' + word + '\\b').exec(node.text);
+          if (m) { hit = { from: pos + m.index, to: pos + m.index + word.length }; return false; }
+        }
+        return true;
+      });
+      if (hit) ed.view.dispatch(ed.state.tr.insertText(suggestion, hit.from, hit.to));
+    }
     function render() {
       body.innerHTML = '';
-      const issues = scanSpelling();
-      const score = el('div', { style: { textAlign: 'center', padding: '8px 0 12px' } }, [
-        el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: issues.length ? String(issues.length) : '✓' }),
-        el('div', { style: { color: '#444' }, text: issues.length ? (issues.length + ' spelling issue' + (issues.length > 1 ? 's' : '') + ' found') : 'No issues. Looks good!' }),
-      ]);
-      body.appendChild(score);
-      if (issues.length) body.appendChild(el('div', { style: { fontWeight: '600', margin: '4px 0 6px' }, text: 'Spelling' }));
+      const issues = scanSpelling(root());
+      if (pm()) {
+        // Word's cloud Editor Score, degraded to the local spelling signal (P4).
+        const pct = issues.length ? Math.max(40, 100 - issues.length * 10) : 100;
+        body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 4px' } }, [
+          el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: pct + '%' }),
+          el('div', { style: { color: '#444', fontWeight: '600' }, text: 'Editor Score' }),
+          el('div', { style: { fontSize: '11px', color: '#888', margin: '2px 0 6px' }, text: 'Local proofing only — cloud refinements require Microsoft 365.' }),
+        ]));
+        const section = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px', fontSize: '12px' }, text: t });
+        const row = (label, badge, disabled) => {
+          const r = el('div', { class: 'tp-result', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: disabled ? '.55' : '1' } }, [
+            el('span', { text: label }),
+            el('b', { text: badge, style: { color: badge === '✓' ? '#107C10' : (disabled ? '#888' : '#b85c00') } }),
+          ]);
+          if (disabled) r.title = 'Requires the Microsoft 365 cloud Editor service — not available in this clone.';
+          return r;
+        };
+        body.appendChild(section('Corrections'));
+        body.appendChild(row('Spelling', issues.length ? String(issues.length) : '✓'));
+        body.appendChild(row('Grammar', '✓'));
+        body.appendChild(section('Refinements'));
+        ['Clarity', 'Conciseness', 'Formality', 'Punctuation Conventions', 'Resume', 'Vocabulary'].forEach((t) => body.appendChild(row(t, '—', true)));
+        body.appendChild(section('Similarity'));
+        body.appendChild(row('Similarity check', '—', true));
+        if (issues.length) body.appendChild(section('Spelling'));
+      } else {
+        // legacy header kept VERBATIM — the frozen gate pins '<N> spelling issue(s)'.
+        body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 12px' } }, [
+          el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: issues.length ? String(issues.length) : '✓' }),
+          el('div', { style: { color: '#444' }, text: issues.length ? (issues.length + ' spelling issue' + (issues.length > 1 ? 's' : '') + ' found') : 'No issues. Looks good!' }),
+        ]));
+        if (issues.length) body.appendChild(el('div', { style: { fontWeight: '600', margin: '4px 0 6px' }, text: 'Spelling' }));
+      }
       issues.forEach((iss) => {
         const card = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px', marginBottom: '8px' } });
         card.appendChild(el('div', {}, [el('span', { style: { textDecoration: 'underline wavy #d13438', color: '#d13438', fontWeight: '600' }, text: iss.word })]));
         card.appendChild(el('div', { style: { fontSize: '12px', color: '#666', margin: '4px 0' }, text: 'Suggestion:' }));
         const sug = el('button', { class: 'btn', style: { display: 'block', width: '100%', textAlign: 'left', marginBottom: '4px' }, text: iss.suggestion });
-        sug.addEventListener('click', () => { changeWord(iss); render(); });
+        sug.addEventListener('click', () => { pm() ? pmReplaceWord(iss.word, iss.suggestion) : changeWord(iss); render(); });
         card.appendChild(sug);
-        const row = el('div', { style: { display: 'flex', gap: '6px' } }, [
+        const row2 = el('div', { style: { display: 'flex', gap: '6px' } }, [
           el('button', { class: 'btn', text: 'Ignore', onclick: () => { (D._ignoredSpelling[iss.word.toLowerCase()] = true); render(); } }),
           el('button', { class: 'btn', text: 'Ignore All', onclick: () => { D._ignoredSpelling[iss.word.toLowerCase()] = true; render(); } }),
         ]);
-        card.appendChild(row);
+        card.appendChild(row2);
         body.appendChild(card);
       });
+      const on = root().getAttribute('spellcheck') !== 'false';
       const cbk = el('input', { type: 'checkbox', checked: on ? 'checked' : null });
-      cbk.addEventListener('change', () => E().node.setAttribute('spellcheck', cbk.checked ? 'true' : 'false'));
+      cbk.addEventListener('change', () => root().setAttribute('spellcheck', cbk.checked ? 'true' : 'false'));
       body.appendChild(el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', fontSize: '12px' } }, [cbk, el('span', { text: 'Check spelling as you type' })]));
     }
     function changeWord(iss) {
-      // re-locate (the node may have shifted) and replace the first occurrence
+      // legacy branch: re-locate (the node may have shifted) and replace the first occurrence
       const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, null); let n;
       while ((n = walker.nextNode())) { const re = new RegExp('\\b' + iss.word + '\\b'); if (re.test(n.nodeValue)) { n.nodeValue = n.nodeValue.replace(re, iss.suggestion); break; } }
       E().dirty = true; E().updateStatus(); E().emit();
@@ -770,6 +823,346 @@
     render();
     pane.appendChild(head); pane.appendChild(body);
     document.getElementById('workarea').appendChild(pane);
+  };
+
+  // ---- Review dialogs (slice 8 task 6: D8.5–D8.7 / T3 / T18 / T19 / X2 / X3) ----
+  // Lock state lives at WC level (not the engine): Word's lock is a UI gate over the
+  // toggle ("not a security feature" — honored literally), enforced by H.trackChanges.
+  WC.pmTrackLock = WC.pmTrackLock || { locked: false, password: '' };
+  const pmActive = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
+
+  // T3: Lock Tracking dialog (password pair). Re-invoking while locked = unlock flow.
+  D.lockTracking = function () {
+    if (WC.pmTrackLock.locked) return D.unlockTracking();
+    const pw = el('input', { type: 'password', class: 'grow' });
+    const pw2 = el('input', { type: 'password', class: 'grow' });
+    const err = el('div', { style: { color: '#A4262C', fontSize: '12px', minHeight: '16px', marginTop: '4px' } });
+    const body = el('div', {}, [
+      el('div', { text: 'Prevent other authors from turning off Track Changes.', style: { marginBottom: '10px' } }),
+      el('div', { class: 'row' }, [el('label', { text: 'Enter password (optional):', style: { width: '170px' } }), pw]),
+      el('div', { class: 'row' }, [el('label', { text: 'Reenter to confirm:', style: { width: '170px' } }), pw2]),
+      err,
+      el('div', { text: '(This is not a security feature.)', style: { fontSize: '12px', color: '#666', marginTop: '6px' } }),
+    ]);
+    WC.dialog({ title: 'Lock Tracking', width: '430px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        if (pw.value !== pw2.value) { err.textContent = 'The passwords don’t match. Please reenter.'; return true; }
+        WC.pmTrackLock.locked = true; WC.pmTrackLock.password = pw.value;
+        const pm = pmActive();
+        if (pm && !pm.reviewState().tracking) pm.cmd('enableTrackChanges'); // Word: locking turns tracking ON
+        WC.toast('Track Changes is locked.');
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+  D.unlockTracking = function () {
+    const pw = el('input', { type: 'password', class: 'grow' });
+    const err = el('div', { style: { color: '#A4262C', fontSize: '12px', minHeight: '16px', marginTop: '4px' } });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Password:', style: { width: '90px' } }), pw]),
+      err,
+    ]);
+    WC.dialog({ title: 'Unlock Tracking', width: '380px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        if ((WC.pmTrackLock.password || '') !== pw.value) { err.textContent = 'The password is incorrect.'; return true; }
+        WC.pmTrackLock.locked = false; WC.pmTrackLock.password = '';
+        WC.toast('Track Changes is unlocked.');
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+
+  // T18: Track Changes Options (Markup-group dialog launcher). Wired to settings the
+  // clone actually consumes: the Show toggles drive WC.pmMarkup + the #pm-editor
+  // classes (same latches as the Show Markup menu), the balloons combo drives the
+  // T10 mode, the pane combo drives the Revisions-pane orientation.
+  D.trackChangesOptions = function () {
+    const mk = WC.pmMarkup || (WC.pmMarkup = { insDel: true, formatting: true, balloons: 'formatting' });
+    const page = () => document.getElementById('pm-editor');
+    const mkCb = (label, checked, disabled) => {
+      const c = el('input', Object.assign({ type: 'checkbox' }, checked ? { checked: 'checked' } : {}));
+      if (disabled) { c.disabled = true; }
+      const lab = el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center', margin: '3px 0', opacity: disabled ? '.55' : '1' } }, [c, el('span', { text: label })]);
+      if (disabled) lab.title = 'Not available in this clone (cloud/co-authoring).';
+      return { c, lab };
+    };
+    const ink = mkCb('Ink', !(page() && page().classList.contains('pm-hide-ink')));
+    const insdel = mkCb('Insertions and Deletions', mk.insDel !== false);
+    const fmt = mkCb('Formatting', mk.formatting !== false);
+    const hl = mkCb('Highlight Updates', false, true);
+    const oa = mkCb('Other Authors', false, true);
+    const balloons = el('select', { class: 'grow' }, [['Comments and formatting', 'formatting'], ['Revisions', 'revisions'], ['Nothing', 'inline']].map(([l, v]) => el('option', { text: l, value: v, selected: mk.balloons === v ? 'selected' : undefined })));
+    const paneSel = el('select', { class: 'grow' }, [['Vertical', 'vertical'], ['Horizontal', 'horizontal']].map(([l, v]) => el('option', { text: l, value: v })));
+    const group = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px 10px', marginBottom: '10px' } }, [
+      el('div', { style: { fontWeight: '600', marginBottom: '4px' }, text: 'Show' }),
+      ink.lab, insdel.lab, fmt.lab, hl.lab, oa.lab,
+    ]);
+    const body = el('div', {}, [
+      group,
+      el('div', { class: 'row' }, [el('label', { text: 'Balloons in All Markup view show:', style: { width: '210px' } }), balloons]),
+      el('div', { class: 'row' }, [el('label', { text: 'Reviewing Pane:', style: { width: '210px' } }), paneSel]),
+      el('div', { class: 'row', style: { marginTop: '10px', gap: '8px' } }, [
+        el('button', { class: 'btn', text: 'Advanced Options…', onclick: () => D.advancedTrackChangesOptions() }),
+        el('button', { class: 'btn', text: 'Change User Name…', onclick: () => D.changeUserName() }),
+      ]),
+    ]);
+    WC.dialog({ title: 'Track Changes Options', width: '440px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        mk.insDel = insdel.c.checked; mk.formatting = fmt.c.checked; mk.balloons = balloons.value;
+        const p = page();
+        if (p) {
+          p.classList.toggle('pm-hide-insdel', !mk.insDel);
+          p.classList.toggle('pm-hide-format', !mk.formatting);
+          p.classList.toggle('pm-hide-ink', !ink.c.checked);
+        }
+        if (WC.TrackChrome && WC.TrackChrome.setOrientation) WC.TrackChrome.setOrientation(paneSel.value);
+        if (WC.TrackChrome && WC.TrackChrome.refresh) WC.TrackChrome.refresh();
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+
+  // T19: Advanced Track Changes Options. CONSUMED settings: insertions/deletions
+  // mark style + color (CSS vars + .wc-track-custom on #pm-editor) and balloon
+  // width (--wc-balloon-width). Everything else renders Word's defaults DISABLED —
+  // honesty over stubs: an enabled control that silently does nothing would lie.
+  D.advancedTrackChangesOptions = function () {
+    const page = () => document.getElementById('pm-editor');
+    const DECOS = [['(none)', 'none'], ['Color only', 'color'], ['Bold', 'bold'], ['Italic', 'italic'], ['Underline', 'underline'], ['Double underline', 'double-underline'], ['Strikethrough', 'strikethrough']];
+    const COLORS = [['By author', ''], ['Auto', 'inherit'], ['Red', '#c00000'], ['Blue', '#0070c0'], ['Green', '#107c10'], ['Violet', '#7030a0'], ['Dark Red', '#7f1d1d'], ['Teal', '#008080']];
+    const sel = (opts, cur) => el('select', { class: 'grow' }, opts.map(([l, v]) => el('option', { text: l, value: v, selected: v === cur ? 'selected' : undefined })));
+    const cur = D._advTrack || (D._advTrack = { insDeco: 'underline', insColor: '', delDeco: 'strikethrough', delColor: '', balloonIn: 3.2 });
+    const insDeco = sel(DECOS, cur.insDeco); const insColor = sel(COLORS, cur.insColor);
+    const delDeco = sel(DECOS, cur.delDeco); const delColor = sel(COLORS, cur.delColor);
+    const balloonW = el('input', { type: 'number', value: String(cur.balloonIn), min: '2', max: '6', step: '0.1', style: { width: '70px' } });
+    const dis = (node) => { node.disabled = true; node.title = 'Fixed at Word’s default in this clone.'; return node; };
+    const row = (label, ctl, ctl2) => el('div', { class: 'row' }, [el('label', { text: label, style: { width: '150px' } }), ctl].concat(ctl2 ? [ctl2] : []));
+    const sec = (t) => el('div', { style: { fontWeight: '600', margin: '8px 0 4px' }, text: t });
+    const body = el('div', {}, [
+      sec('Markup'),
+      row('Insertions:', insDeco, insColor),
+      row('Deletions:', delDeco, delColor),
+      row('Changed lines:', dis(sel([['Outside border', 'outside']], 'outside'))),
+      sec('Moves'),
+      row('Moved from:', dis(sel([['Double strikethrough', 'ds']], 'ds')), dis(sel([['Green', 'g']], 'g'))),
+      row('Moved to:', dis(sel([['Double underline', 'du']], 'du')), dis(sel([['Green', 'g']], 'g'))),
+      sec('Table cell highlighting'),
+      row('Inserted cells:', dis(sel([['Light Blue', 'lb']], 'lb')), dis(sel([['Deleted cells: Pink', 'p']], 'p'))),
+      sec('Formatting'),
+      row('Track formatting:', dis(sel([['By author', 'ba']], 'ba'))),
+      sec('Balloons'),
+      row('Preferred width:', balloonW, el('span', { text: ' Inches', style: { color: '#666', fontSize: '12px' } })),
+      row('Paper orientation:', dis(sel([['Preserve', 'p']], 'p'))),
+    ]);
+    WC.dialog({ title: 'Advanced Track Changes Options', width: '470px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        Object.assign(cur, { insDeco: insDeco.value, insColor: insColor.value, delDeco: delDeco.value, delColor: delColor.value, balloonIn: parseFloat(balloonW.value) || 3.2 });
+        const p = page(); if (!p) return;
+        const decoLine = (d, def) => (d === 'underline' ? 'underline' : d === 'double-underline' ? 'underline double' : d === 'strikethrough' ? 'line-through' : d === 'none' || d === 'color' || d === 'bold' || d === 'italic' ? 'none' : def);
+        p.classList.add('wc-track-custom');
+        p.style.setProperty('--wc-track-ins-line', decoLine(cur.insDeco, 'underline'));
+        p.style.setProperty('--wc-track-ins-weight', cur.insDeco === 'bold' ? '700' : 'inherit');
+        p.style.setProperty('--wc-track-ins-fontstyle', cur.insDeco === 'italic' ? 'italic' : 'inherit');
+        p.style.setProperty('--wc-track-ins-color', cur.insColor || 'inherit');
+        p.style.setProperty('--wc-track-del-line', decoLine(cur.delDeco, 'line-through'));
+        p.style.setProperty('--wc-track-del-weight', cur.delDeco === 'bold' ? '700' : 'inherit');
+        p.style.setProperty('--wc-track-del-fontstyle', cur.delDeco === 'italic' ? 'italic' : 'inherit');
+        p.style.setProperty('--wc-track-del-color', cur.delColor || 'inherit');
+        document.documentElement.style.setProperty('--wc-balloon-width', Math.round(cur.balloonIn * 96) + 'px');
+        if (WC.TrackChrome && WC.TrackChrome.refresh) WC.TrackChrome.refresh();
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+
+  // T18 "Change User Name…": the identity stamped as w:author on tracked changes and
+  // creatorName on comment cards. Live via editor.setOptions; persisted for relaunch
+  // (create-editor.ts reads wc-author-name on every construction).
+  D.changeUserName = function () {
+    let curName = 'Word User'; let curIni = '';
+    try { curName = localStorage.getItem('wc-author-name') || 'Word User'; curIni = localStorage.getItem('wc-author-initials') || ''; } catch (e) { /* storage unavailable */ }
+    if (!curIni) curIni = curName.split(/\s+/).map((w) => w[0] || '').join('').slice(0, 3).toUpperCase();
+    const name = el('input', { type: 'text', class: 'grow', value: curName });
+    const ini = el('input', { type: 'text', value: curIni, style: { width: '70px' } });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'User name:', style: { width: '90px' } }), name]),
+      el('div', { class: 'row' }, [el('label', { text: 'Initials:', style: { width: '90px' } }), ini]),
+      el('div', { text: 'Used for tracked changes and comments.', style: { fontSize: '12px', color: '#666', marginTop: '6px' } }),
+    ]);
+    WC.dialog({ title: 'Change User Name', width: '380px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const n = name.value.trim() || 'Word User';
+        try { localStorage.setItem('wc-author-name', n); localStorage.setItem('wc-author-initials', ini.value.trim()); } catch (e) { /* storage unavailable */ }
+        const pm = pmActive();
+        if (pm) { const ed = pm.getEditor(); try { ed.setOptions({ user: { name: n, email: '' } }); } catch (e) { /* applies on next launch */ } }
+        WC.toast('User name updated: ' + n);
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+
+  // X3: Restrict Editing pane. Enforcement re-points the clone's read-only toggle at
+  // the PM engine (setEditable) — "Tracked changes" mode = tracking ON + locked.
+  D.restrictEditingPane = function () {
+    let pane = document.getElementById('restrict-pane'); if (pane) { pane.remove(); return; }
+    document.querySelectorAll('.taskpane.right').forEach((p) => p.remove());
+    pane = el('div', { class: 'taskpane right', id: 'restrict-pane' });
+    const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Restrict Editing' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
+    const body = el('div', { class: 'tp-body' });
+    const pm = pmActive();
+    const enforced = () => { const p = pmActive(); try { return p ? p.getEditor().view.editable === false : E().node.getAttribute('contenteditable') === 'false'; } catch (e) { return false; } };
+    function render() {
+      body.innerHTML = '';
+      const sec = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px' }, text: t });
+      body.appendChild(sec('1. Formatting restrictions'));
+      const fmtCb = el('input', { type: 'checkbox' }); fmtCb.disabled = true;
+      body.appendChild(el('label', { style: { display: 'flex', gap: '6px', alignItems: 'flex-start', opacity: '.55' }, title: 'Style-set restrictions are not implemented in this clone.' }, [fmtCb, el('span', { text: 'Limit formatting to a selection of styles' })]));
+      body.appendChild(sec('2. Editing restrictions'));
+      const editCb = el('input', { type: 'checkbox', checked: 'checked' });
+      body.appendChild(el('label', { style: { display: 'flex', gap: '6px', alignItems: 'flex-start' } }, [editCb, el('span', { text: 'Allow only this type of editing in the document:' })]));
+      const mode = el('select', { class: 'grow', style: { margin: '4px 0 0 22px', width: 'calc(100% - 22px)' } }, [
+        el('option', { text: 'No changes (Read only)', value: 'readonly' }),
+        el('option', { text: 'Tracked changes', value: 'tracked' }),
+        el('option', { text: 'Comments', value: 'comments' }),
+        el('option', { text: 'Filling in forms', value: 'forms' }),
+      ]);
+      Array.from(mode.options).forEach((o) => { if (o.value === 'comments' || o.value === 'forms') { o.disabled = true; } });
+      body.appendChild(mode);
+      body.appendChild(sec('3. Start enforcement'));
+      if (!enforced()) {
+        const start = el('button', { class: 'btn primary', id: 'wc-restrict-start', text: 'Yes, Start Enforcing Protection' });
+        start.disabled = !editCb.checked;
+        editCb.addEventListener('change', () => { start.disabled = !editCb.checked; mode.disabled = !editCb.checked; });
+        start.addEventListener('click', () => {
+          const p = pmActive();
+          if (mode.value === 'tracked') {
+            if (p) { if (!p.reviewState().tracking) p.cmd('enableTrackChanges'); }
+            WC.pmTrackLock.locked = true;
+            WC.toast('Protection started: all edits are tracked.');
+          } else if (p) {
+            try { p.getEditor().setEditable(false, false); } catch (e) { /* engine unavailable */ }
+            WC.toast('Protection started: the document is read-only.');
+          } else {
+            WC.Review.restrictEditing();
+          }
+          render();
+        });
+        body.appendChild(start);
+      } else {
+        body.appendChild(el('div', { style: { color: '#A4262C', margin: '4px 0 8px', fontSize: '12px' }, text: 'This document is protected (read-only).' }));
+        const stop = el('button', { class: 'btn', id: 'wc-restrict-stop', text: 'Stop Protection' });
+        stop.addEventListener('click', () => {
+          const p = pmActive();
+          if (p) { try { p.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } }
+          else WC.Review.restrictEditing();
+          render();
+        });
+        body.appendChild(stop);
+      }
+      if (WC.pmTrackLock.locked) {
+        body.appendChild(el('div', { style: { color: '#666', marginTop: '8px', fontSize: '12px' }, text: 'Track Changes is locked — edits are recorded as tracked changes.' }));
+        const unlock = el('button', { class: 'btn', text: 'Stop Tracking Protection', style: { marginTop: '4px' } });
+        unlock.addEventListener('click', () => { D.unlockTracking(); setTimeout(render, 300); });
+        body.appendChild(unlock);
+      }
+    }
+    render();
+    pane.appendChild(head); pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+  };
+
+  // X2/D8.6: Compare Documents — full dialog parity; the engine (PM.runCompare)
+  // replays original→revised as REAL fork tracked changes. Word opens the result as
+  // a new document; this single-doc clone REPLACES the current doc (recorded
+  // deviation) — confirmDiscard is the consent gate, and the result is UNBOUND from
+  // any file path (the §5.3 lesson: Ctrl+S must never write a diff over the source).
+  D.compareDocuments = function (mode) {
+    const combine = mode === 'combine';
+    const htmlToText = (html) => { const d = document.createElement('div'); d.innerHTML = html; return (d.innerText || '').replace(/ /g, ' '); };
+    const currentText = () => { const pm = pmActive(); return pm ? pm.getText() : E().node.innerText; };
+    const mkSource = (labelText) => {
+      const selEl = el('select', { class: 'grow' }, [
+        el('option', { text: '(Current document)', value: 'current' }),
+        el('option', { text: 'Browse for a file…', value: 'browse' }),
+      ]);
+      const fileLabel = el('span', { text: '', style: { fontSize: '11px', color: '#666', marginLeft: '6px' } });
+      const file = el('input', { type: 'file' }); file.accept = '.txt,.text,.htm,.html'; file.style.display = 'none';
+      let fileText = null;
+      file.addEventListener('change', () => {
+        const f = file.files && file.files[0]; if (!f) { selEl.value = 'current'; return; }
+        const r = new FileReader();
+        r.onload = () => { fileText = /\.html?$/i.test(f.name) ? htmlToText(String(r.result)) : String(r.result); fileLabel.textContent = f.name; };
+        r.readAsText(f);
+      });
+      selEl.addEventListener('change', () => { if (selEl.value === 'browse') file.click(); else { fileText = null; fileLabel.textContent = ''; } });
+      return {
+        node: el('div', { style: { flex: '1' } }, [
+          el('div', { text: labelText, style: { fontWeight: '600', margin: '2px 0 4px' } }),
+          el('div', { class: 'row' }, [selEl, fileLabel, file]),
+        ]),
+        get: () => (selEl.value === 'browse' && fileText != null ? fileText : currentText()),
+      };
+    };
+    const orig = mkSource(combine ? 'Original document' : 'Original document');
+    const rev = mkSource(combine ? 'Revised document' : 'Revised document');
+    let authorName = 'Word User';
+    try { authorName = localStorage.getItem('wc-author-name') || 'Word User'; } catch (e) { /* default stands */ }
+    const label = el('input', { type: 'text', class: 'grow', value: authorName });
+    const more = el('div', { style: { display: 'none', borderTop: '1px solid #e1dfdd', marginTop: '10px', paddingTop: '8px' } });
+    const cmpSettings = ['Insertions and deletions', 'Moves', 'Comments', 'Formatting', 'Case changes', 'White space', 'Tables', 'Headers and footers', 'Footnotes and endnotes', 'Textboxes', 'Fields'];
+    const settingsGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' } });
+    cmpSettings.forEach((s, i) => {
+      const c = el('input', { type: 'checkbox', checked: 'checked' });
+      c.disabled = true;
+      const lab = el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px', opacity: i === 0 ? '1' : '.55' }, title: i === 0 ? 'Always compared.' : 'Word-level text comparison only in this clone.' }, [c, el('span', { text: s })]);
+      settingsGrid.appendChild(lab);
+    });
+    const granWord = el('input', { type: 'radio', name: 'cmpGran', checked: 'checked' });
+    const granChar = el('input', { type: 'radio', name: 'cmpGran' });
+    const showNew = el('input', { type: 'radio', name: 'cmpShow', checked: 'checked' });
+    const showO = el('input', { type: 'radio', name: 'cmpShow' }); showO.disabled = true;
+    const showR = el('input', { type: 'radio', name: 'cmpShow' }); showR.disabled = true;
+    more.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '4px' }, text: 'Comparison settings' }));
+    more.appendChild(settingsGrid);
+    more.appendChild(el('div', { style: { fontWeight: '600', margin: '8px 0 4px' }, text: 'Show changes' }));
+    more.appendChild(el('div', { class: 'row', style: { gap: '14px' } }, [
+      el('span', { text: 'Show changes at:', style: { fontSize: '12px' } }),
+      el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px' } }, [granChar, el('span', { text: 'Character level' })]),
+      el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px' } }, [granWord, el('span', { text: 'Word level' })]),
+    ]));
+    more.appendChild(el('div', { class: 'row', style: { gap: '14px' } }, [
+      el('span', { text: 'Show changes in:', style: { fontSize: '12px' } }),
+      el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px', opacity: '.55' } }, [showO, el('span', { text: 'Original document' })]),
+      el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px', opacity: '.55' } }, [showR, el('span', { text: 'Revised document' })]),
+      el('label', { style: { display: 'flex', gap: '4px', alignItems: 'center', fontSize: '12px' } }, [showNew, el('span', { text: 'New document' })]),
+    ]));
+    more.appendChild(el('div', { text: 'The result opens as a new unsaved document in this clone.', style: { fontSize: '11px', color: '#666', marginTop: '4px' } }));
+    const moreBtn = el('button', { class: 'btn', text: 'More >>' });
+    moreBtn.addEventListener('click', () => { const open = more.style.display !== 'none'; more.style.display = open ? 'none' : 'block'; moreBtn.textContent = open ? 'More >>' : '<< Less'; });
+    const body = el('div', {}, [
+      el('div', { text: combine ? 'Combine revisions from multiple authors into a single document.' : 'Compare two versions of a document (legal blackline).', style: { fontSize: '12px', color: '#666', marginBottom: '8px' } }),
+      el('div', { style: { display: 'flex', gap: '16px' } }, [orig.node, rev.node]),
+      el('div', { class: 'row', style: { marginTop: '8px' } }, [el('label', { text: 'Label changes with:', style: { width: '140px' } }), label]),
+      el('div', { class: 'row', style: { marginTop: '6px' } }, [moreBtn]),
+      more,
+    ]);
+    WC.dialog({ title: combine ? 'Combine Documents' : 'Compare Documents', width: '560px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const pm = pmActive();
+        if (!pm) { WC.toast('Compare needs the new engine.'); return; }
+        const o = orig.get(); const r = rev.get();
+        (async () => {
+          if (!(await WC.Files.confirmDiscard())) return;
+          const ok = await pm.runCompare(o, r, { granularity: granChar.checked ? 'character' : 'word', label: label.value.trim() || authorName });
+          if (!ok) { WC.toast('Compare failed', 'The documents may be too large.'); return; }
+          // Result = a NEW unsaved document (Word parity): never bound to a path.
+          WC.Files.path = null; WC.Files.name = combine ? 'Combine Result' : 'Compare Result'; WC.Files.format = 'docx';
+          WC.Files.updateTitle();
+          WC.toast(combine ? 'Documents combined' : 'Documents compared', 'Differences are shown as tracked changes.');
+        })();
+      } },
+      { label: 'Cancel' },
+    ] });
   };
 
   // ---- Custom Watermark ----

@@ -307,6 +307,13 @@ function togglePane(orientation?: PaneOrientation) {
   showPane(orientation)
 }
 
+// Track Changes Options dialog (T18): the "Reviewing Pane:" combo sets the
+// DEFAULT orientation without opening the pane; if open, re-render in place.
+function setOrientation(orientation: PaneOrientation) {
+  paneOrientation = orientation
+  if (paneOpen) render()
+}
+
 // ---- install (re-entrant: replaceEditor re-runs installBridge on Open/New;
 // the old editor's listeners die with editor.destroy(); pane/latch state is
 // module-level and survives the swap deliberately) ----
@@ -319,6 +326,7 @@ export function installTrackChrome(ed: AnyEditor) {
     showPane,
     hidePane,
     togglePane,
+    setOrientation, // Track Changes Options dialog (T18)
   }
   ed.on?.('transaction', schedule)
   ed.on?.('commentsUpdate', schedule)

@@ -24,6 +24,11 @@ export async function parseDocx(source: ArrayBuffer): Promise<ParsedDocx> {
 // replaceEditor can detect the degradation and recover in-PM instead of unwinding.
 export type ExtraContent = { html?: string; onContentError?: () => void }
 
+// "Change User Name…" (Track Changes Options, T18) persists the identity here.
+function storedAuthorName(): string {
+  try { return localStorage.getItem('wc-author-name') || 'Word User' } catch { return 'Word User' }
+}
+
 export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extra?: ExtraContent) {
   return new (Editor as any)({
     element: mountEl,
@@ -40,7 +45,9 @@ export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extr
     // changes and as creatorName on comment cards (legacy parity: review-tools/comments
     // used "Word User"). The oracle compares the author FLOW (stamp → card → docx →
     // reimport) against real Word, where the name comes from the signed-in account.
-    user: { name: 'Word User', email: '' },
+    // Task 6 (T18 "Change User Name…"): the dialog persists an override here so the
+    // identity survives relaunch + replaceEditor remounts.
+    user: { name: storedAuthorName(), email: '' },
     isDebug: false,
     telemetry: { enabled: false },
   })

@@ -36,7 +36,8 @@
 #wc-track-chrome .wc-track-balloon {
   position: absolute;
   left: calc(100% + 12px);
-  width: 304px;
+  /* T19: Advanced Track Changes Options "Preferred width" (inches × 96) */
+  width: var(--wc-balloon-width, 304px);
   pointer-events: auto;
   background: #fff;
   border: 1px solid var(--divider);
@@ -134,3 +135,27 @@ body.pm-active #pm-editor.pm-hide-ink .wc-ink-layer { display: none; }
   box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06);
 }
 #wc-review-pane.horizontal.collapsed { height: auto; }
+
+/* ---- slice 8 task 6: proofing + dialog-consumed settings ---- */
+
+/* Read Aloud (P5): the spoken word paints via the CSS Custom Highlight API --
+   no decoration plugin, no model churn; cleared on pause/stop/close. */
+::highlight(wc-read-aloud) {
+  background-color: rgba(255, 213, 79, 0.55);
+}
+
+/* T19 Advanced Track Changes Options: insertions/deletions mark style + color.
+   Gated behind .wc-track-custom (set on first Apply) so the fork's defaults
+   stay byte-identical until the user actually customizes. */
+body.pm-active #pm-editor.wc-track-custom .track-insert-dec.highlighted {
+  text-decoration-line: var(--wc-track-ins-line, underline);
+  color: var(--wc-track-ins-color, inherit);
+  font-weight: var(--wc-track-ins-weight, inherit);
+  font-style: var(--wc-track-ins-fontstyle, inherit);
+}
+body.pm-active #pm-editor.wc-track-custom .track-delete-dec.highlighted {
+  text-decoration-line: var(--wc-track-del-line, line-through);
+  color: var(--wc-track-del-color, inherit);
+  font-weight: var(--wc-track-del-weight, inherit);
+  font-style: var(--wc-track-del-fontstyle, inherit);
+}

@@ -2754,6 +2754,57 @@
     return ent.input.value === 'All Markup' || ('combo shows ' + JSON.stringify(ent.input.value) + ' instead of "All Markup"');
   });
 
+  await t('[8] Lock Tracking gates the ribbon toggle (T3/D8.7)', async () => {
+    // Non-vacuous by construction (the Mod-Z lesson): the UNLOCKED toggle must be
+    // proven to work through the same dispatch before the lock assert means anything.
+    setDoc('lock gate probe');
+    try {
+      reviewReset(); await sleep(50);
+      window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = '';
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== true) return 'baseline ribbon toggle did not enable tracking (D6 still blocking?)';
+      window.WC.pmTrackLock.locked = true; window.WC.pmTrackLock.password = 'pw';
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== true) return 'LOCKED toggle still disabled tracking — the D8.7 gate is dead';
+      window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = '';
+      run('trackChanges'); await sleep(80);
+      return PM().reviewState().tracking === false || 'unlocked toggle did not disable tracking';
+    } finally { window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = ''; reviewReset(); }
+  });
+
+  await t('[8] Restrict Editing enforcement drives engine editability (X3)', async () => {
+    try {
+      run('restrictEditing'); await sleep(80);
+      const pane = document.getElementById('restrict-pane');
+      if (!pane) return 'Restrict Editing pane did not open via the ribbon dispatch (D6 still blocking?)';
+      const start = document.getElementById('wc-restrict-start');
+      if (!start) return 'no Start Enforcing button in the pane';
+      start.click(); await sleep(80);
+      if (window.WC.view.editable !== false) return 'Start Enforcing did not make the PM view read-only';
+      const stop = document.getElementById('wc-restrict-stop');
+      if (!stop) return 'no Stop Protection button after enforcement';
+      stop.click(); await sleep(80);
+      return window.WC.view.editable === true || 'Stop Protection did not restore editability';
+    } finally {
+      try { PM().getEditor().setEditable(true, false); } catch (e) { /* engine teardown-safe */ }
+      const p = document.getElementById('restrict-pane'); if (p) p.remove();
+    }
+  });
+
+  await t('[8] proofing language applies to the PM editing surface (P9)', () => {
+    const dom = PM().getEditor().view.dom;
+    const lang0 = dom.getAttribute('lang'); const spell0 = dom.getAttribute('spellcheck');
+    try {
+      if (!window.WC.setProofingLanguage('fr-FR', true)) return 'setProofingLanguage returned false';
+      if (dom.getAttribute('lang') !== 'fr-FR' || dom.getAttribute('spellcheck') !== 'false') return 'lang/spellcheck attrs not applied to the PM view DOM';
+      window.WC.setProofingLanguage('en-US', false);
+      return dom.getAttribute('lang') === 'en-US' && dom.getAttribute('spellcheck') === 'true';
+    } finally {
+      if (lang0 == null) dom.removeAttribute('lang'); else dom.setAttribute('lang', lang0);
+      if (spell0 == null) dom.removeAttribute('spellcheck'); else dom.setAttribute('spellcheck', spell0);
+    }
+  });
+
   await t('[8] hygiene: review state fully reset', async () => {
     // Verifying replacement for the old bare reviewReset() trailer: never leak
     // tracking state, surviving track marks, OR comment threads into the [0b]
@@ -2813,6 +2864,20 @@
     const ok = await PM().openDocx(back.bytes);
     return ok && /saved via Files.save/.test(window.WC.view.dom.textContent) && cleanAfterSave;
   });
+  await t('[8] Compare mints REAL tracked changes (D8.6 — doc-replacing, [0b] zone)', async () => {
+    const ok = await PM().runCompare('alpha beta gamma', 'alpha BETA gamma delta', { granularity: 'word', label: 'Compare Author' });
+    if (ok !== true) return 'runCompare returned ' + ok;
+    if (PM().reviewState().tracking !== false) return 'tracking left ON after compare (Word turns it off on the result)';
+    const txt = window.WC.view.dom.textContent;
+    if (!/beta/.test(txt) || !/BETA/.test(txt)) return 'diff text missing (old kept + new inserted expected): ' + txt.slice(0, 80);
+    const mOld = markNames('beta');
+    if (!mOld.some((x) => x.startsWith('trackDelete:'))) return 'replaced run lacks trackDelete: ' + mOld.join(' ');
+    const mNew = markNames('BETA');
+    if (!mNew.some((x) => x.startsWith('trackInsert:'))) return 'inserted run lacks trackInsert: ' + mNew.join(' ');
+    const revs = PM().getRevisions();
+    return revs.length >= 2 || ('Revisions provider sees only ' + revs.length + ' rows');
+  });
+
   await t('[0b] New Document loads the blank template + clean state', async () => {
     const f = window.WC.Files;
     const ok = await PM().newBlank();

@@ -84,9 +84,11 @@
         if (k === 'l' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
         if (k === 'e' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
         // slice 8: review chords (Word: Ctrl+Shift+E = Track Changes, Ctrl+Alt+M =
-        // New Comment) — D6-guarded like their ribbon commands until the review flip.
+        // New Comment, Ctrl+Alt+Space = Read Aloud) — D6-guarded like their ribbon
+        // commands until the review flip.
         if (k === 'e' && shift) return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }));
         if (e.altKey && k === 'm') return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'newComment', label: 'New Comment' }));
+        if (e.altKey && k === ' ') return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'readAloud', label: 'Read Aloud' }));
         if (k === 'r' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
         if (k === 'j' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
         if (k === 'l' && shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
