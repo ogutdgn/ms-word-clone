@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-06-11 (bug-fix batch) — 3 user-reported editor fixes (page-click + styles) → main
+
+- **Branch:** fixes shipped on `fix/page-click-and-style-scope` (**PR #26**) +
+  `fix/page-click-to-doc-end` (**PR #27**), both **merged to `main`** and the branches deleted.
+- **Phase:** unchanged — **Phase 2, slice 8 (review) DONE → slice 9 (references) next.** These are
+  post-slice-8 bug fixes, not a phase move.
+- **State summary:** three user-reported usage bugs, each systematic-debugged (probe-proven root
+  cause in the built app) and shipped with regression tests:
+  - **Page-margin click placed no caret** (`5c4ee25`). Root cause (proven via
+    `document.elementFromPoint`): the page sheet `#pm-editor` realizes the page margins as PADDING
+    (fork print-layout inline styles) and the editable `.ProseMirror` only covers the content box,
+    so the margins + the area below the last paragraph hit the non-editable wrapper (`inProse=false`)
+    → no caret, view blurred (the slice-8 overlays were exonerated — both `pointer-events:none`). Fix:
+    `bridge/focus.ts` PM-only, live-editor mousedown handler — `posAtCoords` (clamped into the
+    `.ProseMirror` box) maps the click to the nearest text position + focuses.
+  - **Styles changed everything on hover** (`5cf317d`). Investigation: the ENGINE scope is already
+    correct (caret → its paragraph; selection → the selection; the fork applier's
+    stale-`lastSelection`/`preservedSelection` fallback is UNREACHABLE in this clone — those snapshots
+    are only set by SuperDoc's `.sd-toolbar-button` mousedown / outside-editor paths our ribbon never
+    triggers). The real cause was the slice-3 **hover Live Preview**. **Product decision: PM mode no
+    longer drives Live Preview on hover** (`ribbon.js` stylePreviewEnter/Leave no-op in PM) — styles
+    apply on **CLICK only**, scoped correctly (selection → selection; caret → current paragraph). The
+    bridge preview mechanism (`style-preview.ts`) stays for a possible opt-in; `--legacy` keeps its
+    snapshot preview.
+  - **Click below the text didn't go to the end** (`86540d6`). Refinement: clicking the BLANK area
+    below all content now sends the caret to the document END (`Selection.atEnd`, Word's Ctrl+End /
+    "son yazılan yer"), regardless of the horizontal click-x — `posAtCoords`-nearest had dropped it at
+    the nearest wrapped-line start. Beside-text clicks keep the clamped `posAtCoords` mapping.
+    `Selection` added to the `@/pm` barrel.
+- **Gates (six, after the batch): PM 241/241** (+4 regression tests: below-content→doc-end +
+  left-margin caret placement; hover-no-op; click-scope by selection vs caret), legacy 257/257,
+  smoke 9/9 ×2, docx 17/17, roundtrip 27/27.
+- **Recorded decision (ledger C):** PM-mode styles have **no hover Live Preview** — click-to-apply
+  only (user-directed 2026-06-11; reversible — only the gallery's hover wiring is disabled).
+- **Next:** slice 9 (references). **Blockers/notes:** none. Word never launched for this batch
+  (all evidence via in-app probes + the existing suites).
+
 ## 2026-06-11 (close-out) — Slice 8 DONE + merged to main; loop process RETIRED
 
 - **Branch:** `feature/phase-2-slice-8-review` → **PR #25 merged to `main`**; the

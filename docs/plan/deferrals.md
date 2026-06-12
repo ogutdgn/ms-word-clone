@@ -49,6 +49,7 @@ translator services · Editor (cloud grammar) · Researcher. Loop obligation: no
 | `warnOnUnsupportedContent` not threaded (silent lossy html imports possible) | recorded follow-up | slice 7 review |
 | `[0a] dirty flag` PM test flakes rarely on slow boots | re-run clears; don't chase | slice 7 |
 | Suites flake under heavy parallel load | run gates on an idle machine | slice 7 |
+| **PM-mode styles: NO hover Live Preview** — the gallery applies on CLICK only (selection → selection; caret → current paragraph) | user-directed (the hover preview restyled the selection/whole-paragraph live, read as a bug). REVERSIBLE — only `ribbon.js`'s hover wiring is disabled; `bridge/style-preview.ts` is intact. `--legacy` keeps its snapshot preview | post-slice-8 bug-fix (2026-06-11), PR #26 |
 
 ## Process notes
 

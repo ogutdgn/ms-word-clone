@@ -167,6 +167,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-11 (post-slice-8 bug-fix batch — page-click + styles)
+- [x] **Page-margin click placed no caret** (`5c4ee25`, PR #26) — root-caused via
+  `document.elementFromPoint` (margins are `#pm-editor` padding, outside `.ProseMirror`); fixed in
+  `bridge/focus.ts` (clamped `posAtCoords` → nearest text + focus).
+- [x] **Styles changed everything on hover** (`5cf317d`, PR #26) — engine scope already correct;
+  **disabled PM-mode hover Live Preview** (`ribbon.js`) → click-only apply (selection → selection;
+  caret → current paragraph). Recorded as a ledger-C decision.
+- [x] **Click below the text → caret to doc END** (`86540d6`, PR #27) — `Selection.atEnd` for
+  below-content clicks (Word Ctrl+End); `Selection` added to the `@/pm` barrel.
+- [x] **Six gates green:** PM **241/241** (+4 regression tests), legacy 257, smoke 9/9 ×2, docx 17,
+  roundtrip 27. Both PRs merged to `main`; branches deleted.
+
 ### 2026-06-11 (Slice 8 close-out — direct session; loop process retired)
 - [x] **Task 6 (dialogs + proofing PM-safe, `16ebaee`):** Lock/Unlock Tracking (T3) + lock
   gate on the toggle; Track Changes Options (T18) + Advanced (T19, consumed: ins/del mark
