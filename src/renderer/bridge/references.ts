@@ -276,13 +276,17 @@ export function installReferences(editor: AnyEditor) {
     } catch { return false }
   }
 
-  // refShowNotes: focus/scroll the clone-owned notes area (task 4 wires the DOM).
-  // The bridge surface returns whether any note exists to show; the notes-area
-  // module owns the actual focus/scroll. Degrade to false when there are none.
+  // refShowNotes: reveal + scroll the clone-owned notes area and focus the first note
+  // body (task 4, notes-area.ts owns the DOM + focus/scroll). The notes-area module
+  // exposes WC.NotesArea.showNotes(); degrade honestly to false when there are no notes
+  // (showNotes returns false when the region is hidden / absent).
   function refShowNotes(): boolean {
     try {
+      const na = (window as any).WC?.NotesArea
+      if (na && typeof na.showNotes === 'function') return na.showNotes() === true
+      // Fallback (notes-area not installed — e.g. mid-replace): degrade to "any notes?".
       const el = document.getElementById('pm-notes-area')
-      if (el) { el.scrollIntoView?.({ block: 'nearest' }); return true }
+      if (el && el.style.display !== 'none') { el.scrollIntoView?.({ block: 'nearest' }); return true }
       return refListFootnotes().length > 0
     } catch { return false }
   }

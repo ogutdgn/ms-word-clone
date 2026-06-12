@@ -3355,6 +3355,196 @@
     return match.content === NEW_BODY || 'refListFootnotes content did not reflect the new body: ' + JSON.stringify(match.content);
   });
 
+  // D9.1 NOTES AREA (notes-area.ts): after refInsertFootnote() the clone-owned region
+  // #pm-notes-area renders below the page and shows the note (number + body). Then
+  // simulate editing the body (set its plain text + dispatch a real input event +
+  // blur) and assert refListFootnotes()/editor.doc.footnotes.list() reflect the new
+  // body. DOM-observable + engine-observable, driven via WC.PM.* (flip-independent);
+  // never asserts on a toast.
+  await t('[9] notes-area: refInsertFootnote renders #pm-notes-area with the note number + body (D9.1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120); // start clean — no stale notes from prior tests
+    // Region must be ABSENT/hidden with zero notes (Word draws no empty separator).
+    const empty = document.getElementById('pm-notes-area');
+    if (empty && empty.style.display !== 'none' && empty.querySelector('.pm-note')) return 'notes region shows notes before any insert';
+    setDoc('notes area anchor body');
+    caretAfter('notes area anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160); // let the debounced notes-area render fire (90ms) + slack
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after refInsertFootnote';
+    if (region.style.display === 'none') return '#pm-notes-area hidden after refInsertFootnote';
+    const section = region.querySelector('.pm-notes-section');
+    if (!section) return 'no .pm-notes-section in the notes region';
+    if (!/Footnotes/.test((region.querySelector('.pm-notes-title') || {}).textContent || '')) return 'notes section is not titled "Footnotes"';
+    const noteRow = region.querySelector('.pm-note');
+    if (!noteRow) return 'no .pm-note row in the notes region';
+    const list = PM().refListFootnotes();
+    const expectedNum = list && list[0] && list[0].displayNumber;
+    const numText = (noteRow.querySelector('.pm-note-num') || {}).textContent || '';
+    if (expectedNum && numText.indexOf(String(expectedNum)) < 0) return 'note row number "' + numText + '" does not show displayNumber "' + expectedNum + '"';
+    const bodyEl = noteRow.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body editable element';
+    const expectedBody = (list && list[0] && list[0].content) || '';
+    return bodyEl.textContent === expectedBody || 'note body DOM "' + bodyEl.textContent + '" != refListFootnotes content "' + expectedBody + '"';
+  });
+
+  await t('[9] notes-area: editing a note body in #pm-notes-area persists via the bridge (refListFootnotes + footnotes.list reflect it) (D9.1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    setDoc('edit in region anchor body');
+    caretAfter('edit in region anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM';
+    const bodyEl = region.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body to edit';
+    const noteId = bodyEl.dataset.noteId;
+    if (!noteId) return 'note body has no data-note-id';
+    // Simulate the user editing the contenteditable body: set its plain text, fire a
+    // real input event, then blur (the module commits on blur → refUpdateNote).
+    const NEW_BODY = 'Body typed directly in the notes region';
+    bodyEl.focus();
+    bodyEl.textContent = NEW_BODY;
+    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
+    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await sleep(160);
+    // Engine-observable: the underlying editor.doc.footnotes.list() body changed.
+    let engineBody = null;
+    try {
+      const items = window.WC.editor.doc.footnotes.list().items || [];
+      const it = items.find((x) => String(x.noteId) === String(noteId));
+      engineBody = it ? String(it.content) : null;
+    } catch (e) { return 'editor.doc.footnotes.list() threw: ' + ((e && e.message) || e); }
+    if (engineBody !== NEW_BODY) return 'editor.doc.footnotes.list() body "' + engineBody + '" != edited "' + NEW_BODY + '"';
+    // Bridge-observable: refListFootnotes() reflects the edit too.
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId));
+    if (!match) return 'edited note vanished from refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes content "' + match.content + '" != edited "' + NEW_BODY + '"';
+  });
+
+  await t('[9] notes-area: refShowNotes reveals the region (returns true with notes, focuses a body); false with none (D9.1)', async () => {
+    if (typeof PM().refShowNotes !== 'function') return 'PM.refShowNotes missing (red — bridge not installed)';
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    // With ZERO notes, refShowNotes must degrade to false (nothing to show).
+    if (PM().refShowNotes() !== false) return 'refShowNotes returned non-false with no notes';
+    setDoc('show notes anchor body');
+    caretAfter('show notes anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160);
+    if (PM().refShowNotes() !== true) return 'refShowNotes returned non-true with a note present';
+    const region = document.getElementById('pm-notes-area');
+    if (!region || region.style.display === 'none') return 'refShowNotes did not reveal #pm-notes-area';
+    // It focuses the first note body (so the user can type immediately).
+    const focused = document.activeElement;
+    return (focused && focused.classList && focused.classList.contains('pm-note-body')) || 'refShowNotes did not focus a .pm-note-body (active=' + (focused && focused.className) + ')';
+  });
+
+  // FIX 1 REGRESSION (the edit-clobber): renderInner() rebuilds every note row from the
+  // ENGINE content when the signature changes, recreating bodies from notes[].content. A
+  // re-render fired while the user is typing in a focused note body — BEFORE that edit
+  // commits via refUpdateNote — must NOT discard the uncommitted text. This reproduces
+  // the CROSS-NOTE trigger: type uncommitted text in note B, then commit note A (its
+  // 500ms-debounced edit + blur bumps the signature and schedules a rebuild). Without the
+  // clobber guard the rebuild recreates note B's body from the stale engine value and the
+  // typed text is LOST; with the guard the rebuild is skipped while B is focused-dirty.
+  await t('[9] notes-area CLOBBER GUARD: a re-render mid-edit does NOT revert a focused dirty note body (FIX 1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    // Two footnotes (A before B in document order) so a commit on A can re-render B.
+    setDocs(['clobber anchor alpha', 'clobber anchor beta']);
+    caretAfter('clobber anchor alpha'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote A refused (precondition)';
+    await sleep(120);
+    caretAfter('clobber anchor beta'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote B refused (precondition)';
+    await sleep(180);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after two inserts';
+    const bodies = Array.from(region.querySelectorAll('.pm-note-body'));
+    if (bodies.length < 2) return 'expected 2 note bodies, got ' + bodies.length;
+    const bodyA = bodies[0];
+    const bodyB = bodies[1];
+    const idB = bodyB.dataset.noteId;
+    // 1. The user types new text in note B's body WITHOUT committing (no blur). The
+    //    contenteditable now holds uncommitted text the engine has not seen.
+    const B_TYPED = 'uncommitted text typed in note B';
+    bodyB.focus();
+    bodyB.textContent = B_TYPED;
+    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
+    // 2. Commit note A: edit A's body + blur. That fires refUpdateNote(A) + schedule(),
+    //    bumping the signature → a rebuild is queued WHILE B is focused + dirty. (Refocus
+    //    B first so it is the active dirty element when the rebuild fires — a real user
+    //    clicks back into B; here we set A's text, commit it, then restore focus to B.)
+    const A_BODY = 'note A committed body';
+    bodyA.textContent = A_BODY;
+    bodyA.dispatchEvent(new Event('input', { bubbles: true }));
+    PM().refUpdateNote(PM().refListFootnotes()[0].target || PM().refListFootnotes()[0].noteId, A_BODY);
+    // Re-focus B and restore its uncommitted text (the user is still editing B).
+    bodyB.focus();
+    bodyB.textContent = B_TYPED;
+    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
+    // 3. Drive a re-render now (signature changed because A's engine content changed).
+    //    Use the synchronous render so the assertion is deterministic — this is the exact
+    //    path a debounced transaction-triggered rebuild would take.
+    window.WC.NotesArea.render();
+    // 4. The focused dirty body B must STILL show the user's typed text (NOT reverted to
+    //    the engine 'Footnote' seed). Re-query in case the row element was replaced.
+    const stillRegion = document.getElementById('pm-notes-area');
+    const bodyBnow = Array.from(stillRegion.querySelectorAll('.pm-note-body')).find((el) => el.dataset.noteId === idB) || bodyB;
+    return bodyBnow.textContent === B_TYPED
+      || 'note B body was clobbered: "' + bodyBnow.textContent + '" != typed "' + B_TYPED + '" (rebuild reverted an uncommitted edit)';
+  });
+
+  // FIX 3 (endnote-edit path): the notes area edits BOTH footnotes and endnotes through
+  // the same body+commit path (refUpdateNote(note.target || note.noteId)). Insert an
+  // ENDNOTE, edit its body in the region, commit on blur, and assert the ENGINE endnote
+  // body changes (editor.doc.footnotes.list() of type 'endnote' + refListFootnotes()).
+  // This pins that an endnote edit targets the ENDNOTE store (word/endnotes.xml via
+  // getNotesConfig('endnote')), not a footnote.
+  await t('[9] notes-area: editing an ENDNOTE body in #pm-notes-area persists to the endnote (FIX 3)', async () => {
+    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    if (typeof PM().refUpdateNote !== 'function') return 'PM.refUpdateNote missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    setDoc('endnote edit anchor body');
+    caretAfter('endnote edit anchor');
+    if (PM().refInsertEndnote() !== true) return 'refInsertEndnote refused (precondition)';
+    await sleep(180);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after refInsertEndnote';
+    // The endnote must appear under the Endnotes section.
+    const endTitle = Array.from(region.querySelectorAll('.pm-notes-title')).find((el) => /Endnotes/.test(el.textContent || ''));
+    if (!endTitle) return 'no "Endnotes" section title in the notes region';
+    const bodyEl = region.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body to edit';
+    const noteId = bodyEl.dataset.noteId;
+    if (!noteId) return 'endnote body has no data-note-id';
+    const NEW_BODY = 'Endnote body edited in the notes region';
+    bodyEl.focus();
+    bodyEl.textContent = NEW_BODY;
+    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
+    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await sleep(180);
+    // Engine-observable on the ENDNOTE store: editor.doc.footnotes.list({type:'endnote'}).
+    let endnoteBody = null;
+    try {
+      const items = window.WC.editor.doc.footnotes.list({ type: 'endnote' }).items || [];
+      const it = items.find((x) => String(x.noteId) === String(noteId));
+      endnoteBody = it ? String(it.content) : null;
+    } catch (e) { return 'editor.doc.footnotes.list({type:endnote}) threw: ' + ((e && e.message) || e); }
+    if (endnoteBody !== NEW_BODY) return 'endnote store body "' + endnoteBody + '" != edited "' + NEW_BODY + '" (endnote edit did not target the endnote)';
+    // The bridge surface (refListFootnotes) must agree AND mark it type 'endnote'.
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId) && nn.type === 'endnote');
+    if (!match) return 'edited endnote not found as type endnote in refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes endnote content "' + match.content + '" != edited "' + NEW_BODY + '"';
+  });
+
   await t('[9] refInsertTOC with non-empty opts {showLevels:5, rightAlignPageNumbers:false}: instruction reflects \\o "1-5"', async () => {
     if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
     setDocs(['Custom TOC Heading A', 'Custom TOC body para']);

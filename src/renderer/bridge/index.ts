@@ -11,6 +11,7 @@ import { installReview } from './review'
 import { installReferences } from './references'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
+import { installNotesArea } from './notes-area'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -548,6 +549,10 @@ export function installBridge(editor: AnyEditor) {
   // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
   // Revisions pane). Same PM-only-by-construction placement as comments-ui.
   installTrackChrome(editor)
+  // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
+  // page sheet). Same PM-only-by-construction placement — its DOM never exists under
+  // --legacy (this runs AFTER the legacyBoot early-return above).
+  installNotesArea(editor)
   installFocusGuards()
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
