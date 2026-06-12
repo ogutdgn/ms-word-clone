@@ -15,11 +15,11 @@
   function restoreSel(d) { if (!d) return; try { const r = document.createRange(); r.setStart(nodeAtPath(d.sp), d.so); r.setEnd(nodeAtPath(d.ep), d.eo); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E().saveRange(); } catch (e) { /* selection drifted */ } }
   function stylePreviewEnter(name) {
     if (window.WC.PM && window.WC.PM.active) {
-      // PM-native preview (slice 3): throwaway transaction via the bridge. Gate on
-      // the area flip so an unflipped build previews nothing (D6 courtesy).
-      if (window.WC.PM.ready && !window.WC.PM.isBlocked('stylesGallery')) {
-        window.WC.PM.stylePreviewEnter(window.WC.PM.styleIdForName(name) || '');
-      }
+      // PM mode (2026-06-12 product decision): NO hover Live Preview — styles apply
+      // on CLICK only, scoped to the selection (else the caret paragraph). The
+      // bridge preview mechanism (style-preview.ts) stays for a possible opt-in
+      // later, but the gallery no longer drives it on hover. (--legacy keeps its
+      // snapshot preview below.)
       return;
     }
     if (!E() || !E().node) return;
@@ -27,10 +27,7 @@
     WC.applyNamedStyle(name);
   }
   function stylePreviewLeave() {
-    if (window.WC.PM && window.WC.PM.active) {
-      if (window.WC.PM.ready) window.WC.PM.stylePreviewLeave();
-      return;
-    }
+    if (window.WC.PM && window.WC.PM.active) return; // PM mode: nothing previewed on hover
     if (!gallerySnap) return;
     E().node.innerHTML = gallerySnap.html;
     restoreSel(gallerySnap.sel);
