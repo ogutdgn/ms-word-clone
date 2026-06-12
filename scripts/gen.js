@@ -53,7 +53,10 @@ function buildTab(tab) {
         const isLauncher = /dialog box launcher/i.test(tip);
         const ctrl = {
           id: uniqueId(`${tabSlug}.${gSlug}.${slug(c.label)}`),
-          cmd: camel(c.label),
+          // A4 (slice 8): optional per-control "cmd" override — labels stay
+          // Word-faithful while cmd ids stay unique (e.g. Comments "Previous" →
+          // previousComment vs Tracking "Previous" → previousChange).
+          cmd: c.cmd ? c.cmd : camel(c.label),
           label: decode(c.label),
           type: c.type || 'button',
           tooltip: tip || undefined,
@@ -96,7 +99,9 @@ const backstage = {
 
 const header = `/* AUTO-GENERATED from docs/research/raw-research.json by scripts/gen.js.\n   Faithful Microsoft Word (Microsoft 365) ribbon map. Do not hand-edit; re-run the generator. */\n`;
 const out = `${header}window.WC = window.WC || {};\nwindow.WC.RIBBON = ${JSON.stringify(ribbon, null, 2)};\nwindow.WC.BACKSTAGE = ${JSON.stringify(backstage, null, 2)};\n`;
-fs.writeFileSync(path.join(ROOT, 'src', 'renderer', 'js', 'ribbon-data.js'), out);
+// Phase-1 moved the legacy renderer under public/ (served as static assets);
+// the old src/renderer/js/ path no longer exists and writing there ENOENTs.
+fs.writeFileSync(path.join(ROOT, 'src', 'renderer', 'public', 'js', 'ribbon-data.js'), out);
 
 // ---- NOT_IMPLEMENTED.md from feasibility + ribbon controls ----
 let md = `# Word Clone — Feature Coverage & Known Limitations\n\n`;

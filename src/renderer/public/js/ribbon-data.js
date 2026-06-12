@@ -2113,6 +2113,18 @@ window.WC.RIBBON = [
             "feasible": "partial"
           },
           {
+            "id": "review.proofing.spelling-and-grammar",
+            "cmd": "spellingGrammar",
+            "label": "Spelling and Grammar",
+            "type": "split",
+            "tooltip": "Check the spelling and grammar of text in the document.",
+            "feasible": "partial",
+            "items": [
+              "Spelling",
+              "Spelling and Grammar"
+            ]
+          },
+          {
             "id": "review.proofing.thesaurus",
             "cmd": "thesaurus",
             "label": "Thesaurus",
@@ -2179,7 +2191,8 @@ window.WC.RIBBON = [
             "feasible": "partial",
             "items": [
               "Translate Selection",
-              "Translate Document"
+              "Translate Document",
+              "Translator Preferences..."
             ]
           },
           {
@@ -2206,11 +2219,12 @@ window.WC.RIBBON = [
             "label": "New Comment",
             "type": "button",
             "tooltip": "Add a note about this part of the document. Select the content you want to comment on, then click here.",
+            "shortcut": "Ctrl+Alt+M",
             "feasible": "yes"
           },
           {
             "id": "review.comments.delete",
-            "cmd": "delete",
+            "cmd": "deleteComment",
             "label": "Delete",
             "type": "split",
             "tooltip": "Delete the selected comment, or delete all comments in the document.",
@@ -2218,12 +2232,13 @@ window.WC.RIBBON = [
             "items": [
               "Delete",
               "Delete All Comments Shown",
-              "Delete All Comments in Document"
+              "Delete All Comments in Document",
+              "Delete All Resolved Comments"
             ]
           },
           {
             "id": "review.comments.previous",
-            "cmd": "previous",
+            "cmd": "previousComment",
             "label": "Previous",
             "type": "button",
             "tooltip": "Jump to the previous comment in the document.",
@@ -2231,7 +2246,7 @@ window.WC.RIBBON = [
           },
           {
             "id": "review.comments.next",
-            "cmd": "next",
+            "cmd": "nextComment",
             "label": "Next",
             "type": "button",
             "tooltip": "Jump to the next comment in the document.",
@@ -2241,11 +2256,79 @@ window.WC.RIBBON = [
             "id": "review.comments.show-comments",
             "cmd": "showComments",
             "label": "Show Comments",
-            "type": "toggle",
-            "tooltip": "Choose to see all comments inline alongside the text, or show them in a contextual pane.",
-            "feasible": "yes"
+            "type": "dropdown",
+            "tooltip": "Choose to see all comments contextually alongside the text, or show them in a list pane.",
+            "feasible": "yes",
+            "items": [
+              "Contextual",
+              "List"
+            ]
           }
         ]
+      },
+      {
+        "name": "Markup",
+        "id": "markup",
+        "controls": [
+          {
+            "id": "review.markup.display-for-review",
+            "cmd": "displayForReview",
+            "label": "Display for Review",
+            "type": "combo",
+            "tooltip": "Choose how you want to view changes to the document: Simple Markup, All Markup, No Markup, or Original.",
+            "feasible": "partial",
+            "items": [
+              "Simple Markup",
+              "All Markup",
+              "No Markup",
+              "Original"
+            ]
+          },
+          {
+            "id": "review.markup.filter-all-markup",
+            "cmd": "filterMarkup",
+            "label": "Filter All Markup",
+            "type": "button",
+            "tooltip": "Filter the markup shown in the document.",
+            "feasible": "partial"
+          },
+          {
+            "id": "review.markup.show-markup",
+            "cmd": "showMarkup",
+            "label": "Show Markup",
+            "type": "dropdown",
+            "tooltip": "Choose what kind of markup to show in your document, such as insertions and deletions, formatting, and which reviewers to display.",
+            "feasible": "partial",
+            "items": [
+              "Insertions and Deletions",
+              "Formatting",
+              "Balloons",
+              "Specific People",
+              "Highlight Updates",
+              "Other Authors"
+            ]
+          },
+          {
+            "id": "review.markup.reviewing-pane",
+            "cmd": "reviewingPane",
+            "label": "Reviewing Pane",
+            "type": "split",
+            "tooltip": "Show revisions in a separate window, vertically or horizontally. This is a handy way to make sure that all tracked changes have been removed from your document.",
+            "feasible": "partial",
+            "items": [
+              "Reviewing Pane Vertical...",
+              "Reviewing Pane Horizontal..."
+            ]
+          }
+        ],
+        "launcher": {
+          "id": "review.markup.track-changes-options",
+          "cmd": "trackChangesOptions",
+          "label": "Track Changes Options",
+          "type": "button",
+          "tooltip": "Dialog Box Launcher: opens the Track Changes Options dialog.",
+          "feasible": "partial"
+        }
       },
       {
         "name": "Tracking",
@@ -2260,62 +2343,13 @@ window.WC.RIBBON = [
             "shortcut": "Ctrl+Shift+E",
             "feasible": "partial",
             "items": [
-              "Track Changes",
-              "Lock Tracking..."
+              "For Everyone",
+              "Just Mine",
+              "Lock Tracking"
             ]
           },
           {
-            "id": "review.tracking.display-for-review",
-            "cmd": "displayForReview",
-            "label": "Display for Review",
-            "type": "combo",
-            "tooltip": "Choose how you want to view changes to the document: Simple Markup, All Markup, No Markup, or Original.",
-            "feasible": "partial",
-            "items": [
-              "Simple Markup",
-              "All Markup",
-              "No Markup",
-              "Original"
-            ]
-          },
-          {
-            "id": "review.tracking.show-markup",
-            "cmd": "showMarkup",
-            "label": "Show Markup",
-            "type": "dropdown",
-            "tooltip": "Choose what kind of markup to show in your document, such as comments, insertions and deletions, formatting, and which reviewers to display.",
-            "feasible": "partial",
-            "items": [
-              "Comments",
-              "Insertions and Deletions",
-              "Formatting",
-              "Balloons",
-              "Specific People",
-              "Highlight Updates",
-              "Other Authors",
-              "Reviewing Pane"
-            ]
-          },
-          {
-            "id": "review.tracking.reviewing-pane",
-            "cmd": "reviewingPane",
-            "label": "Reviewing Pane",
-            "type": "split",
-            "tooltip": "Show revisions in a separate window, vertically or horizontally. This is a handy way to make sure that all tracked changes have been removed from your document.",
-            "feasible": "partial",
-            "items": [
-              "Reviewing Pane Vertical",
-              "Reviewing Pane Horizontal"
-            ]
-          }
-        ]
-      },
-      {
-        "name": "Changes",
-        "id": "changes",
-        "controls": [
-          {
-            "id": "review.changes.accept",
+            "id": "review.tracking.accept",
             "cmd": "accept",
             "label": "Accept",
             "type": "split",
@@ -2330,7 +2364,7 @@ window.WC.RIBBON = [
             ]
           },
           {
-            "id": "review.changes.reject",
+            "id": "review.tracking.reject",
             "cmd": "reject",
             "label": "Reject",
             "type": "split",
@@ -2338,23 +2372,23 @@ window.WC.RIBBON = [
             "feasible": "partial",
             "items": [
               "Reject and Move to Next",
-              "Reject This Change",
+              "Reject Change",
               "Reject All Changes Shown",
               "Reject All Changes",
               "Reject All Changes and Stop Tracking"
             ]
           },
           {
-            "id": "review.changes.previous",
-            "cmd": "previous",
+            "id": "review.tracking.previous",
+            "cmd": "previousChange",
             "label": "Previous",
             "type": "button",
             "tooltip": "Jump to the previous tracked change in the document so you can accept or reject it.",
             "feasible": "partial"
           },
           {
-            "id": "review.changes.next",
-            "cmd": "next",
+            "id": "review.tracking.next",
+            "cmd": "nextChange",
             "label": "Next",
             "type": "button",
             "tooltip": "Jump to the next tracked change in the document so you can accept or reject it.",
@@ -2374,8 +2408,9 @@ window.WC.RIBBON = [
             "tooltip": "Compare or combine multiple versions of a document.",
             "feasible": "no",
             "items": [
-              "Compare... (Compare two versions of a document — legal blackline)",
-              "Combine... (Combine revisions from multiple authors into a single document)"
+              "Compare...",
+              "Combine...",
+              "Show Source Documents"
             ]
           }
         ]
@@ -2410,22 +2445,8 @@ window.WC.RIBBON = [
             "id": "review.ink.hide-ink",
             "cmd": "hideInk",
             "label": "Hide Ink",
-            "type": "toggle",
+            "type": "dropdown",
             "tooltip": "Hide or show ink annotations in the document. (Appears when the document contains ink or on touch/pen-enabled devices.)",
-            "feasible": "no"
-          }
-        ]
-      },
-      {
-        "name": "OneNote",
-        "id": "onenote",
-        "controls": [
-          {
-            "id": "review.onenote.linked-notes",
-            "cmd": "linkedNotes",
-            "label": "Linked Notes",
-            "type": "button",
-            "tooltip": "Take notes in OneNote and link them to the part of the document you're working on. (Appears when OneNote integration is available.)",
             "feasible": "no"
           }
         ]

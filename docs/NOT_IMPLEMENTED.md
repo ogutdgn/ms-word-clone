@@ -203,7 +203,6 @@ Every ribbon tab, group, and control from Microsoft Word is rendered in this clo
 - Review ▸ Compare ▸ Compare
 - Review ▸ Protect ▸ Block Authors
 - Review ▸ Ink ▸ Hide Ink
-- Review ▸ OneNote ▸ Linked Notes
 - View ▸ Macros ▸ Macros
 - View ▸ SharePoint ▸ Properties
 - Help ▸ Help ▸ Contact Support
@@ -317,19 +316,22 @@ Every ribbon tab, group, and control from Microsoft Word is rendered in this clo
 - Mailings ▸ Preview Results ▸ Check for Errors
 - Mailings ▸ Finish ▸ Finish & Merge
 - Review ▸ Proofing ▸ Editor
+- Review ▸ Proofing ▸ Spelling and Grammar
 - Review ▸ Proofing ▸ Thesaurus
 - Review ▸ Speech ▸ Read Aloud
 - Review ▸ Accessibility ▸ Check Accessibility
 - Review ▸ Language ▸ Translate
 - Review ▸ Language ▸ Language
+- Review ▸ Markup ▸ Display for Review
+- Review ▸ Markup ▸ Filter All Markup
+- Review ▸ Markup ▸ Show Markup
+- Review ▸ Markup ▸ Reviewing Pane
+- Review ▸ Markup ▸ Track Changes Options
 - Review ▸ Tracking ▸ Track Changes
-- Review ▸ Tracking ▸ Display for Review
-- Review ▸ Tracking ▸ Show Markup
-- Review ▸ Tracking ▸ Reviewing Pane
-- Review ▸ Changes ▸ Accept
-- Review ▸ Changes ▸ Reject
-- Review ▸ Changes ▸ Previous
-- Review ▸ Changes ▸ Next
+- Review ▸ Tracking ▸ Accept
+- Review ▸ Tracking ▸ Reject
+- Review ▸ Tracking ▸ Previous
+- Review ▸ Tracking ▸ Next
 - Review ▸ Protect ▸ Restrict Editing
 - View ▸ Views ▸ Read Mode
 - View ▸ Views ▸ Print Layout

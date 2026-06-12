@@ -7,6 +7,9 @@ import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
+import { installReview } from './review'
+import { installCommentsUI } from './comments-ui'
+import { installTrackChrome } from './track-chrome'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -34,7 +37,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics']) // slices 1-6
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review']) // slices 1-6 + 8
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -81,10 +84,22 @@ const AREA: Record<string, string> = {
   object: 'insert-exotica', signatureLine: 'insert-exotica', dateTime: 'insert-exotica',
   coverPage: 'insert-exotica', quickParts: 'insert-exotica',
   crossReference: 'references', // slice 9 (fork has the cross-reference extension)
-  // review (slice 8)
-  newComment: 'review', comment: 'review', delete: 'review', previous: 'review', next: 'review',
+  // review (slice 8) — task 3 regroup (D8.1/A4): the old label-derived ids
+  // delete/previous/next are GONE from the ribbon; the per-control cmd overrides
+  // (deleteComment/previousComment/nextComment/previousChange/nextChange/
+  // filterMarkup/spellingGrammar) are the live ids.
+  newComment: 'review', comment: 'review', deleteComment: 'review',
+  previousComment: 'review', nextComment: 'review',
+  previousChange: 'review', nextChange: 'review',
   showComments: 'review', trackChanges: 'review', accept: 'review', reject: 'review',
   thesaurus: 'review', language: 'review',
+  spellingGrammar: 'review', filterMarkup: 'review',
+  // review (slice 8, A5): the rest of the tab's doc-touching cmds — unmapped they were
+  // NOT D6-blocked (isBlocked returns false) and silently drove the hidden legacy editor.
+  // App-level by design (never mapped): wordCount, blockAuthors, linkedNotes.
+  editor: 'review', readAloud: 'review', checkAccessibility: 'review', translate: 'review',
+  displayForReview: 'review', showMarkup: 'review', reviewingPane: 'review', compare: 'review',
+  restrictEditing: 'review', hideInk: 'review',
   // references (slice 9)
   tableOfContents: 'references', addText: 'references', updateTable: 'references',
   insertFootnote: 'references', insertEndnote: 'references', nextFootnote: 'references',
@@ -308,6 +323,12 @@ export function preinstallBridge() {
     tableSplit: () => false, tableToText: () => false, textToTable: () => false,
     tableSetTextDirection: () => false, tableAutoFit: () => false,
     tableSelectFirstRowPair: () => false,
+    // slice 8: review pre-mount stubs (replaced by installReview on mount)
+    reviewState: () => ({ tracking: false, view: 'all', engineFlags: { onlyOriginalShown: false, onlyModifiedShown: false }, activeCommentId: null }),
+    getRevisions: () => [],
+    getComments: () => [],
+    getChangeRanges: () => [], // slice 8 task 5: bars/balloons chrome provider
+    runCompare: async () => false, // slice 8 task 6: Compare engine (replaced by installBridge)
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -338,7 +359,11 @@ export function installBridge(editor: AnyEditor) {
       }
     }, true)
   }
-  Object.assign(PM, installCommands(editor), installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor))
+  // installReview goes LAST: its cmd head SHADOWS the raw fork command names it owns
+  // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
+  // falls through to installCommands' cmd for everything else.
+  const commands = installCommands(editor)
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
@@ -365,11 +390,185 @@ export function installBridge(editor: AnyEditor) {
     if (!ed?.view) return false
     return !!ed.view.pasteHTML(html, pasteEvent({ 'text/html': html, 'text/plain': '' }))
   }
+  // slice 8 task 6 (D8.6/X2): Compare Documents — opens the ORIGINAL text as the
+  // doc, then applies the original→revised diff as dispatched transactions with
+  // tracking ON, so the fork rewrite mints REAL trackInsert/trackDelete marks
+  // (exports as w:ins/w:del — never a presentational diff). Word opens the result
+  // as a new document; the clone is single-doc, so the result REPLACES the
+  // current doc (recorded deviation, D8.6). Returns false (doc untouched) on
+  // oversize input or a failed import.
+  PM.runCompare = async (originalText: string, revisedText: string, opts?: { granularity?: 'word' | 'character'; label?: string }) => {
+    const oLines = String(originalText ?? '').replace(/\r\n?/g, '\n').split('\n')
+    const rLines = String(revisedText ?? '').replace(/\r\n?/g, '\n').split('\n')
+    if (oLines.length * rLines.length > 4_000_000) return false
+    if (!(await PM.openText(oLines.join('\n')))) return false
+    const ed: any = current
+    if (!ed?.view) return false
+    const prevUser = ed.options?.user
+    if (opts?.label) { try { ed.setOptions?.({ user: { name: opts.label, email: '' } }) } catch { /* label is cosmetic */ } }
+    PM.cmd('enableTrackChanges')
+    try {
+      const tokenize = (s: string) =>
+        opts?.granularity === 'character' ? Array.from(s) : s.split(/(\s+)/).filter((t) => t.length > 0)
+      const v = () => ed.view
+      // openText = line-per-paragraph, so ORIGINAL line i ↔ textblock i. All edits
+      // are applied RIGHT→LEFT against original coordinates with a FRESH
+      // offset→position map per op: tracked deletes keep their text (offsets
+      // stable) and inserts always land to the right of everything still pending —
+      // so no shift arithmetic can drift. The naive paraPos+1+offset mapping is
+      // WRONG here: the fork wraps inline content in run nodes, whose boundary
+      // tokens make text-offset→PM-position piecewise (probe-proven off-by-N).
+      const blocks = () => {
+        const out: Array<{ pos: number; node: any }> = []
+        v().state.doc.descendants((n: any, p: number) => {
+          if (n.isTextblock) { out.push({ pos: p, node: n }); return false }
+          return true
+        })
+        return out
+      }
+      const off2pm = (bi: number, off: number): number | null => {
+        const b = blocks()[bi]
+        if (!b) return null
+        let pm: number | null = null
+        let seen = 0
+        v().state.doc.nodesBetween(b.pos + 1, b.pos + b.node.nodeSize - 1, (n: any, p: number) => {
+          if (pm != null) return false
+          if (n.isText && n.text) {
+            if (off <= seen + n.text.length) { pm = p + (off - seen); return false }
+            seen += n.text.length
+          }
+          return true
+        })
+        return pm != null ? pm : b.pos + b.node.nodeSize - 1 // past content → block end
+      }
+      const dispatchDelete = (a: number | null, b: number | null) => {
+        if (a != null && b != null && b > a) v().dispatch(v().state.tr.delete(a, b))
+      }
+      const dispatchInsert = (at: number | null, text: string) => {
+        if (at != null && text) v().dispatch(v().state.tr.insertText(text, at))
+      }
+      // Intra-line diff: forward pass computes original offsets (an insert after a
+      // del anchors at the del's END — Word renders the new run after the struck
+      // original); the apply pass walks the steps right→left.
+      const diffWithin = (bi: number, oldLine: string, newLine: string) => {
+        const ops = lcsOps(tokenize(oldLine), tokenize(newLine))
+        const steps: Array<{ type: 'del' | 'ins'; start: number; len: number; text: string }> = []
+        let c = 0
+        for (const op of ops) {
+          const text = op.tokens.join('')
+          if (op.type === 'eq') { c += text.length; continue }
+          if (op.type === 'del') { steps.push({ type: 'del', start: c, len: text.length, text }); c += text.length; continue }
+          steps.push({ type: 'ins', start: c, len: text.length, text }) // c sits past any preceding del ✓
+        }
+        for (let s = steps.length - 1; s >= 0; s--) {
+          const st = steps[s]
+          if (st.type === 'del') dispatchDelete(off2pm(bi, st.start), off2pm(bi, st.start + st.len))
+          else dispatchInsert(off2pm(bi, st.start), st.text)
+        }
+      }
+      const deleteWholeLine = (bi: number) => {
+        const b = blocks()[bi]
+        if (!b) return
+        dispatchDelete(off2pm(bi, 0), off2pm(bi, b.node.textContent.length))
+      }
+      const insertLinesAfter = (anchorIdx: number, lines: string[]) => {
+        if (anchorIdx >= 0) {
+          const b = blocks()[anchorIdx]
+          if (!b) return
+          let at = b.pos + b.node.nodeSize - 1
+          for (const line of lines) {
+            ed.commands.setTextSelection({ from: at, to: at })
+            try { ed.commands.splitBlock() } catch { v().dispatch(v().state.tr.split(at)) }
+            dispatchInsert(at + 2, line)
+            at = at + 2 + line.length
+          }
+        } else {
+          // prepend before the first line: reverse order, each split at content start
+          for (const line of [...lines].reverse()) {
+            const first = blocks()[0]
+            if (!first) return
+            const at = first.pos + 1
+            ed.commands.setTextSelection({ from: at, to: at })
+            try { ed.commands.splitBlock() } catch { v().dispatch(v().state.tr.split(at)) }
+            dispatchInsert(at, line)
+          }
+        }
+      }
+      // Line-level grouping (adjacent del-run + ins-run = modified lines), then
+      // apply the groups right→left.
+      const lineOps = lcsOps(oLines, rLines)
+      const groups: Array<{ oiStart: number; dels: string[]; inss: string[] }> = []
+      let oi = 0
+      for (let i = 0; i < lineOps.length; i++) {
+        const op = lineOps[i]
+        if (op.type === 'eq') { oi += op.tokens.length; continue }
+        const dels = op.type === 'del' ? op.tokens : []
+        let inss: string[] = op.type === 'ins' ? op.tokens : []
+        if (op.type === 'del' && i + 1 < lineOps.length && lineOps[i + 1].type === 'ins') { inss = lineOps[i + 1].tokens; i++ }
+        groups.push({ oiStart: oi, dels, inss })
+        oi += dels.length
+      }
+      for (const g of [...groups].reverse()) {
+        const pairs = Math.min(g.dels.length, g.inss.length)
+        if (g.inss.length > pairs) {
+          const anchorIdx = g.dels.length ? g.oiStart + g.dels.length - 1 : g.oiStart - 1
+          insertLinesAfter(anchorIdx, g.inss.slice(pairs))
+        }
+        for (let d = g.dels.length - 1; d >= pairs; d--) deleteWholeLine(g.oiStart + d)
+        for (let p = pairs - 1; p >= 0; p--) diffWithin(g.oiStart + p, g.dels[p], g.inss[p])
+      }
+      return true
+    } catch (e) {
+      console.error('[WC.PM] runCompare failed', e)
+      return false
+    } finally {
+      PM.cmd('disableTrackChanges')
+      try { if (opts?.label) ed.setOptions?.({ user: prevUser ?? { name: 'Word User', email: '' } }) } catch { /* restore is best-effort */ }
+    }
+  }
   installStateSync(editor)
+  // slice 8 task 4: comments cards/composer/pane chrome. AFTER the legacyBoot
+  // early-return above, so the UI module never runs (and its DOM never exists)
+  // under --legacy (D8.3 PM-only constraint).
+  installCommentsUI(editor)
+  // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
+  // Revisions pane). Same PM-only-by-construction placement as comments-ui.
+  installTrackChrome(editor)
   installFocusGuards()
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
   return PM
+}
+
+// Classic LCS diff over token sequences → merged eq/del/ins runs (Compare engine).
+// Throws on oversize input — runCompare catches and returns false, doc untouched.
+function lcsOps(a: string[], b: string[]): Array<{ type: 'eq' | 'del' | 'ins'; tokens: string[] }> {
+  const n = a.length
+  const m = b.length
+  if ((n + 1) * (m + 1) > 16_000_000) throw new Error('compare input too large')
+  const W = m + 1
+  const dp = new Uint32Array((n + 1) * W)
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * W + j] = a[i] === b[j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1])
+    }
+  }
+  const ops: Array<{ type: 'eq' | 'del' | 'ins'; tokens: string[] }> = []
+  const push = (type: 'eq' | 'del' | 'ins', tok: string) => {
+    const last = ops[ops.length - 1]
+    if (last && last.type === type) last.tokens.push(tok)
+    else ops.push({ type, tokens: [tok] })
+  }
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { push('eq', a[i]); i++; j++ }
+    else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) { push('del', a[i]); i++ }
+    else { push('ins', b[j]); j++ }
+  }
+  while (i < n) { push('del', a[i]); i++ }
+  while (j < m) { push('ins', b[j]); j++ }
+  return ops
 }
 
 // Mount failure (spec §7.2): un-flip BEFORE toasting — never a blank page.

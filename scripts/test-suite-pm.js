@@ -159,10 +159,13 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // probe lives in a STILL-UNFLIPPED area — repointed link→newComment when
-    // insert-basics flipped (slice 6): a link probe would go vacuously green once
-    // insert-basics is live; newComment (review, slice 8) keeps the test MEANINGFUL.
-    window.WC.Commands.run({ cmd: 'newComment', label: 'New Comment' });
+    // probe lives in a STILL-UNFLIPPED area -- repointed link->newComment when
+    // insert-basics flipped (slice 6), then newComment->tableOfContents when slice 8
+    // started flipping review: a newComment probe would go vacuously green once
+    // review is live; tableOfContents (references, stays unflipped until slice 9)
+    // keeps the test MEANINGFUL. Both [0a] D6 guards now converge on tableOfContents
+    // but exercise DISTINCT dispatch heads (Commands.run vs Commands.dropdown) -- keep both.
+    window.WC.Commands.run({ cmd: 'tableOfContents', label: 'Table of Contents' });
     return document.querySelectorAll('.flyout').length === 0
       && !document.querySelector('.modal-backdrop');
   });
@@ -290,22 +293,53 @@
 
   await t('[1] in-view Mod-Z does not double-fire (engine handles it once)', async () => {
     setDoc('double fire probe'); selectText('double');
+    // Doc snapshot MODULO sdBlockRev: the fork's block-revision stamp advances
+    // on every doc-changing transaction INCLUDING the undo itself (probe
+    // evidence 2026-06-11: post-undo doc differed from pre-bold by exactly
+    // sdBlockRev 2->3, nothing else) — it is history-exempt metadata, so
+    // byte-equality is asserted on everything BUT it.
+    const normDoc = () => JSON.stringify(v().state.doc.toJSON(), (k, val) => (k === 'sdBlockRev' ? undefined : val));
+    const preBold = normDoc();
     run('bold'); await sleep(50);
-    // Capture doc size before: if app.js handler fired it would call pm.cmd('undo')
-    // (an explicit, trusted call), reverting the bold AND potentially the setDoc.
-    // The guard must prevent that; only the PM keymap path (untrusted event, likely
-    // ignored by PM) or nothing should happen.
     const sizeBefore = v().state.doc.content.size;
-    const textBefore = v().dom.textContent;
     window.WC.view.focus();
-    // Synthetic (untrusted) keydown on the focused element inside the PM view.
-    // Our app.js guard sees: WC.PM.active && view.dom.contains(activeElement) && mod && k==='z' → return.
-    // So app.js stands down. The PM keymap itself may or may not handle untrusted events.
-    // Either way the doc must NOT change via the app.js path.
-    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    if (!window.WC.view.dom.contains(document.activeElement)) return 'focus did not land in the PM view';
+    // The regression this test pins: app.js's keydown handler firing its undo
+    // (pm.cmd('undo'), app.js:70) IN ADDITION to the PM keymap. The guard
+    // (app.js:108-109) must stand down when focus is inside the view. The
+    // LOAD-BEARING assertion is a spy on WC.PM.cmd — the app.js path goes
+    // through it, the PM keymap path never does — because defaultPrevented
+    // alone cannot tell the two apart (a regressed app.js also preventDefaults).
+    const calls = [];
+    const orig = window.WC.PM.cmd;
+    window.WC.PM.cmd = function (...args) { calls.push(args[0]); return orig.apply(this, args); };
+    let consumed;
+    try {
+      // Synthetic (untrusted) ctrlKey keydown inside the PM view. PLATFORM
+      // FORK: prosemirror-keymap normalizes Mod- to Meta- on macOS and Ctrl-
+      // elsewhere (prosemirror-keymap dist normalizeKeyName mac branch; the
+      // fork binds Mod-z in extensions/history/history.js). So on macOS this
+      // event matches NOTHING (doc must stay untouched), while on Windows the
+      // PM keymap consumes it and performs exactly ONE undo: the bold reverts
+      // and the doc returns byte-identical to its pre-bold state (un-bolding
+      // heals the run-node split, so content.size legitimately shrinks).
+      const ev = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+      consumed = !document.activeElement.dispatchEvent(ev);
+    } finally { window.WC.PM.cmd = orig; }
     await sleep(80);
-    // Assert the guard stood down: doc content unchanged (no double- or single-fire from app.js).
-    return v().state.doc.content.size === sizeBefore && /double fire probe/.test(v().dom.textContent);
+    if (calls.length) return 'app.js handler fired ' + JSON.stringify(calls) + ' — the in-view guard regressed';
+    if (!/double fire probe/.test(v().dom.textContent)) return 'text gone: undo over-fired';
+    if (consumed) {
+      // Engine handled it exactly once: no bold mark anywhere (doc-wide scan —
+      // a partial-split survivor must not pass vacuously) and the doc is
+      // byte-identical to the pre-bold snapshot (nothing else reverted).
+      let anyBold = false;
+      doc().descendants((n) => { if (n.marks && n.marks.some((m) => m.type.name === 'bold')) anyBold = true; });
+      if (anyBold) return 'bold survived a consumed Mod-Z';
+      return normDoc() === preBold || 'doc !== pre-bold state after the single undo';
+    }
+    // Not consumed (macOS): nothing may have touched the doc at all.
+    return v().state.doc.content.size === sizeBefore || 'doc changed though event was not consumed';
   });
 
   await t('[1] imported negation run reports bold=false (converter attrs)', async () => {
@@ -2067,6 +2101,726 @@
     return stateHeld || ('state moved: ' + detail);
   });
 
+  // ---------- slice 8: review ----------
+  // Track changes + comments + view modes on the PM engine.
+  // Plan: docs/superpowers/plans/2026-06-11-phase2-slice-8-review.md (esp. amendments
+  // A2/A3/A5/A6/A7); parity contract: .oracle-probes/slice8/parity.md.
+  // RED until bridge/review.ts (task 2) + the ribbon re-point (task 3) + the flip
+  // (task 7) land. Planned WC.PM surface under test: reviewState() ->
+  // { tracking, view, engineFlags: { onlyOriginalShown, onlyModifiedShown } } (the
+  // fork TrackChangesBasePlugin flags -- A3 ENGINE truth, never an echo of view),
+  // getRevisions() -> [{ id, author, type, text }] (comments COUNT, converter
+  // trackedChange projection rows filtered -- A2/T11), getComments() ->
+  // [{ id, author, text, resolved, replies }], plus cmd names toggleTrackChanges /
+  // acceptChange / rejectChange / acceptSelection / acceptAll / rejectAll /
+  // nextChange / prevChange / setReviewView / addComment / replyComment /
+  // resolveComment / deleteComment / nextComment / prevComment / setActiveComment.
+  // NAME COLLISION: addComment/resolveComment/setActiveComment collide with RAW fork
+  // command names -- the bridge must SHADOW them onto the Document API path
+  // (editor.doc.comments.*, A2); the comment pins stay red on the raw path by design.
+  // EVERY planned-surface access is guarded with a failure-string return (never an
+  // uncaught throw) so the rest of the suite runs.
+  // Engine ground truth (extensions/track-changes/constants.js): mark names are
+  // 'trackInsert'/'trackDelete'/'trackFormat'; a tracked DELETE keeps the text and
+  // ADDS the mark (A7); undo of a tracked insert is ATOMIC (A7). The fork commands
+  // enable/disableTrackChanges exist TODAY (track-changes.js), so the engine-level
+  // pins below may go green before the bridge lands -- they pin the fork engine the
+  // slice builds on (K2/A7 facts), never a blocked-cmd no-op.
+  await PM().newBlank(); await sleep(100);
+  // Tracking is EDITOR-level state that survives setDoc -- every test that enables it
+  // must clean up on EVERY exit path (try/finally) or later setDocs would keep the
+  // replaced text as tracked deletions and poison the whole suite.
+  // TWO-step hygiene (probe-verified 2026-06-11): disabling tracking is NOT enough.
+  // Editor.ts #dispatchTransaction PROTECTS existing tracked review state -- any
+  // transaction touching a surviving trackInsert/trackDelete/trackFormat mark is
+  // rewritten as tracked EVEN WITH TRACKING OFF (Editor.ts:3119-3125
+  // protectsExistingTrackedReviewState), so leftover marks turn the next setDoc's
+  // replace into tracked deletes and the doc text accumulates forever. reviewReset
+  // therefore (1) accept-alls the surviving marks via the FORK command (exists
+  // today; its dispatchReviewDecision path sets skipTrackChanges) and (2) disables
+  // tracking. The planned bridge names (acceptAll/rejectAll) are the surface UNDER
+  // TEST and stay out of the hygiene path. trackOff (bare disable) remains for
+  // MID-test use where the tracked content itself must survive the disable.
+  const trackOff = () => { try { PM().cmd('disableTrackChanges'); } catch (e) { /* red-stage safe */ } };
+  const reviewReset = () => { try { PM().cmd('acceptAllTrackedChanges'); PM().cmd('disableTrackChanges'); } catch (e) { /* red-stage safe */ } };
+  // Comments are EDITOR-level entity-store state and survive setDoc just like
+  // tracking does -- every comment-creating test must commentsReset() in a finally
+  // or later getComments() counts go stale. Pre-bridge (getComments missing) this
+  // is a no-op by construction, so no raw fork deleteComment ever fires.
+  const commentsReset = () => { try { if (typeof PM().getComments !== 'function') return; for (const c of PM().getComments()) { try { PM().cmd('deleteComment', c.id); } catch (e) {} } } catch (e) {} };
+  // Visible-truth probe for the A3 view modes: the fork's Original/Final views
+  // hide tracked runs via decoration classes + display:none CSS (the doc and
+  // its DOM text stay intact -- textContent ignores CSS hiding by design).
+  // True when `needle` exists in the rendered DOM AND every occurrence sits
+  // inside a css-hidden (display:none) container under the PM view.
+  const insertHiddenByCss = (needle) => {
+    const walker = document.createTreeWalker(v().dom, NodeFilter.SHOW_TEXT);
+    let found = false;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.includes(needle)) continue;
+      found = true;
+      let el = n.parentElement;
+      let hidden = false;
+      while (el && el !== v().dom) {
+        if (getComputedStyle(el).display === 'none') { hidden = true; break; }
+        el = el.parentElement;
+      }
+      if (!hidden) return false;
+    }
+    return found;
+  };
+  // Re-locate needle WITHOUT moving the selection (selectText also selects).
+  const findRange = (needle) => {
+    let found = null;
+    doc().descendants((node, pos) => {
+      if (found || !node.isText || !node.text) return;
+      const i = node.text.indexOf(needle);
+      if (i >= 0) found = { from: pos + i, to: pos + i + needle.length };
+    });
+    return found;
+  };
+  const caretAfter = (needle) => { const s = selectText(needle); window.WC.editor.commands.setTextSelection({ from: s.to, to: s.to }); };
+  // Concatenated text of every text node carrying mark `name` (anchor-span asserts).
+  const markedText = (name) => { let s = ''; doc().descendants((n) => { if (n.isText && n.marks.some((m) => m.type.name === name)) s += n.text; }); return s; };
+  const anyTrackMark = () => hasMark('trackInsert') || hasMark('trackDelete') || hasMark('trackFormat');
+  // Snapshot modulo sdBlockRev -- the [1] Mod-Z precedent (history-exempt metadata).
+  const norm8 = () => JSON.stringify(v().state.doc.toJSON(), (k, val) => (k === 'sdBlockRev' ? undefined : val));
+
+  await t('[8] AREA audit: every Review-tab cmd is D6-mapped (or app-level allowlisted)', () => {
+    // A5: unmapped cmds are NOT blocked (isBlocked returns false) and silently drive
+    // the hidden legacy editor in PM mode. Self-enforcing walk of the LIVE ribbon
+    // data so the post-regroup (D8.1) layout is audited automatically.
+    const tab = (window.WC.RIBBON || []).find((tb) => tb.name === 'Review' || tb.id === 'review');
+    if (!tab) return 'Review tab not found in WC.RIBBON';
+    const cmds = new Set();
+    for (const g of tab.groups || []) {
+      for (const c of g.controls || []) {
+        if (c.cmd) cmds.add(c.cmd);
+        // items are plain label strings today; A4's gen.js cmd-override may turn
+        // them into objects carrying cmds -- collect those too.
+        for (const it of c.items || []) if (it && typeof it === 'object' && it.cmd) cmds.add(it.cmd);
+      }
+    }
+    if (cmds.size < 10) return 'walker collected only ' + cmds.size + ' cmds -- ribbon shape changed?';
+    // App-level by design (handlers never touch a document in PM mode): wordCount's
+    // handler is the PM-aware dialog (pinned by [0a]); blockAuthors/linkedNotes are
+    // pure cloud-unavailable toasts. EVERYTHING else must be AREA-mapped so isBlocked
+    // governs it (A5) -- including readAloud/editor/hideInk, whose legacy handlers
+    // poke the hidden legacy doc (e.g. review-tools.js hideInk reads E().node).
+    const appLevel = new Set(['wordCount', 'blockAuthors', 'linkedNotes']);
+    // EXACT 'review' match required -- parking a cmd in an already-FLIPPED area would
+    // pass a truthy check yet leave its legacy-doc-poking handler un-blocked: such
+    // cmds must live in a stays-unflipped area or ship re-pointed handlers.
+    const unmapped = Array.from(cmds).filter((cmd) => !appLevel.has(cmd) && window.WC.PM.AREA[cmd] !== 'review');
+    return unmapped.length === 0 || 'not review-mapped: ' + unmapped.join(', ');
+  });
+
+  await t('[8] trackChanges via ribbon dispatch latches reviewState.tracking on/off', async () => {
+    setDoc('latch probe text');
+    if (typeof PM().reviewState !== 'function') return 'PM.reviewState missing (red)';
+    try {
+      reviewReset(); await sleep(50); // deterministic start (also clears inherited marks)
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== true) return 'tracking did not enable via the ribbon dispatch (D6 still blocking?)';
+      // Ribbon -> ENGINE tie: the latched state must actually drive the rewrite --
+      // a reviewState-only echo would pass the bare latch asserts.
+      caretAfter('text');
+      v().dispatch(v().state.tr.insertText(' LATCHPROBE')); await sleep(80);
+      const mOn = markNames('LATCHPROBE');
+      if (!mOn.some((x) => x.startsWith('trackInsert:'))) return 'ribbon-enabled tracking did not mark the insert: ' + mOn.join(' ');
+      // Clear the surviving tracked mark BEFORE the off-leg insert -- Editor.ts
+      // protects existing tracked state and would rewrite an adjacent insert as
+      // tracked even with tracking off (see the reviewReset note above).
+      PM().cmd('acceptAllTrackedChanges'); await sleep(60);
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== false) return 'second dispatch did not latch tracking off';
+      caretAfter('LATCHPROBE');
+      v().dispatch(v().state.tr.insertText(' LATCHFREE')); await sleep(80);
+      const mOff = markNames('LATCHFREE');
+      return !mOff.some((x) => x.startsWith('trackInsert:'))
+        || 'tracking latched off but the insert still got marked: ' + mOff.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] tracked INSERT carries a trackInsert mark (engine rewrite)', async () => {
+    setDoc('insert probe base');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('base');
+      // tr.insertText flows through the Editor dispatchTransaction rewrite -- the
+      // SAME path typed input takes; the rewrite must mark the inserted run.
+      v().dispatch(v().state.tr.insertText(' INSERTED')); await sleep(80);
+      if (!doc().textContent.includes('INSERTED')) return 'inserted text missing';
+      const m = markNames('INSERTED');
+      return m.some((x) => x.startsWith('trackInsert:')) || 'no trackInsert mark on the inserted run: ' + m.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] tracked DELETE keeps the text and adds a trackDelete mark (A7)', async () => {
+    setDoc('keep doomed tail');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      selectText('doomed');
+      v().dispatch(v().state.tr.deleteSelection()); await sleep(80);
+      if (!doc().textContent.includes('doomed')) return 'text was hard-deleted (delete not tracked)';
+      const m = markNames('doomed');
+      return m.some((x) => x.startsWith('trackDelete:')) || 'no trackDelete mark on the kept run: ' + m.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] tracked FORMAT: bold under tracking adds a trackFormat mark', async () => {
+    // bold IS in TrackedFormatMarkNames (constants.js) and 'character' is FLIPPED,
+    // so the real run('bold') dispatch works today -- only the trackFormat stamp
+    // depends on tracking being live.
+    setDoc('plain formatme rest');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      selectText('formatme'); run('bold'); await sleep(80);
+      const m = markNames('formatme');
+      if (!m.some((x) => x.startsWith('bold:') && !x.includes('"value":"0"'))) return 'bold did not apply: ' + m.join(' ');
+      return m.some((x) => x.startsWith('trackFormat:')) || 'no trackFormat mark: ' + m.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] acceptAll clears every track mark and keeps the inserted text', async () => {
+    setDoc('acceptall base');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('base');
+      v().dispatch(v().state.tr.insertText(' KEEPME')); await sleep(80);
+      if (!hasMark('trackInsert')) return 'tracked insert never marked (engine precondition)';
+      if (!PM().cmd('acceptAll')) return 'acceptAll cmd unavailable/refused (red)';
+      await sleep(80);
+      if (!doc().textContent.includes('KEEPME')) return 'accepted text vanished';
+      return !anyTrackMark() || 'track marks remain after acceptAll';
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] rejectAll removes the tracked insert text entirely', async () => {
+    setDoc('rejectall base');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('base');
+      v().dispatch(v().state.tr.insertText(' GONETEXT')); await sleep(80);
+      if (!doc().textContent.includes('GONETEXT')) return 'tracked insert did not land';
+      if (!hasMark('trackInsert')) return 'tracked insert never marked (engine precondition)';
+      if (!PM().cmd('rejectAll')) return 'rejectAll cmd unavailable/refused (red)';
+      await sleep(80);
+      return !doc().textContent.includes('GONETEXT') || 'rejected text still present';
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] acceptChange accepts exactly ONE change (revision count drops by 1)', async () => {
+    setDocs(['first changeone here', 'second changetwo here']);
+    if (typeof PM().getRevisions !== 'function') return 'PM.getRevisions missing (red)';
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('changeone');
+      v().dispatch(v().state.tr.insertText(' AAA')); await sleep(60);
+      caretAfter('changetwo');
+      v().dispatch(v().state.tr.insertText(' BBB')); await sleep(60);
+      trackOff();
+      const n0 = PM().getRevisions().length;
+      if (n0 !== 2) return 'expected 2 revisions before accept, got ' + n0;
+      const a = findRange('AAA');
+      if (!a) return 'first tracked insert not found';
+      window.WC.editor.commands.setTextSelection({ from: a.from + 1, to: a.from + 1 }); // caret IN the first change
+      if (!PM().cmd('acceptChange')) return 'acceptChange cmd unavailable/refused (red)';
+      await sleep(80);
+      const n1 = PM().getRevisions().length;
+      if (n1 !== 1) return 'revisions after single accept: ' + n1;
+      // WHICH-change pin: the count alone also passes if the WRONG change was accepted.
+      const mA = markNames('AAA');
+      if (mA.some((x) => x.startsWith('trackInsert:'))) return 'AAA still tracked after accept: ' + mA.join(' ');
+      const mB = markNames('BBB');
+      return mB.some((x) => x.startsWith('trackInsert:'))
+        || 'BBB lost its trackInsert (accepted the WRONG change): ' + mB.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] rejectChange rejects exactly the caret change', async () => {
+    // MAJOR-4: mirrors the acceptChange two-change setup on the reject side.
+    setDocs(['first changeone here', 'second changetwo here']);
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('changeone');
+      v().dispatch(v().state.tr.insertText(' AAA')); await sleep(60);
+      caretAfter('changetwo');
+      v().dispatch(v().state.tr.insertText(' BBB')); await sleep(60);
+      trackOff();
+      const a = findRange('AAA');
+      if (!a) return 'first tracked insert not found';
+      window.WC.editor.commands.setTextSelection({ from: a.from + 1, to: a.from + 1 }); // caret IN the first change
+      if (!PM().cmd('rejectChange')) return 'rejectChange cmd unavailable/refused (red)';
+      await sleep(80);
+      if (doc().textContent.includes('AAA')) return 'rejected insert AAA still in the doc';
+      if (!doc().textContent.includes('BBB')) return 'BBB text vanished (rejected the WRONG change)';
+      const mB = markNames('BBB');
+      return mB.some((x) => x.startsWith('trackInsert:'))
+        || 'BBB lost its trackInsert (rejected the WRONG change): ' + mB.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] acceptSelection accepts only the selected change (by-selection)', async () => {
+    // MAJOR-4 variant: planned bridge cmd over the fork acceptTrackedChangeBySelection.
+    setDocs(['first changeone here', 'second changetwo here']);
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('changeone');
+      v().dispatch(v().state.tr.insertText(' AAA')); await sleep(60);
+      caretAfter('changetwo');
+      v().dispatch(v().state.tr.insertText(' BBB')); await sleep(60);
+      trackOff();
+      selectText('AAA'); // selection spans ONLY the first tracked insert
+      if (!PM().cmd('acceptSelection')) return 'acceptSelection cmd unavailable/refused (red)';
+      await sleep(80);
+      if (!doc().textContent.includes('AAA')) return 'accepted text AAA vanished';
+      const mA = markNames('AAA');
+      if (mA.some((x) => x.startsWith('trackInsert:'))) return 'AAA still tracked after acceptSelection: ' + mA.join(' ');
+      const mB = markNames('BBB');
+      return mB.some((x) => x.startsWith('trackInsert:'))
+        || 'BBB touched by acceptSelection (must stay tracked): ' + mB.join(' ');
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] undo of a tracked insert is ATOMIC: one undo restores the snapshot (A7)', async () => {
+    setDoc('undo atom base');
+    caretAfter('base');
+    await sleep(550); // close the history group -- undo must revert ONLY the tracked insert
+    const before = norm8();
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      v().dispatch(v().state.tr.insertText(' TRACKED')); await sleep(80);
+      if (!doc().textContent.includes('TRACKED')) return 'tracked insert did not land';
+      PM().cmd('undo'); await sleep(80);
+      if (doc().textContent.includes('TRACKED')) return 'inserted text survived the single undo';
+      if (anyTrackMark()) return 'track marks survived the single undo';
+      return norm8() === before || 'doc !== pre-insert snapshot after ONE undo';
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] setReviewView original/none/simple/all round-trips without mutating the doc (A3)', async () => {
+    setDoc('viewmode probe text');
+    if (typeof PM().reviewState !== 'function') return 'PM.reviewState missing (red)';
+    try {
+      // BLOCKER fix: with no tracked change in the doc, a reviewState-echo stub
+      // satisfied every assert. Create a REAL tracked insert first, then assert
+      // ENGINE truth per mode -- the fork TrackChangesBasePlugin flags via the
+      // planned reviewState().engineFlags seam -- plus rendered text where cheap.
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('text');
+      v().dispatch(v().state.tr.insertText(' VMODE')); await sleep(80);
+      if (!hasMark('trackInsert')) return 'tracked insert never marked (engine precondition)';
+      const before = norm8();
+      // original: the engine shows the ORIGINAL doc -- the insert must not render.
+      if (!PM().cmd('setReviewView', 'original')) return 'setReviewView unavailable/refused (red)';
+      await sleep(150); // command + rAF-coalesced ribbon sync tick
+      if (PM().reviewState().view !== 'original') return 'view != original: ' + JSON.stringify(PM().reviewState().view);
+      let f = PM().reviewState().engineFlags;
+      if (!f) return 'reviewState().engineFlags missing (red)';
+      if (f.onlyOriginalShown !== true || f.onlyModifiedShown !== false) return 'original engineFlags wrong: ' + JSON.stringify(f);
+      // Visible-truth probe: the fork hides tracked inserts via the decoration
+      // class 'track-insert-dec hidden' + display:none CSS -- textContent is
+      // DOM-structural and IGNORES css hiding, so assert the computed style of
+      // the node that contains the insert text (same assertion strength: the
+      // user must not SEE the insert in Original view).
+      if (!insertHiddenByCss('VMODE')) return 'view=original still renders the tracked insert (no display:none container)';
+      // combo <-> engine sync: the displayForReview input must FOLLOW the engine
+      // (the A6 seed pin below only covers the boot default).
+      const ent = window.WC.Ribbon.controlIndex.displayForReview;
+      if (!ent || !ent.input) return 'displayForReview combo not in controlIndex (red)';
+      if (ent.input.value !== 'Original') return 'combo shows ' + JSON.stringify(ent.input.value) + ' while engine view=original';
+      // none (No Markup): fork showFinal at the engine (A3).
+      PM().cmd('setReviewView', 'none'); await sleep(80);
+      if (PM().reviewState().view !== 'none') return 'view != none: ' + JSON.stringify(PM().reviewState().view);
+      f = PM().reviewState().engineFlags || {};
+      if (f.onlyModifiedShown !== true) return 'none engineFlags wrong (showFinal expected): ' + JSON.stringify(f);
+      // simple: ALSO showFinal at the engine + clone-owned chrome (A3).
+      PM().cmd('setReviewView', 'simple'); await sleep(80);
+      if (PM().reviewState().view !== 'simple') return 'view != simple: ' + JSON.stringify(PM().reviewState().view);
+      f = PM().reviewState().engineFlags || {};
+      if (f.onlyModifiedShown !== true) return 'simple engineFlags wrong (A3: simple = showFinal + clone chrome): ' + JSON.stringify(f);
+      // all: both engine flags reset, markup rendered again.
+      PM().cmd('setReviewView', 'all'); await sleep(80);
+      if (PM().reviewState().view !== 'all') return 'view != all: ' + JSON.stringify(PM().reviewState().view);
+      f = PM().reviewState().engineFlags || {};
+      if (f.onlyOriginalShown !== false || f.onlyModifiedShown !== false) return 'all engineFlags wrong (both must be false): ' + JSON.stringify(f);
+      if (!v().dom.textContent.includes('VMODE')) return 'view=all does not render the tracked insert';
+      if (insertHiddenByCss('VMODE')) return 'view=all still css-hides the tracked insert';
+      // A3: view modes are plugin/presentation state -- NEVER doc mutations.
+      return norm8() === before || 'view switching mutated the doc';
+    } finally {
+      try { if (typeof PM().reviewState === 'function') PM().cmd('setReviewView', 'all'); } catch (e) { /* red-stage safe */ }
+      reviewReset();
+    }
+  });
+
+  await t('[8] exports are view-independent: w:ins survives view=original (A3)', async () => {
+    setDoc('exportview base');
+    if (typeof PM().reviewState !== 'function') return 'PM.reviewState missing (red)';
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('base');
+      v().dispatch(v().state.tr.insertText(' VINS')); await sleep(80);
+      if (!hasMark('trackInsert')) return 'tracked insert never marked (engine precondition)';
+      if (!PM().cmd('setReviewView', 'original')) return 'setReviewView unavailable/refused (red)';
+      if (PM().reviewState().view !== 'original') return 'view did not switch to original';
+      // BLOCKER fix: pin ENGINE truth, not the echo -- the export assert is vacuous
+      // unless the engine is genuinely showing the original when it runs.
+      const f = PM().reviewState().engineFlags;
+      if (!f) return 'reviewState().engineFlags missing (red)';
+      if (f.onlyOriginalShown !== true) return 'engine not in original mode: ' + JSON.stringify(f);
+      if (!insertHiddenByCss('VINS')) return 'view=original still renders the tracked insert (no display:none container)';
+      const xml = await exportDocumentXml();
+      return /<w:ins\b/.test(xml) || 'no <w:ins> in document.xml while viewing Original';
+    } finally {
+      try { if (typeof PM().reviewState === 'function') PM().cmd('setReviewView', 'all'); } catch (e) { /* red-stage safe */ }
+      reviewReset();
+    }
+  });
+
+  await t('[8] EXPORT: tracked insert + tracked delete emit <w:ins> and <w:del>', async () => {
+    setDoc('pin keepword removeword tail');
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('keepword');
+      v().dispatch(v().state.tr.insertText(' ADDED')); await sleep(60);
+      selectText('removeword');
+      v().dispatch(v().state.tr.deleteSelection()); await sleep(80);
+      if (!hasMark('trackInsert') || !hasMark('trackDelete')) {
+        return 'engine precondition: trackInsert=' + hasMark('trackInsert') + ' trackDelete=' + hasMark('trackDelete');
+      }
+      const xml = await exportDocumentXml();
+      const ins = /<w:ins\b/.test(xml);
+      const del = /<w:del\b/.test(xml);
+      return (ins && del) || ('docx pins missing: w:ins=' + ins + ' w:del=' + del);
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] addComment from a collapsed caret expands to the word (A2)', async () => {
+    setDoc('alpha bravado charlie');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      const sel = selectText('bravado');
+      window.WC.editor.commands.setTextSelection({ from: sel.from + 2, to: sel.from + 2 }); // caret INSIDE the word
+      if (!PM().cmd('addComment', 'first comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list = PM().getComments();
+      if (!Array.isArray(list) || list.length !== 1) return 'expected 1 comment, got ' + (Array.isArray(list) ? list.length : typeof list);
+      if (list[0].text !== 'first comment') return 'comment text wrong: ' + JSON.stringify(list[0].text);
+      // Word parity: the caret comment anchors EXACTLY the containing word --
+      // includes() would tolerate an anchor bleeding into the neighbours.
+      const anchored = markedText('commentMark');
+      return anchored === 'bravado' || 'commentMark anchor != "bravado": ' + JSON.stringify(anchored);
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] addComment from a selection anchors it + stamps a real author (A2)', async () => {
+    setDoc('quote exact phrase here');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('exact phrase');
+      if (!PM().cmd('addComment', 'sel comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list = PM().getComments();
+      if (!Array.isArray(list) || list.length !== 1) return 'expected 1 comment, got ' + (Array.isArray(list) ? list.length : typeof list);
+      const anchored = markedText('commentMark');
+      if (anchored !== 'exact phrase') return 'commentMark anchor != "exact phrase": ' + JSON.stringify(anchored);
+      const author = list[0].author;
+      if (typeof author !== 'string' || !author.trim()) return 'author empty: ' + JSON.stringify(author);
+      // A2 identity fix: create-editor.ts must stop stamping the placeholder user.
+      return author !== 'local' || 'author is the placeholder "local" (A2 identity fix missing)';
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] replyComment persists the reply on the thread (A2 Document API pin)', async () => {
+    // THE regression pin for event-only reply loss: raw fork addCommentReply only
+    // EMITS; the bridge must drive editor.doc.comments so the reply persists.
+    setDoc('reply target words');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('target');
+      if (!PM().cmd('addComment', 'parent comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list0 = PM().getComments();
+      if (!Array.isArray(list0) || list0.length !== 1) return 'parent comment missing: ' + (Array.isArray(list0) ? list0.length : typeof list0);
+      if (!PM().cmd('replyComment', list0[0].id, 'roger that')) return 'replyComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const c = PM().getComments()[0];
+      if (!c || !Array.isArray(c.replies)) return 'replies array missing: ' + JSON.stringify(c && c.replies);
+      if (c.replies.length !== 1) return 'expected 1 reply, got ' + c.replies.length;
+      return c.replies[0].text === 'roger that' || 'reply text wrong: ' + JSON.stringify(c.replies[0].text);
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] resolveComment flips the resolved flag (A2 isDone stamping)', async () => {
+    setDoc('resolve target words');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('target');
+      if (!PM().cmd('addComment', 'to be resolved')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list0 = PM().getComments();
+      if (!Array.isArray(list0) || list0.length !== 1) return 'comment missing: ' + (Array.isArray(list0) ? list0.length : typeof list0);
+      if (list0[0].resolved !== false) return 'fresh comment already resolved: ' + JSON.stringify(list0[0].resolved);
+      if (!PM().cmd('resolveComment', list0[0].id)) return 'resolveComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const c = PM().getComments()[0];
+      return (!!c && c.resolved === true) || 'resolved flag not stamped: ' + JSON.stringify(c && c.resolved);
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] setActiveComment exposes the active thread (A2)', async () => {
+    // Small pin over the planned bridge cmd (shadows the raw fork setActiveComment):
+    // either getComments() rows carry an `active` flag or reviewState() exposes
+    // activeCommentId -- the cards/list UI needs one of them.
+    setDoc('active target words');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('target');
+      if (!PM().cmd('addComment', 'activate me')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list0 = PM().getComments();
+      if (!Array.isArray(list0) || list0.length !== 1) return 'comment missing: ' + (Array.isArray(list0) ? list0.length : typeof list0);
+      const id = list0[0].id;
+      if (!PM().cmd('setActiveComment', id)) return 'setActiveComment cmd unavailable/refused (red)';
+      await sleep(80);
+      const c = PM().getComments()[0];
+      const viaFlag = !!c && c.active === true;
+      const viaState = typeof PM().reviewState === 'function' && PM().reviewState().activeCommentId === id;
+      return (viaFlag || viaState)
+        || ('no active surface: comments[0].active=' + JSON.stringify(c && c.active)
+          + ' reviewState.activeCommentId=' + (typeof PM().reviewState === 'function'
+            ? JSON.stringify(PM().reviewState().activeCommentId) : '(reviewState missing)'));
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] deleteComment removes the thread AND its anchors from the doc', async () => {
+    setDoc('delete target words');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('target');
+      if (!PM().cmd('addComment', 'short lived')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const list0 = PM().getComments();
+      if (!Array.isArray(list0) || list0.length !== 1) return 'comment missing: ' + (Array.isArray(list0) ? list0.length : typeof list0);
+      if (!PM().cmd('deleteComment', list0[0].id)) return 'deleteComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const after = PM().getComments();
+      if (!Array.isArray(after) || after.length !== 0) return 'comment still listed: ' + (Array.isArray(after) ? after.length : typeof after);
+      if (hasMark('commentMark')) return 'commentMark anchor survived the delete';
+      return !(hasNode('commentRangeStart') || hasNode('commentRangeEnd') || hasNode('commentReference'))
+        || 'commentRange/commentReference nodes survived the delete';
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] EXPORT: bridge comment emits w:commentRangeStart + w:commentReference (A2/K3)', async () => {
+    // Pins the entity-store wiring: raw fork commands never write converter.comments,
+    // so their anchors export to NOTHING -- this stays red forever on the raw path.
+    setDoc('export comment anchor words');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('anchor');
+      if (!PM().cmd('addComment', 'exported comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      if (!Array.isArray(PM().getComments()) || PM().getComments().length !== 1) return 'comment missing before export';
+      const xml = await exportDocumentXml();
+      const start = /<w:commentRangeStart/.test(xml);
+      const ref = /<w:commentReference/.test(xml);
+      return (start && ref) || ('docx comment pins missing: rangeStart=' + start + ' reference=' + ref);
+    } finally { commentsReset(); }
+  });
+
+  await t('[8] getRevisions merges tracked changes + comments (T11)', async () => {
+    setDoc('merge probe words tail');
+    if (typeof PM().getRevisions !== 'function') return 'PM.getRevisions missing (red)';
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('tail');
+      v().dispatch(v().state.tr.insertText(' INS')); await sleep(60);
+      trackOff(); // the comment add itself must not become a tracked change
+      selectText('probe');
+      if (!PM().cmd('addComment', 'rev comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const revs = PM().getRevisions();
+      if (!Array.isArray(revs)) return 'getRevisions did not return an array';
+      const types = revs.map((r) => r.type);
+      if (revs.length !== 2) return 'expected 2 revisions (1 insert + 1 comment), got ' + revs.length + ' [' + types.join(',') + ']';
+      if (!(types.includes('insert') && types.includes('comment'))) return 'types wrong: [' + types.join(',') + ']';
+      // Reviewing-pane rows show the author (D8.4): both rows from the SAME local
+      // identity (A2) -- non-empty and equal.
+      const authors = revs.map((r) => r.author);
+      if (!authors.every((a) => typeof a === 'string' && a.trim().length > 0)) return 'revision author empty: ' + JSON.stringify(authors);
+      return authors[0] === authors[1] || 'revision authors differ: ' + JSON.stringify(authors);
+    } finally { reviewReset(); commentsReset(); }
+  });
+
+  await t('[8] reimported docx: tracked changes do not become phantom comments (A2 filter)', async () => {
+    // MAJOR-5: the converter projects tracked changes into the comments store as
+    // trackedChange===true rows -- the bridge MUST filter them on getComments() or
+    // every export->open round-trip grows phantom comments.
+    setDoc('phantom filter probe tail');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    if (typeof PM().getRevisions !== 'function') return 'PM.getRevisions missing (red)';
+    try {
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('tail');
+      v().dispatch(v().state.tr.insertText(' PHINS')); await sleep(60);
+      trackOff(); // the comment add itself must not become a tracked change
+      selectText('probe');
+      if (!PM().cmd('addComment', 'real comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const bytes = await PM().exportDocxBytes();
+      const ok = await PM().openDocx(bytes);
+      if (ok !== true) return 'openDocx(bytes) failed on reimport';
+      await sleep(150);
+      const comments = PM().getComments();
+      if (!Array.isArray(comments)) return 'getComments did not return an array after reimport';
+      if (comments.length !== 1) return 'phantom comments after reimport: expected 1, got ' + comments.length;
+      const revs = PM().getRevisions();
+      if (!Array.isArray(revs)) return 'getRevisions did not return an array after reimport';
+      const types = revs.map((r) => r.type);
+      if (revs.length !== 2) return 'expected 2 revisions after reimport (1 insert + 1 comment), got ' + revs.length + ' [' + types.join(',') + ']';
+      return (types.includes('insert') && types.includes('comment')) || 'reimported types wrong: [' + types.join(',') + ']';
+    } finally { reviewReset(); commentsReset(); }
+  });
+
+  await t('[8] nextComment vs nextChange navigate their OWN groups, both directions (A4)', async () => {
+    // Pins the group split: the legacy shared-cmd heuristic routed Comments Prev/Next
+    // and Changes Prev/Next through ONE handler -- a known infidelity.
+    setDocs(['early anchorword paragraph', 'later changetarget paragraph']);
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('anchorword');
+      if (!PM().cmd('addComment', 'nav comment')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      if (!PM().cmd('enableTrackChanges')) return 'enableTrackChanges refused (red)';
+      caretAfter('changetarget');
+      v().dispatch(v().state.tr.insertText('XX')); await sleep(60);
+      trackOff();
+      window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); // doc start
+      if (!PM().cmd('nextComment')) return 'nextComment cmd unavailable/refused (red)';
+      await sleep(80);
+      const a = findRange('anchorword');
+      const s1 = v().state.selection;
+      if (!a || s1.from < a.from - 1 || s1.from > a.to + 1) return 'nextComment did not land on the comment anchor (sel at ' + s1.from + ')';
+      window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+      if (!PM().cmd('nextChange')) return 'nextChange cmd unavailable/refused (red)';
+      await sleep(80);
+      const c = findRange('XX');
+      const s2 = v().state.selection;
+      if (!c || s2.from < c.from - 1 || s2.from > c.to + 1) return 'nextChange did not land on the tracked change (sel at ' + s2.from + ')';
+      // prev direction: from the doc END both prev cmds must walk BACK to their group.
+      const end = doc().content.size - 1;
+      window.WC.editor.commands.setTextSelection({ from: end, to: end }); // doc end
+      if (!PM().cmd('prevChange')) return 'prevChange cmd unavailable/refused (red)';
+      await sleep(80);
+      const c2 = findRange('XX');
+      const s3 = v().state.selection;
+      if (!c2 || s3.from < c2.from - 1 || s3.from > c2.to + 1) return 'prevChange did not land on the tracked change (sel at ' + s3.from + ')';
+      window.WC.editor.commands.setTextSelection({ from: end, to: end });
+      if (!PM().cmd('prevComment')) return 'prevComment cmd unavailable/refused (red)';
+      await sleep(80);
+      const a2 = findRange('anchorword');
+      const s4 = v().state.selection;
+      return (!!a2 && s4.from >= a2.from - 1 && s4.from <= a2.to + 1)
+        || 'prevComment did not land on the comment anchor (sel at ' + s4.from + ')';
+    } finally { reviewReset(); commentsReset(); }
+  });
+
+  await t('[8] state-sync: Track Changes button latches via direct poke (A6)', async () => {
+    // A6: NOT the shared TOGGLE_MAP (would clobber the legacy latch under --legacy);
+    // the format-painter direct-poke pattern is PM-only by construction.
+    setDoc('sync latch probe');
+    const ent = window.WC.Ribbon.controlIndex.trackChanges;
+    const btn = (ent && ent.node) || document.querySelector('[data-cmd="trackChanges"]');
+    if (!btn) return 'trackChanges ribbon control not found';
+    try {
+      reviewReset(); await sleep(150);
+      run('trackChanges'); await sleep(150); // rAF-coalesced sync tick
+      const on = btn.classList.contains('toggled');
+      run('trackChanges'); await sleep(150);
+      const offCleared = !btn.classList.contains('toggled');
+      return (on && offCleared) || ('toggled-class: on=' + on + ' offCleared=' + offCleared);
+    } finally { reviewReset(); }
+  });
+
+  await t('[8] displayForReview combo is seeded to "All Markup" (A6)', () => {
+    // ribbon.js renders non-font combos with an EMPTY input -- the review install
+    // must seed Word's default display mode.
+    const ent = window.WC.Ribbon.controlIndex.displayForReview;
+    if (!ent || !ent.input) return 'displayForReview combo not in controlIndex';
+    return ent.input.value === 'All Markup' || ('combo shows ' + JSON.stringify(ent.input.value) + ' instead of "All Markup"');
+  });
+
+  await t('[8] Lock Tracking gates the ribbon toggle (T3/D8.7)', async () => {
+    // Non-vacuous by construction (the Mod-Z lesson): the UNLOCKED toggle must be
+    // proven to work through the same dispatch before the lock assert means anything.
+    setDoc('lock gate probe');
+    try {
+      reviewReset(); await sleep(50);
+      window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = '';
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== true) return 'baseline ribbon toggle did not enable tracking (D6 still blocking?)';
+      window.WC.pmTrackLock.locked = true; window.WC.pmTrackLock.password = 'pw';
+      run('trackChanges'); await sleep(80);
+      if (PM().reviewState().tracking !== true) return 'LOCKED toggle still disabled tracking — the D8.7 gate is dead';
+      window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = '';
+      run('trackChanges'); await sleep(80);
+      return PM().reviewState().tracking === false || 'unlocked toggle did not disable tracking';
+    } finally { window.WC.pmTrackLock.locked = false; window.WC.pmTrackLock.password = ''; reviewReset(); }
+  });
+
+  await t('[8] Restrict Editing enforcement drives engine editability (X3)', async () => {
+    try {
+      run('restrictEditing'); await sleep(80);
+      const pane = document.getElementById('restrict-pane');
+      if (!pane) return 'Restrict Editing pane did not open via the ribbon dispatch (D6 still blocking?)';
+      const start = document.getElementById('wc-restrict-start');
+      if (!start) return 'no Start Enforcing button in the pane';
+      start.click(); await sleep(80);
+      if (window.WC.view.editable !== false) return 'Start Enforcing did not make the PM view read-only';
+      const stop = document.getElementById('wc-restrict-stop');
+      if (!stop) return 'no Stop Protection button after enforcement';
+      stop.click(); await sleep(80);
+      return window.WC.view.editable === true || 'Stop Protection did not restore editability';
+    } finally {
+      try { PM().getEditor().setEditable(true, false); } catch (e) { /* engine teardown-safe */ }
+      const p = document.getElementById('restrict-pane'); if (p) p.remove();
+    }
+  });
+
+  await t('[8] proofing language applies to the PM editing surface (P9)', () => {
+    const dom = PM().getEditor().view.dom;
+    const lang0 = dom.getAttribute('lang'); const spell0 = dom.getAttribute('spellcheck');
+    try {
+      if (!window.WC.setProofingLanguage('fr-FR', true)) return 'setProofingLanguage returned false';
+      if (dom.getAttribute('lang') !== 'fr-FR' || dom.getAttribute('spellcheck') !== 'false') return 'lang/spellcheck attrs not applied to the PM view DOM';
+      window.WC.setProofingLanguage('en-US', false);
+      return dom.getAttribute('lang') === 'en-US' && dom.getAttribute('spellcheck') === 'true';
+    } finally {
+      if (lang0 == null) dom.removeAttribute('lang'); else dom.setAttribute('lang', lang0);
+      if (spell0 == null) dom.removeAttribute('spellcheck'); else dom.setAttribute('spellcheck', spell0);
+    }
+  });
+
+  await t('[8] hygiene: review state fully reset', async () => {
+    // Verifying replacement for the old bare reviewReset() trailer: never leak
+    // tracking state, surviving track marks, OR comment threads into the [0b]
+    // block (engine-level, idempotent -- see the reviewReset note above).
+    reviewReset(); commentsReset(); await sleep(80);
+    if (anyTrackMark()) return 'track marks survived the hygiene reset -- fork acceptAllTrackedChanges renamed?';
+    // Behavioral tracking-off probe (bridge-independent): with tracking off an
+    // insert must land UNMARKED.
+    setDoc('hygiene trailer');
+    caretAfter('trailer');
+    v().dispatch(v().state.tr.insertText(' HYG8')); await sleep(80);
+    const m = markNames('HYG8');
+    return !m.some((x) => x.startsWith('trackInsert:'))
+      || 'tracking still ON after the hygiene reset (fork disableTrackChanges renamed?): ' + m.join(' ');
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
     const bytes = await PM().exportDocxBytes();
@@ -2110,6 +2864,20 @@
     const ok = await PM().openDocx(back.bytes);
     return ok && /saved via Files.save/.test(window.WC.view.dom.textContent) && cleanAfterSave;
   });
+  await t('[8] Compare mints REAL tracked changes (D8.6 — doc-replacing, [0b] zone)', async () => {
+    const ok = await PM().runCompare('alpha beta gamma', 'alpha BETA gamma delta', { granularity: 'word', label: 'Compare Author' });
+    if (ok !== true) return 'runCompare returned ' + ok;
+    if (PM().reviewState().tracking !== false) return 'tracking left ON after compare (Word turns it off on the result)';
+    const txt = window.WC.view.dom.textContent;
+    if (!/beta/.test(txt) || !/BETA/.test(txt)) return 'diff text missing (old kept + new inserted expected): ' + txt.slice(0, 80);
+    const mOld = markNames('beta');
+    if (!mOld.some((x) => x.startsWith('trackDelete:'))) return 'replaced run lacks trackDelete: ' + mOld.join(' ');
+    const mNew = markNames('BETA');
+    if (!mNew.some((x) => x.startsWith('trackInsert:'))) return 'inserted run lacks trackInsert: ' + mNew.join(' ');
+    const revs = PM().getRevisions();
+    return revs.length >= 2 || ('Revisions provider sees only ' + revs.length + ' rows');
+  });
+
   await t('[0b] New Document loads the blank template + clean state', async () => {
     const f = window.WC.Files;
     const ok = await PM().newBlank();

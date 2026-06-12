@@ -1,0 +1,161 @@
+/* ===========================================================================
+   track-chrome-pm.css -- slice 8 task 5 (D8.2/D8.4): tracked-changes chrome
+   (changed-line bars + format balloons + the Revisions pane) and the T9/T10
+   markup-filter render rules. Every rule is gated under body.pm-active or
+   scoped to wc- ids/classes that only bridge/track-chrome.ts creates, so
+   --legacy renders are untouched. Structure mirrors Word for Windows 16.0
+   (dark-theme captures .oracle-probes/slice8/word-ref/07, 09, 14) re-skinned
+   with the clone's light M365 tokens (base.css).
+   =========================================================================== */
+
+/* Overlay covering #pages (sibling of #pm-editor -- scrolls + zoom-scales with
+   the page, the comments-overlay pattern). Children opt back into the mouse. */
+#wc-track-chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 29; /* one under #wc-comments-overlay (30): cards beat balloons */
+}
+
+/* Changed-line bars (T7): one strip per run of changed lines, in the page's
+   left margin. All Markup = grey ('Changed lines: Outside border', T19);
+   Simple Markup = RED + thicker (capture 09). Click toggles simple<->all. */
+#wc-track-chrome .wc-track-bar {
+  position: absolute;
+  left: 48px;
+  width: 2px;
+  background: #616161;
+  pointer-events: auto;
+  cursor: pointer;
+}
+#wc-track-chrome.simple .wc-track-bar { background: #c00000; width: 3px; }
+
+/* Format balloon (T6): right markup-column card -- author header +
+   'Formatted: <desc>' (capture 07); red left edge = the author change color
+   (single-author clone renders Word's default red, T20). */
+#wc-track-chrome .wc-track-balloon {
+  position: absolute;
+  left: calc(100% + 12px);
+  /* T19: Advanced Track Changes Options "Preferred width" (inches × 96) */
+  width: var(--wc-balloon-width, 304px);
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid var(--divider);
+  border-left: 3px solid #c00000;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #1f1f1f;
+  cursor: pointer;
+}
+#wc-track-chrome .wc-tb-author { font-weight: 600; }
+#wc-track-chrome .wc-tb-text { margin-top: 2px; }
+
+/* Connector line from the formatted range to its balloon (capture 07). */
+#wc-track-chrome .wc-track-connector {
+  position: absolute;
+  height: 0;
+  border-top: 1px solid #c00000;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* D8.2 belt over the JS guard: Simple Markup collapses the balloon column
+   (red bars stay; comment glyphs stay -- they live in the comments overlay). */
+body.pm-active #pm-editor.review-simple ~ #wc-track-chrome .wc-track-balloon,
+body.pm-active #pm-editor.review-simple ~ #wc-track-chrome .wc-track-connector { display: none; }
+
+/* ---- T9 markup filters: render rules for the task-3 latched classes ---- */
+/* Unchecking 'Insertions and Deletions' shows ins/del as FINAL text while
+   formatting markup stays (parity T9, observed live): neutralize the fork's
+   .track-insert-dec decoration paint (prosemirror.css:282-292) and hide
+   deleted runs entirely -- the fork's own showFinal variant uses display:none
+   the same way (.track-delete-dec.hidden). The #pm-editor id outranks the
+   fork's class-chain selectors; text-decoration needs !important because the
+   fork's delete strikethrough carries one. */
+body.pm-active #pm-editor.pm-hide-insdel .track-insert-dec.highlighted {
+  border-top: none;
+  border-bottom: none;
+  background-color: transparent;
+  color: inherit;
+  text-decoration: none;
+}
+body.pm-active #pm-editor.pm-hide-insdel .track-delete-dec.highlighted { display: none; }
+/* Unchecking 'Formatting' drops the inline format underline (the gold
+   border-bottom, prosemirror.css:304-306); balloons + format bars are dropped
+   JS-side in track-chrome.ts. */
+body.pm-active #pm-editor.pm-hide-format .track-format-dec.highlighted { border-bottom: none; }
+
+/* Hide Ink (X4): the H.hideInk latch class. No-op visual today -- the slice-10
+   Draw layer mounts as .wc-ink-layer inside #pm-editor and inherits this rule. */
+body.pm-active #pm-editor.pm-hide-ink .wc-ink-layer { display: none; }
+
+/* ---- Revisions pane (T11/D8.4, capture 14): left-docked taskpane shell ---- */
+#wc-review-pane { left: 0; z-index: 45; }
+#wc-review-pane .wc-rvp-headbtns { display: flex; align-items: center; gap: 2px; }
+.wc-rvp-bar { display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; }
+.wc-rvp-count { font-size: 12.5px; font-weight: 600; }
+.wc-rvp-refresh { margin-left: auto; }
+.wc-rvp-iconbtn {
+  width: 24px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 2px;
+  color: var(--icon);
+  cursor: pointer;
+  padding: 0;
+}
+.wc-rvp-iconbtn:hover { background: var(--btn-hover); }
+/* Collapse chevron points right while the list is collapsed (capture 14 shape). */
+#wc-review-pane.collapsed .wc-rvp-collapse svg { transform: rotate(-90deg); }
+#wc-review-pane.collapsed .tp-body { display: none; }
+#wc-review-pane.collapsed:not(.horizontal) { bottom: auto; }
+.wc-rvp-empty { color: #888; padding: 10px 4px; font-size: 12.5px; }
+.wc-rvp-entry { padding: 8px 4px; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 12.5px; }
+.wc-rvp-entry:hover { background: #f5f5f5; }
+.wc-rvp-author { font-weight: 600; }
+.wc-rvp-verb { color: #605e5c; margin-left: 2px; }
+.wc-rvp-text { margin-top: 3px; color: #1f1f1f; white-space: pre-wrap; word-wrap: break-word; }
+
+/* Horizontal layout (T11 menu) = the same pane docked bottom. */
+#wc-review-pane.horizontal {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 220px;
+  border-right: none;
+  border-top: 1px solid #e1dfdd;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06);
+}
+#wc-review-pane.horizontal.collapsed { height: auto; }
+
+/* ---- slice 8 task 6: proofing + dialog-consumed settings ---- */
+
+/* Read Aloud (P5): the spoken word paints via the CSS Custom Highlight API --
+   no decoration plugin, no model churn; cleared on pause/stop/close. */
+::highlight(wc-read-aloud) {
+  background-color: rgba(255, 213, 79, 0.55);
+}
+
+/* T19 Advanced Track Changes Options: insertions/deletions mark style + color.
+   Gated behind .wc-track-custom (set on first Apply) so the fork's defaults
+   stay byte-identical until the user actually customizes. */
+body.pm-active #pm-editor.wc-track-custom .track-insert-dec.highlighted {
+  text-decoration-line: var(--wc-track-ins-line, underline);
+  color: var(--wc-track-ins-color, inherit);
+  font-weight: var(--wc-track-ins-weight, inherit);
+  font-style: var(--wc-track-ins-fontstyle, inherit);
+}
+body.pm-active #pm-editor.wc-track-custom .track-delete-dec.highlighted {
+  text-decoration-line: var(--wc-track-del-line, line-through);
+  color: var(--wc-track-del-color, inherit);
+  font-weight: var(--wc-track-del-weight, inherit);
+  font-style: var(--wc-track-del-fontstyle, inherit);
+}
