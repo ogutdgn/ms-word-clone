@@ -39,8 +39,13 @@ first, then dive into the linked `docs/`.
 > Restrict Editing via engine `setEditable`, proofing re-points, the titlebar mode pill;
 > oracle legs A+B PASS vs **Word for Windows 16.0** over COM — the parity reference since
 > slice 8; slices 1–7 stay validated vs Word for Mac 16.77.1).
-> **Phase 2** continues wiring ribbon commands → PM transactions (**slice 9: references** next —
-> TOC + footnotes/endnotes + citations per spec §9.1 row 9).
+> Slice 9 flipped **references** — TOC · footnotes/endnotes + a continuous-flow notes area ·
+> citations/bibliography · captions/index · cross-reference, all on the fork's SuperDoc Document
+> API (`editor.doc.*`) so they EXPORT; NOTICE'd fork fix for Add-Text→TOC; oracle Leg A clone→Word
+> PASS, Leg B Word→clone partial (footnotes+TOC import; SEQ/CITATION import a recorded
+> fork-converter follow-up).
+> **Phase 2** continues wiring ribbon commands → PM transactions (**slice 10** —
+> themes/mail-merge/draw/insert-exotica — next).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## What this is

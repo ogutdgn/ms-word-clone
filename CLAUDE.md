@@ -35,9 +35,13 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 > 16.77.1; **since slice 8 the parity reference is Word for Windows 16.0** (COM oracle
 > `scripts/oracle/word-oracle-win.ps1`; slice-8 legs A+B PASS — `w:ins`/`w:del`/`w:rPrChange` +
 > comments survive Word's own resave). Flipped ribbon areas: `character`, `paragraph`, `lists`,
-> `styles`, `clipboard`, `editing-misc`, `find-replace`, `insert-basics`, `review`; the legacy
-> app runs only under `--legacy`. **Phase 2 continues with slice 9 (references)** — TOC +
-> footnotes/endnotes + citations per spec §9.1 row 9.
+> `styles`, `clipboard`, `editing-misc`, `find-replace`, `insert-basics`, `review`, `references`; the legacy
+> app runs only under `--legacy`. **Slice 9 (references) is DONE** — TOC · footnotes/endnotes (+ a continuous-flow notes area) ·
+> citations/bibliography · captions/index · cross-reference, all wired to the fork's SuperDoc
+> Document API (`editor.doc.*`) via `bridge/references.ts` + `bridge/notes-area.ts` so they EXPORT
+> (§9.1 row 9; oracle Leg A clone→Word PASS, Leg B Word→clone partial — footnotes+TOC import,
+> SEQ/CITATION import a recorded fork-converter follow-up). **Slice 10
+> (themes/mail-merge/draw/insert-exotica) next.**
 > Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR

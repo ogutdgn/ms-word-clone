@@ -142,10 +142,24 @@
 > comments survive Word's own resave; Word-authored revisions import with real authors;
 > `notes/2026-06-11-slice8-oracle.json`). Gates (six): **PM 237/237**, legacy 257,
 > smoke 9/9 × 2, docx 17, roundtrip 27/0.
-> **Next: slice 9 — references** (§9.1 row 9: TOC + footnotes/endnotes + citations scope).
-> ⚠️ Both `[0a]` D6 guard tests now probe `tableOfContents` (references area) — slice 9's flip
-> must repoint them to a still-blocked probe. Slice-6 UI-Codex leftovers fold into the
-> slice-10/11 parity passes.
+>
+> **Slice 9 is DONE** (`feature/phase-2-slice-9-references`, PR pending): area **`references`
+> FLIPPED** — TOC (create-from-headings/update/remove; page numbers degrade to `'0'`),
+> footnotes/endnotes (insert + a clone-owned continuous-flow **notes area** `#pm-notes-area`
+> editing bodies via the Document API), captions + Table of Figures (SEQ; ToF = raw `TOC \c` field),
+> citations/bibliography (real source store + exportable CITATION/BIBLIOGRAPHY fields + style combo),
+> index + Table of Authorities (numeric `\c`), and cross-reference — all wired to the fork's
+> **SuperDoc Document API** (`editor.doc.*`) via new `bridge/references.ts` + `bridge/notes-area.ts`;
+> ribbon `H.*` re-pointed via `PMA()` (legacy byte-identical; leak audit clean); both `[0a]` D6
+> guards repointed `tableOfContents`→`startMailMerge`; NOTICE'd fork fix (`toc-entry-builder.ts` reads
+> `outlineLevel ?? outlineLvl`) so Add-Text feeds the TOC. Gates (six): **PM 275/275**, legacy 257,
+> smoke 9/9 × 2, roundtrip 27/0, docx 17/0. Oracle vs Word for Windows 16.0: **Leg A clone→Word
+> PASS** (footnotes/TOC/SEQ/CITATION/sources survive Word's resave unchanged), **Leg B Word→clone
+> partial** (footnotes+TOC import; SEQ caption + CITATION drop on import — a recorded fork-converter
+> follow-up). `notes/2026-06-12-slice9-oracle.json`.
+> **Next: slice 10 — themes · mail-merge · draw · insert-exotica** (§9.1 row 10; independent PRs).
+> ⚠️ Carry-over: the fork docx importer drops SEQ/CITATION complex fields → nodes (Leg B) — a
+> prioritized fork-importer follow-up; slice-6 UI-Codex leftovers fold into slice-10/11 parity.
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -166,6 +180,30 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-12 (Phase 2 — slice 9: references)
+- [x] **Critique-hardened plan** (`docs/superpowers/plans/2026-06-12-phase2-slice-9-references.md`)
+  — fork pre-verification (the references family is already mounted + exposed via `editor.doc.*`)
+  then a 3-critic adversarial pass (12 amendments: TOC `'0'` not `'??'`, footnote body via
+  `getUpdatedDocs`, caption SEQ-shape, `addText`→`setOutlineLevel`, ToF raw field, citations real
+  at field/source level / empty-render headless, `--legacy` has no script-gate, …).
+- [x] **Red `[9]` tests + D6 repoint** (`3c08fed`) — engine-observable; both `[0a]` guards
+  `tableOfContents`→`startMailMerge`.
+- [x] **`bridge/references.ts`** (`b0a2194`) — 25 `ref*` verbs over `editor.doc.*` (caret→address
+  via an `sdBlockId` mint; citation minted-source-id flow); +22 `[9]` coverage tests (caught + fixed
+  a bibliography title→style export bug and an Add-Text wrong-namespace no-op).
+- [x] **D9.1 notes area** (`37bfa2e`) — clone-owned continuous-flow `#pm-notes-area` over
+  `footnotes.list()`/`footnotes.update`; focused-dirty clobber guard (proven via test).
+- [x] **Re-points + THE FLIP** (`6098fa5`) — every References `H.*`/flyout/dialog → `PMA()`→bridge
+  (legacy byte-identical); `references` in FLIPPED; leak audit clean; NOTICE'd Add-Text→TOC fork fix;
+  Mark-Citation numeric `\c`; refAddSource flat→`b:Source` mapping; refUpdateSource wired.
+- [x] **Six gates green:** PM 275/275, legacy 257/257, smoke 9/9 ×2, roundtrip 27/0, docx 17/0.
+- [x] **Oracle** (`d820fea`) — extended `docx-inspect.js` + author/import probes; **Leg A clone→Word
+  PASS**, **Leg B Word→clone partial** (footnotes+TOC import; SEQ/CITATION fork-importer gap recorded).
+- [x] **Checkpoint + PR** — last-point/execution-map/banners advanced; ledger deviations; PR into
+  `main`. *(Graph refresh DEFERRED: the raw `graphify update .` CLI pulls the excluded
+  `superdoc-fork/` — 19.7k nodes; refresh via the `/graphify` skill, which honors the
+  `docs/GRAPHIFY.md` exclusion, next session.)*
 
 ### 2026-06-11 (post-slice-8 bug-fix batch — page-click + styles)
 - [x] **Page-margin click placed no caret** (`5c4ee25`, PR #26) — root-caused via

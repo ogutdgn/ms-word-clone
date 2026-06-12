@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-06-12 — Slice 9 (references) DONE: area `references` FLIPPED onto the PM engine
+
+- **Branch:** `feature/phase-2-slice-9-references` (off fresh `main` @ `61e5ec4`); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 9 (references) DONE → slice 10 (themes/mail-merge/draw/insert-exotica) next.**
+- **State summary:** area **`references` FLIPPED**. The fork already MOUNTS the full references
+  extension family and EXPOSES the **SuperDoc Document API** (`editor.doc.*`, the slice-8
+  comments-export path), so the slice is wiring, not engine-building. New **`bridge/references.ts`**
+  (25 `ref*` verbs over `editor.doc.{toc,create.tableOfContents,footnotes,captions,citations,
+  crossRefs,index,authorities,fields,format.paragraph.setOutlineLevel}`; the caret→Document-API
+  address crux solved by minting an `sdBlockId` on the caret block when `selection.current().target`
+  is null; citation minted-source-id flow) + **`bridge/notes-area.ts`** (D9.1 clone-owned
+  continuous-flow `#pm-notes-area`, sibling of `#pm-editor`, rendering `footnotes.list()` with
+  plain-text body edit via `footnotes.update`; focused-dirty clobber guard). Every References
+  `H.*`/flyout/dialog re-pointed via `PMA()`→bridge (legacy ELSE byte-identical; leak audit clean).
+  NOTICE'd fork fix: `toc-entry-builder.ts` reads `outlineLevel ?? outlineLvl` so Add-Text feeds the
+  TOC. Both `[0a]` D6 guards repointed `tableOfContents`→`startMailMerge`.
+- **Done this session (per-commit):** `3c08fed` red `[9]` tests + D6 repoint · `b0a2194`
+  bridge/references.ts (+22 `[9]` coverage; the coverage pass caught + fixed a bibliography
+  title→style export bug and an Add-Text wrong-namespace no-op) · `37bfa2e` D9.1 notes area
+  (clobber guard added in review) · `6098fa5` re-points + **THE FLIP** + Mark-Citation numeric `\c`
+  + refAddSource flat→`b:Source` mapping + the NOTICE'd fork fix · `d820fea` oracle.
+- **Gates (six):** PM **275/275**, legacy **257/257** (byte-identical), smoke **9/9 ×2**,
+  roundtrip **27/0**, docx **17/0**.
+- **Oracle vs Word for Windows 16.0** (`notes/2026-06-12-slice9-oracle.json`): **Leg A clone→Word
+  PASS** — `word-oracle-win.ps1 roundtrip` → ROUNDTRIP_OK; Word resaved the clone references docx
+  and PRESERVED every construct unchanged (footnotes/footnoteRefs/tocFields/seqFields/citationFields/
+  sources, before==after via the extended `docx-inspect.js`). **Leg B Word→clone PARTIAL** — importing
+  Word's own serialization is healthy (no contentError/blank); footnotes + TOC import faithfully, but
+  the **pre-existing fork converter drops SEQ caption + CITATION complex fields on import** (caption
+  text survives; in-text citation vanishes).
+- **Recorded deviations (ledger):** TOC/ToF/Index/ToA page numbers + caption SEQ numbers + rendered
+  citation/bibliography text are layout-gated (Phase 7) — the field codes export and Word repopulates
+  on F9 (Leg A confirms). Note bodies are plain-text; bibliography flyout title is cosmetic (no fork
+  slot); Manual Table degrades to an auto TOC. **Carry-over (prioritized follow-up):** the fork docx
+  importer does not map SEQ/CITATION complex fields → nodes (Leg B) — a NOTICE'd fork-importer fix is
+  recommended.
+- **Next:** slice 10. **Blockers/notes:** none for the PR. Word never disturbed (PID-safe fresh
+  hidden instance, foreground); `C:\tmp` holds the oracle artifacts (`wc-slice9-clone.docx`,
+  `wc-slice9-resaved.docx`).
+
+---
+
 ## 2026-06-11 (bug-fix batch) — 3 user-reported editor fixes (page-click + styles) → main
 
 - **Branch:** fixes shipped on `fix/page-click-and-style-scope` (**PR #26**) +
