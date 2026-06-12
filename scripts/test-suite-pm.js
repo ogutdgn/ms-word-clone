@@ -2839,9 +2839,14 @@
   });
 
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------
-  await t('[fix] clicking the empty area below the last paragraph places the caret', async () => {
+  await t('[fix] clicking the empty area below the text jumps the caret to the doc END', async () => {
     setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
-    // park the caret at the very start so a successful move is unambiguous
+    // "son yazılan yer" = Word's Ctrl+End = Selection.atEnd (end of the last text
+    // block). Read it via the live selection's class so the test and the fix use
+    // the SAME canonical end-of-doc position (no brittle hand-rolled arithmetic).
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    const docEnd = v().state.selection.constructor.atEnd(v().state.doc).from;
+    // park the caret at the very start so a successful jump-to-end is unambiguous
     window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
     v().dom.blur(); await sleep(20);
     const page = document.getElementById('pm-editor');
@@ -2849,16 +2854,13 @@
     const lastP = Array.from(prose.querySelectorAll('p')).pop();
     const lr = lastP.getBoundingClientRect();
     const pr = page.getBoundingClientRect();
-    // a point BELOW the last paragraph but inside the page sheet (the bottom margin)
+    // a point BELOW the content but inside the page sheet (the bottom margin)
     const x = pr.left + pr.width / 2;
     const y = Math.min(lr.bottom + 30, pr.bottom - 6);
     page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
     await sleep(40);
-    const sel = v().state.selection;
-    // the caret must have left the start and the view must hold focus
-    const lastStart = (() => { let s = -1, pos = null; v().state.doc.descendants((n, p) => { if (n.type.name === 'paragraph') { s++; if (s === 2) pos = p; } return true; }); return pos; })();
     if (!v().hasFocus()) return 'view did not take focus after the page-margin click';
-    return sel.from >= lastStart || ('caret landed at ' + sel.from + ', expected inside the last paragraph (>= ' + lastStart + ')');
+    return v().state.selection.from === docEnd || ('caret landed at ' + v().state.selection.from + ', expected the doc end (' + docEnd + ')');
   });
 
   await t('[fix] clicking the left margin beside a paragraph places the caret in it', async () => {
