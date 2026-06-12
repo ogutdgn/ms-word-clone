@@ -7,6 +7,70 @@
 
 ---
 
+## 2026-06-11 (close-out) — Slice 8 DONE + merged to main; loop process RETIRED
+
+- **Branch:** `feature/phase-2-slice-8-review` → **PR #25 merged to `main`**; the
+  `completion-driven-agent-loop` branch deleted (its 5 commits — Step-0 Windows
+  replication + spec capture — are fully contained in the slice-8 history).
+- **Phase:** **Phase 2 — slice 8 (review) DONE → slice 9 (references) next.**
+- **Process change (user decision):** the completion-driven agent loop is **retired** —
+  back to the plain per-slice PR flow into `main`. `docs/loop/` removed; the deferral
+  ledger (process-independent) moved to `docs/plan/deferrals.md`; execution-map CURRENT
+  PHASE + banners normalized. Historical log entries stay (append-only).
+- **State summary:** area **`review` FLIPPED** — the full Review tab runs on the PM
+  engine: Track Changes (latch/chords/lock dialog), tracked ins/del/format render +
+  bars/balloons/Revisions pane, modern contextual comment cards (Document-API path —
+  comments EXPORT), accept/reject(+advance)/all/by-selection, 4 display modes, Show
+  Markup latches, Track Changes Options (+Advanced) + Change User Name, Compare →
+  REAL tracked-changes diff (`PM.runCompare`), Restrict Editing (engine `setEditable`),
+  proofing re-points (Word Count/Editor pane/Thesaurus/Accessibility/Read Aloud
+  per-word `::highlight`/Language/Spelling), R2/R3 enablement greys, D8.8 mode pill.
+- **Done this session (tasks 6–9 of the plan, direct execution — no loop):**
+  - `16ebaee` task 6 — review dialogs + proofing PM-safe (D8.5–D8.7). Systematic-debug
+    catch: `runCompare`'s naive `paraPos+1+offset` mapping was off by the fork's inline
+    **run-node boundary tokens** (probe-proven); rewritten **right-to-left with a fresh
+    offset→position map per op** (tracked deletes keep text ⇒ no shift arithmetic).
+  - `34e578c` task 7 — THE FLIP (`review` in FLIPPED; K8 belt: legacy beforeinput
+    interceptor binds only under `--legacy`) + the D8.8 titlebar mode pill
+    (Editing|Reviewing|Viewing, state-synced, lock-respecting).
+  - `060f55b` — oracle verdicts + 58/58 parity audit + R2/R3 enablement (the audit's
+    only miss): comments Delete/Prev/Next grey without comments; No Markup/Original
+    grey the markup controls (`wc-disabled` state-sync pokes).
+- **Gates (six, Windows): PM 237/237** (233 + 4 task-6/flip pins), legacy 257/257,
+  smoke 9/9 ×2, docx 17/17, roundtrip 27/0.
+- **Parity:** checklist **57/57 ticked** — evidence = the 58/58 DOM/behavior audit
+  (`scripts/probe-slice8-parity.js`, run in the built app) + `[8]` suite semantics +
+  oracle legs. Pixel-level look rides the task-5 capture-pinned defaults (no fresh
+  pixel diff — cheap follow-up if disputed).
+- **Oracle (spec §8.3) vs Word for Windows 16.0 — BOTH LEGS PASS, driven over COM**
+  (computer-use access dialog timed out → pivoted to `word-oracle-win.ps1` + a one-off
+  PID-safe authoring script; no interactive Word session touched):
+  - **Leg A clone→Word:** tracked ins+del+**format**+comment docx → ROUNDTRIP_OK (no
+    repair) and Word's own resave keeps `w:ins`/`w:del`/`w:delText`/**`w:rPrChange`** +
+    `comments.xml`/`commentsExtended.xml` + authors + texts. **K4 resolved: the fork
+    emits `w:rPrChange`.**
+  - **Leg B Word→clone:** REAL-Word-authored revisions (TrackRevisions + Comments.Add,
+    author = signed-in account "Ogut, Dogan") import as `trackInsert`/`trackDelete`/
+    `trackFormat` marks + comment card with the real author; `getRevisions()` counts 4
+    (comments count — Word semantics); acceptAll yields Word's outcome.
+  - Verdicts: `docs/superpowers/plans/notes/2026-06-11-slice8-oracle.json`.
+- **Recorded deviations (ledger C adds):** reactions 👍 are in-session only (no
+  commentsExtensible round-trip); Just Mine == For Everyone (single-author clone);
+  Compare result replaces the single doc (confirmDiscard-consented, UNBOUND from any
+  path — §5.3); selected-text proofing language applies doc-level (per-run `w:lang`
+  not on the fork command surface); cloud services (Editor score/refinements,
+  Translate, Thesaurus definitions) = class-B local degradations; format-row
+  descriptions verbosely list every rPrChange property (cosmetic).
+- **Carry-overs → slice 9 (references):** BOTH `[0a]` D6 guard tests probe
+  `tableOfContents` — slice 9's flip must repoint them to a still-blocked area probe.
+  Slice-6 UI-Codex leftovers fold into slice-10/11 parity passes. Visual pixel
+  spot-check of review chrome vs live Word = optional cheap follow-up.
+- **Blockers/notes:** none. Word never left running (both COM legs quit gracefully);
+  `C:\tmp` holds the leg artifacts (`wc-slice8-legA*.docx`, `wc-slice8-legB.docx`,
+  `wc-parity-audit.json`).
+
+---
+
 ## 2026-06-11 (later) — Slice 8 IN PROGRESS: Word-side spec capture DONE
 
 - **Branch:** `completion-driven-agent-loop` (slice branch not yet cut — capture phase is

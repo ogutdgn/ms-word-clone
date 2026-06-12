@@ -115,19 +115,37 @@
 > directly via computer-use MCP (first slice; slice-6 table-style reopen recheck closed).
 > Gates (six): **PM 206/206**, legacy 257, smoke 9/9 × 2, docx 17, **roundtrip 27/0**.
 >
-> **Loop Step 0 is DONE (2026-06-11):** the completion-driven loop (`docs/loop/loop.md`) now
-> runs on the user's **Windows** machine — computer-use permissions granted up front (Word +
-> File Explorer + Electron, full tier + clipboard + system combos); all six gates green on
-> Windows (one Mac-vacuous PM test spy-hardened); the **Windows COM oracle**
-> (`scripts/oracle/word-oracle-win.ps1`) ported, live-validated, critique-hardened; the two
-> gitignored real-Word roundtrip fixtures re-authored (`author-fixtures-win.ps1`). From
-> slice 8 the parity reference is **Word for Windows 16.0** (slices 1–7 stay validated vs
-> Word for Mac 16.77.1).
-> **Next: slice 8 — review** (comments on fork ranges + existing pane, track changes,
-> language/proofing re-points) — one slice per loop iteration, PR into
-> `completion-driven-agent-loop` (NEVER `main`). ⚠️ slice-8 must repoint the `[0a]` D6
-> run-block test off `newComment`; slice-6 UI-Codex steps remain open (now feasible via
-> computer use).
+> **Windows replication is DONE (2026-06-11):** development moved to the user's **Windows 11**
+> machine — all six gates green on Windows (one Mac-vacuous PM test spy-hardened); the
+> **Windows COM oracle** (`scripts/oracle/word-oracle-win.ps1`) ported, live-validated,
+> critique-hardened; the two gitignored real-Word roundtrip fixtures re-authored
+> (`author-fixtures-win.ps1`). From slice 8 the parity reference is **Word for Windows 16.0**
+> (slices 1–7 stay validated vs Word for Mac 16.77.1). *(The short-lived
+> completion-driven-agent-loop process was retired the same day — its Windows Step-0 work and
+> the slice-8 build merged to `main` via the normal PR flow (PR #25); `docs/loop/` was removed
+> and the deferral ledger lives on at [deferrals.md](deferrals.md).)*
+>
+> **Slice 8 is DONE** (`feature/phase-2-slice-8-review`, PR #25): area **`review` FLIPPED** —
+> fork-engine **Track Changes** (ribbon latch + Ctrl+Shift+E + D8.7 Lock Tracking password
+> dialog), tracked ins/del/format render + changed-line bars + format balloons + the
+> Word-anatomy **Revisions pane** (comments count), modern contextual **comment cards**
+> (composer/reply/like/edit/resolve + Contextual|List + right-dock pane) on the Document-API
+> path (A2 — comments EXPORT), accept/reject(+advance)/all/by-selection, display modes
+> (All/Simple/None/Original — fork-native ×3 + CSS ×1), Show Markup latches, **Track Changes
+> Options (+Advanced, honestly-consumed settings) + Change User Name**, **Compare → REAL
+> tracked-changes diff** (`PM.runCompare`, right-to-left fresh-offset-map apply), **Restrict
+> Editing pane** (engine `setEditable`), proofing re-points (Word Count/Editor pane/Thesaurus/
+> Accessibility Assistant/Read Aloud per-word `::highlight`/Language P9/Spelling P3), R2/R3
+> enablement greys, **D8.8 titlebar mode pill** (Editing|Reviewing|Viewing). Parity: 57-item
+> checklist ticked via the 58/58 DOM/behavior audit (`scripts/probe-slice8-parity.js`);
+> **oracle legs A+B PASS vs Word for Windows 16.0 over COM** (w:ins/w:del/**w:rPrChange** +
+> comments survive Word's own resave; Word-authored revisions import with real authors;
+> `notes/2026-06-11-slice8-oracle.json`). Gates (six): **PM 237/237**, legacy 257,
+> smoke 9/9 × 2, docx 17, roundtrip 27/0.
+> **Next: slice 9 — references** (§9.1 row 9: TOC + footnotes/endnotes + citations scope).
+> ⚠️ Both `[0a]` D6 guard tests now probe `tableOfContents` (references area) — slice 9's flip
+> must repoint them to a still-blocked probe. Slice-6 UI-Codex leftovers fold into the
+> slice-10/11 parity passes.
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -148,6 +166,34 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-11 (Slice 8 close-out — direct session; loop process retired)
+- [x] **Task 6 (dialogs + proofing PM-safe, `16ebaee`):** Lock/Unlock Tracking (T3) + lock
+  gate on the toggle; Track Changes Options (T18) + Advanced (T19, consumed: ins/del mark
+  style+color, balloon width) + Change User Name (persisted author identity); Restrict
+  Editing pane (X3 → engine `setEditable`); **Compare → real tracked-changes diff**
+  (`PM.runCompare` — probe found the naive offset map off by the fork's run-node tokens;
+  rewritten right-to-left with a fresh map per op); Thesaurus/Accessibility/Read-Aloud
+  (per-word `::highlight`)/Language (P9)/Editor pane (P4)/Word Count (P1) re-pointed at PM.
+- [x] **Task 7 THE FLIP (`34e578c`):** `review` → FLIPPED; K8 belt (legacy beforeinput
+  interceptor `--legacy`-only); **D8.8 titlebar mode pill** built (cheap): Editing |
+  Reviewing | Viewing, state-synced. The 4 flip-pending `[8]` pins went green.
+- [x] **Six gates green:** PM **237/237** · legacy 257/257 · smoke 9/9 ×2 · docx 17/17 ·
+  roundtrip 27/0.
+- [x] **Parity pass:** 58/58 DOM/behavior audit (`scripts/probe-slice8-parity.js`) over the
+  57-item checklist — the only finding (R2/R3 enablement greys missing) fixed via
+  state-sync `wc-disabled` pokes (`060f55b`); checklist ticked 57/57.
+- [x] **Oracle legs A+B PASS vs REAL Word for Windows 16.0 over COM** (no interactive
+  session; computer-use access dialog timed out → pivoted to the COM oracle): Leg A
+  clone→Word — ROUNDTRIP_OK, `w:ins`/`w:del`/`w:rPrChange` + comments survive Word's own
+  resave (K4 resolved: the fork EMITS `w:rPrChange`); Leg B Word→clone — COM-authored
+  revisions import as engine marks with the real account author; acceptAll applies Word's
+  outcome. Verdicts: `notes/2026-06-11-slice8-oracle.json`.
+- [x] **Loop process retired (user decision):** `docs/loop/` removed; the deferral ledger
+  moved to [docs/plan/deferrals.md](deferrals.md); execution-map/banners normalized to the
+  plain PR flow.
+- [x] **PR #25 opened → merged to `main`;** `completion-driven-agent-loop` branch deleted
+  (fully contained in the slice-8 history).
 
 ### 2026-06-11 (Completion-driven loop — Step 0: Windows replication)
 - [x] **Permissions up front (ONE request flow):** Word + File Explorer + Electron (clone)

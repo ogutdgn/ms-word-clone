@@ -19,8 +19,8 @@ first, then dive into the linked `docs/`.
 > **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
 > builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc`
-> npm dep, telemetry off). **Phase 2 slices 0a–6 are DONE** (merged to `main` via PRs #11–#15,
-> #17, #19, #21, #22 and #23): the PM core (`#pm-editor`) is now the **active visible editor** since
+> npm dep, telemetry off). **Phase 2 slices 0a–8 are DONE** (merged to `main` via PRs #11–#15,
+> #17, #19, #21–#25): the PM core (`#pm-editor`) is now the **active visible editor** since
 > slice 0a; the legacy vanilla-JS `window.WC` editor boots only under the `--legacy` flag as a frozen
 > regression target. Flipped ribbon areas so far: **character** (slice 1), **paragraph +
 > lists** (slice 2 — incl. shading/borders, Word-native multilevel, the Paragraph dialog),
@@ -28,13 +28,19 @@ first, then dive into the linked `docs/`.
 > gallery highlight, 4 minted built-in style defaults), **clipboard + editing-misc**
 > (slice 4 — cut/copy/paste via webContents IPC, paste-special dialog, Word-scope Format
 > Painter, select; Cmd+Shift+C/V chords), **find-replace** (slice 5 — fork decoration-based
-> Search; Match Case + Whole Words + Wildcards + Advanced Find + Go To), and **insert-basics +
-> full Table Tools** (slice 6, PR #23 — link/image/page-break/hr/symbol/equation-as-styled-text/
-> bookmark + table insertion + the 9 ops + 14 NOTICE'd fork table commands + Table Layout/Design
-> contextual ribbon tabs + a PM table context menu + the table-defect fix batch incl. minted
-> real-Word table styles end-to-end and cell gridlines; oracle leg-A reopen-in-Word PASS).
-> **Phase 2** continues wiring ribbon commands → PM transactions (**slice 7: file-io** next —
-> html/txt/csv open/save on the PM engine + the PM-converter round-trip suite).
+> Search; Match Case + Whole Words + Wildcards + Advanced Find + Go To), **insert-basics +
+> full Table Tools** (slice 6, PR #23 — insert primitives + table insertion + the 9 ops +
+> 14 NOTICE'd fork table commands + contextual ribbon tabs + minted real-Word table styles),
+> **file-io** (slice 7, PR #24 — docx/html/txt/csv open + docx/html/txt save; `test:roundtrip`
+> is THE docx gate), and **review** (slice 8, PR #25 — fork-engine Track Changes + lock dialog,
+> tracked ins/del/format render with bars/balloons/Revisions pane, modern contextual comment
+> cards on the Document-API path so comments EXPORT, accept/reject(+advance), 4 display modes,
+> Track Changes Options/Advanced + Change User Name, Compare → REAL tracked-changes diff,
+> Restrict Editing via engine `setEditable`, proofing re-points, the titlebar mode pill;
+> oracle legs A+B PASS vs **Word for Windows 16.0** over COM — the parity reference since
+> slice 8; slices 1–7 stay validated vs Word for Mac 16.77.1).
+> **Phase 2** continues wiring ribbon commands → PM transactions (**slice 9: references** next —
+> TOC + footnotes/endnotes + citations per spec §9.1 row 9).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## What this is

@@ -1,12 +1,14 @@
 # Deferrals & exclusions ledger
 
-> The single place for everything the loop must NOT chase. Three classes:
+> The single place for everything the build must NOT chase right now. Three classes:
 > **(A) Phase-7 / pagination-gated** — lands when real page sheets land, after Phase 2.
 > **(B) Cloud-runtime stubs** — physically need Microsoft cloud services; get graceful
-> Word-like degraded behavior, final hide-vs-keep list presented to the user at loop end.
+> Word-like degraded behavior, final hide-vs-keep list presented to the user at Phase-2 end.
 > **(C) Recorded product decisions / known deviations** — deliberate, evidence-backed.
-> Moving a parity item HERE mid-loop requires it to fit A, B, or an explicit C decision —
+> Moving a parity item HERE mid-slice requires it to fit A, B, or an explicit C decision —
 > never "hard to fix". Append, date, justify; never silently drop items.
+> *(Moved from `docs/loop/` 2026-06-11 when the short-lived loop process was retired —
+> the ledger itself is process-independent and stays live.)*
 
 ## A — Phase-7 / pagination-gated (spec §9.3)
 
@@ -51,7 +53,8 @@ translator services · Editor (cloud grammar) · Researcher. Loop obligation: no
 ## Process notes
 
 - Slices 1–7 were oracle-validated vs **Word for Mac 16.77.1**; from slice 8 the
-  reference is **Word for Windows** (Step-0 note in loop.md). Mac-specific C-entries are
+  reference is **Word for Windows 16.0** (recorded in last-point.md, 2026-06-11
+  Windows-replication entry). Mac-specific C-entries are
   re-evaluated against Windows Word during each slice's parity pass.
 - Slice-6 UI-Codex leftover probes (A2 Insert-Table dialog, A5 Bookmark, B-layout/
   autofit, C1/C2) fold into the slice-10/11 parity passes naturally.
