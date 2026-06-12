@@ -274,6 +274,18 @@ The following upstream packages are included in this directory tree:
   unconditional `tempDiv.querySelector('style').innerHTML` deref — Word HTML without a
   `<style>` block threw a TypeError and aborted the whole paste; it now resolves to `''` and
   the paste proceeds with inline/default styles.
+- **TOC `\u` applied-outline collection reads both outline-level keys (slice 9, 2026-06-12):**
+  `collectTocSources` (`document-api-adapters/helpers/toc-entry-builder.ts`) `\u`
+  (useAppliedOutlineLevel) branch read only `paragraphProperties.outlineLevel`, but the live
+  outline setter `format.paragraph.setOutlineLevel`
+  (`document-api-adapters/plan-engine/paragraphs-wrappers.ts`) persists the value under
+  `paragraphProperties.outlineLvl` (the canonical OOXML `w:outlineLvl` key; `outlineLevel` is
+  only the projected sd-props shape). A paragraph given an outline level via the setter (the
+  clone's `refSetOutlineLevel` / Add Text → Level N) was therefore NOT collected into a `\u` TOC.
+  Fix: read `paragraphProps?.outlineLevel ?? paragraphProps?.outlineLvl` (both 0-based, so
+  `tocLevel = raw + 1` is unchanged). Reading `outlineLevel` first keeps the fork's own
+  `toc-entry-builder.test.ts` fixtures (which set `outlineLevel`) byte-identical while collecting
+  setter-applied levels.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

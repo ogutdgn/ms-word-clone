@@ -161,16 +161,18 @@
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     // probe lives in a STILL-UNFLIPPED area -- repointed link->newComment when
     // insert-basics flipped (slice 6), then newComment->tableOfContents when slice 8
-    // started flipping review: a newComment probe would go vacuously green once
-    // review is live; tableOfContents (references, stays unflipped until slice 9)
-    // keeps the test MEANINGFUL. Both [0a] D6 guards now converge on tableOfContents
-    // but exercise DISTINCT dispatch heads (Commands.run vs Commands.dropdown) -- keep both.
-    window.WC.Commands.run({ cmd: 'tableOfContents', label: 'Table of Contents' });
+    // started flipping review. tableOfContents (references) INVERTS once slice 9
+    // flips references, so slice 9 repoints both heads to startMailMerge (AREA
+    // mail-merge, NOT in FLIPPED -> stays blocked; its ribbon control is a dropdown
+    // so both guard heads stay meaningful). Both [0a] D6 guards now converge on
+    // startMailMerge but exercise DISTINCT dispatch heads (Commands.run vs
+    // Commands.dropdown) -- keep both.
+    window.WC.Commands.run({ cmd: 'startMailMerge', label: 'Start Mail Merge' });
     return document.querySelectorAll('.flyout').length === 0
       && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'tableOfContents', type: 'dropdown' }, document.body);
+    window.WC.Commands.dropdown({ cmd: 'startMailMerge', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -2838,6 +2840,880 @@
       || 'tracking still ON after the hygiene reset (fork disableTrackChanges renamed?): ' + m.join(' ');
   });
 
+  // ---------- slice 9: references (TOC · footnotes/endnotes · captions · citations) ----------
+  // Plan: docs/superpowers/plans/2026-06-12-phase2-slice-9-references.md (esp. §0
+  // ground-truth, §1 D9.x, §2 task 2, amendments A1/A2/A3). RED until the bridge
+  // (task 3, installReferences) + the ribbon re-points (task 5) + the FLIP (task 6,
+  // 'references' ∈ FLIPPED) land. Planned WC.PM surface UNDER TEST (none exist yet):
+  // refInsertFootnote/refInsertEndnote/refInsertTOC(opts)/refUpdateTable/
+  // refInsertCaption(label)/refAddSource(src)/refInsertCitation(srcId) — each a thin
+  // editor.doc.* call returning a success boolean (reading WC.editor.doc FRESH).
+  // CRITICAL (driver guidance): the fork's editor.doc.{footnotes,toc,captions,
+  // citations}.* are ALREADY mounted, so we NEVER drive the action via editor.doc.*
+  // directly (that would pass vacuously green NOW) — we drive via the WC.PM bridge
+  // surface the flip unblocks, and ASSERT on engine/doc state or export XML, never on
+  // a toast string. Every planned-surface access is guarded with a `typeof !==
+  // 'function'` failure-string return so the red reason is "method missing" (NOT an
+  // uncaught throw) and the rest of the suite keeps running.
+  //
+  // Ground-truth pins from §0 (node names: extensions/{footnote,endnote,citation,
+  // sequence-field,table-of-contents}.js):
+  //   footnote ref node = 'footnoteReference'; endnote = 'endnoteReference';
+  //   TOC node = 'tableOfContents' (entry paragraphs styled TOC1/TOC2 inside it);
+  //   caption SEQ field node = 'sequenceField' with attrs.instruction `SEQ <label> \* ARABIC`;
+  //   in-text citation node = 'citation'.
+  //   exportDocx({getUpdatedDocs:true}) returns a part→xml map carrying
+  //   'word/footnotes.xml'/'word/endnotes.xml' + customXml/* (Editor.ts:3929-3939,3976);
+  //   exportDocx({exportXmlOnly:true}) returns ONLY word/document.xml (A2).
+  await PM().newBlank(); await sleep(100);
+
+  // Map of every export part (footnotes/endnotes/customXml + document.xml) — A2:
+  // the note BODY lives in word/footnotes.xml, which exportXmlOnly never returns.
+  const exportParts = async () => {
+    const map = await window.WC.editor.exportDocx({ getUpdatedDocs: true });
+    return (map && typeof map === 'object') ? map : {};
+  };
+  // Count tableOfContents nodes / collect a TOC node's descendant entry paragraphs.
+  const tocNode = () => { let f = null; doc().descendants((n) => { if (!f && n.type.name === 'tableOfContents') f = n; }); return f; };
+  // Entry paragraphs inside the first TOC node (text + page-number run live here).
+  const tocEntryTexts = () => {
+    const toc = tocNode();
+    if (!toc) return [];
+    const texts = [];
+    toc.descendants((n) => { if (n.type.name === 'paragraph') texts.push(n.textContent); });
+    return texts;
+  };
+  // All sequenceField instruction strings, in document order.
+  const seqInstructions = () => { const out = []; doc().descendants((n) => { if (n.type.name === 'sequenceField') out.push(String(n.attrs.instruction || '')); }); return out; };
+
+  await t('[9] insertFootnote: footnoteReference node + <w:footnote w:id=> in word/footnotes.xml (A2)', async () => {
+    setDoc('footnote anchor body');
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertFootnote();
+    if (ok !== true) return 'refInsertFootnote returned ' + JSON.stringify(ok) + ' (D6-blocked / refused — red)';
+    await sleep(120);
+    if (!hasNode('footnoteReference')) return 'no footnoteReference node in the doc';
+    // A2: the note BODY is in word/footnotes.xml — read it via the getUpdatedDocs
+    // part map, NOT exportXmlOnly (which returns only document.xml and never carries
+    // the note body).
+    const parts = await exportParts();
+    const fx = parts['word/footnotes.xml'];
+    if (typeof fx !== 'string') return 'word/footnotes.xml not in the export part map';
+    return /<w:footnote\b[^>]*\bw:id=/.test(fx) || 'no <w:footnote w:id=> (seeded note body) in word/footnotes.xml';
+  });
+
+  await t('[9] insertEndnote: endnoteReference node + <w:endnote w:id=> in word/endnotes.xml (A2 symmetric)', async () => {
+    setDoc('endnote anchor body');
+    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertEndnote();
+    if (ok !== true) return 'refInsertEndnote returned ' + JSON.stringify(ok) + ' (D6-blocked / refused — red)';
+    await sleep(120);
+    if (!hasNode('endnoteReference')) return 'no endnoteReference node in the doc';
+    const parts = await exportParts();
+    const ex = parts['word/endnotes.xml'];
+    if (typeof ex !== 'string') return 'word/endnotes.xml not in the export part map';
+    return /<w:endnote\b[^>]*\bw:id=/.test(ex) || 'no <w:endnote w:id=> (seeded note body) in word/endnotes.xml';
+  });
+
+  await t('[9] EXPORT: footnote reference MARKER <w:footnoteReference in document.xml', async () => {
+    setDoc('marker anchor text');
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertFootnote();
+    if (ok !== true) return 'refInsertFootnote returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml(); // exportXmlOnly -> document.xml (the marker lives here)
+    return /<w:footnoteReference\b/.test(xml) || 'no <w:footnoteReference in document.xml';
+  });
+
+  await t('[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads "0" (A1)', async () => {
+    setDocs(['Chapter One Intro', 'Chapter Two Body', 'plain trailing paragraph']);
+    // Real Heading-styled paragraphs (styleId Heading1 — collected by the default
+    // \o "1-3" TOC config, §0.4 K3). applyStyleByName is the FLIPPED styles surface.
+    selectText('Chapter One Intro'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    selectText('Chapter Two Body'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); // insert at doc start
+    const ok = PM().refInsertTOC({});
+    if (ok !== true) return 'refInsertTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node in the doc';
+    const entries = tocEntryTexts();
+    const matchOne = entries.some((tx) => tx.includes('Chapter One Intro'));
+    const matchTwo = entries.some((tx) => tx.includes('Chapter Two Body'));
+    if (!(matchOne && matchTwo)) return 'TOC entries do not match both headings: ' + JSON.stringify(entries);
+    // A1: degraded-create page-number run reads the literal "0" (NOT "??"; "??" is
+    // only the unreachable update({mode:'pageNumbers'}) path). Each entry text ends
+    // with the page-number run, so "0" must appear and "??" must NOT.
+    const joined = entries.join('\n');
+    if (/\?\?/.test(joined)) return 'TOC page number rendered "??" — expected the degraded-create "0" (A1): ' + JSON.stringify(entries);
+    return /0/.test(joined) || 'no degraded "0" page-number run in the TOC entries (A1): ' + JSON.stringify(entries);
+  });
+
+  await t('[9] updateTable after a heading edit updates the matching TOC entry text', async () => {
+    setDocs(['Original Heading X', 'plain body paragraph']);
+    selectText('Original Heading X'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refUpdateTable !== 'function') return 'PM.refUpdateTable missing (red — bridge not installed)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(150);
+    if (!tocEntryTexts().some((tx) => tx.includes('Original Heading X'))) return 'TOC did not pick up the original heading (precondition)';
+    // BLOCKER (FIX 1): the TOC is inserted near the doc START, so a plain
+    // findRange('Original Heading X') returns the FIRST text match — which is the TOC
+    // ENTRY run (entry titles are real text nodes, toc-entry-builder.ts:348), NOT the
+    // body heading. Editing that run rewrites the TOC entry; refUpdateTable then
+    // rebuilds the entry from the untouched body heading and the title reverts → the
+    // test could never go green. So locate the BODY heading EXPLICITLY: the first
+    // TOP-LEVEL paragraph whose paragraphProperties.styleId matches /^Heading[1-6]$/
+    // that is NOT a descendant of a tableOfContents node (return false at a TOC node so
+    // descendants() never walks the entry paragraphs inside it).
+    let bodyHeading = null; // { from, to } text range of the body heading run
+    doc().descendants((node, pos) => {
+      if (bodyHeading) return false;
+      if (node.type.name === 'tableOfContents') return false; // skip the TOC subtree entirely
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) {
+        // text content spans (pos+1 .. pos+1+textLen) — strip enclosing run wrappers by
+        // measuring the rendered text length, which is what we replace.
+        const txt = node.textContent;
+        bodyHeading = { from: pos + 1, to: pos + 1 + txt.length, text: txt };
+        return false;
+      }
+      return true;
+    });
+    if (!bodyHeading) return 'no top-level Heading[1-6] body paragraph found to edit (outside the TOC)';
+    if (!bodyHeading.text.includes('Original Heading X')) return 'located body heading is not the original heading: ' + JSON.stringify(bodyHeading);
+    // Replace the BODY heading text, then verify the mutated paragraph is still the
+    // body heading (styleId Heading*, outside any TOC) and now reads the renamed text —
+    // i.e. we did NOT accidentally rewrite a TOC entry (whose paragraphs carry styleId
+    // TOC1..TOC9, not Heading*).
+    window.WC.editor.commands.insertContentAt({ from: bodyHeading.from, to: bodyHeading.to }, 'Renamed Heading Y'); await sleep(80);
+    let mutated = null;
+    doc().descendants((node) => {
+      if (mutated) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) { mutated = node.textContent; return false; }
+      return true;
+    });
+    if (mutated == null) return 'body heading vanished after the edit';
+    if (!mutated.includes('Renamed Heading Y')) return 'the mutated body heading does not read the renamed text (edited the wrong node?): ' + JSON.stringify(mutated);
+    const ok = PM().refUpdateTable();
+    if (ok !== true) return 'refUpdateTable returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    const entries = tocEntryTexts();
+    if (entries.some((tx) => tx.includes('Original Heading X'))) return 'TOC entry still shows the stale heading text: ' + JSON.stringify(entries);
+    return entries.some((tx) => tx.includes('Renamed Heading Y')) || 'TOC entry did not update to the renamed heading: ' + JSON.stringify(entries);
+  });
+
+  await t('[9] insertCaption ×2 (Figure): two ordered SEQ-field captions, instruction begins "SEQ Figure" (A3)', async () => {
+    setDocs(['caption host paragraph one', 'caption host paragraph two']);
+    if (typeof PM().refInsertCaption !== 'function') return 'PM.refInsertCaption missing (red — bridge not installed)';
+    caretAfter('host paragraph one');
+    if (PM().refInsertCaption('Figure') !== true) return 'first refInsertCaption refused (red)';
+    await sleep(120);
+    caretAfter('host paragraph two');
+    if (PM().refInsertCaption('Figure') !== true) return 'second refInsertCaption refused (red)';
+    await sleep(120);
+    const seqs = seqInstructions();
+    if (seqs.length < 2) return 'expected ≥2 sequenceField nodes, got ' + seqs.length + ': ' + JSON.stringify(seqs);
+    // A3: do NOT assert "Figure 1"/"Figure 2" — resolvedNumber is empty headless
+    // (no SEQ resolver without a layout cycle). Assert the FIELD instruction shape.
+    const figs = seqs.filter((ins) => ins.startsWith('SEQ Figure'));
+    return figs.length >= 2 || 'fewer than 2 SEQ fields whose instruction begins "SEQ Figure": ' + JSON.stringify(seqs);
+  });
+
+  await t('[9] citation store: addSource + insertCitation → citation node AND sources.list() includes it', async () => {
+    setDoc('citation anchor text');
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refInsertCitation !== 'function') return 'PM.refInsertCitation missing (red — bridge not installed)';
+    // editor.doc.citations.sources.list() returns a DiscoveryResult { total, items }
+    // (discovery.ts:133) — NOT a raw array. Normalize so the count assert is robust
+    // whether the bridge surfaces the raw result or a normalized array.
+    const sourceCount = () => {
+      try {
+        const r = window.WC.editor.doc.citations.sources.list();
+        if (Array.isArray(r)) return r.length;
+        if (r && typeof r.total === 'number') return r.total;
+        if (r && Array.isArray(r.items)) return r.items.length;
+        return 0;
+      } catch (e) { return 0; }
+    };
+    const before = sourceCount();
+    const src = { type: 'Book', title: 'Slice Nine Reference Work', author: 'Tester' };
+    const srcId = PM().refAddSource(src);
+    if (!srcId || srcId === false) return 'refAddSource returned ' + JSON.stringify(srcId) + ' (red)';
+    caretAfter('anchor');
+    const ok = PM().refInsertCitation(srcId);
+    if (ok !== true) return 'refInsertCitation returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    if (!hasNode('citation')) return 'no citation node in the doc';
+    // ASSERT via the fork Document API source store (the plan explicitly permits
+    // reading editor.doc.citations.sources.list() — the ACTION is bridge-driven).
+    const after = sourceCount();
+    return after > before || 'citation source store did not grow (before=' + before + ' after=' + after + ')';
+  });
+
+  await t('[9] EXPORT: citation sources reach a customXml <b:Sources>/<b:Source> part (plan ~L73)', async () => {
+    // FIX 2 (plan line ~73): the fork exports bibliography SOURCES as a customXml
+    // <b:Sources> part (Editor.ts:3976 emits every customXml/*.xml on the
+    // getUpdatedDocs path; citations-export.integration.test.ts pins the part path
+    // customXml/item{N}.xml carrying <b:Sources>/<b:Source> + <b:Tag>/<b:Title>). Seed
+    // a source + citation, then grep the export part map for that part.
+    setDoc('export citation anchor text');
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refInsertCitation !== 'function') return 'PM.refInsertCitation missing (red — bridge not installed)';
+    const title = 'Slice Nine Export Source';
+    const src = { type: 'Book', title, author: 'Export Tester' };
+    const srcId = PM().refAddSource(src);
+    if (!srcId || srcId === false) return 'refAddSource returned ' + JSON.stringify(srcId) + ' (red)';
+    caretAfter('anchor');
+    const ok = PM().refInsertCitation(srcId);
+    if (ok !== true) return 'refInsertCitation returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const parts = await exportParts();
+    // The bibliography sources part is a customXml item (key matches customXml/, e.g.
+    // customXml/item1.xml). Find any customXml part whose XML carries <b:Sources>/
+    // <b:Source> AND the seeded identifier (srcId via <b:Tag>) or the title.
+    const customXmlKeys = Object.keys(parts).filter((k) => /(^|\/)customXml\//.test(k) && k.endsWith('.xml') && typeof parts[k] === 'string');
+    if (customXmlKeys.length === 0) return 'no customXml/*.xml part in the export map: ' + JSON.stringify(Object.keys(parts));
+    const hit = customXmlKeys.find((k) => {
+      const xml = parts[k];
+      return /<b:Sources\b/.test(xml) && /<b:Source\b/.test(xml) && (xml.includes(String(srcId)) || xml.includes(title));
+    });
+    return !!hit || 'no customXml <b:Sources>/<b:Source> part carrying the seeded source (id=' + JSON.stringify(srcId) + ' / title=' + JSON.stringify(title) + '); customXml keys: ' + JSON.stringify(customXmlKeys);
+  });
+
+  await t('[9] EXPORT: document.xml carries a TOC field marker AND a "SEQ Figure" caption field', async () => {
+    setDocs(['Export Heading One', 'body para for export', 'figure host para']);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refInsertCaption !== 'function') return 'PM.refInsertCaption missing (red — bridge not installed)';
+    selectText('Export Heading One'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    caretAfter('figure host para');
+    if (PM().refInsertCaption('Figure') !== true) return 'refInsertCaption refused (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml();
+    // TOC field marker: either the instruction text (TOC \o ...) or a w:fldChar.
+    const tocMarker = (/\bTOC\b/.test(xml) && /\\o\b/.test(xml)) || /<w:fldChar\b/.test(xml);
+    if (!tocMarker) return 'no TOC field marker (TOC \\o instruction or <w:fldChar) in document.xml';
+    return /SEQ Figure/.test(xml) || 'no "SEQ Figure" caption field instruction in document.xml';
+  });
+
+  // ========== slice-9 BRIDGE-DIRECT coverage (drive WC.PM.refX, flip-independent;
+  // assert engine/doc state or export XML — never a toast). Covers the verbs the 11
+  // existing [9] tests do NOT exercise. Grounded in the fork wrappers (read before
+  // asserting). ==========
+
+  // First top-level (non-TOC) paragraph whose paragraphProperties match a predicate.
+  const findBodyPara = (needleOrPred) => {
+    const pred = typeof needleOrPred === 'function' ? needleOrPred : (n) => n.textContent.includes(needleOrPred);
+    let hit = null;
+    doc().descendants((node) => {
+      if (hit) return false;
+      if (node.type.name === 'tableOfContents') return false; // never descend into a TOC
+      if (node.type.name === 'paragraph' && pred(node)) { hit = node; return false; }
+      return true;
+    });
+    return hit;
+  };
+  // Attrs of the first node of `type` (anywhere), or null.
+  const firstNodeAttrs = (type) => { let a = null; doc().descendants((n) => { if (a == null && n.type.name === type) a = n.attrs; }); return a; };
+  // Count nodes of `type`.
+  const countNodes = (type) => { let c = 0; doc().descendants((n) => { if (n.type.name === type) c++; }); return c; };
+  // All `instruction` attrs across nodes of `type`, document order.
+  const instructionsOf = (type) => { const o = []; doc().descendants((n) => { if (n.type.name === type && n.attrs && n.attrs.instruction != null) o.push(String(n.attrs.instruction)); }); return o; };
+
+  await t('[9] refSetOutlineLevel (Add Text): persists outlineLvl on a plain paragraph; default TOC carries the \\u branch (D9.8)', async () => {
+    if (typeof PM().refSetOutlineLevel !== 'function') return 'PM.refSetOutlineLevel missing (red — bridge not installed)';
+    setDocs(['Outline plain alpha line', 'plain body two']);
+    caretAfter('Outline plain alpha line');
+    // Level 2 -> outlineLvl 1 (paragraphs-wrappers.setOutlineLevelWrapper stores
+    // paragraphProperties.outlineLvl = level-1; the verb lives at
+    // editor.doc.format.paragraph.setOutlineLevel — proves the wrapper PATH is right).
+    const ok = PM().refSetOutlineLevel(2);
+    if (ok !== true) return 'refSetOutlineLevel(2) returned ' + JSON.stringify(ok) + ' (degraded/wrong wrapper path — red)';
+    await sleep(80);
+    const para = findBodyPara('Outline plain alpha line');
+    if (!para) return 'outline-target paragraph vanished';
+    const pp = para.attrs && para.attrs.paragraphProperties;
+    if (!pp || pp.outlineLvl !== 1) return 'paragraph does not carry paragraphProperties.outlineLvl===1: ' + JSON.stringify(pp);
+    // The default TOC config (DEFAULT_TOC_CONFIG) sets useAppliedOutlineLevel -> the
+    // serialized instruction MUST contain \u (the applied-outline branch that consumes
+    // an outline level). collectTocSources keys the \u branch on the applied level.
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node after refInsertTOC';
+    const ins = String(toc.attrs.instruction || '');
+    if (!/\\u\b/.test(ins)) return 'TOC instruction lacks the \\u (useAppliedOutlineLevel) switch: ' + JSON.stringify(ins);
+    // Clearing (level<=0) must remove outlineLvl ("Do Not Show in TOC").
+    caretAfter('Outline plain alpha line');
+    if (PM().refSetOutlineLevel(0) !== true) return 'refSetOutlineLevel(0) refused (clear path — red)';
+    await sleep(60);
+    const cleared = findBodyPara('Outline plain alpha line');
+    const ppc = cleared && cleared.attrs && cleared.attrs.paragraphProperties;
+    return (ppc == null || ppc.outlineLvl === undefined) || 'outlineLvl not cleared after refSetOutlineLevel(0): ' + JSON.stringify(ppc);
+  });
+
+  await t('[9] refInsertTOF("Figure"): raw TOC field whose instruction contains TOC and \\c "Figure" (D9.4)', async () => {
+    if (typeof PM().refInsertTOF !== 'function') return 'PM.refInsertTOF missing (red — bridge not installed)';
+    setDocs(['table of figures host line', 'plain body two']);
+    caretAfter('table of figures host line');
+    const ok = PM().refInsertTOF('Figure');
+    if (ok !== true) return 'refInsertTOF returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    // fields.insert(mode:'raw', TOC ...) materializes as a sequenceField node carrying
+    // the instruction (field-wrappers.insertRawField). Assert both the node + the
+    // exported document.xml instruction text (the field marker that survives a resave).
+    const seqIns = instructionsOf('sequenceField');
+    const hasNodeInstr = seqIns.some((s) => /\bTOC\b/.test(s) && /\\c\s+"Figure"/.test(s));
+    if (!hasNodeInstr) return 'no sequenceField whose instruction has TOC + \\c "Figure": ' + JSON.stringify(seqIns);
+    const xml = await exportDocumentXml();
+    return (/\bTOC\b/.test(xml) && /\\c\s+&quot;Figure&quot;|\\c\s+"Figure"/.test(xml)) || 'document.xml lacks the TOC \\c "Figure" ToF field instruction';
+  });
+
+  await t('[9] refRemoveTOC: insert a TOC then remove it — no tableOfContents node remains', async () => {
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refRemoveTOC !== 'function') return 'PM.refRemoveTOC missing (red — bridge not installed)';
+    setDocs(['Remove TOC Heading One', 'plain body for remove']);
+    selectText('Remove TOC Heading One'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition — red)';
+    await sleep(120);
+    if (countNodes('tableOfContents') < 1) return 'no tableOfContents node before remove (precondition)';
+    const ok = PM().refRemoveTOC();
+    if (ok !== true) return 'refRemoveTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    return countNodes('tableOfContents') === 0 || 'a tableOfContents node still remains after refRemoveTOC (' + countNodes('tableOfContents') + ')';
+  });
+
+  await t('[9] refMarkIndexEntry + refInsertIndex (+refUpdateIndex): XE indexEntry node + documentIndex node', async () => {
+    if (typeof PM().refMarkIndexEntry !== 'function') return 'PM.refMarkIndexEntry missing (red — bridge not installed)';
+    if (typeof PM().refInsertIndex !== 'function') return 'PM.refInsertIndex missing (red — bridge not installed)';
+    setDocs(['index marker subject here', 'plain index body']);
+    caretAfter('index marker subject here');
+    // index.entries.insert builds an indexEntry node whose instruction is `XE "<text>"`
+    // (index-wrappers.buildXeInstruction). Pass a bare string entry text.
+    const m = PM().refMarkIndexEntry('IndexTermAlpha');
+    if (m !== true) return 'refMarkIndexEntry returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(100);
+    if (countNodes('indexEntry') < 1) return 'no indexEntry node after refMarkIndexEntry';
+    const xeIns = instructionsOf('indexEntry');
+    if (!xeIns.some((s) => /^\s*XE\s+"IndexTermAlpha"/.test(s))) return 'no XE "IndexTermAlpha" instruction on the indexEntry: ' + JSON.stringify(xeIns);
+    const ins = PM().refInsertIndex();
+    if (ins !== true) return 'refInsertIndex returned ' + JSON.stringify(ins) + ' (red)';
+    await sleep(100);
+    // index.insert materializes a documentIndex node (index-wrappers: schema.documentIndex ?? index).
+    if (countNodes('documentIndex') < 1 && countNodes('index') < 1) return 'no documentIndex/index node after refInsertIndex';
+    // refUpdateIndex is best-effort rebuild — must not throw / must return a boolean.
+    const upd = PM().refUpdateIndex();
+    if (upd !== true && upd !== false) return 'refUpdateIndex returned a non-boolean: ' + JSON.stringify(upd);
+    return true;
+  });
+
+  await t('[9] refMarkCitation + refInsertTOA: TA authorityEntry node + tableOfAuthorities node (D9.6)', async () => {
+    if (typeof PM().refMarkCitation !== 'function') return 'PM.refMarkCitation missing (red — bridge not installed)';
+    if (typeof PM().refInsertTOA !== 'function') return 'PM.refInsertTOA missing (red — bridge not installed)';
+    setDocs(['legal citation host line', 'plain toa body']);
+    caretAfter('legal citation host line');
+    // authorities.entries.insert builds an authorityEntry node whose instruction begins
+    // "TA" with \l "<longCitation>" (authority-wrappers.buildTaInstruction). Bare string
+    // = longCitation; category defaults to 'cases' in the bridge.
+    const m = PM().refMarkCitation('Marbury v. Madison, 5 U.S. 137');
+    if (m !== true) return 'refMarkCitation returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(100);
+    if (countNodes('authorityEntry') < 1) return 'no authorityEntry node after refMarkCitation';
+    const taIns = instructionsOf('authorityEntry');
+    if (!taIns.some((s) => /^\s*TA\b/.test(s) && /\\l\s+"Marbury/.test(s))) return 'no TA \\l "Marbury..." instruction on the authorityEntry: ' + JSON.stringify(taIns);
+    const toa = PM().refInsertTOA();
+    if (toa !== true) return 'refInsertTOA returned ' + JSON.stringify(toa) + ' (red)';
+    await sleep(100);
+    return countNodes('tableOfAuthorities') >= 1 || 'no tableOfAuthorities node after refInsertTOA';
+  });
+
+  await t('[9] FIX 2: Mark Citation category Cases → TA field carries NUMERIC "\\c 1" (node instruction + exported instrText)', async () => {
+    if (typeof PM().refMarkCitation !== 'function') return 'PM.refMarkCitation missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(100);
+    setDocs(['numeric category host line', 'plain toa body']);
+    caretAfter('numeric category host line');
+    // The Mark Citation dialog maps "Cases" → numeric 1 (CAT_MAP, commands.js). Drive
+    // refMarkCitation with the SAME numeric code the dialog produces. The fork
+    // buildTaInstruction emits `\c <category>` verbatim and the translator parser only
+    // matches `\c (\d+)`, so the code MUST be numeric (a string would emit `\c cases`).
+    const m = PM().refMarkCitation({ longCitation: 'Brown v. Board, 347 U.S. 483', shortCitation: 'Brown', category: 1 });
+    if (m !== true) return 'refMarkCitation returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(120);
+    // 1) The authorityEntry node instruction must carry the numeric \c 1 (NOT \c cases).
+    const taIns = instructionsOf('authorityEntry');
+    if (!taIns.some((s) => /\\c\s+1(?:\s|$)/.test(s))) return 'no numeric "\\c 1" on the authorityEntry instruction: ' + JSON.stringify(taIns);
+    if (taIns.some((s) => /\\c\s+(cases|[A-Za-z])/.test(s))) return 'TA instruction carries a NON-numeric \\c category (regression): ' + JSON.stringify(taIns);
+    // 2) The EXPORTED document.xml instrText must carry the numeric \c 1 too (the field
+    //    code that real Word's TA \c switch reads — buildInstructionElements emits it).
+    const xml = await exportDocumentXml();
+    if (!/\bTA\b/.test(xml)) return 'no TA field instruction in exported document.xml';
+    return /\\c\s+1(?:\s|"|<|\\)/.test(xml) || 'exported document.xml TA field lacks numeric "\\c 1": ' + xml.slice(Math.max(0, xml.indexOf(' TA ') - 20), xml.indexOf(' TA ') + 120);
+  });
+
+  await t('[9] refCrossReference to a bookmark: crossReference node carrying a REF field (D9.7)', async () => {
+    if (typeof PM().refCrossReference !== 'function') return 'PM.refCrossReference missing (red — bridge not installed)';
+    setDocs(['cross ref source target text', 'cross ref anchor here']);
+    // Create a bookmark target via the fork Document API directly (action is bridge-
+    // adjacent; the crossref is the bridge-driven step under test). bookmarks.insert
+    // takes a TextTarget at the current selection.
+    selectText('cross ref source target text');
+    let bmOk = false;
+    try {
+      const sel = window.WC.editor.doc.selection.current({});
+      const at = sel && sel.target;
+      if (at) bmOk = !!(window.WC.editor.doc.bookmarks.insert({ at, name: 'CrossRefBM1' }) || {}).success;
+    } catch (e) { return 'bookmark setup threw: ' + (e && e.message); }
+    if (!bmOk) return 'bookmark insert (test setup) did not succeed — cannot target a crossref';
+    await sleep(60);
+    caretAfter('cross ref anchor here');
+    // crossRefs.insert builds a crossReference node; fieldType REF for a bookmark target
+    // (crossref-wrappers.buildRefInstruction -> "REF CrossRefBM1 \h").
+    const ok = PM().refCrossReference({ target: { kind: 'bookmark', name: 'CrossRefBM1' }, display: 'content' });
+    if (ok !== true) return 'refCrossReference returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    if (countNodes('crossReference') < 1) return 'no crossReference node after refCrossReference';
+    const crIns = instructionsOf('crossReference');
+    return crIns.some((s) => /\bREF\b/.test(s) && /CrossRefBM1/.test(s)) || 'no "REF CrossRefBM1" instruction on the crossReference node: ' + JSON.stringify(crIns);
+  });
+
+  await t('[9] refInsertBibliography + refSetCitationStyle("APA"): bibliography node AND APA reaches StyleName/selectedStyle (NOT a title)', async () => {
+    if (typeof PM().refInsertBibliography !== 'function') return 'PM.refInsertBibliography missing (red — bridge not installed)';
+    if (typeof PM().refSetCitationStyle !== 'function') return 'PM.refSetCitationStyle missing (red — bridge not installed)';
+    setDoc('bibliography host paragraph');
+    // Seed a source so the exported bibliography part has content to carry the style.
+    const srcId = PM().refAddSource({ type: 'Book', title: 'Bib Style Reference Work', author: 'Bib Tester' });
+    if (!srcId || srcId === false) return 'refAddSource (setup) returned ' + JSON.stringify(srcId);
+    const insOk = PM().refInsertBibliography('References'); // a non-empty TITLE — must NOT become the style
+    if (insOk !== true) return 'refInsertBibliography returned ' + JSON.stringify(insOk) + ' (red)';
+    await sleep(120);
+    if (countNodes('bibliography') < 1) return 'no bibliography node after refInsertBibliography';
+    // The title must NOT have been written as the style (A1): the bibliography node's
+    // style attr must NOT equal the title "References".
+    const bibAttrs = firstNodeAttrs('bibliography');
+    if (bibAttrs && bibAttrs.style === 'References') return 'A1 VIOLATION: bibliography style attr === the title "References" (title leaked into style)';
+    // Now set the citation style to APA via the dedicated verb.
+    const styleOk = PM().refSetCitationStyle('APA');
+    if (styleOk !== true) return 'refSetCitationStyle("APA") returned ' + JSON.stringify(styleOk) + ' (red)';
+    await sleep(80);
+    // The converter bibliographyPart now carries styleName="APA" / selectedStyle="/APA.XSL"
+    // (citation-resolver.syncBibliographyStyleToConverter). Read it back via the converter.
+    let part = null;
+    try { part = window.WC.editor.converter && window.WC.editor.converter.bibliographyPart; } catch (e) { /* none */ }
+    if (!part) return 'converter.bibliographyPart not present after refSetCitationStyle';
+    if (part.styleName !== 'APA') return 'bibliographyPart.styleName is ' + JSON.stringify(part.styleName) + ', expected "APA"';
+    return /APA\.XSL$/i.test(String(part.selectedStyle || '')) || 'bibliographyPart.selectedStyle is ' + JSON.stringify(part.selectedStyle) + ', expected an /APA.XSL path';
+  });
+
+  await t('[9] A1 GUARD: refInsertBibliography("Works Cited") must NOT write style="Works Cited"', async () => {
+    if (typeof PM().refInsertBibliography !== 'function') return 'PM.refInsertBibliography missing (red — bridge not installed)';
+    setDoc('works cited guard host');
+    const ok = PM().refInsertBibliography('Works Cited');
+    if (ok !== true) return 'refInsertBibliography("Works Cited") returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    const bibAttrs = firstNodeAttrs('bibliography');
+    if (!bibAttrs) return 'no bibliography node after insert (precondition)';
+    // The title "Works Cited" MUST NOT corrupt the citation-style slot. Before the A1
+    // fix, the title rode through `style`, syncing styleName="Works Cited" /
+    // selectedStyle="/Works Cited.XSL" (corrupt). After the fix, style is undefined.
+    if (bibAttrs.style === 'Works Cited') return 'A1 REGRESSION: bibliography node style === "Works Cited" (the cosmetic title leaked into the citation-style id)';
+    let part = null;
+    try { part = window.WC.editor.converter && window.WC.editor.converter.bibliographyPart; } catch (e) { /* none */ }
+    if (part && part.styleName === 'Works Cited') return 'A1 REGRESSION: converter bibliographyPart.styleName === "Works Cited" (title leaked into the exported StyleName)';
+    return true;
+  });
+
+  await t('[9] FIX 5: refUpdateSource changes a source field; refListSources reflects it (Source Manager Edit)', async () => {
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refUpdateSource !== 'function') return 'PM.refUpdateSource missing (red — bridge not installed)';
+    if (typeof PM().refListSources !== 'function') return 'PM.refListSources missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(100);
+    setDoc('source edit host paragraph');
+    // Add a source, then EDIT a field through refUpdateSource (the bridge verb the
+    // Source Manager → Edit affordance routes to). The dialog passes the FLAT legacy
+    // shape ({ author, title, year, publisher }); refUpdateSource normalizes it through
+    // buildSourceFields, so the update reaches source.fields.
+    const srcId = PM().refAddSource({ type: 'Book', title: 'Original Title One', author: 'Origauthor', year: '2001' });
+    if (!srcId || srcId === false) return 'refAddSource (setup) returned ' + JSON.stringify(srcId);
+    const before = (PM().refListSources() || []).find((s) => s.sourceId === srcId);
+    if (!before) return 'the new source is not in refListSources (setup): ' + JSON.stringify(PM().refListSources());
+    if ((before.fields || {}).title !== 'Original Title One') return 'unexpected pre-edit title: ' + JSON.stringify(before.fields);
+    // Edit the title + year via the FLAT shape (exactly what the dialog onSubmit sends).
+    const upd = PM().refUpdateSource(srcId, { type: 'Book', author: 'Origauthor', title: 'Edited Title Two', year: '2022', publisher: '' });
+    if (upd !== true) return 'refUpdateSource returned ' + JSON.stringify(upd) + ' (red)';
+    await sleep(80);
+    const after = (PM().refListSources() || []).find((s) => s.sourceId === srcId);
+    if (!after) return 'source vanished after refUpdateSource';
+    const f = after.fields || {};
+    if (f.title !== 'Edited Title Two') return 'refListSources did NOT reflect the edited title (got ' + JSON.stringify(f.title) + ')';
+    return f.year === '2022' || 'refListSources did NOT reflect the edited year (got ' + JSON.stringify(f.year) + ')';
+  });
+
+  await t('[9] refNextNote: two footnotes, refNextNote moves the caret toward a footnoteReference (engine-observable)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refNextNote !== 'function') return 'PM.refNextNote missing (red — bridge not installed)';
+    setDoc('first anchor mid second anchor end of line');
+    caretAfter('first anchor');
+    if (PM().refInsertFootnote() !== true) return 'first refInsertFootnote refused (precondition)';
+    await sleep(100);
+    caretAfter('second anchor');
+    if (PM().refInsertFootnote() !== true) return 'second refInsertFootnote refused (precondition)';
+    await sleep(100);
+    // Collect footnoteReference positions.
+    const refPositions = [];
+    doc().descendants((n, p) => { if (n.type.name === 'footnoteReference') refPositions.push(p); });
+    if (refPositions.length < 2) return 'expected ≥2 footnoteReference nodes, got ' + refPositions.length;
+    // Park the caret at doc start, then refNextNote('next') must land at the FIRST ref.
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    const ok = PM().refNextNote('next');
+    if (ok !== true) return 'refNextNote("next") returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(40);
+    const landed = v().state.selection.from;
+    refPositions.sort((a, b) => a - b);
+    return landed === refPositions[0] || ('refNextNote did not land on the first footnoteReference: caret=' + landed + ' firstRef=' + refPositions[0] + ' all=' + JSON.stringify(refPositions));
+  });
+
+  await t('[9] refUpdateNote(target,text): refListFootnotes reflects the new body (D9.1 notes area)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    if (typeof PM().refUpdateNote !== 'function') return 'PM.refUpdateNote missing (red — bridge not installed)';
+    setDoc('note body anchor here');
+    caretAfter('note body anchor here');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(120);
+    const before = PM().refListFootnotes();
+    if (!Array.isArray(before) || before.length < 1) return 'refListFootnotes returned no notes after insert: ' + JSON.stringify(before);
+    const note = before[0];
+    if (!note || (!note.target && !note.noteId)) return 'first note lacks a target/noteId: ' + JSON.stringify(note);
+    const NEW_BODY = 'Edited footnote body slice nine';
+    const ok = PM().refUpdateNote(note.target || note.noteId, NEW_BODY);
+    if (ok !== true) return 'refUpdateNote returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(note.noteId));
+    if (!match) return 'updated note id vanished from refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes content did not reflect the new body: ' + JSON.stringify(match.content);
+  });
+
+  // D9.1 NOTES AREA (notes-area.ts): after refInsertFootnote() the clone-owned region
+  // #pm-notes-area renders below the page and shows the note (number + body). Then
+  // simulate editing the body (set its plain text + dispatch a real input event +
+  // blur) and assert refListFootnotes()/editor.doc.footnotes.list() reflect the new
+  // body. DOM-observable + engine-observable, driven via WC.PM.* (flip-independent);
+  // never asserts on a toast.
+  await t('[9] notes-area: refInsertFootnote renders #pm-notes-area with the note number + body (D9.1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120); // start clean — no stale notes from prior tests
+    // Region must be ABSENT/hidden with zero notes (Word draws no empty separator).
+    const empty = document.getElementById('pm-notes-area');
+    if (empty && empty.style.display !== 'none' && empty.querySelector('.pm-note')) return 'notes region shows notes before any insert';
+    setDoc('notes area anchor body');
+    caretAfter('notes area anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160); // let the debounced notes-area render fire (90ms) + slack
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after refInsertFootnote';
+    if (region.style.display === 'none') return '#pm-notes-area hidden after refInsertFootnote';
+    const section = region.querySelector('.pm-notes-section');
+    if (!section) return 'no .pm-notes-section in the notes region';
+    if (!/Footnotes/.test((region.querySelector('.pm-notes-title') || {}).textContent || '')) return 'notes section is not titled "Footnotes"';
+    const noteRow = region.querySelector('.pm-note');
+    if (!noteRow) return 'no .pm-note row in the notes region';
+    const list = PM().refListFootnotes();
+    const expectedNum = list && list[0] && list[0].displayNumber;
+    const numText = (noteRow.querySelector('.pm-note-num') || {}).textContent || '';
+    if (expectedNum && numText.indexOf(String(expectedNum)) < 0) return 'note row number "' + numText + '" does not show displayNumber "' + expectedNum + '"';
+    const bodyEl = noteRow.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body editable element';
+    const expectedBody = (list && list[0] && list[0].content) || '';
+    return bodyEl.textContent === expectedBody || 'note body DOM "' + bodyEl.textContent + '" != refListFootnotes content "' + expectedBody + '"';
+  });
+
+  await t('[9] notes-area: editing a note body in #pm-notes-area persists via the bridge (refListFootnotes + footnotes.list reflect it) (D9.1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    setDoc('edit in region anchor body');
+    caretAfter('edit in region anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM';
+    const bodyEl = region.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body to edit';
+    const noteId = bodyEl.dataset.noteId;
+    if (!noteId) return 'note body has no data-note-id';
+    // Simulate the user editing the contenteditable body: set its plain text, fire a
+    // real input event, then blur (the module commits on blur → refUpdateNote).
+    const NEW_BODY = 'Body typed directly in the notes region';
+    bodyEl.focus();
+    bodyEl.textContent = NEW_BODY;
+    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
+    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await sleep(160);
+    // Engine-observable: the underlying editor.doc.footnotes.list() body changed.
+    let engineBody = null;
+    try {
+      const items = window.WC.editor.doc.footnotes.list().items || [];
+      const it = items.find((x) => String(x.noteId) === String(noteId));
+      engineBody = it ? String(it.content) : null;
+    } catch (e) { return 'editor.doc.footnotes.list() threw: ' + ((e && e.message) || e); }
+    if (engineBody !== NEW_BODY) return 'editor.doc.footnotes.list() body "' + engineBody + '" != edited "' + NEW_BODY + '"';
+    // Bridge-observable: refListFootnotes() reflects the edit too.
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId));
+    if (!match) return 'edited note vanished from refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes content "' + match.content + '" != edited "' + NEW_BODY + '"';
+  });
+
+  await t('[9] notes-area: refShowNotes reveals the region (returns true with notes, focuses a body); false with none (D9.1)', async () => {
+    if (typeof PM().refShowNotes !== 'function') return 'PM.refShowNotes missing (red — bridge not installed)';
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    // With ZERO notes, refShowNotes must degrade to false (nothing to show).
+    if (PM().refShowNotes() !== false) return 'refShowNotes returned non-false with no notes';
+    setDoc('show notes anchor body');
+    caretAfter('show notes anchor');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(160);
+    if (PM().refShowNotes() !== true) return 'refShowNotes returned non-true with a note present';
+    const region = document.getElementById('pm-notes-area');
+    if (!region || region.style.display === 'none') return 'refShowNotes did not reveal #pm-notes-area';
+    // It focuses the first note body (so the user can type immediately).
+    const focused = document.activeElement;
+    return (focused && focused.classList && focused.classList.contains('pm-note-body')) || 'refShowNotes did not focus a .pm-note-body (active=' + (focused && focused.className) + ')';
+  });
+
+  // FIX 1 REGRESSION (the edit-clobber): renderInner() rebuilds every note row from the
+  // ENGINE content when the signature changes, recreating bodies from notes[].content. A
+  // re-render fired while the user is typing in a focused note body — BEFORE that edit
+  // commits via refUpdateNote — must NOT discard the uncommitted text. This reproduces
+  // the CROSS-NOTE trigger: type uncommitted text in note B, then commit note A (its
+  // 500ms-debounced edit + blur bumps the signature and schedules a rebuild). Without the
+  // clobber guard the rebuild recreates note B's body from the stale engine value and the
+  // typed text is LOST; with the guard the rebuild is skipped while B is focused-dirty.
+  await t('[9] notes-area CLOBBER GUARD: a re-render mid-edit does NOT revert a focused dirty note body (FIX 1)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    // Two footnotes (A before B in document order) so a commit on A can re-render B.
+    setDocs(['clobber anchor alpha', 'clobber anchor beta']);
+    caretAfter('clobber anchor alpha'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote A refused (precondition)';
+    await sleep(120);
+    caretAfter('clobber anchor beta'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote B refused (precondition)';
+    await sleep(180);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after two inserts';
+    const bodies = Array.from(region.querySelectorAll('.pm-note-body'));
+    if (bodies.length < 2) return 'expected 2 note bodies, got ' + bodies.length;
+    const bodyA = bodies[0];
+    const bodyB = bodies[1];
+    const idB = bodyB.dataset.noteId;
+    // 1. The user types new text in note B's body WITHOUT committing (no blur). The
+    //    contenteditable now holds uncommitted text the engine has not seen.
+    const B_TYPED = 'uncommitted text typed in note B';
+    bodyB.focus();
+    bodyB.textContent = B_TYPED;
+    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
+    // 2. Commit note A: edit A's body + blur. That fires refUpdateNote(A) + schedule(),
+    //    bumping the signature → a rebuild is queued WHILE B is focused + dirty. (Refocus
+    //    B first so it is the active dirty element when the rebuild fires — a real user
+    //    clicks back into B; here we set A's text, commit it, then restore focus to B.)
+    const A_BODY = 'note A committed body';
+    bodyA.textContent = A_BODY;
+    bodyA.dispatchEvent(new Event('input', { bubbles: true }));
+    PM().refUpdateNote(PM().refListFootnotes()[0].target || PM().refListFootnotes()[0].noteId, A_BODY);
+    // Re-focus B and restore its uncommitted text (the user is still editing B).
+    bodyB.focus();
+    bodyB.textContent = B_TYPED;
+    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
+    // 3. Drive a re-render now (signature changed because A's engine content changed).
+    //    Use the synchronous render so the assertion is deterministic — this is the exact
+    //    path a debounced transaction-triggered rebuild would take.
+    window.WC.NotesArea.render();
+    // 4. The focused dirty body B must STILL show the user's typed text (NOT reverted to
+    //    the engine 'Footnote' seed). Re-query in case the row element was replaced.
+    const stillRegion = document.getElementById('pm-notes-area');
+    const bodyBnow = Array.from(stillRegion.querySelectorAll('.pm-note-body')).find((el) => el.dataset.noteId === idB) || bodyB;
+    return bodyBnow.textContent === B_TYPED
+      || 'note B body was clobbered: "' + bodyBnow.textContent + '" != typed "' + B_TYPED + '" (rebuild reverted an uncommitted edit)';
+  });
+
+  // FIX 3 (endnote-edit path): the notes area edits BOTH footnotes and endnotes through
+  // the same body+commit path (refUpdateNote(note.target || note.noteId)). Insert an
+  // ENDNOTE, edit its body in the region, commit on blur, and assert the ENGINE endnote
+  // body changes (editor.doc.footnotes.list() of type 'endnote' + refListFootnotes()).
+  // This pins that an endnote edit targets the ENDNOTE store (word/endnotes.xml via
+  // getNotesConfig('endnote')), not a footnote.
+  await t('[9] notes-area: editing an ENDNOTE body in #pm-notes-area persists to the endnote (FIX 3)', async () => {
+    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    if (typeof PM().refUpdateNote !== 'function') return 'PM.refUpdateNote missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(120);
+    setDoc('endnote edit anchor body');
+    caretAfter('endnote edit anchor');
+    if (PM().refInsertEndnote() !== true) return 'refInsertEndnote refused (precondition)';
+    await sleep(180);
+    const region = document.getElementById('pm-notes-area');
+    if (!region) return 'no #pm-notes-area in the DOM after refInsertEndnote';
+    // The endnote must appear under the Endnotes section.
+    const endTitle = Array.from(region.querySelectorAll('.pm-notes-title')).find((el) => /Endnotes/.test(el.textContent || ''));
+    if (!endTitle) return 'no "Endnotes" section title in the notes region';
+    const bodyEl = region.querySelector('.pm-note-body');
+    if (!bodyEl) return 'no .pm-note-body to edit';
+    const noteId = bodyEl.dataset.noteId;
+    if (!noteId) return 'endnote body has no data-note-id';
+    const NEW_BODY = 'Endnote body edited in the notes region';
+    bodyEl.focus();
+    bodyEl.textContent = NEW_BODY;
+    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
+    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
+    await sleep(180);
+    // Engine-observable on the ENDNOTE store: editor.doc.footnotes.list({type:'endnote'}).
+    let endnoteBody = null;
+    try {
+      const items = window.WC.editor.doc.footnotes.list({ type: 'endnote' }).items || [];
+      const it = items.find((x) => String(x.noteId) === String(noteId));
+      endnoteBody = it ? String(it.content) : null;
+    } catch (e) { return 'editor.doc.footnotes.list({type:endnote}) threw: ' + ((e && e.message) || e); }
+    if (endnoteBody !== NEW_BODY) return 'endnote store body "' + endnoteBody + '" != edited "' + NEW_BODY + '" (endnote edit did not target the endnote)';
+    // The bridge surface (refListFootnotes) must agree AND mark it type 'endnote'.
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId) && nn.type === 'endnote');
+    if (!match) return 'edited endnote not found as type endnote in refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes endnote content "' + match.content + '" != edited "' + NEW_BODY + '"';
+  });
+
+  await t('[9] refInsertTOC with non-empty opts {showLevels:5, rightAlignPageNumbers:false}: instruction reflects \\o "1-5"', async () => {
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    setDocs(['Custom TOC Heading A', 'Custom TOC body para']);
+    selectText('Custom TOC Heading A'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    // refInsertTOC maps showLevels -> config.outlineLevels.to; serializeTocInstruction
+    // writes \o "from-to". showLevels:5 -> \o "1-5". rightAlignPageNumbers is a PM node
+    // attr (not a switch) — assert it lands on the node, not the instruction.
+    const ok = PM().refInsertTOC({ showLevels: 5, rightAlignPageNumbers: false });
+    if (ok !== true) return 'refInsertTOC({showLevels:5,...}) returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node after the custom-opts insert';
+    const ins = String(toc.attrs.instruction || '');
+    if (!/\\o\s+"1-5"/.test(ins)) return 'TOC instruction does not reflect showLevels:5 (\\o "1-5"): ' + JSON.stringify(ins);
+    // rightAlignPageNumbers:false should be recorded on the node attr.
+    if (toc.attrs.rightAlignPageNumbers !== false) return 'rightAlignPageNumbers:false did not land on the TOC node attr: ' + JSON.stringify(toc.attrs.rightAlignPageNumbers);
+    return true;
+  });
+
+  // ---------- slice 9 task 5+6: RIBBON-PATH tests (the FLIP unblocks them) ----------
+  // These drive the DIRECT References handlers through WC.Commands.run({cmd,label})
+  // — exactly the ribbon dispatch path: Commands.run -> isBlocked('references') ->
+  // (post-flip) NOT blocked -> H[cmd] -> PMA() -> WC.PM.refX. They prove the FULL
+  // chain (ribbon -> dispatch guard -> handler -> bridge -> engine) and ONLY go green
+  // WITH 'references' in FLIPPED. They assert ENGINE state, never a toast.
+  await t('[9 ribbon] WC.Commands.run insertFootnote -> footnoteReference node (full ribbon->isBlocked->H->PMA->refX chain)', async () => {
+    await PM().newBlank(); await sleep(120);
+    // Sanity: the flip un-blocked references (the chain is only reachable when NOT blocked).
+    if (PM().isBlocked('insertFootnote') !== false) return 'insertFootnote is still D6-blocked (the flip did not land)';
+    setDoc('ribbon footnote anchor body');
+    caretAfter('ribbon footnote anchor');
+    window.WC.Commands.run({ cmd: 'insertFootnote', label: 'Insert Footnote' });
+    await sleep(140);
+    return hasNode('footnoteReference') || 'no footnoteReference node after WC.Commands.run({cmd:insertFootnote})';
+  });
+
+  await t('[9 ribbon] WC.Commands.run updateTable after a heading edit refreshes the TOC entry (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['Ribbon Heading Orig', 'ribbon plain body']);
+    selectText('Ribbon Heading Orig'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition)';
+    await sleep(140);
+    if (!tocEntryTexts().some((tx) => tx.includes('Ribbon Heading Orig'))) return 'TOC did not pick up the heading (precondition)';
+    // Locate the BODY heading EXPLICITLY (NOT the TOC entry run): the first top-level
+    // paragraph whose paragraphProperties.styleId matches /^Heading[1-6]$/ that is NOT
+    // a descendant of a tableOfContents node (same locator as the [9] in-place test).
+    let bodyHeading = null;
+    doc().descendants((node, pos) => {
+      if (bodyHeading) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) {
+        bodyHeading = { from: pos + 1, to: pos + 1 + node.textContent.length, text: node.textContent };
+        return false;
+      }
+      return true;
+    });
+    if (!bodyHeading || !bodyHeading.text.includes('Ribbon Heading Orig')) return 'could not locate the body heading paragraph to edit: ' + JSON.stringify(bodyHeading);
+    window.WC.editor.commands.insertContentAt({ from: bodyHeading.from, to: bodyHeading.to }, 'Ribbon Heading EDITED');
+    await sleep(80);
+    // Drive Update Table THROUGH THE RIBBON.
+    window.WC.Commands.run({ cmd: 'updateTable', label: 'Update Table' });
+    await sleep(160);
+    const entries = tocEntryTexts();
+    return entries.some((tx) => tx.includes('Ribbon Heading EDITED')) || 'TOC entry not refreshed by ribbon updateTable: ' + JSON.stringify(entries);
+  });
+
+  await t('[9 ribbon] WC.Commands.run markEntry + insertIndex -> indexEntry + documentIndex nodes (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['ribbon index host line', 'ribbon plain body']);
+    // markEntry with no info uses the SELECTED text — select a term so the XE field is non-empty.
+    selectText('ribbon index host line');
+    window.WC.Commands.run({ cmd: 'markEntry', label: 'Mark Entry' });
+    await sleep(120);
+    if (countNodes('indexEntry') < 1) return 'no indexEntry node after WC.Commands.run({cmd:markEntry})';
+    window.WC.Commands.run({ cmd: 'insertIndex', label: 'Insert Index' });
+    await sleep(120);
+    return (countNodes('documentIndex') >= 1 || countNodes('index') >= 1) || 'no documentIndex/index node after WC.Commands.run({cmd:insertIndex})';
+  });
+
+  await t('[9 ribbon] WC.Commands.run insertTableOfAuthorities -> tableOfAuthorities node (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    // A TA mark first (so the TOA has an entry context); markCitation in PM opens a
+    // dialog, so seed the authority entry directly via the bridge, then drive the TOA
+    // insert THROUGH THE RIBBON.
+    setDocs(['ribbon toa host line', 'ribbon plain body']);
+    caretAfter('ribbon toa host line');
+    if (PM().refMarkCitation('Ribbon v. Flip, 1 W.C. 9') !== true) return 'refMarkCitation (precondition) refused';
+    await sleep(100);
+    window.WC.Commands.run({ cmd: 'insertTableOfAuthorities', label: 'Insert Table of Authorities' });
+    await sleep(140);
+    return countNodes('tableOfAuthorities') >= 1 || 'no tableOfAuthorities node after WC.Commands.run({cmd:insertTableOfAuthorities})';
+  });
+
+  // PART A proof (toc-entry-builder \u fix): a paragraph given an outline level via
+  // the LIVE setter (refSetOutlineLevel) writes paragraphProperties.outlineLvl, and a
+  // default TOC (\u branch) must now COLLECT it. Before the fix the \u branch read only
+  // .outlineLevel (never written by the setter), so the paragraph was dropped.
+  await t('[9 PART A] refSetOutlineLevel(1) on a plain paragraph -> refInsertTOC + refUpdateTable COLLECTS it (\\u outlineLvl fix)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['Applied Outline Alpha Para', 'unrelated plain body para']);
+    caretAfter('Applied Outline Alpha Para');
+    if (PM().refSetOutlineLevel(1) !== true) return 'refSetOutlineLevel(1) refused (precondition)';
+    await sleep(80);
+    // Confirm the setter persisted outlineLvl (NOT outlineLevel) — the exact key the fix reads.
+    const para = findBodyPara('Applied Outline Alpha Para');
+    const pp = para && para.attrs && para.attrs.paragraphProperties;
+    if (!pp || pp.outlineLvl !== 0) return 'setter did not persist outlineLvl===0 (level1): ' + JSON.stringify(pp);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition)';
+    await sleep(140);
+    // refUpdateTable rebuilds entries from sources (runs collectTocSources \u branch).
+    if (PM().refUpdateTable() !== true && PM().refUpdateTable() !== false) return 'refUpdateTable returned a non-boolean';
+    await sleep(140);
+    const entries = tocEntryTexts();
+    return entries.some((tx) => tx.includes('Applied Outline Alpha Para'))
+      || 'TOC did NOT collect the applied-outline paragraph (PART A \\u outlineLvl regression): ' + JSON.stringify(entries);
+  });
+
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------
   await t('[fix] clicking the empty area below the text jumps the caret to the doc END', async () => {
     setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
@@ -2934,6 +3810,81 @@
     if (!mNew.some((x) => x.startsWith('trackInsert:'))) return 'inserted run lacks trackInsert: ' + mNew.join(' ');
     const revs = PM().getRevisions();
     return revs.length >= 2 || ('Revisions provider sees only ' + revs.length + ' rows');
+  });
+
+  await t('[9] open→insert footnote+TOC→exportDocxBytes→openDocx round-trip re-finds both (doc-replacing, [0b] zone)', async () => {
+    // RED until bridge (task 3) + flip (task 6); the round-trip (exportDocxBytes→
+    // openDocx) is the slice-9 reimport pin (K2/§0.3 footnote export is LIVE).
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(80);
+    setDocs(['Roundtrip Heading A', 'roundtrip body paragraph']);
+    selectText('Roundtrip Heading A'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    caretAfter('roundtrip body paragraph');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (red)';
+    await sleep(100);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    if (!hasNode('footnoteReference')) return 'footnote not present before export (precondition)';
+    if (!hasNode('tableOfContents')) return 'TOC not present before export (precondition)';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export did not produce a zip';
+    const ok = await PM().openDocx(bytes);
+    if (ok !== true) return 'reimport (openDocx) returned ' + JSON.stringify(ok);
+    await sleep(120);
+    // FIX 4: the footnote leg must round-trip FIRMLY — assert the footnoteReference
+    // node survives reimport (footnote export is LIVE, §0.3).
+    const fnBack = hasNode('footnoteReference');
+    if (!fnBack) return 'after reimport: footnoteReference node did NOT survive';
+    // The TOC leg is TOLERANT: it is not yet confirmed whether export emits an
+    // <sd:tableOfContents> (round-trips as a tableOfContents NODE) or a Word-standard
+    // TOC field (reimports as paragraphs carrying a TOC field marker). Accept EITHER:
+    //   (a) a tableOfContents node, OR
+    //   (b) a TOC field marker in the reimported document.xml — instruction text
+    //       containing "TOC" or a w:fldChar.
+    if (hasNode('tableOfContents')) return true;
+    const reXml = await exportDocumentXml();
+    const tocFieldMarker = /\bTOC\b/.test(reXml) || /<w:fldChar\b/.test(reXml);
+    return tocFieldMarker || 'after reimport: TOC survived as NEITHER a tableOfContents node NOR a TOC field marker (TOC instruction / w:fldChar) in document.xml';
+  });
+
+  await t('[9] TOC collects IMPORTED headings: export→openDocx→refInsertTOC finds an imported heading (K3 import-path pin, doc-replacing [0b] zone)', async () => {
+    // FIX 3 (K3 pin): the [9] in-place TOC tests use applyStyleByName, which proves the
+    // collector matches in-session headings. K3's REAL risk is the IMPORT PATH — do
+    // headings that round-trip through exportDocxBytes()→openDocx() still carry the
+    // styleId the TOC collector matches (\o "1-3" → /heading\s*([1-6])/i)? Build two
+    // Heading-1 paragraphs, export, REIMPORT via openDocx (replaces the doc), THEN
+    // refInsertTOC and assert ≥1 entry matches an imported heading.
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(80);
+    setDocs(['Imported Heading Alpha', 'Imported Heading Beta', 'plain imported body']);
+    selectText('Imported Heading Alpha'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    selectText('Imported Heading Beta'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export did not produce a zip';
+    const opened = await PM().openDocx(bytes); // THE IMPORT PATH K3 guards
+    if (opened !== true) return 'reimport (openDocx) returned ' + JSON.stringify(opened);
+    await sleep(120);
+    // Sanity: at least one reimported paragraph still carries a Heading[1-6] styleId
+    // (if the import dropped the styleId, the TOC could not collect it — surface that).
+    let importedHeadingText = null;
+    doc().descendants((node) => {
+      if (importedHeadingText) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) { importedHeadingText = node.textContent; return false; }
+      return true;
+    });
+    if (!importedHeadingText) return 'no Heading[1-6] paragraph survived the import (styleId dropped on reimport)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    const ok = PM().refInsertTOC({});
+    if (ok !== true) return 'refInsertTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    if (!tocNode()) return 'no tableOfContents node after refInsertTOC on the reimported doc';
+    const entries = tocEntryTexts();
+    if (entries.length < 1) return 'tableOfContents has no entries after reimport';
+    return entries.some((tx) => tx.includes('Imported Heading Alpha') || tx.includes('Imported Heading Beta'))
+      || 'no TOC entry matches an imported heading (collector missed the imported styleId): ' + JSON.stringify(entries);
   });
 
   await t('[0b] New Document loads the blank template + clean state', async () => {

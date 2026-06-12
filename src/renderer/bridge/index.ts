@@ -8,8 +8,10 @@ import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
+import { installReferences } from './references'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
+import { installNotesArea } from './notes-area'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -37,7 +39,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review']) // slices 1-6 + 8
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references']) // slices 1-6 + 8-9
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -329,6 +331,19 @@ export function preinstallBridge() {
     getComments: () => [],
     getChangeRanges: () => [], // slice 8 task 5: bars/balloons chrome provider
     runCompare: async () => false, // slice 8 task 6: Compare engine (replaced by installBridge)
+    // slice 9: references pre-mount stubs (replaced by installReferences on mount)
+    refInsertTOC: () => false, refUpdateTable: () => false, refRemoveTOC: () => false,
+    refSetOutlineLevel: () => false,
+    refInsertFootnote: () => false, refInsertEndnote: () => false,
+    refNextNote: () => false, refShowNotes: () => false,
+    refListFootnotes: () => [], refUpdateNote: () => false,
+    refInsertCaption: () => false, refInsertTOF: () => false,
+    refMarkIndexEntry: () => false, refInsertIndex: () => false, refUpdateIndex: () => false,
+    refMarkCitation: () => false, refInsertTOA: () => false,
+    refAddSource: () => false, refInsertCitation: () => false, refListSources: () => [],
+    refUpdateSource: () => false, refRemoveSource: () => false,
+    refSetCitationStyle: () => false, refInsertBibliography: () => false,
+    refCrossReference: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -363,7 +378,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
@@ -534,6 +549,10 @@ export function installBridge(editor: AnyEditor) {
   // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
   // Revisions pane). Same PM-only-by-construction placement as comments-ui.
   installTrackChrome(editor)
+  // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
+  // page sheet). Same PM-only-by-construction placement — its DOM never exists under
+  // --legacy (this runs AFTER the legacyBoot early-return above).
+  installNotesArea(editor)
   installFocusGuards()
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)

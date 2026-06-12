@@ -148,7 +148,14 @@ export function collectTocSources(doc: ProseMirrorNode, config: TocSwitchConfig)
       // \u switch — applied paragraph outline level
       if (useApplied) {
         const effectiveLevels = outlineLevels ?? { from: 1, to: 9 };
-        const rawOutlineLevel = paragraphProps?.outlineLevel as number | undefined;
+        // The applied outline level can live under either key: `outlineLevel`
+        // (the projected/sd-props shape used by the unit fixtures) or `outlineLvl`
+        // (what format.paragraph.setOutlineLevel actually persists into
+        // paragraphProperties — paragraphs-wrappers.ts). Both are 0-based, so
+        // tocLevel = raw + 1 either way. Reading outlineLevel first keeps the
+        // existing fork fixtures intact while collecting paragraphs given an
+        // outline level via the live setter (wc-clone refSetOutlineLevel).
+        const rawOutlineLevel = (paragraphProps?.outlineLevel ?? paragraphProps?.outlineLvl) as number | undefined;
         if (rawOutlineLevel != null) {
           const tocLevel = rawOutlineLevel + 1;
           if (tocLevel >= effectiveLevels.from && tocLevel <= effectiveLevels.to) {

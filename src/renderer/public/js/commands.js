@@ -235,7 +235,7 @@
   H.myAddIns = (c, node) => addInsMenu(node);
   H.onlineVideo = () => WC.Insert.onlineVideoDialog();
   H.bookmark = () => WC.Insert.bookmarkDialog();
-  H.crossReference = () => WC.Insert.crossRefDialog();
+  H.crossReference = () => { const pm = PMA(); pm ? crossRefDialogPM(pm) : WC.Insert.crossRefDialog(); };
   H.header = (c, node) => WC.HeaderFooter.headerMenu(node);
   H.footer = (c, node) => WC.HeaderFooter.footerMenu(node);
   H.pageNumber = (c, node) => WC.HeaderFooter.pageNumberMenu(node);
@@ -684,7 +684,20 @@
   H.rotate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Rotate Right 90°', { onClick: () => WC.Layout.rotate(90) })); fly.appendChild(WC.flyItem('Rotate Left 90°', { onClick: () => WC.Layout.rotate(-90) })); fly.appendChild(WC.flyItem('Flip Vertical', { onClick: () => WC.Layout.flip('v') })); fly.appendChild(WC.flyItem('Flip Horizontal', { onClick: () => WC.Layout.flip('h') })); });
 
   // ---- References tab ----
-  H.tableOfContents = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); fly.appendChild(WC.flyItem('Automatic Table 1', { onClick: () => WC.Ref.insertTOC(false, { title: 'Contents' }) })); fly.appendChild(WC.flyItem('Automatic Table 2', { onClick: () => WC.Ref.insertTOC(false, { title: 'Table of Contents' }) })); fly.appendChild(WC.flyItem('Manual Table', { onClick: () => WC.Ref.insertTOC(true) })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Table of Contents…', { onClick: () => customTOCDialog() })); fly.appendChild(WC.flyItem('Remove Table of Contents', { onClick: () => { const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); E().repaginate(); } })); });
+  H.tableOfContents = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyHeader('Built-In'));
+    fly.appendChild(WC.flyItem('Automatic Table 1', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ title: 'Contents' }) : WC.Ref.insertTOC(false, { title: 'Contents' }); } }));
+    fly.appendChild(WC.flyItem('Automatic Table 2', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ title: 'Table of Contents' }) : WC.Ref.insertTOC(false, { title: 'Table of Contents' }); } }));
+    // Manual Table: Word's manual TOC is a type-it-yourself table with NO heading
+    // collection. refInsertTOC always builds from headings, so in PM mode this
+    // degrades to an auto TOC (recorded in the slice ledger). FIX 3: refInsertTOC
+    // reads `showLevels` (NOT `levels`), so `{levels:3}` was ignored and produced a
+    // default-config auto TOC anyway — pass the correct key so the level count lands.
+    fly.appendChild(WC.flyItem('Manual Table', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ showLevels: 3 }) : WC.Ref.insertTOC(true); } }));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Custom Table of Contents…', { onClick: () => customTOCDialog() }));
+    fly.appendChild(WC.flyItem('Remove Table of Contents', { onClick: () => { const pm = PMA(); if (pm) { pm.refRemoveTOC(); return; } const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); E().repaginate(); } }));
+  });
   function customTOCDialog() {
     const showPg = el('input', { type: 'checkbox', checked: 'checked' });
     const rightAlign = el('input', { type: 'checkbox', checked: 'checked' });
@@ -697,35 +710,156 @@
       el('div', { class: 'row' }, [el('label', { text: 'Show levels:', style: { width: '90px' } }), levels]),
     ]);
     WC.dialog({ title: 'Table of Contents', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); WC.Ref.insertTOC(false, { showPageNumbers: showPg.checked, levels: parseInt(levels.value, 10) }); } },
+      { label: 'OK', primary: true, onClick: () => {
+        const pm = PMA();
+        if (pm) {
+          // Map the dialog controls to the fork TOC config (references.ts
+          // refInsertTOC reads includePageNumbers / showLevels / rightAlignPageNumbers).
+          pm.refInsertTOC({ includePageNumbers: showPg.checked, showLevels: parseInt(levels.value, 10), rightAlignPageNumbers: rightAlign.checked });
+          return;
+        }
+        const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); WC.Ref.insertTOC(false, { showPageNumbers: showPg.checked, levels: parseInt(levels.value, 10) });
+      } },
       { label: 'Cancel' },
     ] });
   }
-  H.addText = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Do Not Show in Table of Contents', { onClick: () => WC.Ref.addText(0) })); fly.appendChild(WC.flyItem('Level 1', { onClick: () => WC.Ref.addText(1) })); fly.appendChild(WC.flyItem('Level 2', { onClick: () => WC.Ref.addText(2) })); fly.appendChild(WC.flyItem('Level 3', { onClick: () => WC.Ref.addText(3) })); });
-  H.updateTable = () => WC.Ref.updateAny();
-  H.insertFootnote = () => WC.Ref.insertNote('footnote');
-  H.insertEndnote = () => WC.Ref.insertNote('endnote');
-  H.nextFootnote = () => WC.Ref.nextNote();
-  H.showNotes = () => WC.Ref.showNotes();
+  H.addText = (c, node) => WC.flyout(node, (fly) => {
+    const addText = (lvl) => { const pm = PMA(); pm ? pm.refSetOutlineLevel(lvl) : WC.Ref.addText(lvl); };
+    fly.appendChild(WC.flyItem('Do Not Show in Table of Contents', { onClick: () => addText(0) }));
+    fly.appendChild(WC.flyItem('Level 1', { onClick: () => addText(1) }));
+    fly.appendChild(WC.flyItem('Level 2', { onClick: () => addText(2) }));
+    fly.appendChild(WC.flyItem('Level 3', { onClick: () => addText(3) }));
+  });
+  H.updateTable = () => { const pm = PMA(); pm ? pm.refUpdateTable() : WC.Ref.updateAny(); };
+  H.insertFootnote = () => { const pm = PMA(); pm ? pm.refInsertFootnote() : WC.Ref.insertNote('footnote'); };
+  H.insertEndnote = () => { const pm = PMA(); pm ? pm.refInsertEndnote() : WC.Ref.insertNote('endnote'); };
+  H.nextFootnote = () => { const pm = PMA(); pm ? pm.refNextNote() : WC.Ref.nextNote(); };
+  H.showNotes = () => { const pm = PMA(); pm ? pm.refShowNotes() : WC.Ref.showNotes(); };
   H.insertCaption = () => captionDialog();
-  H.insertTableOfFigures = () => WC.Ref.insertTableOfFigures('Figure');
-  H.markEntry = () => WC.Ref.markEntry();
-  H.insertIndex = () => WC.Ref.insertIndex();
-  H.updateIndex = () => WC.Ref.insertIndex();
-  H.markCitation = () => WC.Ref.markCitation();
-  H.insertTableOfAuthorities = () => WC.Ref.insertTableOfAuthorities();
+  H.insertTableOfFigures = () => { const pm = PMA(); pm ? pm.refInsertTOF('Figure') : WC.Ref.insertTableOfFigures('Figure'); };
+  H.markEntry = () => { const pm = PMA(); pm ? pm.refMarkIndexEntry() : WC.Ref.markEntry(); };
+  H.insertIndex = () => { const pm = PMA(); pm ? pm.refInsertIndex() : WC.Ref.insertIndex(); };
+  H.updateIndex = () => { const pm = PMA(); pm ? pm.refUpdateIndex() : WC.Ref.insertIndex(); };
+  H.markCitation = () => { const pm = PMA(); pm ? markCitationPM() : WC.Ref.markCitation(); };
+  H.insertTableOfAuthorities = () => { const pm = PMA(); pm ? pm.refInsertTOA() : WC.Ref.insertTableOfAuthorities(); };
   H.search = () => WC.toast('Smart Lookup / Search uses a cloud knowledge service — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
   H.researcher = () => WC.toast('Researcher uses a cloud research service — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
-  H.insertCitation = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Add New Source…', { onClick: () => WC.Dialogs.addSource() })); fly.appendChild(WC.flyItem('Add New Placeholder…', { onClick: () => E().insertHTML('<span class="wc-citation">(Placeholder1)</span> ') })); if (WC.Ref.sources.length) { fly.appendChild(WC.flySep()); WC.Ref.sources.forEach((s) => fly.appendChild(WC.flyItem(s.author + ', ' + s.year, { onClick: () => WC.Ref.insertCitation && WC.Ref.insertCitation(s) }))); } });
+  H.insertCitation = (c, node) => WC.flyout(node, (fly) => {
+    const pm = PMA();
+    fly.appendChild(WC.flyItem('Add New Source…', { onClick: () => WC.Dialogs.addSource() }));
+    fly.appendChild(WC.flyItem('Add New Placeholder…', { onClick: () => { const p = PMA(); if (p) { WC.toast('Add a source via Add New Source… to insert a citation.'); return; } E().insertHTML('<span class="wc-citation">(Placeholder1)</span> '); } }));
+    if (pm) {
+      const sources = pm.refListSources() || [];
+      if (sources.length) {
+        fly.appendChild(WC.flySep());
+        sources.forEach((s) => {
+          const f = s.fields || {};
+          const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : (f.title || s.sourceId);
+          const label = author + (f.year ? ', ' + f.year : '');
+          fly.appendChild(WC.flyItem(label, { onClick: () => pm.refInsertCitation(s.sourceId) }));
+        });
+      }
+    } else if (WC.Ref.sources.length) {
+      fly.appendChild(WC.flySep());
+      WC.Ref.sources.forEach((s) => fly.appendChild(WC.flyItem(s.author + ', ' + s.year, { onClick: () => WC.Ref.insertCitation && WC.Ref.insertCitation(s) })));
+    }
+  });
   H.manageSources = () => WC.Dialogs.manageSources();
-  H.style = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Citation Style')); ['APA', 'Chicago', 'IEEE', 'ISO 690', 'MLA', 'Turabian'].forEach((s) => fly.appendChild(WC.flyItem((WC.Ref.citationStyle === s ? '✓ ' : '   ') + s, { onClick: () => { WC.Ref.citationStyle = s; WC.Ref.restyle(); WC.toast('Citation style: ' + s); } }))); });
-  H.bibliography = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); ['Bibliography', 'References', 'Works Cited'].forEach((t) => fly.appendChild(WC.flyItem(t, { onClick: () => WC.Ref.insertBibliography && WC.Ref.insertBibliography(t) }))); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Insert Bibliography', { onClick: () => WC.Ref.insertBibliography && WC.Ref.insertBibliography('Bibliography') })); });
+  H.style = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Citation Style')); ['APA', 'Chicago', 'IEEE', 'ISO 690', 'MLA', 'Turabian'].forEach((s) => fly.appendChild(WC.flyItem((WC.Ref.citationStyle === s ? '✓ ' : '   ') + s, { onClick: () => { const pm = PMA(); if (pm) { WC.Ref.citationStyle = s; pm.refSetCitationStyle(s); WC.toast('Citation style: ' + s); return; } WC.Ref.citationStyle = s; WC.Ref.restyle(); WC.toast('Citation style: ' + s); } }))); });
+  H.bibliography = (c, node) => WC.flyout(node, (fly) => {
+    const insertBib = (t) => { const pm = PMA(); pm ? pm.refInsertBibliography(t) : (WC.Ref.insertBibliography && WC.Ref.insertBibliography(t)); };
+    fly.appendChild(WC.flyHeader('Built-In'));
+    ['Bibliography', 'References', 'Works Cited'].forEach((t) => fly.appendChild(WC.flyItem(t, { onClick: () => insertBib(t) })));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Insert Bibliography', { onClick: () => insertBib('Bibliography') }));
+  });
 
   function captionDialog() {
     const label = el('select', {}, ['Figure', 'Table', 'Equation'].map((l) => el('option', { text: l })));
     const text = el('input', { type: 'text', class: 'grow', placeholder: 'Caption text' });
     WC.dialog({ title: 'Caption', width: '420px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Label:', style: { width: '60px' } }), label]), el('div', { class: 'row' }, [el('label', { text: 'Caption:', style: { width: '60px' } }), text])]), footer: [
-      { label: 'OK', primary: true, onClick: () => { WC.Ref.insertCaption(label.value); if (text.value.trim()) { const caps = E().node.querySelectorAll('.wc-caption[data-label="' + label.value + '"]'); const last = caps[caps.length - 1]; if (last) last.lastChild.textContent = ': ' + text.value.trim(); } } },
+      { label: 'OK', primary: true, onClick: () => {
+        const pm = PMA();
+        if (pm) { pm.refInsertCaption(label.value, text.value.trim()); return; }
+        WC.Ref.insertCaption(label.value); if (text.value.trim()) { const caps = E().node.querySelectorAll('.wc-caption[data-label="' + label.value + '"]'); const last = caps[caps.length - 1]; if (last) last.lastChild.textContent = ': ' + text.value.trim(); }
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+
+  // PM-aware Cross-reference dialog (References tab, slice 9). Enumerates the
+  // headings (by sdBlockId) and bookmarks from the PM engine and routes OK to
+  // WC.PM.refCrossReference. The legacy Insert.crossRefDialog path is unchanged
+  // (used under --legacy). Display maps the Word "Insert reference to" select:
+  // Page number → pageNumber, Text → content, Above/below → aboveBelow.
+  function crossRefDialogPM(pm) {
+    const type = el('select', {}, ['Heading', 'Bookmark'].map((t) => el('option', { text: t })));
+    const refType = el('select', {}, ['Page number', 'Text', 'Above/below'].map((t) => el('option', { text: t })));
+    const targets = el('select', { size: '6', class: 'grow', style: { height: 'auto' } });
+    const headings = () => {
+      const out = []; const ed = pm.getEditor && pm.getEditor();
+      if (!ed || !ed.state) return out;
+      ed.state.doc.descendants((n) => {
+        const isHeadingNode = n.type && n.type.name === 'heading';
+        const styleId = n.attrs && n.attrs.paragraphProperties && n.attrs.paragraphProperties.styleId;
+        const isStyledHeading = n.type && n.type.name === 'paragraph' && /^Heading[1-6]$/.test(styleId || '');
+        if (isHeadingNode || isStyledHeading) {
+          const id = n.attrs && (n.attrs.sdBlockId || n.attrs.id);
+          if (id) out.push({ id: String(id), text: (n.textContent || '').slice(0, 80) });
+        }
+        return true;
+      });
+      return out;
+    };
+    function fillTargets() {
+      targets.innerHTML = '';
+      const items = type.value === 'Heading'
+        ? headings().map((h) => ({ value: h.id, label: h.text || '(empty)' }))
+        : (pm.listBookmarks() || []).map((b) => ({ value: b.name, label: b.name }));
+      items.forEach((it) => targets.appendChild(el('option', { value: it.value, text: it.label })));
+      if (!items.length) targets.appendChild(el('option', { text: '(none — create headings/bookmarks first)' }));
+    }
+    type.addEventListener('change', fillTargets); fillTargets();
+    const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Type:', style: { width: '90px' } }), type, el('label', { text: 'Insert:' }), refType]), el('div', { style: { fontSize: '12px', color: '#666', margin: '6px 0' }, text: 'For which item:' }), targets]);
+    WC.dialog({ title: 'Cross-reference', width: '460px', body, footer: [
+      { label: 'Insert', primary: true, onClick: () => {
+        const val = targets.value; if (!val) return;
+        const target = type.value === 'Heading' ? { kind: 'heading', nodeId: val } : { kind: 'bookmark', name: val };
+        const display = refType.value === 'Page number' ? 'pageNumber' : (refType.value === 'Above/below' ? 'aboveBelow' : 'content');
+        pm.refCrossReference({ target, display });
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+
+  // PM-aware Mark Citation dialog (References tab → Table of Authorities, slice 9).
+  // Mirrors the legacy WC.Ref.markCitation dialog structure/UX (Selected text +
+  // Category + Short citation), but routes Mark to WC.PM.refMarkCitation so the TA
+  // field is minted on the engine. Category maps to Word's NUMERIC \c code (FIX 2):
+  // the fork buildTaInstruction emits `\c <category>` verbatim and its parser only
+  // matches `\c (\d+)` (authorityEntry-translator.parseTaInstruction), so a string
+  // category would round-trip-lose. The 7 dialog categories map to Word's 1-based
+  // order: Cases→1, Statutes→2, Other Authorities→3, Rules→4, Treatises→5,
+  // Regulations→6, Constitutional Provisions→7.
+  function markCitationPM() {
+    const pm = PMA(); if (!pm) return;
+    let selText = '';
+    try { const ed = pm.getEditor && pm.getEditor(); if (ed && ed.state) { const s = ed.state.selection; if (s && !s.empty) selText = ed.state.doc.textBetween(s.from, s.to, ' '); } } catch (e) { /* no selection */ }
+    const full = el('input', { type: 'text', class: 'grow', value: selText, placeholder: 'Selected text' });
+    const cat = el('select', {}, ['Cases', 'Statutes', 'Other Authorities', 'Rules', 'Treatises', 'Regulations', 'Constitutional Provisions'].map((c) => el('option', { text: c })));
+    const short = el('input', { type: 'text', class: 'grow', value: selText, placeholder: 'Short citation' });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Selected text:', style: { width: '100px' } }), full]),
+      el('div', { class: 'row' }, [el('label', { text: 'Category:', style: { width: '100px' } }), cat]),
+      el('div', { class: 'row' }, [el('label', { text: 'Short citation:', style: { width: '100px' } }), short]),
+    ]);
+    const CAT_MAP = { 'Cases': 1, 'Statutes': 2, 'Other Authorities': 3, 'Rules': 4, 'Treatises': 5, 'Regulations': 6, 'Constitutional Provisions': 7 };
+    WC.dialog({ title: 'Mark Citation', width: '460px', body, footer: [
+      { label: 'Mark', primary: true, onClick: () => {
+        const info = { longCitation: full.value.trim(), category: CAT_MAP[cat.value] || 1 };
+        if (short.value.trim()) info.shortCitation = short.value.trim();
+        pm.refMarkCitation(info);
+      } },
       { label: 'Cancel' },
     ] });
   }
@@ -1297,8 +1431,29 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.Layout.bringForward() })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.Layout.bringToFront() })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.Layout.wrapText('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.Layout.sendBackward() })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.Layout.sendToBack() })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.Layout.wrapText('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
-      // References tab
-      if (cmd === 'nextFootnote') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => WC.Ref.nextNote('footnote', 1) })); fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => WC.Ref.nextNote('footnote', -1) })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => WC.Ref.nextNote('endnote', 1) })); fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => WC.Ref.nextNote('endnote', -1) })); });
+      // References tab — Footnotes split-button ▾ flyout. PM-mode routes every
+      // item to the bridge (the H.* button handlers + dialogs were re-pointed by
+      // the flip, but this Commands.dropdown flyout was missed — slice-9 FIX 1).
+      // The bridge refNextNote takes a direction ('next'/'prev'); refShowNotes
+      // reveals the clone-owned notes area. Legacy ELSE branch is verbatim.
+      if (cmd === 'nextFootnote') return WC.flyout(node, (fly) => {
+        const pm = PMA();
+        if (pm) {
+          fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => pm.refNextNote('next') }));
+          fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => pm.refNextNote('prev') }));
+          fly.appendChild(WC.flySep());
+          fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => pm.refNextNote('next') }));
+          fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => pm.refNextNote('prev') }));
+          fly.appendChild(WC.flySep());
+          fly.appendChild(WC.flyItem('Show Notes', { onClick: () => pm.refShowNotes() }));
+          return;
+        }
+        fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => WC.Ref.nextNote('footnote', 1) }));
+        fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => WC.Ref.nextNote('footnote', -1) }));
+        fly.appendChild(WC.flySep());
+        fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => WC.Ref.nextNote('endnote', 1) }));
+        fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => WC.Ref.nextNote('endnote', -1) }));
+      });
       if (cmd === 'tableOfContents' || cmd === 'addText' || cmd === 'insertCitation' || cmd === 'style' || cmd === 'bibliography') return H[cmd](control, node);
       // Mailings tab
       if (cmd === 'startMailMerge' || cmd === 'selectRecipients' || cmd === 'insertMergeField' || cmd === 'rules' || cmd === 'finishMerge') return H[cmd](control, node);
