@@ -68,6 +68,7 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 | What works per tab | [docs/FEATURES.md](docs/FEATURES.md) + `docs/*_TAB.md` |
 | Run / harness / COM oracle | [docs/BUILD_AND_RUN.md](docs/BUILD_AND_RUN.md) |
 | Tests | [docs/TESTING.md](docs/TESTING.md) |
+| Research "how does X work / what connects to Y" cheaply | [docs/GRAPHIFY.md](docs/GRAPHIFY.md) — query the prebuilt graph instead of reading many files |
 
 ## Working rules
 

@@ -121,6 +121,9 @@ Read the doc that matches your task:
 - Per-tab status: `docs/{HOME,INSERT,DRAW,DESIGN,LAYOUT,REFERENCES,MAILINGS,REVIEW,VIEW}_TAB.md`.
 - [docs/UI_FIDELITY_AUDIT.md](docs/UI_FIDELITY_AUDIT.md) — on-screen-outcome parity work.
 - [docs/NOT_IMPLEMENTED.md](docs/NOT_IMPLEMENTED.md) — features that need a cloud/host runtime.
+- [docs/GRAPHIFY.md](docs/GRAPHIFY.md) — the prebuilt knowledge graph (`graphify-out/`).
+  **Query it instead of reading many files** for architecture/"what connects to X"
+  research — it's the cheap way to explore the codebase.
 
 ## Run & test (copy-paste)
 

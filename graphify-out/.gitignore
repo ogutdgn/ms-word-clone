@@ -1,0 +1,13 @@
+# graphify-out: track the shareable, queryable graph; ignore machine-local scratch.
+#
+# Tracked (NOT ignored): graph.json, GRAPH_REPORT.md, cost.json
+# See docs/GRAPHIFY.md for how to use the graph.
+
+# Machine-specific pipeline scratch (one hardcodes a local interpreter path)
+.graphify_*
+
+# Extraction cache — machine-local, rebuilt on demand
+cache/
+
+# Generated interactive viewer — regenerate with: graphify export html
+graph.html
