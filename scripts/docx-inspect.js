@@ -70,6 +70,21 @@ function extractTags(xml, elementName) {
   const rels = (await readEntry('word/_rels/document.xml.rels')) || '';
   const stylesXml = (await readEntry('word/styles.xml')) || '';
 
+  // slice-9 references parts. footnotes/endnotes bodies live in their own parts
+  // (NOT document.xml — document.xml carries only the reference MARKERS); the
+  // bibliography source store is emitted as one or more customXml/item*.xml parts.
+  const footnotesXml = await readEntry('word/footnotes.xml'); // null when absent
+  const endnotesXml = await readEntry('word/endnotes.xml'); // null when absent
+  // Every customXml/itemN.xml part (the <b:Sources> bibliography store is one of
+  // these; there can be several customXml items, so read them all).
+  const customXmlEntries = [];
+  zip.forEach((relativePath, file) => {
+    if (/^customXml\/item\d*\.xml$/.test(relativePath) && !file.dir) customXmlEntries.push(file);
+  });
+  const customXmlParts = await Promise.all(
+    customXmlEntries.map(async (file) => ({ name: file.name, xml: await file.async('string') }))
+  );
+
   // Media files: collect name + byte size.
   const media = [];
   zip.forEach((relativePath, file) => {
@@ -169,6 +184,74 @@ function extractTags(xml, elementName) {
     .map((tag) => pullAttr(tag, 'w:val'))
     .filter((v) => v !== null);
 
+  // --- slice-9 references --- attribute-order robust ---
+  // Footnotes/endnotes: each part opens with two RESERVED notes — the separator
+  // (w:type="separator") and continuationSeparator (w:type="continuationSeparator"),
+  // conventionally w:id="-1" and w:id="0". Real (authored) notes carry w:id >= 1.
+  // We pull w:id from each <w:footnote>/<w:endnote> opening tag (order-robust) and
+  // count only the numeric ids >= 1, so the reserved boilerplate never inflates the
+  // count. (A type-based exclusion is a fallback if an id is non-numeric/absent.)
+  const countRealNotes = (xml, tagName) => {
+    if (typeof xml !== 'string') return 0;
+    return extractTags(xml, tagName).filter((tag) => {
+      const idStr = pullAttr(tag, 'w:id');
+      const type = pullAttr(tag, 'w:type');
+      // Reserved boilerplate is identified by its w:type; drop it outright.
+      if (type === 'separator' || type === 'continuationSeparator') return false;
+      const id = idStr === null ? NaN : Number(idStr);
+      // Authored notes have a numeric id >= 1. If the id is missing/non-numeric but
+      // the note is NOT a reserved type, count it (defensive).
+      return Number.isFinite(id) ? id >= 1 : true;
+    }).length;
+  };
+
+  const footnotesPart = footnotesXml !== null;
+  const footnotes = countRealNotes(footnotesXml, 'w:footnote');
+  const endnotesPart = endnotesXml !== null;
+  const endnotes = countRealNotes(endnotesXml, 'w:endnote');
+
+  // Reference MARKERS in document.xml (the body carries these; the note BODIES
+  // live in the footnotes/endnotes parts above). Order-robust: count opening tags.
+  const footnoteRefs = extractTags(documentXml, 'w:footnoteReference').length;
+  const endnoteRefs = extractTags(documentXml, 'w:endnoteReference').length;
+
+  // --- field instructions (TOC / SEQ / CITATION / BIBLIOGRAPHY) ---
+  // A Word field can be encoded two ways: as a complex field whose instruction
+  // text sits in one or more <w:instrText>…</w:instrText> runs, OR as a simple
+  // field <w:fldSimple w:instr="…"/>. We collect BOTH instruction sources and
+  // classify each by the field keyword it contains. instrText for one logical
+  // field may be split across runs, so we also test the concatenation of all
+  // instrText for the keyword (covers a "TO" + "C" style split).
+  const instrTextBlocks = Array.from(documentXml.matchAll(/<w:instrText\b[^>]*>([\s\S]*?)<\/w:instrText>/g)).map((m) => m[1]);
+  const instrTextJoined = instrTextBlocks.join(' ');
+  const fldSimpleInstrs = extractTags(documentXml, 'w:fldSimple')
+    .map((tag) => pullAttr(tag, 'w:instr'))
+    .filter((v) => v !== null);
+
+  // Count fields carrying a given keyword: per-run instrText hits PLUS fldSimple
+  // hits, PLUS one extra if the keyword only appears in the cross-run join (a
+  // split instruction that no single run matched).
+  const countFields = (keyword) => {
+    const re = new RegExp(keyword);
+    let n = instrTextBlocks.filter((s) => re.test(s)).length;
+    n += fldSimpleInstrs.filter((s) => re.test(s)).length;
+    if (n === 0 && re.test(instrTextJoined)) n = 1;
+    return n;
+  };
+
+  const tocFields = countFields('TOC');
+  const seqFields = countFields('SEQ');
+  const citationFields = countFields('CITATION');
+  const bibliographyFields = countFields('BIBLIOGRAPHY');
+
+  // --- bibliography sources (<b:Source> inside any customXml/item*.xml) ---
+  // The fork emits the citation source store as a customXml part carrying
+  // <b:Sources>/<b:Source>. Count every <b:Source> across all customXml items.
+  let sources = 0;
+  for (const part of customXmlParts) {
+    sources += extractTags(part.xml, 'b:Source').length;
+  }
+
   const out = {
     hyperlinks,
     relTargets,
@@ -181,6 +264,18 @@ function extractTags(xml, elementName) {
     media: mediaEntries,
     tableStyles,
     tblStyleRefs,
+    // slice-9 references
+    footnotesPart,
+    footnotes,
+    endnotesPart,
+    endnotes,
+    footnoteRefs,
+    endnoteRefs,
+    tocFields,
+    seqFields,
+    citationFields,
+    bibliographyFields,
+    sources,
   };
 
   console.log(JSON.stringify(out, null, 2));

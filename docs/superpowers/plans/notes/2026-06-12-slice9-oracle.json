@@ -1,0 +1,31 @@
+{
+  "slice": "9 — references",
+  "reference": "Word for Windows 16.0 over COM (scripts/oracle/word-oracle-win.ps1)",
+  "date": "2026-06-12",
+  "headBranch": "feature/phase-2-slice-9-references @ 6098fa5 (references FLIPPED)",
+  "gates": {
+    "pm": "275/275",
+    "legacy": "257/257 (byte-identical)",
+    "smoke": "9/9",
+    "smokeLegacy": "9/9",
+    "roundtrip": "27/0",
+    "docx": "17/0"
+  },
+  "legA_cloneToWord": {
+    "verdict": "PASS",
+    "method": "Authored a clone references docx via the PM engine (scripts/author-slice9-clone.js): a doc with 2 Heading-1 paragraphs + body, then refInsertFootnote (note body 'Footnote'), refInsertCaption('Figure','sample') (SEQ field), refAddSource(book/Ada Lovelace/On Engines/1843)->refInsertCitation (CITATION field + b:Source), refInsertTOC + refUpdateTable (TOC field collecting both headings). Exported via the PM converter to C:/tmp/wc-slice9-clone.docx (16180 bytes). Ran word-oracle-win.ps1 roundtrip (fresh PID-safe hidden Word 16.0 instance, foreground, unsandboxed) -> ROUNDTRIP_OK -> C:/tmp/wc-slice9-resaved.docx (19770 bytes). Ran scripts/docx-inspect.js (extended with references extractors) on both files.",
+    "result": "Real Word opened the clone's references docx and resaved it with NO error (Open + SaveAs2 succeeded, exit 0). Every references construct is PRESERVED across Word's own resave, byte-for-construct identical: footnotesPart true->true, footnotes 1->1, footnoteRefs 1->1, tocFields 1->1, seqFields 1->1, citationFields 1->1, sources 1->1. Raw-XML cross-check: word/footnotes.xml <w:footnote w:id=\"1\">; document.xml instrText 'TOC \\o \"1-3\" \\u \\h \\z', 'SEQ Figure \\* ARABIC', 'CITATION source-...'; customXml/item1.xml <b:Source> (On Engines).",
+    "noRepairNote": "ROUNDTRIP_OK (a hidden-instance Open+SaveAs2 succeeding) + the parts being IDENTICAL before/after is strong evidence of clean acceptance with no structural repair. A literal 'no repair dialog' observation is inherently manual (COM cannot read the repair dialog; a hidden automation instance auto-handles it) and was not performed this session — the COM roundtrip success is the proven proxy per scripts/oracle/README.md."
+  },
+  "legB_wordToClone": {
+    "verdict": "PARTIAL PASS (footnotes + TOC import; SEQ caption + CITATION drop on import — pre-existing fork-converter limitation)",
+    "method": "Imported Word's own serialization (C:/tmp/wc-slice9-resaved.docx, lastModifiedBy 'Ogut, Dogan', AppVersion 16.0000) into the clone via WC.PM.openDocx (scripts/import-slice9-legb.js -> the real parseDocx import path). Inspected the imported doc.toJSON() + a re-export.",
+    "result": "Import HEALTHY: openDocx returned true, lastImportBlanked()=false, no contentError, no throw, doc.content.size=152. SURVIVED: footnoteReference node (the footnote + body) and a real tableOfContents node (re-exports as a Word TOC field, instrText 'TOC \\o \"1-3\" \\u \\h \\z' + w:fldChar). DROPPED on import: the SEQ Figure caption field/number (only the literal text 'Figure : sample' survives; no sequenceField node) and the CITATION field entirely (no citation node, no fieldAnnotation fallback; the in-text citation vanishes). The b:Source in customXml round-trips opaquely but its in-text CITATION reference is lost.",
+    "assertions": { "footnoteRefNode": true, "tocNodeOrField": true, "captionSeq": false, "citationNode": false, "contentError": false }
+  },
+  "deviationsRecorded": [
+    "Leg A page numbers / SEQ numbers / rendered citation+bibliography text degrade to placeholders headless (Phase-7 layout gap, ledger A) — the FIELD CODES + structure export correctly and real Word repopulates them on F9/open (Leg A confirms the fields survive Word's resave).",
+    "Leg B import gap (PRE-EXISTING fork converter, NOT a slice-9 wiring defect, NOT introduced by this slice): footnotes + TOC import faithfully from real-Word docx, but the fork docx importer does NOT map SEQ caption fields or CITATION complex fields to PM nodes — an imported caption keeps its literal text but loses the SEQ auto-number, and an imported managed citation is dropped (its display text vanishes). Recommended PRIORITIZED follow-up: a NOTICE'd fork-importer fix mapping complex SEQ/CITATION fields (w:fldChar + w:instrText) to sequenceField / citation nodes (or at minimum a fieldAnnotation that preserves the cached display text so citations do not visibly disappear on open)."
+  ],
+  "conclusion": "Slice-9 references is real-Word-faithful on the CREATE+EXPORT path (Leg A full PASS — clone-authored footnotes/TOC/captions/citations/sources survive Word for Windows 16.0's own resave unchanged). The import path (Leg B) imports footnotes + TOC faithfully with no blanking/crash; SEQ caption and CITATION fields are dropped by the pre-existing fork converter and are recorded as a prioritized follow-up. The slice's deliverable (flip references onto the PM engine; references work on the engine or degrade honestly; references EXPORT) is met."
+}
