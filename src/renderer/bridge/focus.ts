@@ -11,6 +11,8 @@
 // spinners, search field, zoom range slider, dialog inputs) — those instead get
 // a focusin capture that snapshots the PM selection (spec §7.1-4: a blocked
 // command must never cost the user their selection).
+import { Selection } from '@/pm'
+
 let installed = false // idempotent: replaceEditor() re-runs installBridge on Open/New
 export function installFocusGuards() {
   if (installed) return
@@ -68,19 +70,27 @@ export function installFocusGuards() {
     if (!view) return
     const max = view.state.doc.content.size - 1
     if (max < 1) return
-    // CLAMP the click into the .ProseMirror content box, THEN hit-test: a click
-    // below the (possibly short) content maps to the last row, a left-margin click
-    // to the line start, a top-margin click to the first row. Clamping beats a
-    // null-fallback heuristic — a short doc sits at the TOP of a tall page, so a
-    // click "below the text" is still in the page's upper half (the heuristic's blind spot).
     const prose = (t.closest('#pm-editor') as HTMLElement).querySelector('.ProseMirror') as HTMLElement | null
     const box = (prose || (t.closest('#pm-editor') as HTMLElement)).getBoundingClientRect()
-    const clamp = (val: number, lo: number, hi: number) => Math.max(lo, Math.min(val, hi))
-    const x = clamp(e.clientX, box.left + 1, box.right - 1)
-    const y = clamp(e.clientY, box.top + 1, box.bottom - 1)
-    const hit = view.posAtCoords({ left: x, top: y })
-    const pos = Math.max(1, Math.min(hit ? hit.pos : max, max))
-    editor.commands.setTextSelection({ from: pos, to: pos })
+    if (prose && e.clientY > box.bottom) {
+      // Clicked in the BLANK area below all text → caret to the document END (the
+      // last written position), regardless of horizontal position — what you want
+      // when you click the empty canvas to keep typing. (posAtCoords-nearest would
+      // instead drop the caret at the start of whatever wrapped line sits nearest
+      // the click x — not the end.)
+      view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)))
+    } else {
+      // Beside the text (side margins / within the content's vertical span): CLAMP
+      // the click into the .ProseMirror box, then hit-test — a left-margin click
+      // maps to that line's start, a top-margin click to the first row. Clamping
+      // beats a null-fallback heuristic (a short doc sits at the TOP of a tall page).
+      const clamp = (val: number, lo: number, hi: number) => Math.max(lo, Math.min(val, hi))
+      const x = clamp(e.clientX, box.left + 1, box.right - 1)
+      const y = clamp(e.clientY, box.top + 1, box.bottom - 1)
+      const hit = view.posAtCoords({ left: x, top: y })
+      const pos = Math.max(1, Math.min(hit ? hit.pos : max, max))
+      editor.commands.setTextSelection({ from: pos, to: pos })
+    }
     view.focus()
     e.preventDefault() // keep our caret — the browser's own mousedown would clear it
   })
