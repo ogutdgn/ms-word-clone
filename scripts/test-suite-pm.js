@@ -161,16 +161,18 @@
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     // probe lives in a STILL-UNFLIPPED area -- repointed link->newComment when
     // insert-basics flipped (slice 6), then newComment->tableOfContents when slice 8
-    // started flipping review: a newComment probe would go vacuously green once
-    // review is live; tableOfContents (references, stays unflipped until slice 9)
-    // keeps the test MEANINGFUL. Both [0a] D6 guards now converge on tableOfContents
-    // but exercise DISTINCT dispatch heads (Commands.run vs Commands.dropdown) -- keep both.
-    window.WC.Commands.run({ cmd: 'tableOfContents', label: 'Table of Contents' });
+    // started flipping review. tableOfContents (references) INVERTS once slice 9
+    // flips references, so slice 9 repoints both heads to startMailMerge (AREA
+    // mail-merge, NOT in FLIPPED -> stays blocked; its ribbon control is a dropdown
+    // so both guard heads stay meaningful). Both [0a] D6 guards now converge on
+    // startMailMerge but exercise DISTINCT dispatch heads (Commands.run vs
+    // Commands.dropdown) -- keep both.
+    window.WC.Commands.run({ cmd: 'startMailMerge', label: 'Start Mail Merge' });
     return document.querySelectorAll('.flyout').length === 0
       && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'tableOfContents', type: 'dropdown' }, document.body);
+    window.WC.Commands.dropdown({ cmd: 'startMailMerge', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -2838,6 +2840,270 @@
       || 'tracking still ON after the hygiene reset (fork disableTrackChanges renamed?): ' + m.join(' ');
   });
 
+  // ---------- slice 9: references (TOC · footnotes/endnotes · captions · citations) ----------
+  // Plan: docs/superpowers/plans/2026-06-12-phase2-slice-9-references.md (esp. §0
+  // ground-truth, §1 D9.x, §2 task 2, amendments A1/A2/A3). RED until the bridge
+  // (task 3, installReferences) + the ribbon re-points (task 5) + the FLIP (task 6,
+  // 'references' ∈ FLIPPED) land. Planned WC.PM surface UNDER TEST (none exist yet):
+  // refInsertFootnote/refInsertEndnote/refInsertTOC(opts)/refUpdateTable/
+  // refInsertCaption(label)/refAddSource(src)/refInsertCitation(srcId) — each a thin
+  // editor.doc.* call returning a success boolean (reading WC.editor.doc FRESH).
+  // CRITICAL (driver guidance): the fork's editor.doc.{footnotes,toc,captions,
+  // citations}.* are ALREADY mounted, so we NEVER drive the action via editor.doc.*
+  // directly (that would pass vacuously green NOW) — we drive via the WC.PM bridge
+  // surface the flip unblocks, and ASSERT on engine/doc state or export XML, never on
+  // a toast string. Every planned-surface access is guarded with a `typeof !==
+  // 'function'` failure-string return so the red reason is "method missing" (NOT an
+  // uncaught throw) and the rest of the suite keeps running.
+  //
+  // Ground-truth pins from §0 (node names: extensions/{footnote,endnote,citation,
+  // sequence-field,table-of-contents}.js):
+  //   footnote ref node = 'footnoteReference'; endnote = 'endnoteReference';
+  //   TOC node = 'tableOfContents' (entry paragraphs styled TOC1/TOC2 inside it);
+  //   caption SEQ field node = 'sequenceField' with attrs.instruction `SEQ <label> \* ARABIC`;
+  //   in-text citation node = 'citation'.
+  //   exportDocx({getUpdatedDocs:true}) returns a part→xml map carrying
+  //   'word/footnotes.xml'/'word/endnotes.xml' + customXml/* (Editor.ts:3929-3939,3976);
+  //   exportDocx({exportXmlOnly:true}) returns ONLY word/document.xml (A2).
+  await PM().newBlank(); await sleep(100);
+
+  // Map of every export part (footnotes/endnotes/customXml + document.xml) — A2:
+  // the note BODY lives in word/footnotes.xml, which exportXmlOnly never returns.
+  const exportParts = async () => {
+    const map = await window.WC.editor.exportDocx({ getUpdatedDocs: true });
+    return (map && typeof map === 'object') ? map : {};
+  };
+  // Count tableOfContents nodes / collect a TOC node's descendant entry paragraphs.
+  const tocNode = () => { let f = null; doc().descendants((n) => { if (!f && n.type.name === 'tableOfContents') f = n; }); return f; };
+  // Entry paragraphs inside the first TOC node (text + page-number run live here).
+  const tocEntryTexts = () => {
+    const toc = tocNode();
+    if (!toc) return [];
+    const texts = [];
+    toc.descendants((n) => { if (n.type.name === 'paragraph') texts.push(n.textContent); });
+    return texts;
+  };
+  // All sequenceField instruction strings, in document order.
+  const seqInstructions = () => { const out = []; doc().descendants((n) => { if (n.type.name === 'sequenceField') out.push(String(n.attrs.instruction || '')); }); return out; };
+
+  await t('[9] insertFootnote: footnoteReference node + <w:footnote w:id=> in word/footnotes.xml (A2)', async () => {
+    setDoc('footnote anchor body');
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertFootnote();
+    if (ok !== true) return 'refInsertFootnote returned ' + JSON.stringify(ok) + ' (D6-blocked / refused — red)';
+    await sleep(120);
+    if (!hasNode('footnoteReference')) return 'no footnoteReference node in the doc';
+    // A2: the note BODY is in word/footnotes.xml — read it via the getUpdatedDocs
+    // part map, NOT exportXmlOnly (which returns only document.xml and never carries
+    // the note body).
+    const parts = await exportParts();
+    const fx = parts['word/footnotes.xml'];
+    if (typeof fx !== 'string') return 'word/footnotes.xml not in the export part map';
+    return /<w:footnote\b[^>]*\bw:id=/.test(fx) || 'no <w:footnote w:id=> (seeded note body) in word/footnotes.xml';
+  });
+
+  await t('[9] insertEndnote: endnoteReference node + <w:endnote w:id=> in word/endnotes.xml (A2 symmetric)', async () => {
+    setDoc('endnote anchor body');
+    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertEndnote();
+    if (ok !== true) return 'refInsertEndnote returned ' + JSON.stringify(ok) + ' (D6-blocked / refused — red)';
+    await sleep(120);
+    if (!hasNode('endnoteReference')) return 'no endnoteReference node in the doc';
+    const parts = await exportParts();
+    const ex = parts['word/endnotes.xml'];
+    if (typeof ex !== 'string') return 'word/endnotes.xml not in the export part map';
+    return /<w:endnote\b[^>]*\bw:id=/.test(ex) || 'no <w:endnote w:id=> (seeded note body) in word/endnotes.xml';
+  });
+
+  await t('[9] EXPORT: footnote reference MARKER <w:footnoteReference in document.xml', async () => {
+    setDoc('marker anchor text');
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertFootnote();
+    if (ok !== true) return 'refInsertFootnote returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml(); // exportXmlOnly -> document.xml (the marker lives here)
+    return /<w:footnoteReference\b/.test(xml) || 'no <w:footnoteReference in document.xml';
+  });
+
+  await t('[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads "0" (A1)', async () => {
+    setDocs(['Chapter One Intro', 'Chapter Two Body', 'plain trailing paragraph']);
+    // Real Heading-styled paragraphs (styleId Heading1 — collected by the default
+    // \o "1-3" TOC config, §0.4 K3). applyStyleByName is the FLIPPED styles surface.
+    selectText('Chapter One Intro'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    selectText('Chapter Two Body'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); // insert at doc start
+    const ok = PM().refInsertTOC({});
+    if (ok !== true) return 'refInsertTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node in the doc';
+    const entries = tocEntryTexts();
+    const matchOne = entries.some((tx) => tx.includes('Chapter One Intro'));
+    const matchTwo = entries.some((tx) => tx.includes('Chapter Two Body'));
+    if (!(matchOne && matchTwo)) return 'TOC entries do not match both headings: ' + JSON.stringify(entries);
+    // A1: degraded-create page-number run reads the literal "0" (NOT "??"; "??" is
+    // only the unreachable update({mode:'pageNumbers'}) path). Each entry text ends
+    // with the page-number run, so "0" must appear and "??" must NOT.
+    const joined = entries.join('\n');
+    if (/\?\?/.test(joined)) return 'TOC page number rendered "??" — expected the degraded-create "0" (A1): ' + JSON.stringify(entries);
+    return /0/.test(joined) || 'no degraded "0" page-number run in the TOC entries (A1): ' + JSON.stringify(entries);
+  });
+
+  await t('[9] updateTable after a heading edit updates the matching TOC entry text', async () => {
+    setDocs(['Original Heading X', 'plain body paragraph']);
+    selectText('Original Heading X'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refUpdateTable !== 'function') return 'PM.refUpdateTable missing (red — bridge not installed)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(150);
+    if (!tocEntryTexts().some((tx) => tx.includes('Original Heading X'))) return 'TOC did not pick up the original heading (precondition)';
+    // BLOCKER (FIX 1): the TOC is inserted near the doc START, so a plain
+    // findRange('Original Heading X') returns the FIRST text match — which is the TOC
+    // ENTRY run (entry titles are real text nodes, toc-entry-builder.ts:348), NOT the
+    // body heading. Editing that run rewrites the TOC entry; refUpdateTable then
+    // rebuilds the entry from the untouched body heading and the title reverts → the
+    // test could never go green. So locate the BODY heading EXPLICITLY: the first
+    // TOP-LEVEL paragraph whose paragraphProperties.styleId matches /^Heading[1-6]$/
+    // that is NOT a descendant of a tableOfContents node (return false at a TOC node so
+    // descendants() never walks the entry paragraphs inside it).
+    let bodyHeading = null; // { from, to } text range of the body heading run
+    doc().descendants((node, pos) => {
+      if (bodyHeading) return false;
+      if (node.type.name === 'tableOfContents') return false; // skip the TOC subtree entirely
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) {
+        // text content spans (pos+1 .. pos+1+textLen) — strip enclosing run wrappers by
+        // measuring the rendered text length, which is what we replace.
+        const txt = node.textContent;
+        bodyHeading = { from: pos + 1, to: pos + 1 + txt.length, text: txt };
+        return false;
+      }
+      return true;
+    });
+    if (!bodyHeading) return 'no top-level Heading[1-6] body paragraph found to edit (outside the TOC)';
+    if (!bodyHeading.text.includes('Original Heading X')) return 'located body heading is not the original heading: ' + JSON.stringify(bodyHeading);
+    // Replace the BODY heading text, then verify the mutated paragraph is still the
+    // body heading (styleId Heading*, outside any TOC) and now reads the renamed text —
+    // i.e. we did NOT accidentally rewrite a TOC entry (whose paragraphs carry styleId
+    // TOC1..TOC9, not Heading*).
+    window.WC.editor.commands.insertContentAt({ from: bodyHeading.from, to: bodyHeading.to }, 'Renamed Heading Y'); await sleep(80);
+    let mutated = null;
+    doc().descendants((node) => {
+      if (mutated) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) { mutated = node.textContent; return false; }
+      return true;
+    });
+    if (mutated == null) return 'body heading vanished after the edit';
+    if (!mutated.includes('Renamed Heading Y')) return 'the mutated body heading does not read the renamed text (edited the wrong node?): ' + JSON.stringify(mutated);
+    const ok = PM().refUpdateTable();
+    if (ok !== true) return 'refUpdateTable returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    const entries = tocEntryTexts();
+    if (entries.some((tx) => tx.includes('Original Heading X'))) return 'TOC entry still shows the stale heading text: ' + JSON.stringify(entries);
+    return entries.some((tx) => tx.includes('Renamed Heading Y')) || 'TOC entry did not update to the renamed heading: ' + JSON.stringify(entries);
+  });
+
+  await t('[9] insertCaption ×2 (Figure): two ordered SEQ-field captions, instruction begins "SEQ Figure" (A3)', async () => {
+    setDocs(['caption host paragraph one', 'caption host paragraph two']);
+    if (typeof PM().refInsertCaption !== 'function') return 'PM.refInsertCaption missing (red — bridge not installed)';
+    caretAfter('host paragraph one');
+    if (PM().refInsertCaption('Figure') !== true) return 'first refInsertCaption refused (red)';
+    await sleep(120);
+    caretAfter('host paragraph two');
+    if (PM().refInsertCaption('Figure') !== true) return 'second refInsertCaption refused (red)';
+    await sleep(120);
+    const seqs = seqInstructions();
+    if (seqs.length < 2) return 'expected ≥2 sequenceField nodes, got ' + seqs.length + ': ' + JSON.stringify(seqs);
+    // A3: do NOT assert "Figure 1"/"Figure 2" — resolvedNumber is empty headless
+    // (no SEQ resolver without a layout cycle). Assert the FIELD instruction shape.
+    const figs = seqs.filter((ins) => ins.startsWith('SEQ Figure'));
+    return figs.length >= 2 || 'fewer than 2 SEQ fields whose instruction begins "SEQ Figure": ' + JSON.stringify(seqs);
+  });
+
+  await t('[9] citation store: addSource + insertCitation → citation node AND sources.list() includes it', async () => {
+    setDoc('citation anchor text');
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refInsertCitation !== 'function') return 'PM.refInsertCitation missing (red — bridge not installed)';
+    // editor.doc.citations.sources.list() returns a DiscoveryResult { total, items }
+    // (discovery.ts:133) — NOT a raw array. Normalize so the count assert is robust
+    // whether the bridge surfaces the raw result or a normalized array.
+    const sourceCount = () => {
+      try {
+        const r = window.WC.editor.doc.citations.sources.list();
+        if (Array.isArray(r)) return r.length;
+        if (r && typeof r.total === 'number') return r.total;
+        if (r && Array.isArray(r.items)) return r.items.length;
+        return 0;
+      } catch (e) { return 0; }
+    };
+    const before = sourceCount();
+    const src = { type: 'Book', title: 'Slice Nine Reference Work', author: 'Tester' };
+    const srcId = PM().refAddSource(src);
+    if (!srcId || srcId === false) return 'refAddSource returned ' + JSON.stringify(srcId) + ' (red)';
+    caretAfter('anchor');
+    const ok = PM().refInsertCitation(srcId);
+    if (ok !== true) return 'refInsertCitation returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    if (!hasNode('citation')) return 'no citation node in the doc';
+    // ASSERT via the fork Document API source store (the plan explicitly permits
+    // reading editor.doc.citations.sources.list() — the ACTION is bridge-driven).
+    const after = sourceCount();
+    return after > before || 'citation source store did not grow (before=' + before + ' after=' + after + ')';
+  });
+
+  await t('[9] EXPORT: citation sources reach a customXml <b:Sources>/<b:Source> part (plan ~L73)', async () => {
+    // FIX 2 (plan line ~73): the fork exports bibliography SOURCES as a customXml
+    // <b:Sources> part (Editor.ts:3976 emits every customXml/*.xml on the
+    // getUpdatedDocs path; citations-export.integration.test.ts pins the part path
+    // customXml/item{N}.xml carrying <b:Sources>/<b:Source> + <b:Tag>/<b:Title>). Seed
+    // a source + citation, then grep the export part map for that part.
+    setDoc('export citation anchor text');
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refInsertCitation !== 'function') return 'PM.refInsertCitation missing (red — bridge not installed)';
+    const title = 'Slice Nine Export Source';
+    const src = { type: 'Book', title, author: 'Export Tester' };
+    const srcId = PM().refAddSource(src);
+    if (!srcId || srcId === false) return 'refAddSource returned ' + JSON.stringify(srcId) + ' (red)';
+    caretAfter('anchor');
+    const ok = PM().refInsertCitation(srcId);
+    if (ok !== true) return 'refInsertCitation returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const parts = await exportParts();
+    // The bibliography sources part is a customXml item (key matches customXml/, e.g.
+    // customXml/item1.xml). Find any customXml part whose XML carries <b:Sources>/
+    // <b:Source> AND the seeded identifier (srcId via <b:Tag>) or the title.
+    const customXmlKeys = Object.keys(parts).filter((k) => /(^|\/)customXml\//.test(k) && k.endsWith('.xml') && typeof parts[k] === 'string');
+    if (customXmlKeys.length === 0) return 'no customXml/*.xml part in the export map: ' + JSON.stringify(Object.keys(parts));
+    const hit = customXmlKeys.find((k) => {
+      const xml = parts[k];
+      return /<b:Sources\b/.test(xml) && /<b:Source\b/.test(xml) && (xml.includes(String(srcId)) || xml.includes(title));
+    });
+    return !!hit || 'no customXml <b:Sources>/<b:Source> part carrying the seeded source (id=' + JSON.stringify(srcId) + ' / title=' + JSON.stringify(title) + '); customXml keys: ' + JSON.stringify(customXmlKeys);
+  });
+
+  await t('[9] EXPORT: document.xml carries a TOC field marker AND a "SEQ Figure" caption field', async () => {
+    setDocs(['Export Heading One', 'body para for export', 'figure host para']);
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refInsertCaption !== 'function') return 'PM.refInsertCaption missing (red — bridge not installed)';
+    selectText('Export Heading One'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    caretAfter('figure host para');
+    if (PM().refInsertCaption('Figure') !== true) return 'refInsertCaption refused (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml();
+    // TOC field marker: either the instruction text (TOC \o ...) or a w:fldChar.
+    const tocMarker = (/\bTOC\b/.test(xml) && /\\o\b/.test(xml)) || /<w:fldChar\b/.test(xml);
+    if (!tocMarker) return 'no TOC field marker (TOC \\o instruction or <w:fldChar) in document.xml';
+    return /SEQ Figure/.test(xml) || 'no "SEQ Figure" caption field instruction in document.xml';
+  });
+
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------
   await t('[fix] clicking the empty area below the text jumps the caret to the doc END', async () => {
     setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
@@ -2934,6 +3200,81 @@
     if (!mNew.some((x) => x.startsWith('trackInsert:'))) return 'inserted run lacks trackInsert: ' + mNew.join(' ');
     const revs = PM().getRevisions();
     return revs.length >= 2 || ('Revisions provider sees only ' + revs.length + ' rows');
+  });
+
+  await t('[9] open→insert footnote+TOC→exportDocxBytes→openDocx round-trip re-finds both (doc-replacing, [0b] zone)', async () => {
+    // RED until bridge (task 3) + flip (task 6); the round-trip (exportDocxBytes→
+    // openDocx) is the slice-9 reimport pin (K2/§0.3 footnote export is LIVE).
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(80);
+    setDocs(['Roundtrip Heading A', 'roundtrip body paragraph']);
+    selectText('Roundtrip Heading A'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    caretAfter('roundtrip body paragraph');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (red)';
+    await sleep(100);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    if (!hasNode('footnoteReference')) return 'footnote not present before export (precondition)';
+    if (!hasNode('tableOfContents')) return 'TOC not present before export (precondition)';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export did not produce a zip';
+    const ok = await PM().openDocx(bytes);
+    if (ok !== true) return 'reimport (openDocx) returned ' + JSON.stringify(ok);
+    await sleep(120);
+    // FIX 4: the footnote leg must round-trip FIRMLY — assert the footnoteReference
+    // node survives reimport (footnote export is LIVE, §0.3).
+    const fnBack = hasNode('footnoteReference');
+    if (!fnBack) return 'after reimport: footnoteReference node did NOT survive';
+    // The TOC leg is TOLERANT: it is not yet confirmed whether export emits an
+    // <sd:tableOfContents> (round-trips as a tableOfContents NODE) or a Word-standard
+    // TOC field (reimports as paragraphs carrying a TOC field marker). Accept EITHER:
+    //   (a) a tableOfContents node, OR
+    //   (b) a TOC field marker in the reimported document.xml — instruction text
+    //       containing "TOC" or a w:fldChar.
+    if (hasNode('tableOfContents')) return true;
+    const reXml = await exportDocumentXml();
+    const tocFieldMarker = /\bTOC\b/.test(reXml) || /<w:fldChar\b/.test(reXml);
+    return tocFieldMarker || 'after reimport: TOC survived as NEITHER a tableOfContents node NOR a TOC field marker (TOC instruction / w:fldChar) in document.xml';
+  });
+
+  await t('[9] TOC collects IMPORTED headings: export→openDocx→refInsertTOC finds an imported heading (K3 import-path pin, doc-replacing [0b] zone)', async () => {
+    // FIX 3 (K3 pin): the [9] in-place TOC tests use applyStyleByName, which proves the
+    // collector matches in-session headings. K3's REAL risk is the IMPORT PATH — do
+    // headings that round-trip through exportDocxBytes()→openDocx() still carry the
+    // styleId the TOC collector matches (\o "1-3" → /heading\s*([1-6])/i)? Build two
+    // Heading-1 paragraphs, export, REIMPORT via openDocx (replaces the doc), THEN
+    // refInsertTOC and assert ≥1 entry matches an imported heading.
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(80);
+    setDocs(['Imported Heading Alpha', 'Imported Heading Beta', 'plain imported body']);
+    selectText('Imported Heading Alpha'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    selectText('Imported Heading Beta'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export did not produce a zip';
+    const opened = await PM().openDocx(bytes); // THE IMPORT PATH K3 guards
+    if (opened !== true) return 'reimport (openDocx) returned ' + JSON.stringify(opened);
+    await sleep(120);
+    // Sanity: at least one reimported paragraph still carries a Heading[1-6] styleId
+    // (if the import dropped the styleId, the TOC could not collect it — surface that).
+    let importedHeadingText = null;
+    doc().descendants((node) => {
+      if (importedHeadingText) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) { importedHeadingText = node.textContent; return false; }
+      return true;
+    });
+    if (!importedHeadingText) return 'no Heading[1-6] paragraph survived the import (styleId dropped on reimport)';
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    const ok = PM().refInsertTOC({});
+    if (ok !== true) return 'refInsertTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(150);
+    if (!tocNode()) return 'no tableOfContents node after refInsertTOC on the reimported doc';
+    const entries = tocEntryTexts();
+    if (entries.length < 1) return 'tableOfContents has no entries after reimport';
+    return entries.some((tx) => tx.includes('Imported Heading Alpha') || tx.includes('Imported Heading Beta'))
+      || 'no TOC entry matches an imported heading (collector missed the imported styleId): ' + JSON.stringify(entries);
   });
 
   await t('[0b] New Document loads the blank template + clean state', async () => {
