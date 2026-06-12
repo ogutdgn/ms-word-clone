@@ -180,6 +180,16 @@ export function installStateSync(editor: AnyEditor) {
         const mode = viewing ? 'Viewing' : (rev.tracking ? 'Reviewing' : 'Editing')
         if (pillLabel.textContent !== mode) pillLabel.textContent = mode
       }
+      // R2/R3 enablement (Word greys, never toasts): Comments Delete/Prev/Next
+      // disable with no comments; No Markup/Original disable the markup controls.
+      const toggleDisabled = (cmd: string, off: boolean) => {
+        const n = w.WC?.Ribbon?.controlIndex?.[cmd]?.node
+        if (n) n.classList.toggle('wc-disabled', off)
+      }
+      const noComments = (w.WC?.PM?.getComments?.() || []).length === 0
+      for (const c of ['deleteComment', 'previousComment', 'nextComment']) toggleDisabled(c, noComments)
+      const markupHidden = rev.view === 'none' || rev.view === 'original'
+      for (const c of ['showComments', 'filterMarkup', 'showMarkup']) toggleDisabled(c, markupHidden)
     }
     // slice 6: track whether the caret is inside a table (drives Table Tools contextual tabs).
     // isInTable() is installed by installTable — optional-chain so pre-mount sync is safe.

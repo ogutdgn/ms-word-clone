@@ -284,3 +284,8 @@
 .color-row { display: flex; gap: 6px; align-items: center; padding: 5px 4px; }
 .color-row:hover { background: var(--word-blue-tint); }
 .color-row .sw { width: 16px; height: 16px; border: 1px solid #999; }
+
+/* slice 8 (R2/R3): Word greys unavailable review controls instead of toasting.
+   pointer-events:none kills the DOM click path; JS-level dispatch (tests,
+   chords) is intentionally unaffected -- the handlers no-op safely. */
+body.pm-active .ribbon-panel .wc-disabled { opacity: 0.45; pointer-events: none; }

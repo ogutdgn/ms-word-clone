@@ -1,0 +1,30 @@
+{
+  "slice": 8,
+  "date": "2026-06-11",
+  "reference": "Word for Windows 16.0 (Microsoft 365), Windows 11 — driven via COM (scripts/oracle/word-oracle-win.ps1 roundtrip + a one-off authoring script); no interactive Word session was touched (fresh hidden instances, graceful Quit)",
+  "legs": {
+    "A-clone-to-word": {
+      "verdict": "PASS",
+      "fixture": "C:/tmp/wc-slice8-legA.docx (clone-authored: tracked insert ' INSERTEDRUN' + tracked delete 'doomed' + tracked bold on 'words' + 1 comment on 'anchor'; author 'Word User')",
+      "author_probe": "scripts/probe-slice8-legA.js (headless engine authoring; marks ins/del/fmt all true; getRevisions = 4 rows incl. the comment — Word's revision-count semantics)",
+      "export_evidence": "document.xml: w:ins=1 w:del=1 w:delText=1 w:rPrChange=1 commentRangeStart=1 commentReference=1; parts comments.xml (w:comment=1, w:author='Word User') + commentsExtended.xml; K4 resolved — the fork EMITS w:rPrChange for tracked format changes",
+      "word_roundtrip": "word-oracle-win.ps1 roundtrip → ROUNDTRIP_OK (real Word opened the clone docx with NO repair prompt and saved it)",
+      "word_saved_evidence": "Word's own save kept w:ins=1 w:del=1 w:delText=1 w:rPrChange=1 commentRangeStart=1 commentReference=1, author attrs, 'INSERTEDRUN', the kept deleted text 'doomed', comments.xml w:comment=1 with the full comment text"
+    },
+    "B-word-to-clone": {
+      "verdict": "PASS",
+      "fixture": "C:/tmp/wc-slice8-legB.docx (REAL-Word-authored via COM: TrackRevisions=true; insert ' WORDINSERT', delete 'target', bold 'words', comment on 'anchor'; author = the signed-in account 'Ogut, Dogan')",
+      "author_script": "scripts/oracle/author-legB-slice8.ps1 (PID-safe per oracle README)",
+      "import_probe": "scripts/probe-slice8-legB.js — import true; engine marks: trackInsert [' WORDINSERT'], trackDelete ['target '], trackFormat ['words']; getComments 1 row with the full text + real author; getRevisions 4 rows (3 changes + the comment, Word semantics); getChangeRanges 3",
+      "accept_semantics": "acceptAllTrackedChanges clears every track mark; 'target ' physically removed, 'WORDINSERT' retained — Word's accept outcome"
+    }
+  },
+  "deviations_noted": [
+    "Leg B format-row description reads 'Font: Bold, Font: Aptos, Font: 1…' — Word stamps the full rPrChange (font family/size) under w:rPrChange; the clone's describeFormatChange lists each property. Cosmetic verbosity, content faithful.",
+    "Comments authored in the clone export with epoch-derived w:date; Word canonicalizes benign metadata on resave (same class as the slice-6 rIds/filename canonicalization)."
+  ],
+  "environment_notes": [
+    "Run UNSANDBOXED + FOREGROUND per the Windows COM rules in scripts/oracle/README.md (sandboxed shells hang at DCOM; background shells wedge in SaveAs2).",
+    "No WINWORD orphans left: both legs used fresh hidden instances and quit gracefully (verified by completion of both scripts without kill paths)."
+  ]
+}
