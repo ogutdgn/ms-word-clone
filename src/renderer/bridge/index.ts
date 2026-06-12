@@ -8,6 +8,7 @@ import { installSearch } from './search'
 import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
+import { installReferences } from './references'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installIo } from './io'
@@ -329,6 +330,19 @@ export function preinstallBridge() {
     getComments: () => [],
     getChangeRanges: () => [], // slice 8 task 5: bars/balloons chrome provider
     runCompare: async () => false, // slice 8 task 6: Compare engine (replaced by installBridge)
+    // slice 9: references pre-mount stubs (replaced by installReferences on mount)
+    refInsertTOC: () => false, refUpdateTable: () => false, refRemoveTOC: () => false,
+    refSetOutlineLevel: () => false,
+    refInsertFootnote: () => false, refInsertEndnote: () => false,
+    refNextNote: () => false, refShowNotes: () => false,
+    refListFootnotes: () => [], refUpdateNote: () => false,
+    refInsertCaption: () => false, refInsertTOF: () => false,
+    refMarkIndexEntry: () => false, refInsertIndex: () => false, refUpdateIndex: () => false,
+    refMarkCitation: () => false, refInsertTOA: () => false,
+    refAddSource: () => false, refInsertCitation: () => false, refListSources: () => [],
+    refUpdateSource: () => false, refRemoveSource: () => false,
+    refSetCitationStyle: () => false, refInsertBibliography: () => false,
+    refCrossReference: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -363,7 +377,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

@@ -3104,6 +3104,277 @@
     return /SEQ Figure/.test(xml) || 'no "SEQ Figure" caption field instruction in document.xml';
   });
 
+  // ========== slice-9 BRIDGE-DIRECT coverage (drive WC.PM.refX, flip-independent;
+  // assert engine/doc state or export XML — never a toast). Covers the verbs the 11
+  // existing [9] tests do NOT exercise. Grounded in the fork wrappers (read before
+  // asserting). ==========
+
+  // First top-level (non-TOC) paragraph whose paragraphProperties match a predicate.
+  const findBodyPara = (needleOrPred) => {
+    const pred = typeof needleOrPred === 'function' ? needleOrPred : (n) => n.textContent.includes(needleOrPred);
+    let hit = null;
+    doc().descendants((node) => {
+      if (hit) return false;
+      if (node.type.name === 'tableOfContents') return false; // never descend into a TOC
+      if (node.type.name === 'paragraph' && pred(node)) { hit = node; return false; }
+      return true;
+    });
+    return hit;
+  };
+  // Attrs of the first node of `type` (anywhere), or null.
+  const firstNodeAttrs = (type) => { let a = null; doc().descendants((n) => { if (a == null && n.type.name === type) a = n.attrs; }); return a; };
+  // Count nodes of `type`.
+  const countNodes = (type) => { let c = 0; doc().descendants((n) => { if (n.type.name === type) c++; }); return c; };
+  // All `instruction` attrs across nodes of `type`, document order.
+  const instructionsOf = (type) => { const o = []; doc().descendants((n) => { if (n.type.name === type && n.attrs && n.attrs.instruction != null) o.push(String(n.attrs.instruction)); }); return o; };
+
+  await t('[9] refSetOutlineLevel (Add Text): persists outlineLvl on a plain paragraph; default TOC carries the \\u branch (D9.8)', async () => {
+    if (typeof PM().refSetOutlineLevel !== 'function') return 'PM.refSetOutlineLevel missing (red — bridge not installed)';
+    setDocs(['Outline plain alpha line', 'plain body two']);
+    caretAfter('Outline plain alpha line');
+    // Level 2 -> outlineLvl 1 (paragraphs-wrappers.setOutlineLevelWrapper stores
+    // paragraphProperties.outlineLvl = level-1; the verb lives at
+    // editor.doc.format.paragraph.setOutlineLevel — proves the wrapper PATH is right).
+    const ok = PM().refSetOutlineLevel(2);
+    if (ok !== true) return 'refSetOutlineLevel(2) returned ' + JSON.stringify(ok) + ' (degraded/wrong wrapper path — red)';
+    await sleep(80);
+    const para = findBodyPara('Outline plain alpha line');
+    if (!para) return 'outline-target paragraph vanished';
+    const pp = para.attrs && para.attrs.paragraphProperties;
+    if (!pp || pp.outlineLvl !== 1) return 'paragraph does not carry paragraphProperties.outlineLvl===1: ' + JSON.stringify(pp);
+    // The default TOC config (DEFAULT_TOC_CONFIG) sets useAppliedOutlineLevel -> the
+    // serialized instruction MUST contain \u (the applied-outline branch that consumes
+    // an outline level). collectTocSources keys the \u branch on the applied level.
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (red)';
+    await sleep(120);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node after refInsertTOC';
+    const ins = String(toc.attrs.instruction || '');
+    if (!/\\u\b/.test(ins)) return 'TOC instruction lacks the \\u (useAppliedOutlineLevel) switch: ' + JSON.stringify(ins);
+    // Clearing (level<=0) must remove outlineLvl ("Do Not Show in TOC").
+    caretAfter('Outline plain alpha line');
+    if (PM().refSetOutlineLevel(0) !== true) return 'refSetOutlineLevel(0) refused (clear path — red)';
+    await sleep(60);
+    const cleared = findBodyPara('Outline plain alpha line');
+    const ppc = cleared && cleared.attrs && cleared.attrs.paragraphProperties;
+    return (ppc == null || ppc.outlineLvl === undefined) || 'outlineLvl not cleared after refSetOutlineLevel(0): ' + JSON.stringify(ppc);
+  });
+
+  await t('[9] refInsertTOF("Figure"): raw TOC field whose instruction contains TOC and \\c "Figure" (D9.4)', async () => {
+    if (typeof PM().refInsertTOF !== 'function') return 'PM.refInsertTOF missing (red — bridge not installed)';
+    setDocs(['table of figures host line', 'plain body two']);
+    caretAfter('table of figures host line');
+    const ok = PM().refInsertTOF('Figure');
+    if (ok !== true) return 'refInsertTOF returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    // fields.insert(mode:'raw', TOC ...) materializes as a sequenceField node carrying
+    // the instruction (field-wrappers.insertRawField). Assert both the node + the
+    // exported document.xml instruction text (the field marker that survives a resave).
+    const seqIns = instructionsOf('sequenceField');
+    const hasNodeInstr = seqIns.some((s) => /\bTOC\b/.test(s) && /\\c\s+"Figure"/.test(s));
+    if (!hasNodeInstr) return 'no sequenceField whose instruction has TOC + \\c "Figure": ' + JSON.stringify(seqIns);
+    const xml = await exportDocumentXml();
+    return (/\bTOC\b/.test(xml) && /\\c\s+&quot;Figure&quot;|\\c\s+"Figure"/.test(xml)) || 'document.xml lacks the TOC \\c "Figure" ToF field instruction';
+  });
+
+  await t('[9] refRemoveTOC: insert a TOC then remove it — no tableOfContents node remains', async () => {
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    if (typeof PM().refRemoveTOC !== 'function') return 'PM.refRemoveTOC missing (red — bridge not installed)';
+    setDocs(['Remove TOC Heading One', 'plain body for remove']);
+    selectText('Remove TOC Heading One'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition — red)';
+    await sleep(120);
+    if (countNodes('tableOfContents') < 1) return 'no tableOfContents node before remove (precondition)';
+    const ok = PM().refRemoveTOC();
+    if (ok !== true) return 'refRemoveTOC returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    return countNodes('tableOfContents') === 0 || 'a tableOfContents node still remains after refRemoveTOC (' + countNodes('tableOfContents') + ')';
+  });
+
+  await t('[9] refMarkIndexEntry + refInsertIndex (+refUpdateIndex): XE indexEntry node + documentIndex node', async () => {
+    if (typeof PM().refMarkIndexEntry !== 'function') return 'PM.refMarkIndexEntry missing (red — bridge not installed)';
+    if (typeof PM().refInsertIndex !== 'function') return 'PM.refInsertIndex missing (red — bridge not installed)';
+    setDocs(['index marker subject here', 'plain index body']);
+    caretAfter('index marker subject here');
+    // index.entries.insert builds an indexEntry node whose instruction is `XE "<text>"`
+    // (index-wrappers.buildXeInstruction). Pass a bare string entry text.
+    const m = PM().refMarkIndexEntry('IndexTermAlpha');
+    if (m !== true) return 'refMarkIndexEntry returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(100);
+    if (countNodes('indexEntry') < 1) return 'no indexEntry node after refMarkIndexEntry';
+    const xeIns = instructionsOf('indexEntry');
+    if (!xeIns.some((s) => /^\s*XE\s+"IndexTermAlpha"/.test(s))) return 'no XE "IndexTermAlpha" instruction on the indexEntry: ' + JSON.stringify(xeIns);
+    const ins = PM().refInsertIndex();
+    if (ins !== true) return 'refInsertIndex returned ' + JSON.stringify(ins) + ' (red)';
+    await sleep(100);
+    // index.insert materializes a documentIndex node (index-wrappers: schema.documentIndex ?? index).
+    if (countNodes('documentIndex') < 1 && countNodes('index') < 1) return 'no documentIndex/index node after refInsertIndex';
+    // refUpdateIndex is best-effort rebuild — must not throw / must return a boolean.
+    const upd = PM().refUpdateIndex();
+    if (upd !== true && upd !== false) return 'refUpdateIndex returned a non-boolean: ' + JSON.stringify(upd);
+    return true;
+  });
+
+  await t('[9] refMarkCitation + refInsertTOA: TA authorityEntry node + tableOfAuthorities node (D9.6)', async () => {
+    if (typeof PM().refMarkCitation !== 'function') return 'PM.refMarkCitation missing (red — bridge not installed)';
+    if (typeof PM().refInsertTOA !== 'function') return 'PM.refInsertTOA missing (red — bridge not installed)';
+    setDocs(['legal citation host line', 'plain toa body']);
+    caretAfter('legal citation host line');
+    // authorities.entries.insert builds an authorityEntry node whose instruction begins
+    // "TA" with \l "<longCitation>" (authority-wrappers.buildTaInstruction). Bare string
+    // = longCitation; category defaults to 'cases' in the bridge.
+    const m = PM().refMarkCitation('Marbury v. Madison, 5 U.S. 137');
+    if (m !== true) return 'refMarkCitation returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(100);
+    if (countNodes('authorityEntry') < 1) return 'no authorityEntry node after refMarkCitation';
+    const taIns = instructionsOf('authorityEntry');
+    if (!taIns.some((s) => /^\s*TA\b/.test(s) && /\\l\s+"Marbury/.test(s))) return 'no TA \\l "Marbury..." instruction on the authorityEntry: ' + JSON.stringify(taIns);
+    const toa = PM().refInsertTOA();
+    if (toa !== true) return 'refInsertTOA returned ' + JSON.stringify(toa) + ' (red)';
+    await sleep(100);
+    return countNodes('tableOfAuthorities') >= 1 || 'no tableOfAuthorities node after refInsertTOA';
+  });
+
+  await t('[9] refCrossReference to a bookmark: crossReference node carrying a REF field (D9.7)', async () => {
+    if (typeof PM().refCrossReference !== 'function') return 'PM.refCrossReference missing (red — bridge not installed)';
+    setDocs(['cross ref source target text', 'cross ref anchor here']);
+    // Create a bookmark target via the fork Document API directly (action is bridge-
+    // adjacent; the crossref is the bridge-driven step under test). bookmarks.insert
+    // takes a TextTarget at the current selection.
+    selectText('cross ref source target text');
+    let bmOk = false;
+    try {
+      const sel = window.WC.editor.doc.selection.current({});
+      const at = sel && sel.target;
+      if (at) bmOk = !!(window.WC.editor.doc.bookmarks.insert({ at, name: 'CrossRefBM1' }) || {}).success;
+    } catch (e) { return 'bookmark setup threw: ' + (e && e.message); }
+    if (!bmOk) return 'bookmark insert (test setup) did not succeed — cannot target a crossref';
+    await sleep(60);
+    caretAfter('cross ref anchor here');
+    // crossRefs.insert builds a crossReference node; fieldType REF for a bookmark target
+    // (crossref-wrappers.buildRefInstruction -> "REF CrossRefBM1 \h").
+    const ok = PM().refCrossReference({ target: { kind: 'bookmark', name: 'CrossRefBM1' }, display: 'content' });
+    if (ok !== true) return 'refCrossReference returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    if (countNodes('crossReference') < 1) return 'no crossReference node after refCrossReference';
+    const crIns = instructionsOf('crossReference');
+    return crIns.some((s) => /\bREF\b/.test(s) && /CrossRefBM1/.test(s)) || 'no "REF CrossRefBM1" instruction on the crossReference node: ' + JSON.stringify(crIns);
+  });
+
+  await t('[9] refInsertBibliography + refSetCitationStyle("APA"): bibliography node AND APA reaches StyleName/selectedStyle (NOT a title)', async () => {
+    if (typeof PM().refInsertBibliography !== 'function') return 'PM.refInsertBibliography missing (red — bridge not installed)';
+    if (typeof PM().refSetCitationStyle !== 'function') return 'PM.refSetCitationStyle missing (red — bridge not installed)';
+    setDoc('bibliography host paragraph');
+    // Seed a source so the exported bibliography part has content to carry the style.
+    const srcId = PM().refAddSource({ type: 'Book', title: 'Bib Style Reference Work', author: 'Bib Tester' });
+    if (!srcId || srcId === false) return 'refAddSource (setup) returned ' + JSON.stringify(srcId);
+    const insOk = PM().refInsertBibliography('References'); // a non-empty TITLE — must NOT become the style
+    if (insOk !== true) return 'refInsertBibliography returned ' + JSON.stringify(insOk) + ' (red)';
+    await sleep(120);
+    if (countNodes('bibliography') < 1) return 'no bibliography node after refInsertBibliography';
+    // The title must NOT have been written as the style (A1): the bibliography node's
+    // style attr must NOT equal the title "References".
+    const bibAttrs = firstNodeAttrs('bibliography');
+    if (bibAttrs && bibAttrs.style === 'References') return 'A1 VIOLATION: bibliography style attr === the title "References" (title leaked into style)';
+    // Now set the citation style to APA via the dedicated verb.
+    const styleOk = PM().refSetCitationStyle('APA');
+    if (styleOk !== true) return 'refSetCitationStyle("APA") returned ' + JSON.stringify(styleOk) + ' (red)';
+    await sleep(80);
+    // The converter bibliographyPart now carries styleName="APA" / selectedStyle="/APA.XSL"
+    // (citation-resolver.syncBibliographyStyleToConverter). Read it back via the converter.
+    let part = null;
+    try { part = window.WC.editor.converter && window.WC.editor.converter.bibliographyPart; } catch (e) { /* none */ }
+    if (!part) return 'converter.bibliographyPart not present after refSetCitationStyle';
+    if (part.styleName !== 'APA') return 'bibliographyPart.styleName is ' + JSON.stringify(part.styleName) + ', expected "APA"';
+    return /APA\.XSL$/i.test(String(part.selectedStyle || '')) || 'bibliographyPart.selectedStyle is ' + JSON.stringify(part.selectedStyle) + ', expected an /APA.XSL path';
+  });
+
+  await t('[9] A1 GUARD: refInsertBibliography("Works Cited") must NOT write style="Works Cited"', async () => {
+    if (typeof PM().refInsertBibliography !== 'function') return 'PM.refInsertBibliography missing (red — bridge not installed)';
+    setDoc('works cited guard host');
+    const ok = PM().refInsertBibliography('Works Cited');
+    if (ok !== true) return 'refInsertBibliography("Works Cited") returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(100);
+    const bibAttrs = firstNodeAttrs('bibliography');
+    if (!bibAttrs) return 'no bibliography node after insert (precondition)';
+    // The title "Works Cited" MUST NOT corrupt the citation-style slot. Before the A1
+    // fix, the title rode through `style`, syncing styleName="Works Cited" /
+    // selectedStyle="/Works Cited.XSL" (corrupt). After the fix, style is undefined.
+    if (bibAttrs.style === 'Works Cited') return 'A1 REGRESSION: bibliography node style === "Works Cited" (the cosmetic title leaked into the citation-style id)';
+    let part = null;
+    try { part = window.WC.editor.converter && window.WC.editor.converter.bibliographyPart; } catch (e) { /* none */ }
+    if (part && part.styleName === 'Works Cited') return 'A1 REGRESSION: converter bibliographyPart.styleName === "Works Cited" (title leaked into the exported StyleName)';
+    return true;
+  });
+
+  await t('[9] refNextNote: two footnotes, refNextNote moves the caret toward a footnoteReference (engine-observable)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refNextNote !== 'function') return 'PM.refNextNote missing (red — bridge not installed)';
+    setDoc('first anchor mid second anchor end of line');
+    caretAfter('first anchor');
+    if (PM().refInsertFootnote() !== true) return 'first refInsertFootnote refused (precondition)';
+    await sleep(100);
+    caretAfter('second anchor');
+    if (PM().refInsertFootnote() !== true) return 'second refInsertFootnote refused (precondition)';
+    await sleep(100);
+    // Collect footnoteReference positions.
+    const refPositions = [];
+    doc().descendants((n, p) => { if (n.type.name === 'footnoteReference') refPositions.push(p); });
+    if (refPositions.length < 2) return 'expected ≥2 footnoteReference nodes, got ' + refPositions.length;
+    // Park the caret at doc start, then refNextNote('next') must land at the FIRST ref.
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    const ok = PM().refNextNote('next');
+    if (ok !== true) return 'refNextNote("next") returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(40);
+    const landed = v().state.selection.from;
+    refPositions.sort((a, b) => a - b);
+    return landed === refPositions[0] || ('refNextNote did not land on the first footnoteReference: caret=' + landed + ' firstRef=' + refPositions[0] + ' all=' + JSON.stringify(refPositions));
+  });
+
+  await t('[9] refUpdateNote(target,text): refListFootnotes reflects the new body (D9.1 notes area)', async () => {
+    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
+    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
+    if (typeof PM().refUpdateNote !== 'function') return 'PM.refUpdateNote missing (red — bridge not installed)';
+    setDoc('note body anchor here');
+    caretAfter('note body anchor here');
+    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
+    await sleep(120);
+    const before = PM().refListFootnotes();
+    if (!Array.isArray(before) || before.length < 1) return 'refListFootnotes returned no notes after insert: ' + JSON.stringify(before);
+    const note = before[0];
+    if (!note || (!note.target && !note.noteId)) return 'first note lacks a target/noteId: ' + JSON.stringify(note);
+    const NEW_BODY = 'Edited footnote body slice nine';
+    const ok = PM().refUpdateNote(note.target || note.noteId, NEW_BODY);
+    if (ok !== true) return 'refUpdateNote returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const after = PM().refListFootnotes();
+    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(note.noteId));
+    if (!match) return 'updated note id vanished from refListFootnotes: ' + JSON.stringify(after);
+    return match.content === NEW_BODY || 'refListFootnotes content did not reflect the new body: ' + JSON.stringify(match.content);
+  });
+
+  await t('[9] refInsertTOC with non-empty opts {showLevels:5, rightAlignPageNumbers:false}: instruction reflects \\o "1-5"', async () => {
+    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
+    setDocs(['Custom TOC Heading A', 'Custom TOC body para']);
+    selectText('Custom TOC Heading A'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    // refInsertTOC maps showLevels -> config.outlineLevels.to; serializeTocInstruction
+    // writes \o "from-to". showLevels:5 -> \o "1-5". rightAlignPageNumbers is a PM node
+    // attr (not a switch) — assert it lands on the node, not the instruction.
+    const ok = PM().refInsertTOC({ showLevels: 5, rightAlignPageNumbers: false });
+    if (ok !== true) return 'refInsertTOC({showLevels:5,...}) returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const toc = tocNode();
+    if (!toc) return 'no tableOfContents node after the custom-opts insert';
+    const ins = String(toc.attrs.instruction || '');
+    if (!/\\o\s+"1-5"/.test(ins)) return 'TOC instruction does not reflect showLevels:5 (\\o "1-5"): ' + JSON.stringify(ins);
+    // rightAlignPageNumbers:false should be recorded on the node attr.
+    if (toc.attrs.rightAlignPageNumbers !== false) return 'rightAlignPageNumbers:false did not land on the TOC node attr: ' + JSON.stringify(toc.attrs.rightAlignPageNumbers);
+    return true;
+  });
+
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------
   await t('[fix] clicking the empty area below the text jumps the caret to the doc END', async () => {
     setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
