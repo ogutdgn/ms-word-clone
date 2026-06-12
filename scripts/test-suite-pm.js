@@ -3237,6 +3237,29 @@
     return countNodes('tableOfAuthorities') >= 1 || 'no tableOfAuthorities node after refInsertTOA';
   });
 
+  await t('[9] FIX 2: Mark Citation category Cases → TA field carries NUMERIC "\\c 1" (node instruction + exported instrText)', async () => {
+    if (typeof PM().refMarkCitation !== 'function') return 'PM.refMarkCitation missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(100);
+    setDocs(['numeric category host line', 'plain toa body']);
+    caretAfter('numeric category host line');
+    // The Mark Citation dialog maps "Cases" → numeric 1 (CAT_MAP, commands.js). Drive
+    // refMarkCitation with the SAME numeric code the dialog produces. The fork
+    // buildTaInstruction emits `\c <category>` verbatim and the translator parser only
+    // matches `\c (\d+)`, so the code MUST be numeric (a string would emit `\c cases`).
+    const m = PM().refMarkCitation({ longCitation: 'Brown v. Board, 347 U.S. 483', shortCitation: 'Brown', category: 1 });
+    if (m !== true) return 'refMarkCitation returned ' + JSON.stringify(m) + ' (red)';
+    await sleep(120);
+    // 1) The authorityEntry node instruction must carry the numeric \c 1 (NOT \c cases).
+    const taIns = instructionsOf('authorityEntry');
+    if (!taIns.some((s) => /\\c\s+1(?:\s|$)/.test(s))) return 'no numeric "\\c 1" on the authorityEntry instruction: ' + JSON.stringify(taIns);
+    if (taIns.some((s) => /\\c\s+(cases|[A-Za-z])/.test(s))) return 'TA instruction carries a NON-numeric \\c category (regression): ' + JSON.stringify(taIns);
+    // 2) The EXPORTED document.xml instrText must carry the numeric \c 1 too (the field
+    //    code that real Word's TA \c switch reads — buildInstructionElements emits it).
+    const xml = await exportDocumentXml();
+    if (!/\bTA\b/.test(xml)) return 'no TA field instruction in exported document.xml';
+    return /\\c\s+1(?:\s|"|<|\\)/.test(xml) || 'exported document.xml TA field lacks numeric "\\c 1": ' + xml.slice(Math.max(0, xml.indexOf(' TA ') - 20), xml.indexOf(' TA ') + 120);
+  });
+
   await t('[9] refCrossReference to a bookmark: crossReference node carrying a REF field (D9.7)', async () => {
     if (typeof PM().refCrossReference !== 'function') return 'PM.refCrossReference missing (red — bridge not installed)';
     setDocs(['cross ref source target text', 'cross ref anchor here']);
@@ -3307,6 +3330,32 @@
     try { part = window.WC.editor.converter && window.WC.editor.converter.bibliographyPart; } catch (e) { /* none */ }
     if (part && part.styleName === 'Works Cited') return 'A1 REGRESSION: converter bibliographyPart.styleName === "Works Cited" (title leaked into the exported StyleName)';
     return true;
+  });
+
+  await t('[9] FIX 5: refUpdateSource changes a source field; refListSources reflects it (Source Manager Edit)', async () => {
+    if (typeof PM().refAddSource !== 'function') return 'PM.refAddSource missing (red — bridge not installed)';
+    if (typeof PM().refUpdateSource !== 'function') return 'PM.refUpdateSource missing (red — bridge not installed)';
+    if (typeof PM().refListSources !== 'function') return 'PM.refListSources missing (red — bridge not installed)';
+    await PM().newBlank(); await sleep(100);
+    setDoc('source edit host paragraph');
+    // Add a source, then EDIT a field through refUpdateSource (the bridge verb the
+    // Source Manager → Edit affordance routes to). The dialog passes the FLAT legacy
+    // shape ({ author, title, year, publisher }); refUpdateSource normalizes it through
+    // buildSourceFields, so the update reaches source.fields.
+    const srcId = PM().refAddSource({ type: 'Book', title: 'Original Title One', author: 'Origauthor', year: '2001' });
+    if (!srcId || srcId === false) return 'refAddSource (setup) returned ' + JSON.stringify(srcId);
+    const before = (PM().refListSources() || []).find((s) => s.sourceId === srcId);
+    if (!before) return 'the new source is not in refListSources (setup): ' + JSON.stringify(PM().refListSources());
+    if ((before.fields || {}).title !== 'Original Title One') return 'unexpected pre-edit title: ' + JSON.stringify(before.fields);
+    // Edit the title + year via the FLAT shape (exactly what the dialog onSubmit sends).
+    const upd = PM().refUpdateSource(srcId, { type: 'Book', author: 'Origauthor', title: 'Edited Title Two', year: '2022', publisher: '' });
+    if (upd !== true) return 'refUpdateSource returned ' + JSON.stringify(upd) + ' (red)';
+    await sleep(80);
+    const after = (PM().refListSources() || []).find((s) => s.sourceId === srcId);
+    if (!after) return 'source vanished after refUpdateSource';
+    const f = after.fields || {};
+    if (f.title !== 'Edited Title Two') return 'refListSources did NOT reflect the edited title (got ' + JSON.stringify(f.title) + ')';
+    return f.year === '2022' || 'refListSources did NOT reflect the edited year (got ' + JSON.stringify(f.year) + ')';
   });
 
   await t('[9] refNextNote: two footnotes, refNextNote moves the caret toward a footnoteReference (engine-observable)', async () => {
@@ -3563,6 +3612,106 @@
     // rightAlignPageNumbers:false should be recorded on the node attr.
     if (toc.attrs.rightAlignPageNumbers !== false) return 'rightAlignPageNumbers:false did not land on the TOC node attr: ' + JSON.stringify(toc.attrs.rightAlignPageNumbers);
     return true;
+  });
+
+  // ---------- slice 9 task 5+6: RIBBON-PATH tests (the FLIP unblocks them) ----------
+  // These drive the DIRECT References handlers through WC.Commands.run({cmd,label})
+  // — exactly the ribbon dispatch path: Commands.run -> isBlocked('references') ->
+  // (post-flip) NOT blocked -> H[cmd] -> PMA() -> WC.PM.refX. They prove the FULL
+  // chain (ribbon -> dispatch guard -> handler -> bridge -> engine) and ONLY go green
+  // WITH 'references' in FLIPPED. They assert ENGINE state, never a toast.
+  await t('[9 ribbon] WC.Commands.run insertFootnote -> footnoteReference node (full ribbon->isBlocked->H->PMA->refX chain)', async () => {
+    await PM().newBlank(); await sleep(120);
+    // Sanity: the flip un-blocked references (the chain is only reachable when NOT blocked).
+    if (PM().isBlocked('insertFootnote') !== false) return 'insertFootnote is still D6-blocked (the flip did not land)';
+    setDoc('ribbon footnote anchor body');
+    caretAfter('ribbon footnote anchor');
+    window.WC.Commands.run({ cmd: 'insertFootnote', label: 'Insert Footnote' });
+    await sleep(140);
+    return hasNode('footnoteReference') || 'no footnoteReference node after WC.Commands.run({cmd:insertFootnote})';
+  });
+
+  await t('[9 ribbon] WC.Commands.run updateTable after a heading edit refreshes the TOC entry (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['Ribbon Heading Orig', 'ribbon plain body']);
+    selectText('Ribbon Heading Orig'); PM().applyStyleByName('Heading 1'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition)';
+    await sleep(140);
+    if (!tocEntryTexts().some((tx) => tx.includes('Ribbon Heading Orig'))) return 'TOC did not pick up the heading (precondition)';
+    // Locate the BODY heading EXPLICITLY (NOT the TOC entry run): the first top-level
+    // paragraph whose paragraphProperties.styleId matches /^Heading[1-6]$/ that is NOT
+    // a descendant of a tableOfContents node (same locator as the [9] in-place test).
+    let bodyHeading = null;
+    doc().descendants((node, pos) => {
+      if (bodyHeading) return false;
+      if (node.type.name === 'tableOfContents') return false;
+      if (node.type.name === 'paragraph' && /^Heading[1-6]$/.test(node.attrs?.paragraphProperties?.styleId || '')) {
+        bodyHeading = { from: pos + 1, to: pos + 1 + node.textContent.length, text: node.textContent };
+        return false;
+      }
+      return true;
+    });
+    if (!bodyHeading || !bodyHeading.text.includes('Ribbon Heading Orig')) return 'could not locate the body heading paragraph to edit: ' + JSON.stringify(bodyHeading);
+    window.WC.editor.commands.insertContentAt({ from: bodyHeading.from, to: bodyHeading.to }, 'Ribbon Heading EDITED');
+    await sleep(80);
+    // Drive Update Table THROUGH THE RIBBON.
+    window.WC.Commands.run({ cmd: 'updateTable', label: 'Update Table' });
+    await sleep(160);
+    const entries = tocEntryTexts();
+    return entries.some((tx) => tx.includes('Ribbon Heading EDITED')) || 'TOC entry not refreshed by ribbon updateTable: ' + JSON.stringify(entries);
+  });
+
+  await t('[9 ribbon] WC.Commands.run markEntry + insertIndex -> indexEntry + documentIndex nodes (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['ribbon index host line', 'ribbon plain body']);
+    // markEntry with no info uses the SELECTED text — select a term so the XE field is non-empty.
+    selectText('ribbon index host line');
+    window.WC.Commands.run({ cmd: 'markEntry', label: 'Mark Entry' });
+    await sleep(120);
+    if (countNodes('indexEntry') < 1) return 'no indexEntry node after WC.Commands.run({cmd:markEntry})';
+    window.WC.Commands.run({ cmd: 'insertIndex', label: 'Insert Index' });
+    await sleep(120);
+    return (countNodes('documentIndex') >= 1 || countNodes('index') >= 1) || 'no documentIndex/index node after WC.Commands.run({cmd:insertIndex})';
+  });
+
+  await t('[9 ribbon] WC.Commands.run insertTableOfAuthorities -> tableOfAuthorities node (ribbon path)', async () => {
+    await PM().newBlank(); await sleep(120);
+    // A TA mark first (so the TOA has an entry context); markCitation in PM opens a
+    // dialog, so seed the authority entry directly via the bridge, then drive the TOA
+    // insert THROUGH THE RIBBON.
+    setDocs(['ribbon toa host line', 'ribbon plain body']);
+    caretAfter('ribbon toa host line');
+    if (PM().refMarkCitation('Ribbon v. Flip, 1 W.C. 9') !== true) return 'refMarkCitation (precondition) refused';
+    await sleep(100);
+    window.WC.Commands.run({ cmd: 'insertTableOfAuthorities', label: 'Insert Table of Authorities' });
+    await sleep(140);
+    return countNodes('tableOfAuthorities') >= 1 || 'no tableOfAuthorities node after WC.Commands.run({cmd:insertTableOfAuthorities})';
+  });
+
+  // PART A proof (toc-entry-builder \u fix): a paragraph given an outline level via
+  // the LIVE setter (refSetOutlineLevel) writes paragraphProperties.outlineLvl, and a
+  // default TOC (\u branch) must now COLLECT it. Before the fix the \u branch read only
+  // .outlineLevel (never written by the setter), so the paragraph was dropped.
+  await t('[9 PART A] refSetOutlineLevel(1) on a plain paragraph -> refInsertTOC + refUpdateTable COLLECTS it (\\u outlineLvl fix)', async () => {
+    await PM().newBlank(); await sleep(120);
+    setDocs(['Applied Outline Alpha Para', 'unrelated plain body para']);
+    caretAfter('Applied Outline Alpha Para');
+    if (PM().refSetOutlineLevel(1) !== true) return 'refSetOutlineLevel(1) refused (precondition)';
+    await sleep(80);
+    // Confirm the setter persisted outlineLvl (NOT outlineLevel) — the exact key the fix reads.
+    const para = findBodyPara('Applied Outline Alpha Para');
+    const pp = para && para.attrs && para.attrs.paragraphProperties;
+    if (!pp || pp.outlineLvl !== 0) return 'setter did not persist outlineLvl===0 (level1): ' + JSON.stringify(pp);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    if (PM().refInsertTOC({}) !== true) return 'refInsertTOC refused (precondition)';
+    await sleep(140);
+    // refUpdateTable rebuilds entries from sources (runs collectTocSources \u branch).
+    if (PM().refUpdateTable() !== true && PM().refUpdateTable() !== false) return 'refUpdateTable returned a non-boolean';
+    await sleep(140);
+    const entries = tocEntryTexts();
+    return entries.some((tx) => tx.includes('Applied Outline Alpha Para'))
+      || 'TOC did NOT collect the applied-outline paragraph (PART A \\u outlineLvl regression): ' + JSON.stringify(entries);
   });
 
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------

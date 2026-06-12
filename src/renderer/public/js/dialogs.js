@@ -1202,25 +1202,89 @@
   };
 
   // ---- Add Source / Manage Sources ----
-  D.addSource = function (onAdd) {
-    const type = el('select', {}, ['Book', 'Journal Article', 'Web Site', 'Report'].map((t) => el('option', { text: t })));
-    const author = el('input', { type: 'text', class: 'grow', placeholder: 'Last, First' });
-    const title = el('input', { type: 'text', class: 'grow' });
-    const year = el('input', { type: 'text', style: { width: '80px' }, placeholder: 'Year' });
-    const publisher = el('input', { type: 'text', class: 'grow' });
+  // opts (PM-only, additive — legacy callers pass only `onAdd`): { prefill, onSubmit }.
+  // When `onSubmit` is supplied (the Source Manager → Edit flow, slice-9 FIX 5) it
+  // OVERRIDES the default add/insert behavior and receives the flat source `s`, so the
+  // caller can route to pm.refUpdateSource. `prefill` seeds the inputs for editing.
+  D.addSource = function (onAdd, opts) {
+    // pre = null under --legacy (legacy callers pass only onAdd). Pass `undefined`
+    // (NOT '') for value so el() omits the attribute entirely → the legacy Create
+    // Source dialog stays byte-identical (el sets any non-null value, FIX 4).
+    const pre = (opts && opts.prefill) || null;
+    const type = el('select', {}, ['Book', 'Journal Article', 'Web Site', 'Report'].map((t) => el('option', { text: t, selected: (pre && pre.type === t) ? 'selected' : undefined })));
+    const author = el('input', { type: 'text', class: 'grow', placeholder: 'Last, First', value: pre ? (pre.author || '') : undefined });
+    const title = el('input', { type: 'text', class: 'grow', value: pre ? (pre.title || '') : undefined });
+    const year = el('input', { type: 'text', style: { width: '80px' }, placeholder: 'Year', value: pre ? (pre.year || '') : undefined });
+    const publisher = el('input', { type: 'text', class: 'grow', value: pre ? (pre.publisher || '') : undefined });
     const row = (l, c) => el('div', { class: 'row' }, [el('label', { text: l, style: { width: '80px' } }), c]);
     const body = el('div', {}, [row('Type:', type), row('Author:', author), row('Title:', title), row('Year:', year), row('Publisher:', publisher)]);
-    WC.dialog({ title: 'Create Source', width: '480px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const s = { type: type.value, author: author.value.trim() || 'Unknown', title: title.value.trim(), year: year.value.trim(), publisher: publisher.value.trim() }; WC.Ref.addSource(s); if (onAdd) onAdd(s); else WC.Ref.insertCitation(s); } },
+    WC.dialog({ title: pre ? 'Edit Source' : 'Create Source', width: '480px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const s = { type: type.value, author: author.value.trim() || 'Unknown', title: title.value.trim(), year: year.value.trim(), publisher: publisher.value.trim() };
+        // PM-only Edit override: route to the supplied onSubmit (refUpdateSource) and
+        // skip the add/insert default entirely.
+        if (opts && typeof opts.onSubmit === 'function') { opts.onSubmit(s); return; }
+        const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+        if (pm) {
+          // refAddSource accepts the flat legacy shape and maps author/title/year/
+          // publisher into the fork CitationSourceFields (so the source EXPORTS its
+          // real values). It MINTS + returns the engine sourceId.
+          const id = pm.refAddSource(s);
+          if (onAdd) onAdd(s, id);
+          else if (id) pm.refInsertCitation(id);
+          return;
+        }
+        WC.Ref.addSource(s); if (onAdd) onAdd(s); else WC.Ref.insertCitation(s);
+      } },
       { label: 'Cancel' },
     ] });
   };
   D.manageSources = function () {
     const list = el('div', { style: { border: '1px solid #c8c6c4', maxHeight: '200px', overflowY: 'auto', margin: '8px 0' } });
-    function render() { list.innerHTML = ''; if (!WC.Ref.sources.length) list.appendChild(el('div', { style: { padding: '8px', color: '#888' }, text: 'No sources yet.' })); WC.Ref.sources.forEach((s, i) => list.appendChild(el('div', { style: { padding: '6px 8px', borderBottom: '1px solid #f0f0f0', display: 'flex' } }, [el('span', { style: { flex: 1 }, text: s.author + ' (' + (s.year || 'n.d.') + ') — ' + (s.title || '') }), el('span', { style: { color: '#c0392b', cursor: 'pointer' }, text: 'Delete', onclick: () => { WC.Ref.sources.splice(i, 1); render(); } })]))); }
+    const pm = () => (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    // PM provenance: normalize a fork source { sourceId, type, fields } into the
+    // flat display shape this dialog renders. Legacy uses WC.Ref.sources directly.
+    function sourceLabel(s) {
+      if (s.fields !== undefined) {
+        const f = s.fields || {};
+        const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : 'Unknown';
+        return author + ' (' + (f.year || 'n.d.') + ') — ' + (f.title || '');
+      }
+      return s.author + ' (' + (s.year || 'n.d.') + ') — ' + (s.title || '');
+    }
+    // PM Edit prefill (FIX 5): map a fork source { sourceId, type, fields } into the
+    // flat Create-Source shape the D.addSource inputs expect.
+    function editPrefill(s) {
+      const f = s.fields || {};
+      const author = (Array.isArray(f.authors) && f.authors[0])
+        ? [f.authors[0].last, f.authors[0].first].filter(Boolean).join(', ')
+        : '';
+      return { type: s.type, author, title: f.title || '', year: f.year || '', publisher: f.publisher || '' };
+    }
+    function render() {
+      list.innerHTML = '';
+      const p = pm();
+      const sources = p ? (p.refListSources() || []) : WC.Ref.sources;
+      if (!sources.length) list.appendChild(el('div', { style: { padding: '8px', color: '#888' }, text: 'No sources yet.' }));
+      sources.forEach((s, i) => {
+        const actions = [];
+        // PM-only Edit affordance (FIX 5): legacy manageSources had Delete only.
+        // Edit opens D.addSource prefilled and routes OK → refUpdateSource so the
+        // edit reaches the engine (and the exported source reflects it).
+        if (p) actions.push(el('span', { style: { color: '#0066cc', cursor: 'pointer', marginRight: '12px' }, text: 'Edit', onclick: () => {
+          D.addSource(null, { prefill: editPrefill(s), onSubmit: (patch) => { const q = pm(); if (q) q.refUpdateSource(s.sourceId, patch); render(); } });
+        } }));
+        actions.push(el('span', { style: { color: '#c0392b', cursor: 'pointer' }, text: 'Delete', onclick: () => { const q = pm(); if (q) { q.refRemoveSource(s.sourceId); } else { WC.Ref.sources.splice(i, 1); } render(); } }));
+        list.appendChild(el('div', { style: { padding: '6px 8px', borderBottom: '1px solid #f0f0f0', display: 'flex' } }, [
+          el('span', { style: { flex: 1 }, text: sourceLabel(s) }),
+        ].concat(actions)));
+      });
+    }
     render();
     WC.dialog({ title: 'Source Manager', width: '560px', body: el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Current List' }), list]), footer: [
-      { label: 'New…', onClick: () => { D.addSource(() => {}); return true; } },
+      // FIX 4: branch the New… handler. PM re-renders the list on add; legacy stays
+      // byte-identical to the original HEAD (D.addSource(() => {})).
+      { label: 'New…', onClick: () => { const p = pm(); if (p) { D.addSource(() => { render(); }); } else { D.addSource(() => {}); } return true; } },
       { label: 'Close', primary: true },
     ] });
   };

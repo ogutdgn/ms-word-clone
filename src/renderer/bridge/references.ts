@@ -292,17 +292,21 @@ export function installReferences(editor: AnyEditor) {
   }
 
   // ---- captions + Table of Figures (D9.4) -----------------------------------
-  // refInsertCaption(label): SEQ-numbered "Caption"-styled paragraph below the
-  // current block. resolvedNumber is empty headless (ledger A); the SEQ field
-  // instruction "SEQ <label> \* ARABIC" is what exports.
-  function refInsertCaption(label: string): boolean {
+  // refInsertCaption(label, text?): SEQ-numbered "Caption"-styled paragraph below
+  // the current block. resolvedNumber is empty headless (ledger A); the SEQ field
+  // instruction "SEQ <label> \* ARABIC" is what exports. The optional caption text
+  // rides the fork's CaptionInsertInput.text slot (captions.types.ts) so the
+  // descriptive run is part of the same caption paragraph and exports with it.
+  function refInsertCaption(label: string, text?: string): boolean {
     const d = docApi()
     if (!d) return false
     if (typeof label !== 'string' || !label.trim()) return false
     const adjacentTo = caretBlockAddress()
     if (!adjacentTo) return false
     try {
-      const r = d.captions.insert({ label, position: 'below', adjacentTo })
+      const input: any = { label, position: 'below', adjacentTo }
+      if (typeof text === 'string' && text.trim()) input.text = text.trim()
+      const r = d.captions.insert(input)
       refocus()
       return ok(r)
     } catch { return false }
@@ -377,15 +381,18 @@ export function installReferences(editor: AnyEditor) {
 
   // ---- table of authorities (D9.6) ------------------------------------------
   // refMarkCitation(info): TA field at the caret. info = { longCitation, shortCitation?,
-  // category }; category defaults to 'cases'. A bare string = longCitation.
+  // category }; category is Word's NUMERIC \c code (default 1 = Cases). A bare string =
+  // longCitation. FIX 2: the fork buildTaInstruction emits `\c <category>` verbatim and
+  // its translator parser only matches `\c (\d+)` — a STRING category would emit `\c cases`
+  // which fails the regex and resets the category to 0 on re-import. Default numeric 1.
   function refMarkCitation(info: any): boolean {
     const d = docApi()
     if (!d) return false
     const at = inlineTarget()
     if (!at) return false
     let entry: any
-    if (typeof info === 'string') entry = { longCitation: info, category: 'cases' }
-    else if (info && typeof info === 'object') entry = { category: 'cases', ...info }
+    if (typeof info === 'string') entry = { longCitation: info, category: 1 }
+    else if (info && typeof info === 'object') entry = { category: 1, ...info }
     else return false
     if (!entry.longCitation) {
       let txt = ''
@@ -441,15 +448,66 @@ export function installReferences(editor: AnyEditor) {
     return raw.charAt(0).toLowerCase() + raw.slice(1)
   }
 
+  // The fork CitationSourceFields (citations.types.ts) follows the OOXML
+  // bibliography schema: simple string fields (title/year/publisher/…) and
+  // CONTRIBUTOR fields (authors/editor/translator) that are arrays of
+  // CitationPerson { first?, middle?, last }. The legacy Create-Source dialog
+  // emits a FLAT shape { type, author, title, year, publisher } where `author`
+  // is a single free string (typically "Last, First"). buildSourceFields maps
+  // either an already-fork-shaped { fields } / { authors:[…] } OR the flat legacy
+  // keys into a valid CitationSourceFields so the source EXPORTS its real values
+  // (b:Author/b:Title/b:Year/b:Publisher — citation-sources.js) rather than
+  // silently dropping the singular `author` (the fork ignores keys it doesn't
+  // recognize, and `author` is not in its field map).
+  function personFromString(raw: unknown): any | null {
+    if (typeof raw !== 'string' || !raw.trim()) return null
+    const s = raw.trim()
+    // "Last, First [Middle]" → split on the FIRST comma (Word's canonical order).
+    const comma = s.indexOf(',')
+    if (comma >= 0) {
+      const last = s.slice(0, comma).trim()
+      const rest = s.slice(comma + 1).trim().split(/\s+/).filter(Boolean)
+      if (!last) return null
+      const first = rest.shift()
+      const middle = rest.join(' ') || undefined
+      return first ? { last, first, ...(middle ? { middle } : {}) } : { last }
+    }
+    // No comma: treat the trailing token as the surname, the rest as given names.
+    const parts = s.split(/\s+/).filter(Boolean)
+    if (!parts.length) return null
+    const last = parts.pop() as string
+    const first = parts.shift()
+    const middle = parts.join(' ') || undefined
+    return first ? { last, first, ...(middle ? { middle } : {}) } : { last }
+  }
+  function buildSourceFields(src: any): Record<string, unknown> {
+    // Start from an explicit fork-shaped `fields` object when present.
+    const base: Record<string, unknown> = (src.fields && typeof src.fields === 'object') ? { ...src.fields } : {}
+    // Copy any recognized simple/contributor keys supplied at the TOP level
+    // (a caller may pass a partly-fork-shaped flat object).
+    for (const k of ['title', 'year', 'publisher', 'city', 'journalName', 'volume', 'issue', 'pages', 'url', 'doi', 'edition', 'medium', 'shortTitle', 'standardNumber', 'authors', 'editor', 'translator']) {
+      if (base[k] === undefined && src[k] !== undefined) base[k] = src[k]
+    }
+    // Map the legacy singular `author` string → authors:[CitationPerson] (only
+    // when the fork-shaped `authors` array was not already supplied).
+    if (!Array.isArray(base.authors)) {
+      const p = personFromString(src.author)
+      if (p) base.authors = [p]
+    }
+    return base
+  }
+
   // refAddSource(src): inserts a bibliography source; the engine MINTS the
-  // sourceId (source-<ts>). RETURNS the minted sourceId (string) or false. src =
-  // { type, title, author, ... }; the whole object rides as `fields`.
+  // sourceId (source-<ts>). RETURNS the minted sourceId (string) or false. src
+  // may be the flat legacy shape { type, author, title, year, publisher } OR a
+  // fork-shaped { type, fields: { title, authors:[…], … } } — buildSourceFields
+  // normalizes both.
   function refAddSource(src: any): string | false {
     const d = docApi()
     if (!d || !src || typeof src !== 'object') return false
     const type = normalizeSourceType(src.type)
     try {
-      const r = d.citations.sources.insert({ type, fields: src })
+      const r = d.citations.sources.insert({ type, fields: buildSourceFields(src) })
       if (!ok(r)) return false
       const id = r?.source?.sourceId
       return (typeof id === 'string' && id) ? id : false
@@ -485,12 +543,21 @@ export function installReferences(editor: AnyEditor) {
     } catch { return [] }
   }
 
+  // refUpdateSource(srcId, patch): edit a source's fields (Source Manager → Edit,
+  // FIX 5). The fork update wrapper does Object.assign(source.fields, patch), so the
+  // patch must be FORK-shaped CitationSourceFields. The Source Manager dialog passes
+  // the FLAT legacy shape ({ author:"Last, First", title, year, publisher }); normalize
+  // it through buildSourceFields (maps author→authors:[CitationPerson], copies the
+  // recognized simple keys) so the singular `author` string is not silently dropped.
+  // An already-fork-shaped patch ({ fields } or { authors:[…] }) passes through unchanged.
   function refUpdateSource(srcId: string, patch: any): boolean {
     const d = docApi()
     if (!d || !srcId || !patch || typeof patch !== 'object') return false
+    const forkPatch = buildSourceFields(patch)
+    if (!forkPatch || !Object.keys(forkPatch).length) return false
     try {
       const target = { kind: 'entity', entityType: 'citationSource', sourceId: String(srcId) }
-      return ok(d.citations.sources.update({ target, patch }))
+      return ok(d.citations.sources.update({ target, patch: forkPatch }))
     } catch { return false }
   }
 
