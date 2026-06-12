@@ -2821,6 +2821,45 @@
       || 'tracking still ON after the hygiene reset (fork disableTrackChanges renamed?): ' + m.join(' ');
   });
 
+  // ---------- bugfix: page-region click places the caret (Word behavior) ----------
+  await t('[fix] clicking the empty area below the last paragraph places the caret', async () => {
+    setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
+    // park the caret at the very start so a successful move is unambiguous
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
+    v().dom.blur(); await sleep(20);
+    const page = document.getElementById('pm-editor');
+    const prose = page.querySelector('.ProseMirror');
+    const lastP = Array.from(prose.querySelectorAll('p')).pop();
+    const lr = lastP.getBoundingClientRect();
+    const pr = page.getBoundingClientRect();
+    // a point BELOW the last paragraph but inside the page sheet (the bottom margin)
+    const x = pr.left + pr.width / 2;
+    const y = Math.min(lr.bottom + 30, pr.bottom - 6);
+    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    await sleep(40);
+    const sel = v().state.selection;
+    // the caret must have left the start and the view must hold focus
+    const lastStart = (() => { let s = -1, pos = null; v().state.doc.descendants((n, p) => { if (n.type.name === 'paragraph') { s++; if (s === 2) pos = p; } return true; }); return pos; })();
+    if (!v().hasFocus()) return 'view did not take focus after the page-margin click';
+    return sel.from >= lastStart || ('caret landed at ' + sel.from + ', expected inside the last paragraph (>= ' + lastStart + ')');
+  });
+
+  await t('[fix] clicking the left margin beside a paragraph places the caret in it', async () => {
+    setDocs(['Alpha paragraph one.', 'Beta paragraph two.']);
+    window.WC.editor.commands.setTextSelection({ from: v().state.doc.content.size - 1, to: v().state.doc.content.size - 1 });
+    const page = document.getElementById('pm-editor');
+    const firstP = page.querySelector('.ProseMirror p');
+    const fr = firstP.getBoundingClientRect();
+    const pr = page.getBoundingClientRect();
+    // left-margin band, vertically aligned with the first paragraph
+    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: pr.left + 6, clientY: fr.top + fr.height / 2 }));
+    await sleep(40);
+    const sel = v().state.selection;
+    // first paragraph spans [1, firstP end). caret should land within it.
+    const firstEnd = firstP.textContent.length + 1;
+    return (sel.from >= 1 && sel.from <= firstEnd) || ('caret landed at ' + sel.from + ', expected within the first paragraph [1,' + firstEnd + ']');
+  });
+
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
     const bytes = await PM().exportDocxBytes();
