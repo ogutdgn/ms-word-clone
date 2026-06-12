@@ -172,6 +172,14 @@ export function installStateSync(editor: AnyEditor) {
       if (dfr?.input && document.activeElement !== dfr.input) {
         dfr.input.value = REVIEW_VIEW_LABELS[rev.view] || 'All Markup'
       }
+      // D8.8 chrome pill (T1): tracking ON flips Editing→Reviewing; a read-only
+      // view (Restrict Editing enforcement / pill Viewing) shows Viewing.
+      const pillLabel = document.querySelector('#wc-mode-pill .mode-pill-label')
+      if (pillLabel) {
+        const viewing = (w.WC?.PM?.getEditor?.() as any)?.view?.editable === false
+        const mode = viewing ? 'Viewing' : (rev.tracking ? 'Reviewing' : 'Editing')
+        if (pillLabel.textContent !== mode) pillLabel.textContent = mode
+      }
     }
     // slice 6: track whether the caret is inside a table (drives Table Tools contextual tabs).
     // isInTable() is installed by installTable — optional-chain so pre-mount sync is safe.

@@ -32,6 +32,27 @@
     // centered title
     tb.appendChild(el('div', { class: 'title-center', text: 'Document1 - Word' }));
 
+    // D8.8 chrome mode pill (PM-only — legacy titlebar DOM stays byte-identical):
+    // Editing | Reviewing | Viewing; Reviewing rides the SAME trackChanges dispatch
+    // as the ribbon (lock-respecting), state-sync keeps the label honest (T1).
+    if (WC.PM && WC.PM.active) {
+      const pill = el('div', { class: 'mode-pill', id: 'wc-mode-pill', title: 'Editing mode' });
+      pill.appendChild(el('span', { class: 'mode-pill-label', text: 'Editing' }));
+      pill.appendChild(el('span', { class: 'mode-pill-caret', html: WC.icon('chevron_down', 8) }));
+      pill.addEventListener('click', () => {
+        const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null;
+        if (!pm) return;
+        WC.flyout(pill, (fly) => {
+          const cur = pill.querySelector('.mode-pill-label').textContent;
+          const item = (label, fn) => fly.appendChild(WC.flyItem((cur === label ? '✓ ' : '   ') + label, { onClick: fn }));
+          item('Editing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
+          item('Reviewing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (!pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
+          item('Viewing', () => { try { pm.getEditor().setEditable(false, false); } catch (e) { /* engine unavailable */ } });
+        });
+      });
+      tb.appendChild(pill);
+    }
+
     // window controls
     const right = el('div', { class: 'titlebar-right' });
     const wc = el('div', { class: 'window-controls' });
@@ -169,7 +190,9 @@
     WC.Backstage.init();
     WC.Files.init();
     if (WC.Layout && WC.Layout.initSelection) WC.Layout.initSelection();
-    if (WC.Review && WC.Review.init) WC.Review.init();
+    // slice-8 flip (K8 belt): the legacy tracked-changes beforeinput interceptor
+    // binds only under --legacy — in PM mode the fork engine owns tracking.
+    if (!(WC.PM && WC.PM.active) && WC.Review && WC.Review.init) WC.Review.init();
     bindKeys();
     bindMisc();
     if (!(WC.PM && WC.PM.active)) WC.Editor.focus(); // PM mode: bridge focuses the PM view post-mount
