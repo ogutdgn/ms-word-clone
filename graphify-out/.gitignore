@@ -6,6 +6,10 @@
 # Machine-specific pipeline scratch (one hardcodes a local interpreter path)
 .graphify_*
 
+# Incremental-update manifest — machine-local (absolute paths + file hashes),
+# rebuilt by `--update`; not part of the shareable graph
+manifest.json
+
 # Extraction cache — machine-local, rebuilt on demand
 cache/
 
