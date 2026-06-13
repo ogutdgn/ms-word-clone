@@ -1177,7 +1177,7 @@
       el('div', { class: 'row' }, [el('label', { text: 'Color:', style: { width: '60px' } }), colorBtn, el('label', { style: { marginLeft: '12px' } }, [diag, el('span', { text: ' Diagonal' })])]),
     ]);
     WC.dialog({ title: 'Custom Watermark', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => WC.Design.watermark(text.value, { color, diagonal: diag.checked }) },
+      { label: 'OK', primary: true, onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.deWatermark(text.value, { color, diagonal: diag.checked }); return; } WC.Design.watermark(text.value, { color, diagonal: diag.checked }); } },
       { label: 'Cancel' },
     ] });
   };
@@ -1195,8 +1195,8 @@
       el('div', { class: 'row' }, [el('label', { text: 'Width (px):', style: { width: '60px' } }), width]),
     ]);
     WC.dialog({ title: 'Borders and Shading — Page Border', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => WC.Design.pageBorders({ style: style.value, color, width: parseFloat(width.value) }) },
-      { label: 'Remove', onClick: () => WC.Design.pageBorders({ remove: true }) },
+      { label: 'OK', primary: true, onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.dePageBorders({ style: style.value, color, width: parseFloat(width.value) }); return; } WC.Design.pageBorders({ style: style.value, color, width: parseFloat(width.value) }); } },
+      { label: 'Remove', onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.dePageBordersRemove(); return; } WC.Design.pageBorders({ remove: true }); } },
       { label: 'Cancel' },
     ] });
   };

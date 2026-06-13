@@ -49,6 +49,7 @@
   // --- overlay/flyout management ---
   let openFly = null;
   function closeFly() {
+    try { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm && pm.dePreviewEnd) pm.dePreviewEnd(); } catch (e) {}
     if (openFly) { openFly.remove(); openFly = null; document.removeEventListener('mousedown', onDocDown, true); }
   }
   function onDocDown(e) {

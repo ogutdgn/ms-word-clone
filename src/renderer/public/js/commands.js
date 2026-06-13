@@ -541,11 +541,13 @@
   }
 
   // ---- Design tab ----
-  H.themes = (c, node) => galleryMenu(node, 'Office Themes', WC.Design.THEMES, (t, silent) => WC.Design.applyTheme(t, silent), (t) => firstFont(t.body) === currentDocFont());
+  H.themes = (c, node) => galleryMenu(node, 'Office Themes', WC.Design.THEMES, (t, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('theme', t); else pm.deApplyTheme(t); return; } WC.Design.applyTheme(t, silent); }, (t) => firstFont(t.body) === currentDocFont());
   H.styleSet = (c, node) => styleSetGallery(node);
-  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Colors')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => WC.Design.applyColorScheme(s) }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => WC.Design.applyColorScheme(item, silent)); fly.appendChild(it); }); });
-  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fonts')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => WC.Design.applyFontPairing(item, silent)); fly.appendChild(it); }); });
-  H.paragraphSpacing = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); WC.Design.SPACING.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} }); livePreviewCell(it, s, (item, silent) => WC.Design.applyParagraphSpacing(item, silent)); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Paragraph Spacing…', { onClick: () => WC.Dialogs.paragraph() })); });
+  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Colors')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => { const pm = PMA(); if (pm) return; /* PM: livePreviewCell's click owns the commit (dePreviewCommit + apply) — returning here avoids a double deApplyColors/double toast */ WC.Design.applyColorScheme(s); } }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('colors', item); else pm.deApplyColors(item); return; } WC.Design.applyColorScheme(item, silent); }); fly.appendChild(it); }); });
+  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fonts')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('fonts', item); else pm.deApplyFonts(item); return; } WC.Design.applyFontPairing(item, silent); }); fly.appendChild(it); }); });
+  // PM: paragraph spacing is COMMIT-ONLY (no hover preview) — spacing changes are applied via
+  // docDefaults/Normal redefinition; a transient live preview isn't wired (honest degrade). Click commits.
+  H.paragraphSpacing = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); WC.Design.SPACING.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} }); livePreviewCell(it, s, (item, silent) => { const pm = PMA(); if (pm) { if (!silent) pm.deParagraphSpacing(item); return; } WC.Design.applyParagraphSpacing(item, silent); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Paragraph Spacing…', { onClick: () => WC.Dialogs.paragraph() })); });
   H.effects = (c, node) => effectsMenu(node);
   function firstFont(chain) { return String(chain).split(',')[0].replace(/['"]/g, '').trim(); }
   function currentDocFont() { return firstFont(getComputedStyle(document.documentElement).getPropertyValue('--doc-font') || 'Aptos'); }
@@ -559,7 +561,9 @@
         cell.appendChild(el('div', { text: 'Heading', style: { fontSize: '9px', color: '#2b579a' } }));
         cell.appendChild(el('div', { text: 'Body text sample', style: { fontSize: '8px', color: '#333', marginTop: '2px' } }));
         cell.appendChild(el('div', { text: name, style: { fontSize: '9px', marginTop: '3px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }));
-        livePreviewCell(cell, name, (n, silent) => WC.Design.applyStyleSet(n, silent));
+        // PM: style sets are COMMIT-ONLY (no hover preview) — the clone's style sets map to Normal
+        // paragraph spacing, which isn't wired for transient live preview (honest degrade). Click commits.
+        livePreviewCell(cell, name, (n, silent) => { const pm = PMA(); if (pm) { if (!silent) pm.deApplyStyleSet(n); return; } WC.Design.applyStyleSet(n, silent); });
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
@@ -584,12 +588,13 @@
     });
   }
   function applyShapeEffect(shadow) {
+    const pm = PMA(); if (pm) { pm.deEffects(shadow); return; }
     const objs = E().node.querySelectorAll('img, .wc-shape, .wc-wordart');
     objs.forEach((o) => { o.style.boxShadow = shadow === 'none' ? '' : shadow; });
     E().dirty = true;
     WC.toast(objs.length ? ('Theme effect applied to ' + objs.length + ' object(s).') : 'Theme effect set (applies to shapes/pictures).');
   }
-  H.setAsDefault = () => WC.Design.setAsDefault();
+  H.setAsDefault = () => { const pm = PMA(); if (pm) { pm.deSetAsDefault(); return; } WC.Design.setAsDefault(); };
   H.watermark = (c, node) => watermarkMenu(node);
   H.pageBorders = () => WC.Dialogs.pageBorders();
 
@@ -597,9 +602,9 @@
   // the pointer leaving reverts it; clicking commits. `apply(item, silent)`.
   function livePreviewCell(cell, item, apply) {
     let snap = null;
-    cell.addEventListener('mouseenter', () => { if (!snap) snap = WC.Design.snapshot(); apply(item, true); });
-    cell.addEventListener('mouseleave', () => { if (snap) { WC.Design.restore(snap); } });
-    cell.addEventListener('click', () => { snap = null; WC.closeFlyouts(); apply(item, false); });
+    cell.addEventListener('mouseenter', () => { if (!PMA() && !snap) snap = WC.Design.snapshot(); apply(item, true); });
+    cell.addEventListener('mouseleave', () => { const pm = PMA(); if (pm) { pm.dePreviewRestore(); return; } if (snap) { WC.Design.restore(snap); } });
+    cell.addEventListener('click', () => { const pm = PMA(); if (pm) { pm.dePreviewCommit(); } else { snap = null; } WC.closeFlyouts(); apply(item, false); });
   }
   function galleryMenu(node, title, items, apply, isActive) {
     WC.flyout(node, (fly) => {
@@ -634,14 +639,14 @@
           const label = text.replace(/ 1$/, '');
           const cell = el('div', { title: text, style: { border: '1px solid #e1dfdd', borderRadius: '2px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' } });
           cell.appendChild(el('div', { text: label, style: { transform: 'rotate(-18deg)', color: '#c8c8c8', fontWeight: '700', fontSize: '11px', whiteSpace: 'nowrap' } }));
-          cell.addEventListener('click', () => { WC.closeFlyouts(); WC.Design.watermark(label); });
+          cell.addEventListener('click', () => { WC.closeFlyouts(); const pm = PMA(); if (pm) { pm.deWatermark(label, {}); return; } WC.Design.watermark(label); });
           grid.appendChild(cell);
         });
         fly.appendChild(grid);
       });
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Custom Watermark…', { onClick: () => WC.Dialogs.watermark() }));
-      fly.appendChild(WC.flyItem('Remove Watermark', { onClick: () => WC.Design.removeWatermark() }));
+      fly.appendChild(WC.flyItem('Remove Watermark', { onClick: () => { const pm = PMA(); if (pm) { pm.deWatermarkRemove(); return; } WC.Design.removeWatermark(); } }));
     });
   }
 
@@ -1731,7 +1736,7 @@
       }
       WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
     } else if (kind === 'page') {
-      if (pm) { pm.notifyBlocked('Page Color'); return; } // design area — slice 10
+      if (pm) { pm.dePageColor(color); return; } // design area — slice 10 PR2 (real w:background)
       E().node.style.backgroundColor = color; // not 'background' — that wipes a watermark's background-image
     }
   }
@@ -1739,7 +1744,7 @@
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else pm.notifyBlocked(kind); return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
+        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
