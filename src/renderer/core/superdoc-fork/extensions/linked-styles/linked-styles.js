@@ -216,6 +216,10 @@ export const LinkedStyles = Extension.create({
             if (sid && touched.has(sid)) tr.setNodeMarkup(pos, undefined, { ...node.attrs });
           });
           tr.setMeta('addToHistory', false);
+          // The regen restamp is a docChanged tr; in hover-preview mode the caller passes a meta
+          // key (the clone's PREVIEW_META) so its dirty-flag listener ignores it — a hover that
+          // touches styled paragraphs must NOT mark the doc dirty (no spurious Save prompt).
+          if (opts.previewMeta) tr.setMeta(opts.previewMeta, true);
 
           // (3c) Paginated DOM refresh (clears the flow-block cache + reschedules render).
           if (typeof editor.emit === 'function') editor.emit('stylesDefaultsChanged');

@@ -4002,6 +4002,18 @@
     return PM().isDirty() === true || 'doc not dirty after a styles-only theme apply (no Save prompt — data loss)';
   });
 
+  await t('[10th] hover preview (dePreviewTheme) does NOT dirty a styled doc — no spurious Save prompt', () => {
+    setDocs(['Executive Summary', 'body text']); selectText('Executive Summary'); PM().applyStyleByName('Heading 1');
+    if (typeof PM().dePreviewTheme !== 'function') return 'PM.dePreviewTheme missing (red)';
+    if (PM().setClean) PM().setClean();
+    if (PM().isDirty() !== false) return 'doc not clean after setClean (test setup)';
+    // Preview a theme over a doc that HAS a Heading1 paragraph (the regen restamps it).
+    PM().dePreviewTheme('theme', { name: 'P', heading: 'Georgia,serif', body: 'Georgia,serif', color: '#C00000', accents: ['#C00000', '#1', '#2', '#3', '#4', '#5'] });
+    const dirtyAfterPreview = PM().isDirty();
+    PM().dePreviewRestore(); // cleanup the visual preview
+    return dirtyAfterPreview === false || 'hover preview dirtied a styled doc (regen tr not tagged PREVIEW_META)';
+  });
+
   await t('[10th] pageColor does NOT wipe an active watermark (CSS longhand, no shorthand collision)', () => {
     setDoc('x');
     if (typeof PM().deWatermark !== 'function' || typeof PM().dePageColor !== 'function') return 'design verbs missing (red)';

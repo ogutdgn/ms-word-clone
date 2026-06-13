@@ -10,6 +10,7 @@
 //
 // editor.doc / editor.converter are read FRESH each call (K6 — cached, reset on Open/New).
 import { ensureDisplayBackgroundShape } from '@core/super-converter/v2/importer/settings-background.js'
+import { PREVIEW_META } from './style-preview'
 
 type AnyEditor = any
 
@@ -37,7 +38,11 @@ export function installDesign(editor: AnyEditor) {
   // updates: Array<{ styleId, run?, paragraph? }>. doExport=false = hover preview (visual only).
   function redefine(updates: any[], doExport = true): boolean {
     if (!Array.isArray(updates) || !updates.length) return false
-    try { return editor.commands.redefineNamedStyles(updates, { export: doExport }) === true } catch { return false }
+    // In preview mode (doExport=false) tag the regen tr with PREVIEW_META so io.ts's dirty
+    // listener ignores it — hovering a gallery over a styled doc must not mark it dirty.
+    const opts: any = { export: doExport }
+    if (!doExport) opts.previewMeta = PREVIEW_META
+    try { return editor.commands.redefineNamedStyles(updates, opts) === true } catch { return false }
   }
 
   // Build the named-style updates for a theme/font-pairing/color-scheme.
