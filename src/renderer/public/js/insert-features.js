@@ -412,6 +412,8 @@
   Insert.screenshot = async function () {
     if (!window.wordAPI.screenshot) { WC.toast('Screenshot capture is not available in this build.'); return; }
     const r = await window.wordAPI.screenshot();
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm && r && r.ok) { pm.insertImage({ src: r.dataUrl, alt: 'Screenshot' }); return; }
     if (r && r.ok) E().insertHTML(`<img src="${r.dataUrl}" alt="Screenshot" style="max-width:100%">`);
     else WC.toast('Screenshot ' + (r && r.error ? 'failed: ' + r.error : 'canceled') + '.');
   };
