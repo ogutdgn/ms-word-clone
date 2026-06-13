@@ -4124,6 +4124,113 @@
     return /<w:rFonts\b[^>]*w:ascii="Garamond"/.test(m[0]) || 'Heading1 ascii not Garamond after round-trip';
   });
 
+  // ===== [10ex] insert-exotica (slice 10 PR3) — doc-replacing tests LAST =====
+  await t('[10ex] D6 flip: insert-exotica is FLIPPED', () => PM().isFlipped('insert-exotica') === true || 'insert-exotica not in FLIPPED');
+
+  await t('[10ex] EXPORT: xeDropCap → <w:framePr w:dropCap> in document.xml', async () => {
+    setDocs(['Dropped capital paragraph here', 'body']); caretAfter('Dropped');
+    if (typeof PM().xeDropCap !== 'function') return 'PM.xeDropCap missing (red — bridge not installed)';
+    if (PM().xeDropCap('drop', 3) !== true) return 'xeDropCap refused (red)';
+    await sleep(60);
+    const xml = await exportDocumentXml();
+    return /<w:framePr\b[^>]*w:dropCap="drop"/.test(xml) || 'no <w:framePr w:dropCap=drop>: ' + xml.slice(0, 300);
+  });
+
+  await t('[10ex] EXPORT: xeCoverPage → documentPartObject / w:sdt docPartObj', async () => {
+    setDocs(['existing body']);
+    if (typeof PM().xeCoverPage !== 'function') return 'PM.xeCoverPage missing (red)';
+    if (PM().xeCoverPage('Banded') !== true) return 'xeCoverPage refused (red)';
+    await sleep(80);
+    let hasDpo = false; doc().descendants((n) => { if (n.type.name === 'documentPartObject') hasDpo = true; });
+    if (!hasDpo) return 'no documentPartObject node inserted';
+    const xml = await exportDocumentXml();
+    return /docPartGallery|<w:docPartObj\b/.test(xml) || 'no w:sdt docPartObj in export';
+  });
+
+  await t('[10ex] EXPORT: xeDateTime → DATE field in document.xml', async () => {
+    setDoc('Today '); caretAfter('Today ');
+    if (typeof PM().xeDateTime !== 'function') return 'PM.xeDateTime missing (red)';
+    if (PM().xeDateTime('M/d/yyyy') !== true) return 'xeDateTime refused (red)';
+    await sleep(80);
+    const xml = await exportDocumentXml();
+    return /DATE\b/.test(xml) || 'no DATE field in document.xml: ' + xml.slice(0, 300);
+  });
+
+  await t('[10ex] EXPORT: xeQuickPart(author) → AUTHOR field', async () => {
+    setDoc('By '); caretAfter('By ');
+    if (typeof PM().xeQuickPart !== 'function') return 'PM.xeQuickPart missing (red)';
+    if (PM().xeQuickPart('author') !== true) return 'xeQuickPart refused (red)';
+    await sleep(80);
+    const xml = await exportDocumentXml();
+    return /AUTHOR/.test(xml) || 'no AUTHOR field';
+  });
+
+  await t('[10ex] EXPORT: xeWordArt → wps:wsp + fromWordArt + prstTxWarp', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeWordArt !== 'function') return 'PM.xeWordArt missing (red)';
+    if (PM().xeWordArt('Hello WordArt', { color: '#C00000' }) !== true) return 'xeWordArt refused (red)';
+    await sleep(80);
+    const xml = await exportDocumentXml();
+    if (!/<wps:wsp\b/.test(xml)) return 'no <wps:wsp> (WordArt shape) in document.xml';
+    if (!/fromWordArt="1"/.test(xml)) return 'no fromWordArt="1" on bodyPr';
+    return /<a:prstTxWarp\b/.test(xml) || 'no <a:prstTxWarp> (WordArt warp)';
+  });
+
+  await t('[10ex] EXPORT: xeTextBox → editable v:textbox/w:txbxContent', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeTextBox !== 'function') return 'PM.xeTextBox missing (red)';
+    if (PM().xeTextBox('Box text') !== true) return 'xeTextBox refused (red)';
+    await sleep(80);
+    let hasBox = false; doc().descendants((n) => { if (n.type.name === 'shapeContainer' || n.type.name === 'shapeTextbox') hasBox = true; });
+    if (!hasBox) return 'no shapeContainer/shapeTextbox node inserted (not editable)';
+    const xml = await exportDocumentXml();
+    return (/<v:textbox\b/.test(xml) && /<w:txbxContent\b/.test(xml)) || 'no <v:textbox>/<w:txbxContent> in export';
+  });
+
+  await t('[10ex] xeIcon inserts a real image node (not a legacy span)', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeIcon !== 'function') return 'PM.xeIcon missing (red)';
+    if (PM().xeIcon('save') !== true) return 'xeIcon refused (red)';
+    await sleep(60);
+    let hasImg = false; doc().descendants((n) => { if (n.type.name === 'image') hasImg = true; });
+    return hasImg || 'no image node from xeIcon';
+  });
+
+  await t('[10ex] honest-degrade verbs (chart/smartart/object/signatureLine) are no-op toasts (no E() leak)', () => {
+    setDoc('keepme');
+    for (const v of ['xeChart', 'xeSmartArt', 'xeObject', 'xeSignatureLine']) {
+      if (typeof PM()[v] !== 'function') return 'PM.' + v + ' missing (red)';
+      PM()[v]();
+    }
+    let shapes = 0; doc().descendants((n) => { if (['shapeContainer', 'vectorShape', 'image'].includes(n.type.name)) shapes++; });
+    return (shapes === 0 && doc().textContent.includes('keepme')) || 'a degrade verb mutated the doc (should be a no-op toast)';
+  });
+
+  // ---- doc-replacing tests LAST (openDocx remounts; 300ms threshold) ----
+  await t('[10ex] IMPORT round-trip: WordArt survives export→openDocx', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeWordArt !== 'function') return 'PM.xeWordArt missing (red)';
+    if (PM().xeWordArt('RT WordArt', {}) !== true) return 'refused';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    if (await PM().openDocx(bytes) !== true) return 'reimport failed';
+    await sleep(300);
+    let hasWa = false; doc().descendants((n) => { if (n.type.name === 'vectorShape') hasWa = true; });
+    return hasWa || 'WordArt vectorShape lost on round-trip';
+  });
+
+  await t('[10ex] IMPORT round-trip: textBox survives export→openDocx (editable)', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeTextBox !== 'function') return 'PM.xeTextBox missing (red)';
+    if (PM().xeTextBox('RT box') !== true) return 'refused';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    if (await PM().openDocx(bytes) !== true) return 'reimport failed';
+    await sleep(300);
+    let hasBox = false; doc().descendants((n) => { if (n.type.name === 'shapeContainer' || n.type.name === 'shapeTextbox') hasBox = true; });
+    return hasBox || 'textBox lost on round-trip';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
