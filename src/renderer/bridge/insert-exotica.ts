@@ -78,10 +78,13 @@ export function installInsertExotica(editor: AnyEditor) {
       const title = (name && name.trim()) ? name : 'Document Title'
       const year = new Date().getFullYear()
       const cover = {
-        // id MUST be a non-empty STRING — the docPartObj exporter's sanitizeId drops a numeric id,
-        // emitting no <w:id> (lower fidelity in Word).
+        // id MUST be a non-empty NUMERIC STRING: the docPartObj exporter's sanitizeId keeps any
+        // non-empty string but drops a JS number (→ no <w:id>); and the sdt <w:id w:val> is an
+        // ST_DecimalNumber, so a non-numeric string ("wc-cover-…") makes Word REFUSE to open the
+        // file (oracle Leg A: hard open error). A digits-only string both survives sanitizeId and
+        // validates. (Slice-10 PR3 oracle fix.)
         type: 'documentPartObject',
-        attrs: { id: 'wc-cover-' + (Date.now() % 1000000), docPartGallery: 'Cover Pages', docPartUnique: true },
+        attrs: { id: String(Date.now() % 1000000), docPartGallery: 'Cover Pages', docPartUnique: true },
         content: [
           { type: 'paragraph', content: [{ type: 'text', text: title, marks: [{ type: 'bold' }] }] },
           { type: 'paragraph', content: [{ type: 'text', text: '[Subtitle]' }] },
