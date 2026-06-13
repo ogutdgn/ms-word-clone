@@ -9,6 +9,7 @@ import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
 import { installReferences } from './references'
+import { installMailMerge } from './mail'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -344,6 +345,10 @@ export function preinstallBridge() {
     refUpdateSource: () => false, refRemoveSource: () => false,
     refSetCitationStyle: () => false, refInsertBibliography: () => false,
     refCrossReference: () => false,
+    // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
+    mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
+    mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
+    mmBuildMerge: () => '', mmFinishToNewDoc: async () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -378,7 +383,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
