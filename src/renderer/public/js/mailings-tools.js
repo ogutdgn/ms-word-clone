@@ -136,6 +136,14 @@
       if (field === '__NextRecord__') { return ''; }
       return rec[field] != null ? esc(rec[field]) : '';
     },
+    // PM merge/preview value resolver: plain fields resolve via _val (Match-Fields +
+    // squashed-name match, IDENTICAL to preview's _previewMap); composite sentinels
+    // stay on composite(). Keeps PM preview and PM Finish&Merge in agreement.
+    _mergeResolve(field, rec) {
+      if (String(field).startsWith('__')) return this.composite(field, rec || {}, {});
+      const raw = this._val(rec || {}, field);
+      return (raw != null && raw !== '') ? WC.escapeHtml(raw) : '';
+    },
     fill(rec) {
       const div = document.createElement('div'); div.innerHTML = this.template;
       div.querySelectorAll('.wc-mergefield').forEach((m) => { m.outerHTML = this.composite(m.dataset.field, rec || {}, { greet: m.dataset.greet, punct: m.dataset.punct }); });
@@ -180,7 +188,7 @@
         { label: 'Close' },
       ] });
     },
-    checkErrors() { const pm = PMA(); if (pm) { const used = []; const tmp = document.createElement('div'); tmp.innerHTML = pm.getHTML() || ''; tmp.querySelectorAll('span.annotation[data-field-type="MERGEFIELD"]').forEach((m) => { const n = (m.getAttribute('data-display-label') || '').replace(/^«|»$/g, ''); if (n) used.push(n); }); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); return; } const tmpl = this.previewOn ? this.template : E().getHTML(); const used = (tmpl.match(/data-field="([^"]+)"/g) || []).map((m) => m.slice(12, -1)).filter((f) => !f.startsWith('__')); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); },
+    checkErrors() { const pm = PMA(); if (pm) { const used = []; const tmp = document.createElement('div'); tmp.innerHTML = pm.getHTML() || ''; tmp.querySelectorAll('span.annotation[data-field-type="MERGEFIELD"]').forEach((m) => { const n = (m.getAttribute('data-default-display-label') || m.getAttribute('data-display-label') || '').replace(/^«|»$/g, ''); if (n) used.push(n); }); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); return; } const tmpl = this.previewOn ? this.template : E().getHTML(); const used = (tmpl.match(/data-field="([^"]+)"/g) || []).map((m) => m.slice(12, -1)).filter((f) => !f.startsWith('__')); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); },
 
     finishMerge(mode) {
       if (mode === 'edit') {
@@ -191,7 +199,7 @@
           // Restore the «name» template before reading it (K-5): finish-merge reads
           // PM.getHTML() and substitutes per record, so a live preview must be off first.
           if (this.previewOn) { pm.mmPreview(null); this.previewOn = false; }
-          const merged = pm.mmBuildMerge(this.recipients, (field, rec) => this.composite(field, rec, {}));
+          const merged = pm.mmBuildMerge(this.recipients, (field, rec) => this._mergeResolve(field, rec));
           return Promise.resolve(pm.mmFinishToNewDoc(merged)).then((ok) => { if (ok) WC.toast('Merged to a new document: ' + n + ' records.'); return ok; });
         }
       }

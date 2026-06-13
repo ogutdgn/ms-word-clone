@@ -3941,6 +3941,15 @@
     return /Alice/.test(html) || 'merged html does not contain the record value Alice';
   });
   await t('[10mm] D6 flip: mail-merge is FLIPPED', () => PM().isFlipped('mail-merge') === true || 'mail-merge not in FLIPPED');
+  await t('[10mm] merge resolver matches preview (_val: «Last_Name» field over a LastName column)', () => {
+    // Regression (task-5 review): PM preview resolves via _val (squashed-name match);
+    // the Finish&Merge resolver must too, else «Last_Name» over a LastName column
+    // previews correctly yet merges BLANK. _mergeResolve unifies both on _val.
+    const M = window.WC.Mail;
+    if (!M || typeof M._mergeResolve !== 'function') return 'WC.Mail._mergeResolve missing (red)';
+    const v = M._mergeResolve('Last_Name', { LastName: 'Smith' });
+    return /Smith/.test(String(v)) || 'resolver returned ' + JSON.stringify(v) + ' (expected Smith via _val squashed match)';
+  });
   // ---- doc-replacing tests LAST (openDocx remounts; 300ms threshold) ----
   await t('[10mm] IMPORT (self round-trip): clone export reimports MERGEFIELD as a fieldAnnotation', async () => {
     setDoc('Dear , end'); caretAfter('Dear ');

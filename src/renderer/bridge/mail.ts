@@ -44,7 +44,9 @@ export function installMailMerge(editor: AnyEditor) {
       const div = document.createElement('div'); div.innerHTML = template
       div.querySelectorAll('span.annotation[data-field-type]').forEach((m: any) => {
         const code = m.getAttribute('data-field-type')
-        const label = m.getAttribute('data-display-label') || ''
+        // Read the IMMUTABLE name (data-default-display-label); data-display-label is
+        // overwritten by mmPreview to the record value while preview is on.
+        const label = m.getAttribute('data-default-display-label') || m.getAttribute('data-display-label') || ''
         const name = code === 'MERGEFIELD' ? label.replace(/^«|»$/g, '')
           : code === 'ADDRESSBLOCK' ? '__AddressBlock__' : code === 'GREETINGLINE' ? '__GreetingLine__' : code === 'NEXT' ? '__NextRecord__' : ''
         m.outerHTML = name ? (resolve(name, rec) || '') : m.outerHTML
