@@ -11,6 +11,7 @@ import { installReview } from './review'
 import { installReferences } from './references'
 import { installMailMerge } from './mail'
 import { installDesign } from './design'
+import { installInsertExotica } from './insert-exotica'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -41,7 +42,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes']) // slices 1-6 + 8-10
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes', 'insert-exotica']) // slices 1-6 + 8-10
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -359,6 +360,11 @@ export function preinstallBridge() {
     dePageBorders: () => false, dePageBordersRemove: () => false,
     deWatermark: () => false, deWatermarkRemove: () => false,
     deEffects: () => false, deSetAsDefault: () => false,
+    // slice 10 PR3: insert-exotica pre-mount stubs (replaced by installInsertExotica on mount)
+    xeDropCap: () => false, xeCoverPage: () => false, xeRemoveCoverPage: () => false, xeDateTime: () => false, xeQuickPart: () => false,
+    xeScreenshot: async () => false, xeIcon: () => false, xeOnlinePicture: async () => false,
+    xeTextBox: () => false, xeWordArt: () => false, xeOnlineVideo: () => false,
+    xeChart: () => false, xeSmartArt: () => false, xeObject: () => false, xeSignatureLine: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -393,7 +399,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

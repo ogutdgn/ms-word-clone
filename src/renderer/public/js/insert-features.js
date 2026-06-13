@@ -31,6 +31,8 @@
     });
   };
   Insert.insertCover = function (t) {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { pm.xeCoverPage(t.name); return; }
     // Word replaces an existing cover page; it never stacks two. Strip the old
     // one (and its trailing page break) before inserting the new one.
     const old = E().node.querySelector('.cover-page');
@@ -42,6 +44,8 @@
     WC.toast('Cover page “' + t.name + '” inserted — click the [fields] to edit.');
   };
   Insert.removeCover = function () {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { pm.xeRemoveCoverPage(); return; }
     const cover = E().node.querySelector('.cover-page');
     if (!cover) { WC.toast('No cover page found.'); return; }
     const brk = cover.nextElementSibling; cover.remove(); if (brk && brk.classList.contains('manual-break')) brk.remove();
@@ -175,7 +179,7 @@
         const cell = el('div', { title: n, style: { border: '1px solid #eee', borderRadius: '3px', padding: '8px 4px', textAlign: 'center', cursor: 'pointer' }, html: WC.icon(n, 24) });
         cell.addEventListener('mouseenter', () => cell.style.background = 'var(--word-blue-tint)');
         cell.addEventListener('mouseleave', () => cell.style.background = '');
-        cell.addEventListener('click', () => { dlg.close(); E().insertHTML(`<span class="wc-shape" contenteditable="false" style="display:inline-block;vertical-align:middle;width:32px;height:32px;color:#2B579A">${WC.icon(n, 32)}</span>&nbsp;`); });
+        cell.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { dlg.close(); pm.xeIcon(n); return; } dlg.close(); E().insertHTML(`<span class="wc-shape" contenteditable="false" style="display:inline-block;vertical-align:middle;width:32px;height:32px;color:#2B579A">${WC.icon(n, 32)}</span>&nbsp;`); });
         grid.appendChild(cell);
       });
     }
@@ -189,6 +193,8 @@
     WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('SmartArt Graphics')); layouts.forEach(([l, k]) => fly.appendChild(WC.flyItem(l, { onClick: () => Insert.insertSmartArt(k) }))); });
   };
   Insert.insertSmartArt = function (kind) {
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { pm.xeSmartArt(); return; }
     const box = (t) => `<div contenteditable="true" style="flex:1;background:#4472C4;color:#fff;padding:14px 10px;border-radius:4px;text-align:center;min-width:80px">${t}</div>`;
     let html;
     if (kind === 'list') html = `<div class="wc-smartart" style="display:flex;gap:10px;margin:8px 0">${box('Item 1')}${box('Item 2')}${box('Item 3')}</div><p><br></p>`;
@@ -208,7 +214,7 @@
       el('div', { style: { fontSize: '12px', color: '#666', margin: '6px 0' }, text: 'Data (label, value per line):' }), data,
     ]);
     WC.dialog({ title: 'Insert Chart', width: '460px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const rows = data.value.trim().split(/\n/).map((l) => l.split(',')).map(([l, v]) => [l.trim(), parseFloat(v) || 0]); E().insertHTML(Insert.chartSVG(type.value, rows) + '&nbsp;'); } },
+      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeChart(); return; } const rows = data.value.trim().split(/\n/).map((l) => l.split(',')).map(([l, v]) => [l.trim(), parseFloat(v) || 0]); E().insertHTML(Insert.chartSVG(type.value, rows) + '&nbsp;'); } },
       { label: 'Cancel' },
     ] });
   };
@@ -237,7 +243,7 @@
     const upd = el('input', { type: 'checkbox' });
     const body = el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Available formats:' }), list, el('label', { style: { display: 'flex', gap: '6px', marginTop: '8px' } }, [upd, el('span', { text: 'Update automatically' })])]);
     WC.dialog({ title: 'Date and Time', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const t = fmts[+list.value]; E().insertHTML(upd.checked ? `<span class="wc-field" data-field="date">${WC.escapeHtml(t)}</span>` : WC.escapeHtml(t)); } },
+      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeDateTime(['MMMM d, yyyy','M/d/yyyy','yyyy-MM-dd','dddd, MMMM d, yyyy','h:mm AM/PM','M/d/yyyy h:mm AM/PM'][+list.value] || 'M/d/yyyy'); return; } const t = fmts[+list.value]; E().insertHTML(upd.checked ? `<span class="wc-field" data-field="date">${WC.escapeHtml(t)}</span>` : WC.escapeHtml(t)); } },
       { label: 'Cancel' },
     ] });
   };
@@ -258,6 +264,8 @@
   };
   Insert.insertWordArt = function (style) {
     const sel = window.getSelection(); const txt = (sel && sel.toString()) || 'Your text here';
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm) { const mc = /color:\s*(#[0-9a-fA-F]{3,6})/.exec(style); pm.xeWordArt(txt, { color: mc ? mc[1] : '#2B579A' }); return; }
     E().insertHTML(`<span class="wc-wordart" style="font:bold 36pt Calibri;${style}">${WC.escapeHtml(txt)}</span>&nbsp;`);
   };
 
@@ -267,7 +275,7 @@
     const title = el('input', { type: 'text', class: 'grow', placeholder: 'Suggested signer’s title' });
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Signer:', style: { width: '60px' } }), name]), el('div', { class: 'row' }, [el('label', { text: 'Title:', style: { width: '60px' } }), title])]);
     WC.dialog({ title: 'Signature Setup', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => E().insertHTML(`<div class="wc-signature" contenteditable="false" style="display:inline-block;margin:10px 0"><div style="border-top:1px solid #000;width:240px;padding-top:4px"><span style="font-size:9pt;color:#555">✕ ${WC.escapeHtml(name.value || 'Signature')}</span><br><span style="font-size:8pt;color:#888">${WC.escapeHtml(title.value || '')}</span></div></div>&nbsp;`) },
+      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeSignatureLine(); return; } E().insertHTML(`<div class="wc-signature" contenteditable="false" style="display:inline-block;margin:10px 0"><div style="border-top:1px solid #000;width:240px;padding-top:4px"><span style="font-size:9pt;color:#555">✕ ${WC.escapeHtml(name.value || 'Signature')}</span><br><span style="font-size:8pt;color:#888">${WC.escapeHtml(title.value || '')}</span></div></div>&nbsp;`); } },
       { label: 'Cancel' },
     ] });
   };
@@ -295,7 +303,7 @@
     if (k === 'title') return ((WC.Files && WC.Files.name) || 'Document1').replace(/\.[^.]+$/, '');
     return '';
   };
-  Insert.insertField = function (k) { E().insertHTML(`<span class="wc-field" data-field="${k}">${WC.escapeHtml(Insert.fieldValue(k))}</span>&nbsp;`); };
+  Insert.insertField = function (k) { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeQuickPart(k); return; } E().insertHTML(`<span class="wc-field" data-field="${k}">${WC.escapeHtml(Insert.fieldValue(k))}</span>&nbsp;`); };
   Insert.refreshFields = function () { (E().node ? E().node.querySelectorAll('.wc-field') : []).forEach((f) => { const k = f.dataset.field; if (k === 'page') f.textContent = String(E().pageOfElement(f)); else if (k === 'numpages') f.textContent = String(E().pageCount()); }); };
 
   // ===================== Bookmark =====================
@@ -388,18 +396,24 @@
   };
   Insert.textFromFile = async function () {
     const r = await window.wordAPI.open();
-    if (r && r.ok) { E().focus(); E().restoreRange(); E().insertHTML(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name); }
+    if (r && r.ok) {
+      const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+      if (pm) { pm.pasteHTMLString(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name); return; }
+      E().focus(); E().restoreRange(); E().insertHTML(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name);
+    }
   };
   Insert.onlineVideoDialog = function () {
     const url = el('input', { type: 'text', class: 'grow', placeholder: 'Paste a video URL (YouTube, Vimeo…)' });
     WC.dialog({ title: 'Insert Online Video', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'URL:', style: { width: '50px' } }), url]), el('div', { style: { fontSize: '12px', color: '#666', marginTop: '6px' }, text: 'A clickable video thumbnail is inserted (embedded playback is restricted by the app sandbox).' })]), footer: [
-      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; E().insertHTML(`<a class="wc-video" href="${WC.escapeHtml(u)}" contenteditable="false" style="display:inline-block;width:320px;height:180px;background:#000;color:#fff;text-decoration:none;position:relative;vertical-align:middle"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">▶</span><span style="position:absolute;bottom:6px;left:8px;font-size:11px;opacity:.85">${WC.escapeHtml(u).slice(0, 40)}</span></a>&nbsp;`); } },
+      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeOnlineVideo(u); return; } E().insertHTML(`<a class="wc-video" href="${WC.escapeHtml(u)}" contenteditable="false" style="display:inline-block;width:320px;height:180px;background:#000;color:#fff;text-decoration:none;position:relative;vertical-align:middle"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">▶</span><span style="position:absolute;bottom:6px;left:8px;font-size:11px;opacity:.85">${WC.escapeHtml(u).slice(0, 40)}</span></a>&nbsp;`); } },
       { label: 'Cancel' },
     ] });
   };
   Insert.screenshot = async function () {
     if (!window.wordAPI.screenshot) { WC.toast('Screenshot capture is not available in this build.'); return; }
     const r = await window.wordAPI.screenshot();
+    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (pm && r && r.ok) { pm.insertImage({ src: r.dataUrl, alt: 'Screenshot' }); return; }
     if (r && r.ok) E().insertHTML(`<img src="${r.dataUrl}" alt="Screenshot" style="max-width:100%">`);
     else WC.toast('Screenshot ' + (r && r.error ? 'failed: ' + r.error : 'canceled') + '.');
   };

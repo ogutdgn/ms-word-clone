@@ -1,6 +1,9 @@
 import { Node } from '@core/Node.js';
 import { Attribute } from '@core/Attribute.js';
 
+// Per-session monotonic VML shape id (unique within a doc — duplicate VML shape ids trigger Word repair).
+let _shapeTextboxSeq = 1025;
+
 /**
  * Configuration options for ShapeTextbox
  * @typedef {Object} ShapeTextboxOptions
@@ -69,5 +72,39 @@ export const ShapeTextbox = Node.create({
       Attribute.mergeAttributes(this.options.htmlAttributes, htmlAttributes, { 'data-type': this.name }),
       0,
     ];
+  },
+
+  addCommands() {
+    return {
+      /**
+       * NET-NEW (slice 10 PR3 insert-exotica, NOTICE'd). Insert an editable text box:
+       * a shapeContainer > shapeTextbox > paragraph tree. The EXISTING VML exporter
+       * (translate-shape-container/textbox) synthesizes a real <w:pict><v:shape type="#_x0000_t202">
+       * <v:textbox><w:txbxContent> from the live node — VML is valid Word OOXML, editable in-app,
+       * round-trips. options: { text?, width?, height?, fillcolor? }.
+       */
+      insertTextBox:
+        (options = {}) =>
+        ({ commands }) => {
+          const text = typeof options.text === 'string' ? options.text : 'Text';
+          const w = options.width || 200;
+          const h = options.height || 100;
+          const shapeId = '_x0000_s' + (++_shapeTextboxSeq); // unique per insert
+          return commands.insertContent({
+            type: 'shapeContainer',
+            attrs: {
+              ...(options.fillcolor ? { fillcolor: options.fillcolor } : {}),
+              attributes: { id: shapeId, type: '#_x0000_t202', style: 'width:' + w + 'pt;height:' + h + 'pt' },
+            },
+            content: [
+              {
+                type: 'shapeTextbox',
+                attrs: {},
+                content: [{ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] }],
+              },
+            ],
+          });
+        },
+    };
   },
 });

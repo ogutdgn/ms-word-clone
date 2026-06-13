@@ -210,8 +210,8 @@
   H.dateAndTime = () => E().insertHTML(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
   H.horizontalLine = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertHr(); return; } E().insertHTML('<hr>'); };
   H.wordArt = (c, node) => insertWordArt();
-  H.textBox = () => E().insertHTML('<div style="border:1px solid #888;padding:8px;margin:6px 0;display:inline-block;min-width:200px">Text box — type here</div>&nbsp;');
-  H.dropCap = () => dropCap();
+  H.textBox = () => { const pm = PMA(); if (pm) { pm.xeTextBox(''); return; } E().insertHTML('<div style="border:1px solid #888;padding:8px;margin:6px 0;display:inline-block;min-width:200px">Text box — type here</div>&nbsp;'); };
+  H.dropCap = () => { const pm = PMA(); if (pm) { pm.xeDropCap('drop', 3); return; } dropCap(); };
   H.equation = () => WC.Dialogs.equation();
   H.comment = (c, node) => WC.Commands.run({ cmd: 'newComment' });
   // PM branch: the contextual composer card (slice-8 task 4) owns text entry —
@@ -262,9 +262,9 @@
   }
   function dropCapMenu(node) {
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('None', { onClick: () => { const b = E().selectedBlocks()[0]; if (b) { const s = b.querySelector('span[style*="float:left"]'); if (s) s.replaceWith(...s.childNodes); } } }));
-      fly.appendChild(WC.flyItem('Dropped', { onClick: () => H.dropCap() }));
-      fly.appendChild(WC.flyItem('In Margin', { onClick: () => H.dropCap() }));
+      fly.appendChild(WC.flyItem('None', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('none', 0); return; } const b = E().selectedBlocks()[0]; if (b) { const s = b.querySelector('span[style*="float:left"]'); if (s) s.replaceWith(...s.childNodes); } } }));
+      fly.appendChild(WC.flyItem('Dropped', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('drop', 3); return; } H.dropCap(); } }));
+      fly.appendChild(WC.flyItem('In Margin', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('margin', 3); return; } H.dropCap(); } }));
     });
   }
   function equationMenu(node) {
@@ -2019,6 +2019,7 @@
   function insertWordArt() {
     const sel = window.getSelection();
     const txt = (sel && sel.toString()) || 'Your text here';
+    const pm = PMA(); if (pm) { pm.xeWordArt(txt, {}); return; }
     E().insertHTML(`<span style="font:bold 36pt Calibri;color:#2B579A;text-shadow:1px 1px 2px rgba(0,0,0,.3)">${WC.escapeHtml(txt)}</span>`);
   }
   function dropCap() {
