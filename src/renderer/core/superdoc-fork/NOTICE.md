@@ -345,6 +345,8 @@ The following upstream packages are included in this directory tree:
   sibling of <w:body> into result.attrs.background (round-trips with the exporter).
 - `core/super-converter/v2/importer/settings-background.js` — NET-NEW `ensureDisplayBackgroundShape(converter,on)`:
   add/removes <w:displayBackgroundShape/> in word/settings.xml so Word renders the page color on open.
+- `extensions/shape-textbox/shape-textbox.js` — NET-NEW `insertTextBox` command (slice 10 PR3): inserts an editable
+  shapeContainer>shapeTextbox>paragraph; the existing VML exporter synthesizes a real <v:textbox>/<w:txbxContent>.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
