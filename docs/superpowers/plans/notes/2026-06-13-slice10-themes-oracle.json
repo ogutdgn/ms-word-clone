@@ -1,0 +1,53 @@
+{
+  "slice": "10 PR2 — themes (Design tab) on the PM engine",
+  "date": "2026-06-13",
+  "reference": "Word for Windows 16.0 (COM oracle scripts/oracle/word-oracle-win.ps1, PID-safe foreground unsandboxed)",
+  "artifacts": {
+    "clone_authored": "C:/tmp/wc-slice10-themes-clone.docx",
+    "word_resaved": "C:/tmp/wc-slice10-themes-resaved.docx",
+    "authoring_probe": "scripts/oracle-probe-slice10-themes.js",
+    "legb_probe": "scripts/oracle-probe-slice10-themes-legb.js",
+    "inspector": "scripts/inspect-themes.js"
+  },
+  "authored_constructs": "deApplyTheme(heading/body=Georgia, color=#C00000) on Title+Heading1+Normal; dePageColor(#FFF2CC); dePageBorders(solid #2E74B5 2px); deParagraphSpacing(after 13pt -> 260 twips, line 1.5). All five verbs returned true; export 14293 bytes, valid zip.",
+  "legA_clone_to_word": {
+    "verdict": "PASS",
+    "roundtrip": "ROUNDTRIP_OK — real Word opened the clone docx with NO repair prompt and resaved it via SaveAs2 (wdFormatXMLDocument).",
+    "construct_survival_after_word_resave": {
+      "w:background w:color": "FFF2CC — PRESERVED",
+      "w:displayBackgroundShape (settings.xml)": "present — PRESERVED",
+      "w:pgBorders (sectPr, top color)": "2E74B5 — PRESERVED",
+      "Heading1/Title w:color w:val": "C00000 — PRESERVED",
+      "Normal w:rFonts w:ascii": "Georgia — PRESERVED (on the base style)",
+      "Heading1/Title w:rFonts w:ascii": "removed by Word's redundant-override optimization — Heading1 is basedOn Normal which carries Georgia, so the heading still RESOLVES to Georgia via inheritance (faithful, not a loss)",
+      "docDefaults w:spacing w:after": "260 — PRESERVED",
+      "K9 theme bindings (w:asciiTheme / w:themeColor)": "absent on the redefined styles after resave — the literal font/color is honored by Word (no theme-binding resurrection)"
+    },
+    "note": "docDefaults rFonts reverted to the theme minorHAnsi on resave, but Normal explicitly sets Georgia (higher priority than docDefaults), so all paragraphs render Georgia. The heading font/color is real and Word-honored."
+  },
+  "legB_word_to_clone": {
+    "verdict": "PASS",
+    "method": "Imported Word's OWN serialization (the resaved docx) back into the clone via openBytes -> PM.openDocx (the files.js path), then re-exported.",
+    "result": "openDocx=true, importBlanked=false (healthy import). Re-export carries: w:background=FFF2CC, w:pgBorders present, Normal w:rFonts ascii=Georgia, Heading1 w:color val=C00000 (the themed color, NOT the default 0F4761). All constructs survive the clone's import of Word's bytes."
+  },
+  "visual_repaint_K1": {
+    "verdict": "CONFIRMED — heading repaints live",
+    "evidence": "After deApplyTheme, the Heading1 paragraph's linked-style decoration span changes from style 'font-family: \"Aptos Display\", Arial, sans-serif' to 'font-family: Georgia; color: rgb(192, 0, 0); font-size: 20pt;' in the live #pm-editor DOM. converter.linkedStyles Heading1 definition.styles font-family flips Aptos Display -> Georgia. The restamp transaction (styleId=Heading1) drives the linked-styles plugin regen + emit; the decoration repaints.",
+    "K2_note": "Body font for styleId-less paragraphs is best-effort (ledger A); heading restyle (explicit styleId) is the guaranteed live visual."
+  },
+  "gates": {
+    "test:pm": "298/298 (idle re-run; a 2-fail [6b] table-tab result during the flip run was load-flake, not a regression)",
+    "test:legacy": "257/257 (byte-identical)",
+    "test:smoke": "9/9",
+    "test:smoke:legacy": "9/9",
+    "test:roundtrip": "27/0",
+    "test:docx": "17/0"
+  },
+  "ledger_deviations": [
+    "Heading FONT survives via Normal-inheritance (Word optimizes away the redundant explicit override) — faithful, recorded for transparency.",
+    "docDefaults font reverts to theme minorHAnsi on Word resave but is overridden by the explicit Normal font — cosmetic, no visual effect.",
+    "Style Sets + Paragraph Spacing galleries are COMMIT-ONLY (no hover preview) — the clone's style-sets map to Normal spacing, not wired for transient preview (honest degrade); themes/colors/fonts DO hover-preview.",
+    "watermark = visual stand-in + honest toast (real header watermark = Phase 7); pageBorders/pageColor on-page visual paint is presentational (model/export real now).",
+    "Named-style redefinition writes literal fonts/colors (valid real OOXML), not theme-token indirection (theme1.xml clrScheme/fontScheme) — recorded deeper-fidelity follow-up (K5)."
+  ]
+}
