@@ -436,9 +436,17 @@ function translateDocumentNode(params) {
     attributes['mc:Ignorable'] = mergedIgnorable;
   }
 
+  // NET-NEW (slice 10 themes, NOTICE'd): document page color. <w:background> must be
+  // the FIRST child of <w:document> (before <w:body>) per OOXML ordering. The value is
+  // the raw element JSON stashed on the doc node's `background` attr (round-trips via
+  // the importer at docxImporter.js createDocumentJson). carbonCopy already imported.
+  const docElements = [translatedBodyNode];
+  const background = params.node && params.node.attrs && params.node.attrs.background;
+  if (background) docElements.unshift(carbonCopy(background));
+
   const node = {
     name: 'w:document',
-    elements: [translatedBodyNode],
+    elements: docElements,
     attributes,
   };
 

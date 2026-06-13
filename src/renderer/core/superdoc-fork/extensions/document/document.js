@@ -58,6 +58,14 @@ export const Document = Node.create({
          * ensuring that the last section’s page size/orientation/margins are applied correctly.
          */
       },
+      background: {
+        rendered: false,
+        default: null,
+        // NET-NEW (slice 10 themes, NOTICE’d). Document page color — the raw
+        // <w:background> element JSON (child of <w:document>, sibling-before <w:body>).
+        // null = no page color. rendered:false keeps it out of the DOM (export-only,
+        // like bodySectPr). Without this declaration nodeFromJSON drops result.attrs.background.
+      },
     };
   },
 
