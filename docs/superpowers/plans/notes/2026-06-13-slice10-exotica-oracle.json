@@ -1,0 +1,42 @@
+{
+  "slice": "10 PR3 — insert-exotica (Insert tab) on the PM engine",
+  "date": "2026-06-13",
+  "reference": "Word for Windows 16.0 (COM oracle scripts/oracle/word-oracle-win.ps1, PID-safe, foreground/STA, unsandboxed)",
+  "probes": [
+    "scripts/oracle-probe-slice10-exotica.js (authoring; MODE selects constructs)",
+    "scripts/oracle-probe-slice10-exotica-legb.js (Word->clone reimport)"
+  ],
+  "constructs": ["dropCap (w:framePr)", "coverPage (w:sdt docPartObj)", "dateTime (DATE w:fldChar)", "WordArt (DrawingML wps:wsp + a:prstTxWarp + w14:textFill)", "textBox (VML v:textbox / w:txbxContent)"],
+  "bisect": {
+    "note": "First 'all' run FAILED Word open (EXIT=1). Bisected to isolate the culprit.",
+    "wordart": "EXIT=0 (clean)",
+    "textbox": "EXIT=0 (clean)",
+    "dropcap": "EXIT=0 (clean)",
+    "date": "EXIT=0 (clean)",
+    "cover": "EXIT=1 (Word REFUSED to open) — root cause"
+  },
+  "rootCause": "coverPage documentPartObject id was a non-numeric string ('wc-cover-837400'). The sdt <w:id w:val> is an ST_DecimalNumber; a non-numeric value is a hard schema violation (Word will not open the file). The exporter's sanitizeId keeps any non-empty string but drops a JS number, so the fix is a digits-only string (String(Date.now() % 1000000)) — survives sanitizeId AND validates.",
+  "fix": "bridge/insert-exotica.ts xeCoverPage: id String(Date.now() % 1000000) (was 'wc-cover-' + ...).",
+  "legA": {
+    "verb": "roundtrip clone.docx -> Word resave",
+    "result": "EXIT=0 — Word opened the full 5-construct doc WITHOUT repair and resaved it (17161 bytes).",
+    "survivesWordResave": {
+      "w:framePr/w:dropCap": true,
+      "w:docPartObj/docPartGallery": true,
+      "DATE/w:fldChar": true,
+      "wps:wsp + a:prstTxWarp (WordArt)": true,
+      "v:textbox/w:txbxContent (textBox)": true,
+      "w14:textFill": false
+    },
+    "notes": "Word canonicalized the WordArt run color (w14:textFill re-expressed elsewhere) and inlined the wps Choice without mc:AlternateContent — both normal Word serialization; the shapes/warp survived."
+  },
+  "legB": {
+    "verb": "Word's resaved docx -> PM.openDocx (clone import)",
+    "result": "openDocx=true, importBlanked=false — clone imports Word's own serialization HEALTHY.",
+    "importedNodeTypes": { "documentPartObject": 1, "vectorShape": 1, "passthroughInline": 5, "paragraph": 8 },
+    "survivesCloneReimportExport": { "framePrDropCap": true, "docPartObj": true, "dateField": true, "wordArtWsp": true, "textboxVml": true },
+    "notes": "Cover re-imports as an EDITABLE documentPartObject; WordArt as an editable vectorShape; textBox + DATE arrive as passthroughInline (content + OOXML preserved, re-exports) — see deferrals (block-level VML-textbox import is a recorded fork follow-up)."
+  },
+  "verdict": "BOTH LEGS PASS. dropCap/coverPage/dateTime/WordArt/textBox export real Word OOXML that opens without repair, survives Word's resave, and re-imports into the clone healthy. The bisect-found cover-id schema violation is fixed.",
+  "gates": "PM 310/310, legacy 257/257 byte-identical, smoke 9/9 x2, roundtrip 27/0, docx 17/0."
+}
