@@ -3972,6 +3972,146 @@
     return (types.has('MERGEFIELD') && types.has('GREETINGLINE') && types.has('ADDRESSBLOCK') && types.has('NEXT')) || 'missing field types: ' + JSON.stringify([...types]);
   });
 
+  // ===== [10th] themes / Design tab (slice 10 PR2) — doc-replacing tests LAST =====
+  await t('[10th] D6 flip: themes is FLIPPED', () => PM().isFlipped('themes') === true || 'themes not in FLIPPED');
+
+  await t('[10th] EXPORT: deApplyTheme redefines Heading1 with literal w:rFonts ascii + w:color val in styles.xml', async () => {
+    setDocs(['Heading One', 'body text']);
+    selectText('Heading One'); PM().applyStyleByName('Heading 1'); await sleep(40);
+    if (typeof PM().deApplyTheme !== 'function') return 'PM.deApplyTheme missing (red — bridge not installed)';
+    const theme = { name: 'TestTheme', heading: 'Georgia,serif', body: 'Georgia,serif', color: '#FF0000', accents: ['#FF0000', '#00AA00', '#0000FF', '#FFAA00', '#AA00FF', '#00AAFF'] };
+    if (PM().deApplyTheme(theme) !== true) return 'deApplyTheme refused (red)';
+    await sleep(80);
+    const parts = await exportParts();
+    const sx = parts['word/styles.xml'];
+    if (typeof sx !== 'string') return 'no word/styles.xml in export part map';
+    const m = sx.match(/<w:style\b[^>]*w:styleId="Heading1"[\s\S]*?<\/w:style>/);
+    if (!m) return 'no Heading1 <w:style> in styles.xml';
+    const h1 = m[0];
+    if (!/<w:rFonts\b[^>]*w:ascii="Georgia"/.test(h1)) return 'Heading1 w:rFonts ascii not Georgia: ' + h1.slice(0, 400);
+    if (!/<w:color\b[^>]*w:val="FF0000"/.test(h1)) return 'Heading1 w:color val not FF0000: ' + h1.slice(0, 400);
+    // K9: the theme bindings MUST be gone, or Word resolves the theme and IGNORES the literal.
+    if (/w:asciiTheme/.test(h1)) return 'Heading1 still binds w:asciiTheme — Word would ignore the literal font (K9)';
+    return !/w:themeColor/.test(h1) || 'Heading1 still binds w:themeColor — Word would ignore the literal color (K9)';
+  });
+
+  await t('[10th] deApplyTheme flips the app dirty flag even on a heading-less doc (K3 Save-prompt)', () => {
+    setDoc('plain body, no headings'); PM().setClean && PM().setClean();
+    if (typeof PM().deApplyTheme !== 'function') return 'PM.deApplyTheme missing (red)';
+    if (PM().deApplyTheme({ name: 'D', heading: 'Georgia,serif', body: 'Georgia,serif', color: '#222222', accents: ['#222222', '#1', '#2', '#3', '#4', '#5'] }) !== true) return 'refused';
+    return PM().isDirty() === true || 'doc not dirty after a styles-only theme apply (no Save prompt — data loss)';
+  });
+
+  await t('[10th] pageColor does NOT wipe an active watermark (CSS longhand, no shorthand collision)', () => {
+    setDoc('x');
+    if (typeof PM().deWatermark !== 'function' || typeof PM().dePageColor !== 'function') return 'design verbs missing (red)';
+    PM().deWatermark('DRAFT', {}); PM().dePageColor('#FFFF00');
+    const ed = document.getElementById('pm-editor');
+    if (!/data:image\/svg/.test(ed.style.backgroundImage || '')) return 'pageColor wiped the watermark backgroundImage (used the background shorthand)';
+    return /ffff00|255,\s*255,\s*0/i.test((ed.style.backgroundColor || '')) || 'pageColor did not set backgroundColor';
+  });
+
+  await t('[10th] deApplyTheme repaints the VISUAL source (linkedStyles array Heading1 definition.styles)', async () => {
+    setDocs(['Heading One', 'body']); selectText('Heading One'); PM().applyStyleByName('Heading 1'); await sleep(40);
+    if (typeof PM().deApplyTheme !== 'function') return 'PM.deApplyTheme missing (red)';
+    const theme = { name: 'T', heading: 'Georgia,serif', body: 'Georgia,serif', color: '#123456', accents: ['#123456', '#111', '#222', '#333', '#444', '#555'] };
+    if (PM().deApplyTheme(theme) !== true) return 'refused (red)';
+    await sleep(60);
+    const arr = window.WC.editor.converter?.linkedStyles || [];
+    const h1 = arr.find((s) => s.id === 'Heading1');
+    if (!h1) return 'no Heading1 in converter.linkedStyles array';
+    const fam = String(h1.definition?.styles?.['font-family'] || '');
+    if (!/Georgia/.test(fam)) return 'array font-family not Georgia (visual source stale): ' + fam;
+    return /123456/i.test(String(h1.definition?.styles?.['color'] || '')) || 'array color not #123456: ' + h1.definition?.styles?.['color'];
+  });
+
+  await t('[10th] EXPORT: deApplyFonts sets docDefaults w:rFonts (body font, real export)', async () => {
+    setDoc('body text');
+    if (typeof PM().deApplyFonts !== 'function') return 'PM.deApplyFonts missing (red)';
+    if (PM().deApplyFonts({ name: 'Verdana', heading: 'Verdana,sans-serif', body: 'Verdana,sans-serif' }) !== true) return 'refused (red)';
+    await sleep(60);
+    const parts = await exportParts();
+    const sx = parts['word/styles.xml'] || '';
+    const dd = (sx.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/) || [''])[0];
+    return /<w:rFonts\b[^>]*w:ascii="Verdana"/.test(dd) || 'no docDefaults w:rFonts ascii=Verdana: ' + dd.slice(0, 400);
+  });
+
+  await t('[10th] EXPORT: deParagraphSpacing → docDefaults w:spacing (real export)', async () => {
+    setDoc('body text');
+    if (typeof PM().deParagraphSpacing !== 'function') return 'PM.deParagraphSpacing missing (red)';
+    if (PM().deParagraphSpacing({ before: 0, after: 13, line: 2 }) !== true) return 'refused (red)';
+    await sleep(60);
+    const parts = await exportParts();
+    const sx = parts['word/styles.xml'] || '';
+    const dd = (sx.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/) || [''])[0];
+    // Pin the SPECIFIC value (13pt -> 260 twips), not just <w:spacing> presence — docDefaults
+    // already carries default line spacing, so a presence-only check would pass vacuously.
+    return /<w:spacing\b[^>]*w:after="260"/.test(dd) || 'no docDefaults <w:spacing w:after="260"> (13pt->260twips): ' + dd.slice(0, 400);
+  });
+
+  await t('[10th] EXPORT: dePageBorders → <w:pgBorders> in document.xml sectPr (real)', async () => {
+    setDoc('x');
+    if (typeof PM().dePageBorders !== 'function') return 'PM.dePageBorders missing (red)';
+    if (PM().dePageBorders({ style: 'solid', color: '#000000', width: 1 }) !== true) return 'dePageBorders refused (red)';
+    await sleep(60);
+    const xml = await exportDocumentXml();
+    return /<w:pgBorders\b/.test(xml) || 'no <w:pgBorders> in document.xml';
+  });
+
+  await t('[10th] EXPORT: dePageColor → <w:background w:color> in document.xml (real)', async () => {
+    setDoc('x');
+    if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
+    if (PM().dePageColor('#FFFF00') !== true) return 'dePageColor refused (red)';
+    await sleep(60);
+    const xml = await exportDocumentXml();
+    return /<w:background\b[^>]*w:color="FFFF00"/.test(xml) || 'no <w:background w:color=FFFF00>: ' + xml.slice(0, 200);
+  });
+
+  await t('[10th] dePageColor paints the live page sheet (#pm-editor background)', () => {
+    if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
+    if (PM().dePageColor('#ABCDEF') !== true) return 'refused';
+    const ed = document.getElementById('pm-editor');
+    // Read backgroundColor ONLY (the longhand contract) — reading the `background` shorthand
+    // would mask a buggy impl that wrote the shorthand and wiped a watermark (collision test).
+    const bg = (ed.style.backgroundColor || '').toLowerCase();
+    return /abcdef|171,\s*205,\s*239/.test(bg) || 'page sheet bg not set: ' + bg;
+  });
+
+  await t('[10th] watermark: PM paints an SVG bg on #pm-editor (visual stand-in), never touches legacy E()', () => {
+    if (typeof PM().deWatermark !== 'function') return 'PM.deWatermark missing (red)';
+    if (PM().deWatermark('DRAFT', {}) !== true) return 'deWatermark refused (red)';
+    const ed = document.getElementById('pm-editor');
+    return /data:image\/svg/.test(ed.style.backgroundImage || '') || 'no watermark SVG bg-image on #pm-editor';
+  });
+
+  // ---- doc-replacing tests LAST (openDocx remounts; 300ms threshold) ----
+  await t('[10th] IMPORT round-trip: w:background survives export→openDocx (K8 schema-attr pin)', async () => {
+    setDoc('x');
+    if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
+    if (PM().dePageColor('#00FF00') !== true) return 'dePageColor refused (red)';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export not a zip';
+    if (await PM().openDocx(bytes) !== true) return 'reimport (openDocx) failed';
+    await sleep(300);
+    const xml = await exportDocumentXml();
+    return /<w:background\b[^>]*w:color="00FF00"/.test(xml) || 'w:background lost on round-trip (schema attr dropped it)';
+  });
+
+  await t('[10th] IMPORT round-trip: redefined Heading1 styles.xml survives export→openDocx', async () => {
+    setDocs(['Heading One', 'body']); selectText('Heading One'); PM().applyStyleByName('Heading 1'); await sleep(40);
+    if (typeof PM().deApplyTheme !== 'function') return 'PM.deApplyTheme missing (red)';
+    if (PM().deApplyTheme({ name: 'RT', heading: 'Garamond,serif', body: 'Garamond,serif', color: '#654321', accents: ['#654321', '#1', '#2', '#3', '#4', '#5'] }) !== true) return 'refused';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    if (await PM().openDocx(bytes) !== true) return 'reimport failed';
+    await sleep(300);
+    const parts = await exportParts();
+    const sx = parts['word/styles.xml'] || '';
+    const m = sx.match(/<w:style\b[^>]*w:styleId="Heading1"[\s\S]*?<\/w:style>/);
+    if (!m) return 'no Heading1 style after round-trip';
+    return /<w:rFonts\b[^>]*w:ascii="Garamond"/.test(m[0]) || 'Heading1 ascii not Garamond after round-trip';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
