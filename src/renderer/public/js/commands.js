@@ -875,7 +875,7 @@
   H.greetingLine = () => WC.Mail.greetingLine();
   H.insertMergeField = (c, node) => WC.Mail.insertMergeFieldMenu(node);
   H.rules = (c, node) => WC.flyout(node, (fly) => {
-    const insertField = (code) => E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> ');
+    const insertField = (code) => { const pm = PMA(); if (pm) { pm.mmInsertRule(code, code); return; } E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> '); };
     fly.appendChild(WC.flyItem('If…Then…Else…', { onClick: () => ifThenElseDialog() }));
     fly.appendChild(WC.flyItem('Fill-in…', { onClick: () => { const t = el('input', { type: 'text', class: 'grow', placeholder: 'Prompt' }); WC.dialog({ title: 'Insert Word Field: Fill-in', width: '420px', body: el('div', {}, [el('div', { text: 'Prompt:' }), t]), footer: [{ label: 'OK', primary: true, onClick: () => insertField('FILLIN "' + (t.value || 'Enter text') + '"') }, { label: 'Cancel' }] }); } }));
     fly.appendChild(WC.flyItem('Ask…', { onClick: () => { const b = el('input', { type: 'text', class: 'grow', placeholder: 'Bookmark' }); const p = el('input', { type: 'text', class: 'grow', placeholder: 'Prompt' }); WC.dialog({ title: 'Insert Word Field: Ask', width: '420px', body: el('div', {}, [el('div', { text: 'Bookmark:' }), b, el('div', { text: 'Prompt:' }), p]), footer: [{ label: 'OK', primary: true, onClick: () => insertField('ASK ' + (b.value || 'Bookmark') + ' "' + (p.value || 'Prompt') + '"') }, { label: 'Cancel' }] }); } }));
@@ -900,7 +900,7 @@
       el('div', { class: 'row' }, [el('label', { text: 'Else:', style: { width: '90px' } }), tElse]),
     ]);
     WC.dialog({ title: 'Insert Word Field: IF', width: '480px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const code = 'IF «' + (fld.value || 'Field') + '» ' + op.value + ' "' + val.value + '" "' + tThen.value + '" "' + tElse.value + '"'; E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> '); } },
+      { label: 'OK', primary: true, onClick: () => { const code = 'IF «' + (fld.value || 'Field') + '» ' + op.value + ' "' + val.value + '" "' + tThen.value + '" "' + tElse.value + '"'; const pm = PMA(); if (pm) { pm.mmInsertRule(code, code); return; } E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> '); } },
       { label: 'Cancel' },
     ] });
   }

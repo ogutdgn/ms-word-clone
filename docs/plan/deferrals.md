@@ -19,6 +19,13 @@
 - Find → Go To "Page"/"Line" visual landing.
 - Table visuals pinned to layout: distribute-rows height render, AutoFit reflow,
   repeat-header render, text-direction BiDi metrics.
+- **Mail-merge envelopes/labels page geometry (slice 10, D10.10).** PM mode inserts REAL
+  content honestly — envelopes prepend a real PM page (`PM.openHtml(env + getHTML())`,
+  existing content preserved); Labels → New Document builds a real PM label grid
+  (`PM.openHtml(gridHtml)`). DEFERRED to Phase 7: Avery-grid page fidelity (true
+  envelope/label sheet geometry), Labels → **Print** (PM path toasts, no E() mutation),
+  and `updateLabels` «Next Record» propagation across a PM label table (PM path toasts,
+  no E() mutation). NO `E()` mutation is reachable in PM mode (leak audit clean).
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 
