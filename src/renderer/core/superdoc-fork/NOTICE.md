@@ -300,6 +300,37 @@ The following upstream packages are included in this directory tree:
   helper with `<w:noProof/>` in every run's `w:rPr`. Non-merge `fieldAnnotation` nodes
   (unrecognized or absent `fieldType`) fall through to the existing `w:sdt` path unchanged,
   keeping the docx round-trip gate green.
+- **Word merge fields imported as `fieldAnnotation` PM nodes (slice 10, 2026-06-12):** the
+  fork's importer now turns a Word `MERGEFIELD`/`ADDRESSBLOCK`/`GREETINGLINE`/`NEXT` (+ the
+  rule codes `NEXTIF`/`MERGEREC`/`MERGESEQ`/`IF`/`FILLIN`/`ASK`/`SET`/`SKIPIF`) field into a
+  `fieldAnnotation` node, flag-INDEPENDENT of `editor.options.annotations` (which the clone
+  never sets, so the upstream `handleAnnotationNode` path never fires). Five coordinated
+  additions, mirroring the `indexEntry` precedent exactly:
+  - **Stage-1 preprocessor** `field-references/fld-preprocessors/mergefield-preprocessor.js`
+    (`preProcessMergefieldInstruction`) collapses a merge field into an `sd:mergeField`
+    OpenXmlNode (`{ name:'sd:mergeField', attributes:{ instruction }, elements }`). Mirrors
+    `xe-preprocessor.js`. Covers BOTH the `w:fldSimple` and the combined `w:fldChar` forms —
+    `preProcessNodesForFldChar` dispatches both through `getInstructionPreProcessor` by keyword.
+  - **Registry** `field-references/fld-preprocessors/index.js` — the field keywords above are
+    added as `case` lines in `getInstructionPreProcessor` (before `default`), all returning
+    `preProcessMergefieldInstruction`.
+  - **`NodeTranslator`** `v3/handlers/sd/mergeField/mergeField-translator.js` (+ `index.js`
+    barrel): a `NodeTranslator.from(config)` instance whose `encode` maps `sd:mergeField` →
+    `{ type:'fieldAnnotation', attrs:{ type:'text', fieldType:<code>, fieldId, displayLabel:«…»,
+    defaultDisplayLabel } }`. Uses a UNIQUE `sdNodeOrKeyName` (`'fieldAnnotation-mergeField'`)
+    to avoid a decode-routing collision with the `w:sdt` translator's `'fieldAnnotation'`;
+    `decode` is an inert `() => null` (export goes via `translate-field-annotation.js`).
+  - **v2 handler entity** `v2/importer/mergefieldImporter.js` —
+    `generateV2HandlerEntity('mergeFieldHandler', translator)`. MANDATORY: registering only in
+    the v3 `translatorList` makes `passthroughNodeImporter` REFUSE the node (it skips anything in
+    `registeredHandlers`) and the node is dropped.
+  - **`v2/importer/docxImporter.js` wiring** — `mergeFieldHandlerEntity` is imported and inserted
+    into the `defaultNodeListHandler` `entities` array next to `indexEntryHandlerEntity`, BEFORE
+    `passthroughNodeHandlerEntity`.
+  KNOWN deviation (ledger C, D10.12): the encode discards `node.elements` (the cached result runs)
+  and reconstructs the label from the instruction — lossless for MERGEFIELD, but a
+  previewed/merged ADDRESSBLOCK/GREETINGLINE source imports as the `«…»` placeholder, not the
+  rendered multi-line text.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

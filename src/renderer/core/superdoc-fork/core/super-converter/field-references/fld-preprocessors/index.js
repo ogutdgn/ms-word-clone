@@ -15,6 +15,7 @@ import { preProcessBibliographyInstruction } from './bibliography-preprocessor.j
 import { preProcessTaInstruction } from './ta-preprocessor.js';
 import { preProcessToaInstruction } from './toa-preprocessor.js';
 import { preProcessDocumentStatInstruction } from './document-stat-preprocessor.js';
+import { preProcessMergefieldInstruction } from './mergefield-preprocessor.js';
 
 /**
  * @callback InstructionPreProcessor
@@ -67,6 +68,19 @@ export const getInstructionPreProcessor = (instruction) => {
       return preProcessTaInstruction;
     case 'TOA':
       return preProcessToaInstruction;
+    case 'MERGEFIELD':
+    case 'ADDRESSBLOCK':
+    case 'GREETINGLINE':
+    case 'NEXT':
+    case 'NEXTIF':
+    case 'MERGEREC':
+    case 'MERGESEQ':
+    case 'IF':
+    case 'FILLIN':
+    case 'ASK':
+    case 'SET':
+    case 'SKIPIF':
+      return preProcessMergefieldInstruction;
     default:
       return null;
   }
