@@ -331,6 +331,20 @@ The following upstream packages are included in this directory tree:
   and reconstructs the label from the instruction — lossless for MERGEFIELD, but a
   previewed/merged ADDRESSBLOCK/GREETINGLINE source imports as the `«…»` placeholder, not the
   rendered multi-line text.
+- `extensions/linked-styles/linked-styles.js` — NET-NEW `redefineNamedStyles(updates, {export})` command
+  (slice 10 PR2 themes): redefines named-style definitions (Heading1/Title/Normal …) for real Word fidelity.
+  Mutates BOTH the export structure (`translatedLinkedStyles.styles` + `syncStylesDiffToConvertedXml`) and the
+  visual structure (`converter.linkedStyles[].definition.styles`), then forces a linked-styles decoration regen
+  (re-stamp styled paragraphs, addToHistory:false) and emits `stylesDefaultsChanged`. `{export:false}` = visual-only
+  (hover preview). Imports `syncStylesDiffToConvertedXml` from `core/helpers/styles-xml-helpers`.
+- `extensions/document/document.js` — NET-NEW `background` doc-node attr (slice 10 themes): raw <w:background>
+  element JSON, rendered:false (export-only, mirrors bodySectPr).
+- `core/super-converter/exporter.js` (`translateDocumentNode`) — NET-NEW: inject <w:background> as the first child
+  of <w:document> from the doc node's `background` attr.
+- `core/super-converter/v2/importer/docxImporter.js` (`createDocumentJson`) — NET-NEW: read the <w:background>
+  sibling of <w:body> into result.attrs.background (round-trips with the exporter).
+- `core/super-converter/v2/importer/settings-background.js` — NET-NEW `ensureDisplayBackgroundShape(converter,on)`:
+  add/removes <w:displayBackgroundShape/> in word/settings.xml so Word renders the page color on open.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

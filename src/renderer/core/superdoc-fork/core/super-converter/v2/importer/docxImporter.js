@@ -215,6 +215,10 @@ export const createDocumentJson = (docx, converter, editor) => {
 
   const nodeListHandler = defaultNodeListHandler();
   const bodyNode = json.elements[0].elements.find((el) => el.name === 'w:body');
+  // NET-NEW (slice 10 themes, NOTICE'd): document page color — the <w:background>
+  // sibling of <w:body> under <w:document>. Stashed on the doc node attrs so it
+  // round-trips to the exporter (parallel to the bodySectPr passthrough).
+  const backgroundNode = json.elements[0].elements?.find((el) => el.name === 'w:background') ?? null;
 
   if (bodyNode) {
     ensureSectionProperties(bodyNode);
@@ -291,6 +295,8 @@ export const createDocumentJson = (docx, converter, editor) => {
         attributes: json.elements[0].attributes,
         // Attach body-level sectPr if it exists
         ...(bodySectPr ? { bodySectPr } : {}),
+        // NET-NEW (slice 10 themes): document page color
+        ...(backgroundNode ? { background: backgroundNode } : {}),
       },
     };
 

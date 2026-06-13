@@ -55,6 +55,11 @@ export function installIo(editor: AnyEditor) {
   return {
     isDirty: () => dirty,
     setClean: () => { dirty = false; w.WC?.Files?.updateTitle?.() },
+    // K3 (plan §2): design verbs that mutate styles.xml/docDefaults/pageBorders WITHOUT a
+    // docChanged transaction (e.g. theme applied to a heading-less doc) must flip the dirty
+    // flag explicitly — otherwise PM.isDirty() stays false and the Save prompt never fires
+    // (silent data loss). Mirrors setClean with dirty = true + the same statusbar/title poke.
+    markDirty: () => { dirty = true; w.WC?.Files?.updateTitle?.() },
     exportDocxBytes,
     getHTML,
     getText,

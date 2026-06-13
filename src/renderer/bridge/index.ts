@@ -10,6 +10,7 @@ import { installTable } from './table'
 import { installReview } from './review'
 import { installReferences } from './references'
 import { installMailMerge } from './mail'
+import { installDesign } from './design'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -40,7 +41,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge']) // slices 1-6 + 8-10
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes']) // slices 1-6 + 8-10
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -268,6 +269,7 @@ export function preinstallBridge() {
     getState: () => null,
     isDirty: () => false,
     setClean: () => {},
+    markDirty: () => {},
     counts: () => ({ words: 0, chars: 0, charsNoSpace: 0, paras: 0, lines: 1, pages: 1, selWords: 0 }),
     getHTML: () => '', // slice 7 pre-mount stub (replaced by installIo on mount)
     getText: () => '', // slice 7 pre-mount stub (replaced by installIo on mount)
@@ -349,6 +351,14 @@ export function preinstallBridge() {
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
     mmBuildMerge: () => '', mmFinishToNewDoc: async () => false,
+    // slice 10 PR2: design/themes pre-mount stubs (replaced by installDesign on mount)
+    deApplyTheme: () => false, deApplyColors: () => false, deApplyFonts: () => false,
+    deApplyStyleSet: () => false, deParagraphSpacing: () => false,
+    dePreviewTheme: () => false, dePreviewRestore: () => false, dePreviewCommit: () => {}, dePreviewEnd: () => {},
+    dePageColor: () => false, dePageColorClear: () => false,
+    dePageBorders: () => false, dePageBordersRemove: () => false,
+    deWatermark: () => false, deWatermarkRemove: () => false,
+    deEffects: () => false, deSetAsDefault: () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -383,7 +393,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-06-13 — Slice 10 PR 2 (themes) DONE: area `themes` FLIPPED with real named-style redefinition + w:background
+
+- **Branch:** `feature/phase-2-slice-10-themes` (off fresh `main` @ `38bf7cf`); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 10 PR 2 (themes) DONE → slice 10 PR 3 (insert-exotica) next** (then draw).
+- **State summary:** area **`themes` FLIPPED** at **maximal real-MS-Word fidelity**. themes/styleSet/colors/fonts
+  **redefine NAMED-STYLE DEFINITIONS** (Heading1/2/3/Title/Subtitle/Normal) so headings restyle like real Word —
+  net-new fork command **`redefineNamedStyles`** (`extensions/linked-styles/linked-styles.js`, NOTICE'd) that mutates
+  BOTH the export structure (`converter.translatedLinkedStyles.styles` + `syncStylesDiffToConvertedXml` → real
+  `<w:style><w:rPr>` font+color in `word/styles.xml`, **DELETING the theme bindings** `w:asciiTheme`/`w:themeColor` so
+  Word honors the literal — K9) AND the visual structure (`converter.linkedStyles[].definition.styles` — the array the
+  linked-styles decoration plugin reads), then forces a decoration regen (re-stamp styled paragraphs, `addToHistory:false`,
+  PREVIEW_META-tagged in hover mode so a hover never dirties) + `stylesDefaultsChanged` emit. **pageColor** = net-new real
+  **`w:background`** exporter/importer + a `background` doc-node attr + a `displayBackgroundShape` settings flag (4 fork
+  edits, NOTICE'd). **pageBorders** = real `w:pgBorders` via `editor.doc.sections.setPageBorders`; **paragraphSpacing** =
+  real docDefaults `w:spacing` via `editor.doc.styles.apply`. **watermark** = honest visual stand-in + toast (real header
+  watermark = Phase-7); **effects/setAsDefault** = clone-owned (no OOXML). New **`bridge/design.ts`** (17 `de*` verbs +
+  hover live-preview snapshot/restore for themes/colors/fonts; styleSet/paragraphSpacing commit-only — spacing isn't
+  cheaply previewable) + `PM.markDirty()` in `bridge/io.ts`. `WC.Design` re-pointed via `PMA()` (legacy ELSE byte-identical;
+  leak audit clean — every design mutation site PMA()-guarded). No D6-guard repoint (themes ≠ margins/header).
+- **Done this session (per-commit):** `990d1fa` critique-hardened plan · `9ce22aa` red `[10th]` tests · `5ab3190`
+  test-assertion sync · `7e9fcb9` fork `redefineNamedStyles` · `ffd75f7` fork `w:background` · `5ac7e48` `bridge/design.ts`
+  + wiring + io.ts markDirty · `e4b1a24` re-point `WC.Design` · `89b2348` THE FLIP + leak audit · `06bfeb5` fix
+  hover-preview-dirty (final-review catch) · `b25292c` oracle probes + verdicts. Executed subagent-driven (6 tasks,
+  two-stage review each; plan 3-critic-hardened; final whole-branch review caught the hover-dirty bug).
+- **Gates (six):** PM **299/299**, legacy **257/257** (byte-identical), smoke **9/9 ×2**, roundtrip **27/0**, docx **17/0**.
+- **Oracle vs Word for Windows 16.0** (`notes/2026-06-13-slice10-themes-oracle.json`): **Leg A clone→Word PASS** —
+  `word-oracle-win.ps1 roundtrip` → ROUNDTRIP_OK (no repair); Word's resave PRESERVED `w:background` (FFF2CC) +
+  `displayBackgroundShape` + `w:pgBorders` (2E74B5) + Heading1/Title color (C00000) + Normal font (Georgia) + docDefaults
+  spacing (260); the K9 theme-binding deletes held. Heading FONT survives via Normal-inheritance (Word optimizes away the
+  redundant explicit Heading1 override — faithful). **Leg B Word→clone PASS** — clone imports Word's own serialization
+  healthy; all constructs survive import+re-export. **Live heading repaint CONFIRMED** (decoration span flips Aptos→Georgia
+  + dark red after `deApplyTheme`).
+- **Recorded deviations (ledger):** heading font via Normal-inheritance (Word's redundant-override optimization, faithful);
+  docDefaults font reverts to theme `minorHAnsi` on resave but is overridden by Normal's explicit Georgia (cosmetic);
+  Style Sets + Paragraph Spacing galleries are commit-only (no hover preview — spacing isn't cheaply live-previewable;
+  themes/colors/fonts DO preview); body-font live render for styleId-less paragraphs best-effort (K2); named-style
+  redefinition writes literal fonts/colors (not theme1.xml `clrScheme`/`fontScheme` token indirection — K5, deeper-fidelity
+  follow-up); watermark + on-page pageBorders/pageColor render = Phase-7 (model/export real now).
+- **Next:** slice 10 PR 3 = **insert-exotica** (coverPage/wordArt/dropCap as PM content), then draw. **Blockers/notes:**
+  none. `C:\tmp` holds the oracle artifacts (`wc-slice10-themes-clone.docx`, `wc-slice10-themes-resaved.docx`). The
+  `sd:mergeField`/named-style-redefinition fork patterns are templates for the carry-over fork-importer gaps (deferrals.md).
+
+---
+
 ## 2026-06-12 — Slice 10 PR 1 (mail-merge) DONE: area `mail-merge` FLIPPED with real MERGEFIELD round-trip
 
 - **Branch:** `feature/phase-2-slice-10-mail-merge` (off fresh `main`); **PR pending** into `main`.

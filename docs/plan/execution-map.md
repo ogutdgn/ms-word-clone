@@ -178,7 +178,28 @@
 > the flip commit verified byte-identity+leak clean and caught 2 majors on gate-untested paths (PM
 > merge resolver vs preview; checkErrors name read) — fixed in `e9e2242`. ⚠️ Ledger: rule-field IF
 > operator semantics (C) · composite-import placeholder (C) · envelopes/labels page geometry (A).
-> **Next: slice 10 PR 2 = themes** (then insert-exotica, then draw).
+>
+> **Slice 10 PR 2 (themes) is DONE** (`feature/phase-2-slice-10-themes`, PR pending): area **`themes`
+> FLIPPED** at MAXIMAL real-MS-Word fidelity — themes/styleSet/colors/fonts **redefine NAMED-STYLE
+> DEFINITIONS** (Heading1/2/3/Title/Subtitle/Normal) so headings restyle like real Word. Net-new fork
+> command `redefineNamedStyles` (NOTICE'd) mutates BOTH the export structure (`translatedLinkedStyles.styles`
+> + `syncStylesDiffToConvertedXml` → real `<w:style><w:rPr>` font+color, DELETING the `w:asciiTheme`/
+> `w:themeColor` bindings so Word honors the literal) AND the visual array (`converter.linkedStyles[].definition.styles`,
+> the decoration source), then forces a regen + emit (PREVIEW_META-tagged in hover so it never dirties).
+> pageColor = net-new real `w:background` exporter/importer + `background` doc-attr + `displayBackgroundShape`
+> settings flag (4 fork edits, NOTICE'd); pageBorders = real `w:pgBorders` (`editor.doc.sections.setPageBorders`);
+> paragraphSpacing = real docDefaults `w:spacing` (`editor.doc.styles.apply`); watermark = honest visual stand-in
+> + toast (Phase-7); effects/setAsDefault clone-owned. New `bridge/design.ts` (17 `de*` verbs + hover preview)
+> + `PM.markDirty()` in io.ts; `WC.Design` re-pointed via `PMA()` (legacy byte-identical; leak audit clean).
+> Gates (six): **PM 299/299**, legacy 257, smoke 9/9 × 2, roundtrip 27/0, docx 17/0. Oracle vs Word 16:
+> **Leg A clone→Word PASS** (ROUNDTRIP_OK no repair; Word preserved w:background/displayBackgroundShape/
+> w:pgBorders/heading color/Normal font/docDefaults spacing; K9 theme-deletes held; heading font survives via
+> Normal-inheritance), **Leg B Word→clone PASS** (clone imports Word's serialization healthy). Live heading
+> repaint confirmed. `notes/2026-06-13-slice10-themes-oracle.json`. The final whole-branch review caught a
+> hover-preview-dirties-styled-doc bug (fixed `06bfeb5`, PREVIEW_META). ⚠️ Ledger: Style-Set/Spacing hover
+> preview commit-only (C) · body-font live render best-effort (A/K2) · named-style not theme-token (C/K5) ·
+> watermark/on-page render Phase-7 (A).
+> **Next: slice 10 PR 3 = insert-exotica** (then draw).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -199,6 +220,32 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-13 (Phase 2 — slice 10 PR 2: themes)
+- [x] **Orient + deep fork pre-verification** (7-agent verbatim gather + author re-verification): the
+  load-bearing finds — named-style export machinery exists (`replayStyles`/`syncStylesDiffToConvertedXml`) and
+  Heading1/Title/Normal ARE populated in `translatedLinkedStyles.styles` at runtime; the **export/visual
+  asymmetry** (the decoration plugin reads `converter.linkedStyles` ARRAY, not `translatedLinkedStyles`) so a
+  faithful redefinition must mutate BOTH + force regen; `w:background` is genuinely net-new.
+- [x] **Brainstorm + user decisions** (AskUserQuestion): hover **live-preview** + watermark **visual stand-in**.
+- [x] **Critique-hardened plan** (`990d1fa`, `docs/superpowers/plans/2026-06-13-phase2-slice-10-themes.md`) —
+  3-critic adversarial pass folded 3 blockers (setDocAttribute not setNodeMarkup(0); DELETE theme bindings or
+  Word ignores the literal — K9; drop a non-existent carbonCopy import) + 3 majors (params.tr; backgroundColor
+  longhand; PM.markDirty).
+- [x] **Subagent-driven execution (6 tasks, two-stage review each):** `9ce22aa`/`5ab3190` red `[10th]` tests ·
+  `7e9fcb9` fork `redefineNamedStyles` · `ffd75f7` fork `w:background` · `5ac7e48` `bridge/design.ts` + wiring +
+  io.ts markDirty · `e4b1a24` re-point `WC.Design` · `89b2348` THE FLIP + leak audit. Per-task reviews caught:
+  the export-only-style sync gate (Task 1), the documentModified-on-no-op (Task 2), the deApplyFonts ok-guard +
+  watermark double-encode (Task 3), the colors double-fire (Task 4).
+- [x] **Six gates green:** PM 299/299, legacy 257/257 (byte-identical), smoke 9/9 ×2, roundtrip 27/0, docx 17/0.
+  (A 2-fail `[6b]` flip-run blip was load-flake — idle re-run 298→299.)
+- [x] **Oracle vs Word 16** (`b25292c`, `notes/2026-06-13-slice10-themes-oracle.json`): Leg A clone→Word PASS
+  (ROUNDTRIP_OK; constructs survive Word resave; K9 deletes held; heading font via Normal-inheritance), Leg B
+  Word→clone PASS (clone imports Word's serialization healthy). Live heading repaint confirmed (decoration span
+  Aptos→Georgia).
+- [x] **Final whole-branch review** caught a hover-preview-dirties-styled-doc bug → fixed `06bfeb5` (PREVIEW_META
+  on the preview regen tr) + a `[10th]` regression test.
+- [x] **Checkpoint + PR** (this entry). **Next:** slice 10 PR 3 = insert-exotica.
 
 ### 2026-06-12 (Phase 2 — slice 10 PR 1: mail-merge)
 - [x] **Orient + graph currency** — graph was already current (commit `de4f967`, 1315 nodes,
