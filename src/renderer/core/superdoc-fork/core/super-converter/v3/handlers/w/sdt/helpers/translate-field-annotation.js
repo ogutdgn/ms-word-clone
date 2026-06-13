@@ -8,6 +8,39 @@ import { sanitizeHtml } from '@core/InputRule';
 import { getTextNodeForExport } from '@converter/v3/handlers/w/t/helpers/translate-text-node.js';
 import he from 'he';
 import { translator as wHyperlinkTranslator } from '@converter/v3/handlers/w/hyperlink/index.js';
+import { buildComplexFieldRuns } from '../../../sd/build-complex-field-runs.js';
+
+const SIMPLE_FIELD_CODES = new Set(['MERGEFIELD', 'GREETINGLINE']);
+const EMPTY_FIELD_CODES = new Set(['NEXT', 'NEXTIF', 'MERGEREC', 'MERGESEQ', 'SET', 'ASK', 'SKIPIF']);
+const COMPOSITE_FIELD_CODES = new Set(['ADDRESSBLOCK']);
+const RULE_FIELD_CODES = new Set(['IF', 'FILLIN']);
+const MERGE_FIELD_CODES = new Set([...SIMPLE_FIELD_CODES, ...EMPTY_FIELD_CODES, ...COMPOSITE_FIELD_CODES, ...RULE_FIELD_CODES]);
+const NO_PROOF = [{ name: 'w:noProof' }];
+
+function buildSimpleFieldElement(instruction, cachedText) {
+  return {
+    name: 'w:fldSimple',
+    attributes: { 'w:instr': ` ${instruction} ` },
+    elements: [{ name: 'w:r', elements: [{ name: 'w:rPr', elements: NO_PROOF }, { name: 'w:t', elements: [{ type: 'text', text: cachedText }] }] }],
+  };
+}
+function buildEmptyComplexFieldRuns(instruction) {
+  const run = (child) => ({ name: 'w:r', elements: [{ name: 'w:rPr', elements: NO_PROOF }, child] });
+  return [
+    run({ name: 'w:fldChar', attributes: { 'w:fldCharType': 'begin' } }),
+    run({ name: 'w:instrText', attributes: { 'xml:space': 'preserve' }, elements: [{ type: 'text', text: ` ${instruction} ` }] }),
+    run({ name: 'w:fldChar', attributes: { 'w:fldCharType': 'end' } }),
+  ];
+}
+function mergeFieldInstruction(attrs) {
+  const code = attrs.fieldType;
+  const label = attrs.displayLabel || attrs.defaultDisplayLabel || '';
+  if (code === 'MERGEFIELD') { const name = label.replace(/^«|»$/g, '').trim() || 'Field'; return { instr: `MERGEFIELD ${name}`, cached: `«${name}»` }; }
+  if (COMPOSITE_FIELD_CODES.has(code)) return { instr: code, cached: label };
+  if (code === 'GREETINGLINE') return { instr: code, cached: label };
+  const inner = label.replace(/^\{\s*|\s*\}$/g, '');
+  return { instr: inner || code, cached: label };
+}
 
 /**
  * Translate a field annotation node
@@ -17,6 +50,15 @@ import { translator as wHyperlinkTranslator } from '@converter/v3/handlers/w/hyp
 export function translateFieldAnnotation(params) {
   const { node, isFinalDoc, fieldsHighlightColor } = params;
   const { attrs = {} } = node;
+
+  if (attrs.fieldType && MERGE_FIELD_CODES.has(attrs.fieldType)) {
+    const { instr, cached } = mergeFieldInstruction(attrs);
+    if (SIMPLE_FIELD_CODES.has(attrs.fieldType)) return buildSimpleFieldElement(instr, cached);
+    if (EMPTY_FIELD_CODES.has(attrs.fieldType)) return buildEmptyComplexFieldRuns(instr);
+    // COMPOSITE (ADDRESSBLOCK) + RULE (IF/FILLIN) → 5-run w:fldChar with noProof result run
+    return buildComplexFieldRuns({ instruction: instr, cachedText: cached, outputMarks: NO_PROOF, dirty: false });
+  }
+
   const annotationHandler = getTranslationByAnnotationType(attrs.type, attrs.fieldType);
   if (!annotationHandler) return {};
 

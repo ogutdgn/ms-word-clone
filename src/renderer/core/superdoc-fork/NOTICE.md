@@ -286,6 +286,20 @@ The following upstream packages are included in this directory tree:
   `tocLevel = raw + 1` is unchanged). Reading `outlineLevel` first keeps the fork's own
   `toc-entry-builder.test.ts` fixtures (which set `outlineLevel`) byte-identical while collecting
   setter-applied levels.
+- **Merge-field `fieldAnnotation` nodes exported as real Word field codes (slice 10, 2026-06-12):**
+  `translate-field-annotation.js` gains a merge-field branch that fires when
+  `attrs.fieldType` is in `MERGE_FIELD_CODES` (`MERGEFIELD`, `GREETINGLINE`, `NEXT`,
+  `NEXTIF`, `MERGEREC`, `MERGESEQ`, `SET`, `ASK`, `SKIPIF`, `ADDRESSBLOCK`, `IF`,
+  `FILLIN`). The fork's default path emits a `w:sdt` content control, which Word accepts
+  but treats as a form field, not a mail-merge field — Word's own mail-merge engine
+  ignores `w:sdt`-wrapped field codes. The branch maps each code to the OOXML shape Word
+  actually writes: `MERGEFIELD`/`GREETINGLINE` → `<w:fldSimple w:instr=" MERGEFIELD … ">`
+  with a `<w:noProof/>` result run; control fields (`NEXT`, `MERGEREC`, etc.) → a 3-run
+  begin/instrText/end complex field (no result run, matching Word's own output); composite
+  and rule fields (`ADDRESSBLOCK`, `IF`, `FILLIN`) → the shared 5-run `buildComplexFieldRuns`
+  helper with `<w:noProof/>` in every run's `w:rPr`. Non-merge `fieldAnnotation` nodes
+  (unrecognized or absent `fieldType`) fall through to the existing `w:sdt` path unchanged,
+  keeping the docx round-trip gate green.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
