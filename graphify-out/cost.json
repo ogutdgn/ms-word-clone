@@ -11,6 +11,13 @@
       "input_tokens": 848980,
       "output_tokens": 0,
       "files": 195
+    },
+    {
+      "date": "2026-06-13",
+      "input_tokens": 165477,
+      "output_tokens": 0,
+      "files": 12,
+      "note": "slice-10 mail-merge incremental update"
     }
   ],
   "total_input_tokens": 1509853,
