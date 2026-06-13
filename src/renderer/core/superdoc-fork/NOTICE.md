@@ -331,6 +331,12 @@ The following upstream packages are included in this directory tree:
   and reconstructs the label from the instruction — lossless for MERGEFIELD, but a
   previewed/merged ADDRESSBLOCK/GREETINGLINE source imports as the `«…»` placeholder, not the
   rendered multi-line text.
+- `extensions/linked-styles/linked-styles.js` — NET-NEW `redefineNamedStyles(updates, {export})` command
+  (slice 10 PR2 themes): redefines named-style definitions (Heading1/Title/Normal …) for real Word fidelity.
+  Mutates BOTH the export structure (`translatedLinkedStyles.styles` + `syncStylesDiffToConvertedXml`) and the
+  visual structure (`converter.linkedStyles[].definition.styles`), then forces a linked-styles decoration regen
+  (re-stamp styled paragraphs, addToHistory:false) and emits `stylesDefaultsChanged`. `{export:false}` = visual-only
+  (hover preview). Imports `syncStylesDiffToConvertedXml` from `core/helpers/styles-xml-helpers`.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
