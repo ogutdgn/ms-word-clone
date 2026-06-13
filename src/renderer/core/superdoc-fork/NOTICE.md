@@ -347,6 +347,10 @@ The following upstream packages are included in this directory tree:
   add/removes <w:displayBackgroundShape/> in word/settings.xml so Word renders the page color on open.
 - `extensions/shape-textbox/shape-textbox.js` — NET-NEW `insertTextBox` command (slice 10 PR3): inserts an editable
   shapeContainer>shapeTextbox>paragraph; the existing VML exporter synthesizes a real <v:textbox>/<w:txbxContent>.
+- `extensions/vector-shape/vector-shape.js` — NET-NEW `isWordArt` attr + `synthesizeWordArtDrawing` + `insertWordArt`
+  command (slice 10 PR3): inserts a vectorShape with a synthesized DrawingML blob (wps:wsp + bodyPr fromWordArt +
+  a:prstTxWarp + w14:textFill) on drawingContent; the replay exporter re-emits it (round-trips Word + fork). Sets
+  textContent for a flat in-app SVG render (warp renders in Word only).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
