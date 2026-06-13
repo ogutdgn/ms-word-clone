@@ -315,12 +315,14 @@ Insert this block (uses the existing harness helpers `setDoc`/`setDocs`/`selectT
   await t('[10th] EXPORT: deParagraphSpacing → docDefaults w:spacing (real export)', async () => {
     setDoc('body text');
     if (typeof PM().deParagraphSpacing !== 'function') return 'PM.deParagraphSpacing missing (red)';
-    if (PM().deParagraphSpacing({ before: 0, after: 8, line: 2 }) !== true) return 'refused (red)';
+    if (PM().deParagraphSpacing({ before: 0, after: 13, line: 2 }) !== true) return 'refused (red)';
     await sleep(60);
     const parts = await exportParts();
     const sx = parts['word/styles.xml'] || '';
     const dd = (sx.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/) || [''])[0];
-    return /<w:spacing\b/.test(dd) || 'no <w:spacing> in docDefaults: ' + dd.slice(0, 400);
+    // Pin the SPECIFIC value (13pt -> 260 twips), not just <w:spacing> presence — docDefaults
+    // already carries default line spacing, so a presence-only check would pass vacuously.
+    return /<w:spacing\b[^>]*w:after="260"/.test(dd) || 'no docDefaults <w:spacing w:after="260"> (13pt->260twips): ' + dd.slice(0, 400);
   });
 
   await t('[10th] EXPORT: dePageBorders → <w:pgBorders> in document.xml sectPr (real)', async () => {
@@ -345,7 +347,9 @@ Insert this block (uses the existing harness helpers `setDoc`/`setDocs`/`selectT
     if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
     if (PM().dePageColor('#ABCDEF') !== true) return 'refused';
     const ed = document.getElementById('pm-editor');
-    const bg = (ed.style.background || ed.style.backgroundColor || '').toLowerCase();
+    // Read backgroundColor ONLY (the longhand contract) — reading the `background` shorthand
+    // would mask a buggy impl that wrote the shorthand and wiped a watermark (collision test).
+    const bg = (ed.style.backgroundColor || '').toLowerCase();
     return /abcdef|171,\s*205,\s*239/.test(bg) || 'page sheet bg not set: ' + bg;
   });
 
@@ -374,7 +378,7 @@ Insert this block (uses the existing harness helpers `setDoc`/`setDocs`/`selectT
     if (typeof PM().deApplyTheme !== 'function') return 'PM.deApplyTheme missing (red)';
     if (PM().deApplyTheme({ name: 'RT', heading: 'Garamond,serif', body: 'Garamond,serif', color: '#654321', accents: ['#654321', '#1', '#2', '#3', '#4', '#5'] }) !== true) return 'refused';
     const bytes = await PM().exportDocxBytes();
-    if (!(bytes && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
     if (await PM().openDocx(bytes) !== true) return 'reimport failed';
     await sleep(300);
     const parts = await exportParts();
