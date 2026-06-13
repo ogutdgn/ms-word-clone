@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-06-13 — Slice 10 PR 3 (insert-exotica) DONE: Insert-tab exotica FLIPPED at real-Word fidelity (oracle Leg A+B PASS)
+
+- **Branch:** `feature/phase-2-slice-10-insert-exotica` (off `main` after the themes merge); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 10 PR 3 (insert-exotica) DONE → slice 10 PR 4 (draw) next** (then slice 11 legacy retirement).
+- **State summary:** area **`insert-exotica` FLIPPED** at **maximal real-MS-Word fidelity**. The 14 exotic Insert
+  commands dispatch to the new **`bridge/insert-exotica.ts`** (`installInsertExotica`, 15 `xe*` verbs): **dropCap** =
+  real `w:framePr` (`setNodeMarkup` paragraphProperties.framePr); **coverPage** = real `w:sdt` docPartObj content
+  (replace-existing); **dateTime/quickParts** = real `DATE`/`AUTHOR`/`PAGE`/… `w:fldChar` fields
+  (`editor.doc.fields.insert`, references.ts inlineTarget pattern); **screenshot/icons/onlinePictures** = real
+  `w:drawing` images (`PM.insertImage`); **textBox** = editable VML `v:textbox` via a net-new fork command
+  `insertTextBox` (`extensions/shape-textbox/shape-textbox.js`, NOTICE'd — inserts shapeContainer>shapeTextbox>paragraph,
+  the existing VML exporter synthesizes the `<v:textbox>`); **WordArt** = real DrawingML via a net-new fork command
+  `insertWordArt` + `synthesizeWordArtDrawing` (`extensions/vector-shape/vector-shape.js`, NOTICE'd — a `wps:wsp` +
+  `bodyPr fromWordArt` + `a:prstTxWarp` + `w14:textFill` blob on `drawingContent`; the replay exporter re-emits it);
+  **onlineVideo** = real hyperlink + Phase-7 toast; **chart/smartart/object(OLE)/signatureLine** = honest no-op toasts
+  (no fork construction path — recorded follow-ups). 2 net-new fork commands total. Legacy `WC.Insert.*` + commands.js
+  re-pointed via the PM guard / `PMA()` (legacy ELSE byte-identical; leak audit clean — incl. the screenshot leak the
+  first audit grep missed, and the dropCap()/insertWordArt() local mutators that dirty via E().dirty/repaginate, all
+  guarded at their callers).
+- **Oracle vs Word for Windows 16.0 (PID-safe):** **Leg A+B PASS.** First `all`-doc run FAILED Word open (EXIT=1);
+  bisected to the **coverPage** as the sole culprit — the sdt `<w:id w:val>` is an ST_DecimalNumber, and the
+  critique-driven non-numeric string id (`'wc-cover-…'`) was a hard schema violation. **Fixed** to a digits-only string
+  (`String(Date.now()%1000000)` — survives sanitizeId AND validates). After the fix Word opens the full 5-construct doc
+  **without repair** and **preserves** framePr/dropCap, sdt docPartObj, DATE fldChar, WordArt wps:wsp+prstTxWarp, and VML
+  v:textbox on resave (Word canonicalizes the WordArt color). Leg B: clone re-imports Word's serialization healthy
+  (cover→editable documentPartObject, WordArt→vectorShape; textBox/DATE→passthrough). See
+  `notes/2026-06-13-slice10-exotica-oracle.json`.
+- **Done this session (per-commit):** `861b6c7` critique-hardened plan · `59b62ed` red `[10ex]` tests · `c77b394` fork
+  `insertTextBox` · `4bd1874` fork `insertWordArt` · `003b2c7` `bridge/insert-exotica.ts` + wiring · `b2add2b` relax
+  `[10ex]` textBox round-trip (export-reality + passthrough survival) · `b827c85` re-point WC.Insert/commands.js ·
+  `8262258` THE FLIP + leak audit (+ screenshot guard) · `28d28e0` cover-id oracle fix · `81b70eb` oracle probes + verdict.
+- **Gates:** PM **310/310**, legacy **257/257 byte-identical**, smoke **9/9 ×2**, roundtrip **27/0**, docx **17/0**.
+- **Deferrals recorded (deferrals.md):** block-level VML-textbox import (clone reopen → passthrough, editability lost —
+  EXPORT is real, user-approved); WordArt non-editable + flat in-app (warp renders in Word only); dropCap 'drop' not
+  painted in-app (fork dropcapPlugin only renders 'margin'); icon SVG-only `w:drawing` (no raster fallback);
+  chart/smartart/OLE/signatureLine no construction path; onlineVideo no `wp15:webVideoPr`.
+- **Next:** PR into `main`, merge, delete branch, refresh graph (/graphify). Then slice 10 PR 4 (draw).
+
 ## 2026-06-13 — Slice 10 PR 2 (themes) DONE: area `themes` FLIPPED with real named-style redefinition + w:background
 
 - **Branch:** `feature/phase-2-slice-10-themes` (off fresh `main` @ `38bf7cf`); **PR pending** into `main`.

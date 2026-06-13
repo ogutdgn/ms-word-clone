@@ -179,7 +179,26 @@
 > merge resolver vs preview; checkErrors name read) — fixed in `e9e2242`. ⚠️ Ledger: rule-field IF
 > operator semantics (C) · composite-import placeholder (C) · envelopes/labels page geometry (A).
 >
-> **Slice 10 PR 2 (themes) is DONE** (`feature/phase-2-slice-10-themes`, PR pending): area **`themes`
+> **Slice 10 PR 3 (insert-exotica) is DONE** (`feature/phase-2-slice-10-insert-exotica`, PR pending): area
+> **`insert-exotica` FLIPPED** at MAXIMAL real-MS-Word fidelity. The 14 exotic Insert commands dispatch to the
+> new **`bridge/insert-exotica.ts`** (15 `xe*` verbs): dropCap = real `w:framePr`; coverPage = real `w:sdt`
+> docPartObj (replace-existing); dateTime/quickParts = real `DATE`/`AUTHOR`/… `w:fldChar` fields
+> (`editor.doc.fields.insert`); screenshot/icons/onlinePictures = real `w:drawing` images (`PM.insertImage`);
+> textBox = editable VML `v:textbox` via net-new fork `insertTextBox` (NOTICE'd); WordArt = real DrawingML via
+> net-new fork `insertWordArt` + `synthesizeWordArtDrawing` (`wps:wsp`+`bodyPr fromWordArt`+`a:prstTxWarp`+`w14`,
+> NOTICE'd); onlineVideo = real link + Phase-7 toast; chart/smartart/object(OLE)/signatureLine = honest no-op
+> toasts. 2 net-new fork commands. Legacy `WC.Insert.*`/commands.js re-pointed (legacy byte-identical; leak audit
+> clean incl. the screenshot leak the first grep missed). Gates (six): **PM 310/310**, legacy 257, smoke 9/9 × 2,
+> roundtrip 27/0, docx 17/0. Oracle vs Word 16 **Leg A+B PASS**: first run FAILED Word open — **bisected** to the
+> coverPage sdt `<w:id>` (an ST_DecimalNumber; the critique-driven non-numeric string id was a hard schema
+> violation) — **fixed** to a digits-only string; after the fix Word opens the 5-construct doc WITHOUT repair +
+> preserves framePr/docPartObj/DATE/WordArt-wps/v:textbox on resave; Leg B clone re-imports Word's serialization
+> healthy. `notes/2026-06-13-slice10-exotica-oracle.json`. ⚠️ Ledger: block-level VML-textbox import (user-approved
+> defer — EXPORT real, reopen→passthrough) · WordArt non-editable/flat in-app · dropCap 'drop' not painted in-app ·
+> icon SVG-only drawing · chart/smartart/OLE/signatureLine no construction path · onlineVideo no webVideoPr.
+> **Next: slice 10 PR 4 = draw** (then slice 11 legacy retirement).
+>
+> **Slice 10 PR 2 (themes) is DONE** (`feature/phase-2-slice-10-themes`, merged): area **`themes`
 > FLIPPED** at MAXIMAL real-MS-Word fidelity — themes/styleSet/colors/fonts **redefine NAMED-STYLE
 > DEFINITIONS** (Heading1/2/3/Title/Subtitle/Normal) so headings restyle like real Word. Net-new fork
 > command `redefineNamedStyles` (NOTICE'd) mutates BOTH the export structure (`translatedLinkedStyles.styles`
@@ -220,6 +239,24 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-13 (Phase 2 — slice 10 PR 3: insert-exotica)
+- [x] **Orient + deep fork pre-verification** (5-agent + 3-agent verbatim gather): textBox is much cheaper than
+  feared (existing editable VML path); WordArt needs a synthesized `drawingContent` blob; only 2 net-new fork
+  commands needed (`insertTextBox`, `insertWordArt`). 14-cmd area, 2 dispatch paths (H.* + dispatchMenu).
+- [x] **Critique-hardened plan** (`861b6c7`, `docs/superpowers/plans/2026-06-13-phase2-slice-10-insert-exotica.md`)
+  — 3-critic pass folded in (string-typed coverPage id, per-insert id counters, broadened leak grep, byte-exact
+  legacy strings, explicit dropCapMenu kind mapping, in-app render-gap notes).
+- [x] **Subagent-driven execution (Tasks 0–5)**: `59b62ed` red `[10ex]` tests · `c77b394` fork `insertTextBox` ·
+  `4bd1874` fork `insertWordArt` · `003b2c7` `bridge/insert-exotica.ts`+wiring · `b2add2b` relax textBox round-trip
+  (user-approved defer of block-level VML-textbox reimport) · `b827c85` re-point WC.Insert/commands.js · `8262258`
+  THE FLIP + leak audit (caught + fixed a screenshot leak the first grep missed).
+- [x] **Six gates**: PM **310/310**, legacy **257/257 byte-identical**, smoke 9/9 ×2, roundtrip 27/0, docx 17/0.
+- [x] **Oracle vs Word 16** (`28d28e0` fix, `81b70eb` probes, `notes/2026-06-13-slice10-exotica-oracle.json`):
+  Leg A first FAILED Word open → bisected to coverPage sdt `<w:id>` non-numeric string (ST_DecimalNumber violation)
+  → fixed to digits-only string → Word opens 5-construct doc without repair + preserves all constructs on resave;
+  Leg B clone re-imports Word's serialization healthy. **Both legs PASS.**
+- [x] **Checkpoint + PR** (this entry). **Next:** slice 10 PR 4 = draw.
 
 ### 2026-06-13 (Phase 2 — slice 10 PR 2: themes)
 - [x] **Orient + deep fork pre-verification** (7-agent verbatim gather + author re-verification): the
