@@ -32,6 +32,7 @@ import { endnoteReferenceHandlerEntity } from './endnoteReferenceImporter.js';
 import { tableNodeHandlerEntity } from './tableImporter.js';
 import { tableOfContentsHandlerEntity } from './tableOfContentsImporter.js';
 import { indexHandlerEntity, indexEntryHandlerEntity } from './indexImporter.js';
+import { mergeFieldHandlerEntity } from './mergefieldImporter.js';
 import { bibliographyHandlerEntity } from './bibliographyImporter.js';
 import { tableOfAuthoritiesHandlerEntity } from './tableOfAuthoritiesImporter.js';
 import { preProcessNodesForFldChar } from '../../field-references';
@@ -347,6 +348,7 @@ export const defaultNodeListHandler = () => {
     bibliographyHandlerEntity,
     tableOfAuthoritiesHandlerEntity,
     indexEntryHandlerEntity,
+    mergeFieldHandlerEntity,
     autoPageHandlerEntity,
     autoTotalPageCountEntity,
     documentStatFieldHandlerEntity,

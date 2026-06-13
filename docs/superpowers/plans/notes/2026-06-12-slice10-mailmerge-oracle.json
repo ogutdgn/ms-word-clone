@@ -1,0 +1,37 @@
+{
+  "slice": "10 — mail-merge (PR 1 of 4)",
+  "date": "2026-06-12",
+  "reference": "Word for Windows 16.0 (COM oracle scripts/oracle/word-oracle-win.ps1)",
+  "summary": "Both legs PASS. Merge fields round-trip as REAL Word field codes (w:fldSimple / w:fldChar MERGEFIELD), NOT w:sdt content controls — validated against the user's actual Word 16.",
+  "legA_clone_to_word": {
+    "verdict": "PASS",
+    "input": "C:/tmp/wc-slice10-clone.docx (clone-authored via scripts/author-slice10-mm-clone-probe.js: MERGEFIELD x2 [FirstName, Last_Name] + ADDRESSBLOCK + GREETINGLINE + NEXT)",
+    "roundtrip": "word-oracle-win.ps1 roundtrip -> ROUNDTRIP_OK (real Word opened it with NO repair prompt and resaved to C:/tmp/wc-slice10-resaved.docx)",
+    "clone_export_field_codes": [
+      "fldSimple: MERGEFIELD FirstName",
+      "fldSimple: MERGEFIELD Last_Name",
+      "fldSimple: GREETINGLINE",
+      "instrText(fldChar): ADDRESSBLOCK",
+      "instrText(fldChar): NEXT (3-run, no separate/result)"
+    ],
+    "word_resaved_field_codes": [
+      "instrText: MERGEFIELD FirstName",
+      "instrText: MERGEFIELD Last_Name",
+      "instrText: ADDRESSBLOCK",
+      "instrText: GREETINGLINE",
+      "instrText: NEXT"
+    ],
+    "notes": "Word canonicalized the compact w:fldSimple form to the verbose w:fldChar/w:instrText form on resave (benign — both represent the same live field). ALL 5 merge field codes preserved; underscore field name (Last_Name) intact. NO w:sdt content-control leak in either file; NO spurious «Next Record» result run for NEXT."
+  },
+  "legB_word_to_clone": {
+    "verdict": "PASS (automated)",
+    "evidence": "scripts/test-suite-pm.js '[10mm] IMPORT (Leg B, real Word fixture)' loads C:/tmp/wc-slice10-mergefields.docx (authored in real Word via Fields.Add) through PM.openDocx and asserts MERGEFIELD «FirstName»/«Last_Name» + GREETINGLINE + ADDRESSBLOCK + NEXT all import as fieldAnnotation nodes with the correct fieldType. PASS in the PM gate (285/285).",
+    "notes": "The fork importer additions (mergefield-preprocessor + sd:mergeField NodeTranslator + generateV2HandlerEntity in docxImporter) turn Word's w:fldSimple AND w:fldChar MERGEFIELD/ADDRESSBLOCK/GREETINGLINE/NEXT into fieldAnnotation PM nodes, flag-independently (not gated on editor.options.annotations)."
+  },
+  "gates": { "test:pm": "285/0", "test:legacy": "257/0 (byte-identical)", "test:smoke": "9/9 x2", "test:roundtrip": "27/0", "test:docx": "17/0" },
+  "recorded_deviations": [
+    "Rule-field IF/FILLIN/ASK/SKIPIF/SET export as STRUCTURALLY VALID field codes and round-trip, but Word's IF operator syntax ('=' / '<>') is not mapped from the legacy 'Equal to' label — an IF won't auto-evaluate in Word yet (ledger C, D10.9). MERGEFIELD/GREETINGLINE/ADDRESSBLOCK/NEXT are full-fidelity.",
+    "A previewed/merged ADDRESSBLOCK/GREETINGLINE imported from Word comes in as the «...» placeholder, not the rendered multi-line text (the import encode reconstructs the label from the instruction, discarding cached runs). A plain MERGEFIELD is lossless (ledger C, D10.12).",
+    "Envelopes/labels page geometry + Labels-Print + updateLabels «Next Record» propagation are pagination-gated (Phase 7, ledger A); PM paths insert real content or toast, never the legacy editor."
+  ]
+}

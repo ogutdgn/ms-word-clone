@@ -160,6 +160,25 @@
 > **Next: slice 10 — themes · mail-merge · draw · insert-exotica** (§9.1 row 10; independent PRs).
 > ⚠️ Carry-over: the fork docx importer drops SEQ/CITATION complex fields → nodes (Leg B) — a
 > prioritized fork-importer follow-up; slice-6 UI-Codex leftovers fold into slice-10/11 parity.
+>
+> **Slice 10 PR 1 (mail-merge) is DONE** (`feature/phase-2-slice-10-mail-merge`, PR pending): area
+> **`mail-merge` FLIPPED** with MAXIMAL real-MS-Word fidelity — merge fields are REAL Word
+> `MERGEFIELD` field codes (`w:fldSimple`/`w:fldChar`), NOT `w:sdt` content controls, round-tripping
+> BOTH directions over the fork's mounted `FieldAnnotation` node. New fork work (NOTICE'd): an export
+> branch in `translate-field-annotation.js` (`w:fldSimple` MERGEFIELD/GREETINGLINE · 5-run `w:fldChar`
+> ADDRESSBLOCK · **3-run** NEXT, no spurious result) + an import path (`mergefield-preprocessor` +
+> `sd:mergeField` `NodeTranslator` + a `generateV2HandlerEntity` in `docxImporter`, flag-independent of
+> `editor.options.annotations`). New `bridge/mail.ts` (insert/highlight/non-destructive preview via
+> `updateFieldAnnotations`/PM-aware Finish&Merge); `WC.Mail` doc-writes + `commands.js` rule inserts
+> re-pointed via `PMA()` (legacy byte-identical; leak audit clean); both `[0a]` D6 guards repointed
+> `startMailMerge`→`margins`/`header` (Phase-7-gated). Gates (six): **PM 285/285**, legacy 257, smoke
+> 9/9 × 2, roundtrip 27/0, docx 17/0. Oracle vs Word 16: **Leg A clone→Word PASS** (ROUNDTRIP_OK no
+> repair; Word's own resave preserved all 5 field codes), **Leg B Word→clone PASS** (automated
+> `[10mm]` real-fixture import). `notes/2026-06-12-slice10-mailmerge-oracle.json`. A 2-lens review of
+> the flip commit verified byte-identity+leak clean and caught 2 majors on gate-untested paths (PM
+> merge resolver vs preview; checkErrors name read) — fixed in `e9e2242`. ⚠️ Ledger: rule-field IF
+> operator semantics (C) · composite-import placeholder (C) · envelopes/labels page geometry (A).
+> **Next: slice 10 PR 2 = themes** (then insert-exotica, then draw).
 
 **Goal:** make the owned engine the **ACTIVE** editor — wire `WC.RIBBON` commands → PM transactions,
 feature area by feature area, and **retire the legacy `contenteditable` editor** (no more "two
@@ -180,6 +199,24 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-12 (Phase 2 — slice 10 PR 1: mail-merge)
+- [x] **Orient + graph currency** — graph was already current (commit `de4f967`, 1315 nodes,
+  `.graphifyignore` excludes the fork); incremental detect = 0 changed. Per-engine pre-verification
+  (4-agent fan-out): fork inventory + scope decisions + PR order (mail-merge → themes → exotica → draw).
+- [x] **User decision: maximal real-MS-Word fidelity** (real MERGEFIELD, not w:sdt) → saved to memory.
+  Captured real Word's merge-field OOXML via PID-safe COM (`w:fldSimple`).
+- [x] **Brainstorm → critique-hardened plan** (`e88bc11`, `docs/superpowers/plans/2026-06-12-phase2-slice-10-mail-merge.md`)
+  — 4-reader verbatim gather + 3-critic pass (2 blockers + 3 majors folded in).
+- [x] **Subagent-driven execution (6 tasks, two-stage review):** `ea02757` red `[10mm]` + `[0a]` repoint ·
+  `2677ec1` fork export branch · `68d42c5` fork import (preprocessor + NodeTranslator + handler entity) ·
+  `d76065c` bridge/mail.ts · `1738798` re-point + THE FLIP + leak audit · `e9e2242` review fixes
+  (`_mergeResolve` preview/merge unification; immutable name read) · `550180a` oracle.
+- [x] **Six gates green:** PM 285/285, legacy 257/257 (byte-identical), smoke 9/9 ×2, roundtrip 27/0, docx 17/0.
+- [x] **Oracle vs Word 16:** Leg A clone→Word PASS (ROUNDTRIP_OK; Word resave preserved all 5 field codes,
+  no w:sdt, no spurious «Next Record»); Leg B Word→clone PASS (automated fixture import).
+- [x] **Checkpoint + PR** (this entry). **Next:** slice 10 PR 2 = themes. Computer-Use visual Mailings
+  parity = optional follow-up (functional fidelity already proven via the COM oracle on the user's Word).
 
 ### 2026-06-12 (Phase 2 — slice 9: references)
 - [x] **Critique-hardened plan** (`docs/superpowers/plans/2026-06-12-phase2-slice-9-references.md`)

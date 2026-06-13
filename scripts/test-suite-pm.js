@@ -159,20 +159,14 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // probe lives in a STILL-UNFLIPPED area -- repointed link->newComment when
-    // insert-basics flipped (slice 6), then newComment->tableOfContents when slice 8
-    // started flipping review. tableOfContents (references) INVERTS once slice 9
-    // flips references, so slice 9 repoints both heads to startMailMerge (AREA
-    // mail-merge, NOT in FLIPPED -> stays blocked; its ribbon control is a dropdown
-    // so both guard heads stay meaningful). Both [0a] D6 guards now converge on
-    // startMailMerge but exercise DISTINCT dispatch heads (Commands.run vs
-    // Commands.dropdown) -- keep both.
-    window.WC.Commands.run({ cmd: 'startMailMerge', label: 'Start Mail Merge' });
-    return document.querySelectorAll('.flyout').length === 0
-      && !document.querySelector('.modal-backdrop');
+    // Repointed slice 10: startMailMerge flips this slice → run-block probe moves to
+    // `margins` (AREA layout-page, Phase-7-gated, stays blocked through slice 11).
+    window.WC.Commands.run({ cmd: 'margins', label: 'Margins' });
+    return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    window.WC.Commands.dropdown({ cmd: 'startMailMerge', type: 'dropdown' }, document.body);
+    // Repointed slice 10: `header` (AREA header-footer, Phase-7-gated, a dropdown control).
+    window.WC.Commands.dropdown({ cmd: 'header', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -3891,6 +3885,91 @@
     const f = window.WC.Files;
     const ok = await PM().newBlank();
     return ok === true && PM().isDirty() === false && window.WC.view.state.doc.content.size < 60;
+  });
+
+  // ===== [10mm] mail-merge (slice 10) — KEEP doc-replacing tests LAST in this block =====
+  await t('[10mm] insertMergeField: fieldAnnotation node fieldType=MERGEFIELD + «name» label', () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (typeof PM().mmInsertField !== 'function') return 'PM.mmInsertField missing (red — bridge not installed)';
+    if (PM().mmInsertField('FirstName') !== true) return 'mmInsertField refused (red)';
+    let f = null; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation' && n.attrs.fieldType === 'MERGEFIELD') f = n; });
+    if (!f) return 'no fieldAnnotation[fieldType=MERGEFIELD]';
+    return f.attrs.displayLabel === '«FirstName»' || 'displayLabel was ' + JSON.stringify(f.attrs.displayLabel);
+  });
+  await t('[10mm] EXPORT: MERGEFIELD → w:fldSimple " MERGEFIELD FirstName " (not w:sdt)', async () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (PM().mmInsertField('FirstName') !== true) return 'insert refused (red)';
+    const xml = await exportDocumentXml();
+    if (/<w:sdt\b[^>]*>[\s\S]*MERGEFIELD/.test(xml)) return 'exported as w:sdt content control, not a field code';
+    return /<w:fldSimple\b[^>]*w:instr="\s*MERGEFIELD FirstName\s*"/.test(xml) || 'no <w:fldSimple … MERGEFIELD FirstName>';
+  });
+  await t('[10mm] EXPORT: NEXT → 3-run w:fldChar (no separate, no «Next Record» result)', async () => {
+    setDoc('A B'); caretAfter('A ');
+    if (typeof PM().mmInsertRule !== 'function') return 'PM.mmInsertRule missing (red)';
+    if (PM().mmInsertRule('NEXT', 'NEXT') !== true) return 'insert refused (red)';
+    const xml = await exportDocumentXml();
+    if (/«Next Record»/.test(xml)) return 'NEXT emitted a spurious «Next Record» result run';
+    if (/<w:fldChar[^>]*w:fldCharType="separate"[\s\S]{0,400}NEXT/.test(xml)) return 'NEXT emitted a w:fldChar separate (should be 3-run)';
+    return /NEXT/.test(xml) && /<w:fldChar[^>]*w:fldCharType="begin"/.test(xml) || 'no NEXT field code';
+  });
+  await t('[10mm] highlightMergeFields toggles the highlighted attr', () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (PM().mmInsertField('FirstName') !== true) return 'insert refused (red)';
+    if (typeof PM().mmHighlight !== 'function') return 'PM.mmHighlight missing (red)';
+    PM().mmHighlight(false); let off = true; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation') off = off && n.attrs.highlighted === false; });
+    PM().mmHighlight(true); let on = true; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation') on = on && n.attrs.highlighted === true; });
+    return (off && on) || 'highlighted did not toggle false→true';
+  });
+  await t('[10mm] preview substitutes record values into displayLabel (non-destructive)', () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (PM().mmInsertField('FirstName') !== true) return 'insert refused (red)';
+    if (typeof PM().mmPreview !== 'function') return 'PM.mmPreview missing (red)';
+    PM().mmPreview({ FirstName: 'Alice' });
+    let shown = null; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation' && n.attrs.fieldType === 'MERGEFIELD') shown = n.attrs.displayLabel; });
+    if (shown !== 'Alice') return 'preview value was ' + JSON.stringify(shown);
+    PM().mmPreview(null);
+    let back = null; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation' && n.attrs.fieldType === 'MERGEFIELD') back = n.attrs.displayLabel; });
+    return back === '«FirstName»' || 'restore failed: ' + JSON.stringify(back);
+  });
+  await t('[10mm] finishMerge produces a doc with the record VALUE, not «placeholder» (K-9)', async () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (PM().mmInsertField('FirstName') !== true) return 'insert refused (red)';
+    if (typeof PM().mmBuildMerge !== 'function') return 'PM.mmBuildMerge missing (red)';
+    const html = PM().mmBuildMerge([{ FirstName: 'Alice' }], (field, rec) => rec[field] != null ? String(rec[field]) : '');
+    if (typeof html !== 'string') return 'mmBuildMerge did not return html';
+    if (/«FirstName»/.test(html)) return 'merged html kept the «FirstName» placeholder';
+    return /Alice/.test(html) || 'merged html does not contain the record value Alice';
+  });
+  await t('[10mm] D6 flip: mail-merge is FLIPPED', () => PM().isFlipped('mail-merge') === true || 'mail-merge not in FLIPPED');
+  await t('[10mm] merge resolver matches preview (_val: «Last_Name» field over a LastName column)', () => {
+    // Regression (task-5 review): PM preview resolves via _val (squashed-name match);
+    // the Finish&Merge resolver must too, else «Last_Name» over a LastName column
+    // previews correctly yet merges BLANK. _mergeResolve unifies both on _val.
+    const M = window.WC.Mail;
+    if (!M || typeof M._mergeResolve !== 'function') return 'WC.Mail._mergeResolve missing (red)';
+    const v = M._mergeResolve('Last_Name', { LastName: 'Smith' });
+    return /Smith/.test(String(v)) || 'resolver returned ' + JSON.stringify(v) + ' (expected Smith via _val squashed match)';
+  });
+  // ---- doc-replacing tests LAST (openDocx remounts; 300ms threshold) ----
+  await t('[10mm] IMPORT (self round-trip): clone export reimports MERGEFIELD as a fieldAnnotation', async () => {
+    setDoc('Dear , end'); caretAfter('Dear ');
+    if (PM().mmInsertField('LastName') !== true) return 'insert refused (red)';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'export not a zip';
+    const ok = await PM().openDocx(bytes); if (ok !== true) return 'reimport returned ' + JSON.stringify(ok);
+    await sleep(300);
+    let n = 0; doc().descendants((x) => { if (x.type.name === 'fieldAnnotation' && x.attrs.fieldType === 'MERGEFIELD') n++; });
+    return n === 1 || 'expected 1 MERGEFIELD fieldAnnotation after reimport, got ' + n;
+  });
+  await t('[10mm] IMPORT (Leg B, real Word fixture): MERGEFIELD/GREETINGLINE/ADDRESSBLOCK/NEXT import as fieldAnnotations', async () => {
+    const r = await window.wordAPI.openBytes('C:\\tmp\\wc-slice10-mergefields.docx');
+    if (!r || !r.bytes) return 'fixture not readable (skip if absent on this machine)';
+    const ok = await PM().openDocx(r.bytes); if (ok !== true) return 'openDocx returned ' + JSON.stringify(ok);
+    await sleep(300);
+    const types = new Set(); doc().descendants((n) => { if (n.type.name === 'fieldAnnotation' && n.attrs.fieldType) types.add(n.attrs.fieldType); });
+    let firstName = false, last = false; doc().descendants((n) => { if (n.type.name === 'fieldAnnotation') { if (n.attrs.displayLabel === '«FirstName»') firstName = true; if (n.attrs.displayLabel === '«Last_Name»') last = true; } });
+    if (!firstName || !last) return 'MERGEFIELD «FirstName»/«Last_Name» (underscore) not both imported';
+    return (types.has('MERGEFIELD') && types.has('GREETINGLINE') && types.has('ADDRESSBLOCK') && types.has('NEXT')) || 'missing field types: ' + JSON.stringify([...types]);
   });
 
   const pass = results.filter((r) => r.pass).length;

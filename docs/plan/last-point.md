@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-06-12 — Slice 10 PR 1 (mail-merge) DONE: area `mail-merge` FLIPPED with real MERGEFIELD round-trip
+
+- **Branch:** `feature/phase-2-slice-10-mail-merge` (off fresh `main`); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 10 PR 1 (mail-merge) DONE → slice 10 PR 2 (themes) next** (then exotica, draw).
+- **State summary:** area **`mail-merge` FLIPPED** with **maximal real-MS-Word fidelity** (user-directed:
+  real `MERGEFIELD` field codes, NOT `w:sdt` content controls — saved to memory `slice10-prefer-real-word-constructs`).
+  Merge fields are the fork's mounted **`FieldAnnotation`** node (its `update`/`highlight`/`hideByCondition`
+  commands back preview/highlight/rules — no new node). New fork work, BOTH directions (NOTICE'd):
+  **export** branches `translate-field-annotation.js` → `w:fldSimple` (MERGEFIELD/GREETINGLINE) · 5-run
+  `w:fldChar` (ADDRESSBLOCK) · **3-run** `w:fldChar` (NEXT, no spurious result), non-merge annotations
+  still emit `w:sdt`; **import** = `mergefield-preprocessor.js` (covers both fldSimple+fldChar via the
+  registry) + a `sd:mergeField` **`NodeTranslator`** (`encode`→`fieldAnnotation`, flag-independent of
+  `editor.options.annotations`) + a `generateV2HandlerEntity` in `docxImporter.js` (the load-bearing 3rd
+  wiring point the critique caught). New **`bridge/mail.ts`** (8 verbs: insert/addressBlock/greetingLine/
+  rule/highlight/**non-destructive preview via `updateFieldAnnotations`**/PM-aware `mmBuildMerge`/finish).
+  `WC.Mail` doc-writes + `commands.js:878/:903` rule inserts re-pointed via `PMA()` (legacy ELSE
+  byte-identical; leak audit clean — 12 `E()` calls all behind guards); both `[0a]` D6 guards repointed
+  `startMailMerge`→`margins`/`header` (Phase-7-gated, stay blocked through slice 11).
+- **Done this session (per-commit):** `ea02757` red `[10mm]` + `[0a]` repoint · `2677ec1` export branch ·
+  `68d42c5` import (preprocessor+NodeTranslator+handler entity) · `d76065c` bridge/mail.ts · `1738798`
+  re-point + THE FLIP + leak audit · `e9e2242` task-5 review fixes (`_mergeResolve` unifies PM merge with
+  preview via `_val`; `checkErrors`/`mmBuildMerge` read immutable `data-default-display-label`) · `550180a`
+  oracle. Plan `e88bc11` (4-reader gather + 3-critic hardened). Executed subagent-driven (two-stage review).
+- **Gates (six):** PM **285/285**, legacy **257/257** (byte-identical), smoke **9/9 ×2**, roundtrip **27/0**, docx **17/0**.
+- **Oracle vs Word for Windows 16.0** (`notes/2026-06-12-slice10-mailmerge-oracle.json`): **Leg A clone→Word
+  PASS** — `word-oracle-win.ps1 roundtrip` → ROUNDTRIP_OK (no repair prompt); Word's own resave PRESERVED
+  all 5 field codes (MERGEFIELD FirstName/Last_Name [underscore intact], ADDRESSBLOCK, GREETINGLINE, NEXT),
+  canonicalizing `w:fldSimple`→`w:fldChar` (benign); NO `w:sdt` leak, NO spurious «Next Record». **Leg B
+  Word→clone PASS** — the automated `[10mm] IMPORT (Leg B)` test loads the real-Word fixture
+  (`C:\tmp\wc-slice10-mergefields.docx`) and imports all 4 field types as `fieldAnnotation` nodes. So merge
+  fields are REAL live Word fields, not content controls. A 2-lens review of the flip commit ran clean on
+  byte-identity+leak and caught 2 majors on gate-untested paths (fixed in `e9e2242`).
+- **Recorded deviations (ledger):** rule-field IF/FILLIN operator semantics deferred — export is
+  structurally valid but `Equal to`≠Word `=` so IF won't auto-evaluate (C, D10.9); previewed-composite
+  ADDRESSBLOCK/GREETINGLINE import as the `«…»` placeholder, plain MERGEFIELD lossless (C, D10.12);
+  envelopes/labels page geometry pagination-gated (A) — PM paths insert real content or toast, never `E()`.
+- **Next:** slice 10 PR 2 = **themes** (re-point `WC.Design`; the levers are `editor.doc.styles.apply`
+  docDefaults + `sections.setPageBorders`; pageColor/watermark degrade). **Blockers/notes:** none. The
+  fork-importer `NodeTranslator` pattern from this slice could also close the slice-9 SEQ/CITATION import
+  gap. Computer-Use visual Mailings parity = optional follow-up (COM oracle already validated functionally
+  vs the user's Word). `C:\tmp` holds the oracle artifacts (`wc-slice10-clone.docx`, `wc-slice10-resaved.docx`).
+
+---
+
 ## 2026-06-12 — Slice 9 (references) DONE: area `references` FLIPPED onto the PM engine
 
 - **Branch:** `feature/phase-2-slice-9-references` (off fresh `main` @ `61e5ec4`); **PR pending** into `main`.

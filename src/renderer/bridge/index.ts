@@ -9,6 +9,7 @@ import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
 import { installReferences } from './references'
+import { installMailMerge } from './mail'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -39,7 +40,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references']) // slices 1-6 + 8-9
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge']) // slices 1-6 + 8-10
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -344,6 +345,10 @@ export function preinstallBridge() {
     refUpdateSource: () => false, refRemoveSource: () => false,
     refSetCitationStyle: () => false, refInsertBibliography: () => false,
     refCrossReference: () => false,
+    // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
+    mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
+    mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
+    mmBuildMerge: () => '', mmFinishToNewDoc: async () => false,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -378,7 +383,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

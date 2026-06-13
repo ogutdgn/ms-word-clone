@@ -1,0 +1,42 @@
+# .graphifyignore — controls what the graphify knowledge graph (graphify-out/) scans.
+#
+# WHY THIS FILE EXISTS: graphify reads .graphifyignore in PLACE OF .gitignore at
+# this directory (it does not merge them). So this file must MIRROR .gitignore and
+# then add the one extra exclusion the graph needs: the vendored editor fork.
+# See docs/GRAPHIFY.md — the graph deliberately covers only OUR code + docs
+# (~186 files, ~1,300 nodes); the fork is 94% of the file count and would bloat
+# the graph to ~19.7k nodes. Keep it excluded on every rebuild.
+#
+# KEEP IN SYNC with .gitignore: if you add an entry there, add it here too.
+
+# --- mirror of .gitignore ---
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+npm-debug.log*
+
+# Cloned upstream repos used only as local research reference (not part of the app)
+opensource-solutions/
+
+# Throwaway de-risking spike (prototype only; findings captured in docs/)
+spike/
+
+# Local scheduler lock
+.claude/scheduled_tasks.lock
+
+# Oracle scratch fixtures (clone exports / Word-authored probes; never checked in)
+tests/fixtures/.oracle-*
+tests/fixtures/oracle-*
+
+# Slice-4 Codex computer-use probe evidence (screenshots; never checked in)
+.oracle-probes/
+
+# Codex/agent scratch (not part of the project)
+.agents/
+
+# --- graphify-only exclusion (NOT in .gitignore — the fork is tracked code) ---
+# The vendored ProseMirror engine forked from SuperDoc. Excluded from the graph
+# (docs/GRAPHIFY.md). Grep it directly when you need engine internals.
+src/renderer/core/superdoc-fork/

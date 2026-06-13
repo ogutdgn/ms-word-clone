@@ -19,6 +19,13 @@
 - Find → Go To "Page"/"Line" visual landing.
 - Table visuals pinned to layout: distribute-rows height render, AutoFit reflow,
   repeat-header render, text-direction BiDi metrics.
+- **Mail-merge envelopes/labels page geometry (slice 10, D10.10).** PM mode inserts REAL
+  content honestly — envelopes prepend a real PM page (`PM.openHtml(env + getHTML())`,
+  existing content preserved); Labels → New Document builds a real PM label grid
+  (`PM.openHtml(gridHtml)`). DEFERRED to Phase 7: Avery-grid page fidelity (true
+  envelope/label sheet geometry), Labels → **Print** (PM path toasts, no E() mutation),
+  and `updateLabels` «Next Record» propagation across a PM label table (PM path toasts,
+  no E() mutation). NO `E()` mutation is reachable in PM mode (leak audit clean).
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 
@@ -53,6 +60,8 @@ translator services · Editor (cloud grammar) · Researcher. Loop obligation: no
 | TOC / Table of Figures / Index / Table of Authorities page numbers + caption SEQ numbers + rendered in-text-citation/bibliography text degrade to placeholders headless (TOC entry page run = `'0'`; caption number empty; bibliography/citation render empty) — the FIELD CODES + structure export and real Word repopulates on F9 (oracle Leg A clone→Word PASS) | Phase-7 layout gap (ledger-A class); `notes/2026-06-12-slice9-oracle.json` | slice 9 |
 | Footnote/endnote note bodies are plain-text (rich formatting dropped); bibliography flyout title is cosmetic (the fork `BibliographyInsertInput` has no title slot — Bibliography/References/Works Cited collapse to one); Manual Table degrades to an auto TOC (`refInsertTOC` always builds from headings) | fork Document API shapes | slice 9 |
 | **Word→clone import: the fork docx converter drops SEQ caption + CITATION complex fields → nodes** (footnotes + TOC import faithfully; an imported caption keeps its literal text but loses the SEQ number; an imported managed citation vanishes) — **PRIORITIZED fork-importer follow-up** (map `w:fldChar`+`w:instrText` SEQ/CITATION fields to `sequenceField`/`citation` nodes, or at least a `fieldAnnotation` preserving the cached display text) | oracle Leg B (`notes/2026-06-12-slice9-oracle.json`); pre-existing fork limitation, NOT a slice-9 wiring defect — clone create+export is faithful (Leg A) | slice 9 |
+| **Mail-merge rule fields (IF/FILLIN/ASK/SKIPIF/SET) export as structurally-valid field codes but the IF OPERATOR is not mapped** — the legacy dialog builds `IF «F» Equal to "v" …`; Word's IF syntax is `IF «F» = "v" …`, so an exported IF won't auto-evaluate in Word (it round-trips as an inert-but-valid field, parity with the legacy engine which never evaluated rule fields). MERGEFIELD/GREETINGLINE/ADDRESSBLOCK/NEXT are full-fidelity (oracle Leg A PASS). Follow-up: map the operator labels (`Equal to`→`=`, `Not equal to`→`<>`, …) in `ifThenElseDialog` | recorded product decision (D10.9); `notes/2026-06-12-slice10-mailmerge-oracle.json` | slice 10 |
+| **Word→clone import: a previewed/merged ADDRESSBLOCK/GREETINGLINE imports as the «…» placeholder, not the rendered multi-line text** — the `sd:mergeField` translator reconstructs `displayLabel` from the field instruction and discards the cached result runs. A plain MERGEFIELD is lossless (the cached run IS just «Name»). Follow-up: extract the cached text into `displayLabel` when it differs from the placeholder | recorded deviation (D10.12); `notes/2026-06-12-slice10-mailmerge-oracle.json` | slice 10 |
 
 ## Process notes
 
