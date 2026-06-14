@@ -479,7 +479,9 @@
     ]);
     function render() {
       list.innerHTML = '';
-      (WC.Styles ? WC.Styles.all() : ['Normal']).forEach((s) => {
+      // slice 11: WC.Styles (formatting.js) retired — use PM bridge catalog in PM mode.
+      const styleList = pm ? pm.allStyleNames() : (WC.Styles ? WC.Styles.all() : ['Normal']);
+      styleList.forEach((s) => {
         const item = el('div', { class: 'sl-item', text: s });
         if (preview) item.setAttribute('style', (STYLE_PREVIEW[s] || '') + ';');
         item.addEventListener('mousedown', (e) => e.preventDefault());
@@ -522,7 +524,8 @@
 
   // Apply Styles combo (Ctrl+Shift+S)
   D.applyStyles = function () {
-    const dl = el('datalist', { id: 'apply-styles-list' }, (WC.Styles ? WC.Styles.all() : []).map((s) => el('option', { value: s })));
+    const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    const dl = el('datalist', { id: 'apply-styles-list' }, (pm2 ? pm2.allStyleNames() : WC.Styles ? WC.Styles.all() : []).map((s) => el('option', { value: s })));
     const input = el('input', { type: 'text', class: 'grow', list: 'apply-styles-list', placeholder: 'Style name' });
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Style Name:', style: { width: '90px' } }), input, dl])]);
     WC.dialog({ title: 'Apply Styles', width: '360px', body, footer: [

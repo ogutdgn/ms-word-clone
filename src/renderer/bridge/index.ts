@@ -2,6 +2,7 @@
 // ProseMirror engine (spec §4/§5). Grafted onto the existing WC namespace;
 // NEVER reassign window.WC or window.WC.Editor (main.ts invariant).
 import { installCommands } from './commands'
+import { STYLE_NAME_TO_ID } from './style-names'
 import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
@@ -373,6 +374,8 @@ export function preinstallBridge() {
     dInsertInk: () => false, dInsertCanvas: () => false, dSetDrawing: () => false, dIsDrawing: () => false,
     dSetEraser: () => false, dSetSelect: () => false, dSetLasso: () => false, dSetPen: () => false,
     dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
+    // slice 11: WC.Styles (formatting.js) is retired — expose the canonical PM style list here.
+    allStyleNames: (): string[] => Object.keys(STYLE_NAME_TO_ID),
   }
   document.body.classList.add('pm-active')
 }
