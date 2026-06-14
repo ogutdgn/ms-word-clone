@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-06-14 (planning) — Phase 3 RE-SCOPED: ribbon tab-by-tab hardening pass + ribbon state machine; pagination pulled up to Phase 4
+
+- **Branch:** `main` (planning only — no code branch yet; the first will be `fix/ribbon-home`).
+- **Phase:** **Phase 3 — Editing-core hardening + scope finalization** (NEW). Re-sequenced from the old
+  "Phase 3 = Logger". Full roadmap now: 3 hardening · **4 Pagination/layout engine** (was "last") · 5 Logger ·
+  6 Verifier · 7 MCP · 8 hard-constructs verification · 9 docx round-trip · 10 RL loop · 11 cua-bench.
+- **Why (user decision):** primary goal = a **fully working editing env first**. The editing core is the
+  environment the future CUA agent acts on; logging/verifying a buggy editor = garbage in. "UI fidelity +
+  feature preservation" are the locked constraints — so quality here is a project goal, not a detour.
+- **The method (Phase 3 loop):** tab-by-tab, section-by-section. **Section kickoff is a HUMAN GATE** — I do
+  a general research sweep, propose in/out scope, **user locks scope** (→ `docs/SCOPE.md`). Then per in-scope
+  feature I run autonomously: research Word **+ enablement/checked rules** → **three-sided compare** (Word
+  reference via COM oracle + live Word, vs the **clone's actual in-env behavior driven live** — real effect +
+  its *scope* + edge cases + control state) → **fix-now vs layout-flag** (my call) → fix + regression test +
+  eyeball visuals → three gates. **One branch/PR per tab** (`fix/ribbon-<tab>`), commit per section, merge to `main`.
+- **Ribbon STATE MACHINE (first-class, concurrent):** a real systemic gap (most controls are always-active).
+  Two facets per control — **enablement** (grey when unusable) + **checked/latch + value**. Build a thin
+  shared spine ONCE in the first section (one evaluator recomputing enablement per transaction + a declarative
+  per-control rule registry, extending `PM.queryState()`→ribbon); each section registers its rules. Enablement
+  IS `test:pm`-assertable → real regressions. Don't scatter ad-hoc `wc-disabled` pokes (slice-8 style).
+- **Layout = the hard gap, handled as FLAG-AS-SPEC.** We do NOT build the engine first. Architecture is RIGHT
+  (PM/OOXML/Word all = a text-flow doc + an anchored floating-object layer; the gap is a missing layout engine,
+  not the model — confirmed vs `docs/PAGINATION.md`: "no `repaginate()` engine today"). Two layers: vertical
+  pagination (precedented) + floating-object positioning & **text-wrap** (harder; browsers don't do shape-aware
+  wrap). **Classifier — flag, don't fix:** multi-page / floating-object position / text-wrap /
+  headers-footers-on-page / columns / vertical page geometry. **Flag-don't-hack rule (non-negotiable):** layout
+  bugs → `deferrals.md` §A.1 (the accumulating Phase-4 spec), NEVER a continuous-flow DOM hack (the legacy
+  spacer-hack was deleted in slice 11 — don't grow a new one). Phase 4 builds the engine model-driven (PM plugin
+  + overlay) to CLEAR those flags + add multi-page; validated vs oracle.
+- **Docs written this session:** `plan.md` (roadmap re-sequence + "pagination LAST"→Phase 4); `execution-map.md`
+  (CURRENT PHASE rewritten + daily-log entry); this entry; new `docs/SCOPE.md` (in/out registry, three buckets);
+  `deferrals.md` (§A Phase-7→Phase-4 + new §A.1 layout-engine-requirements + flag-don't-hack rule); resume-point
+  memory ([[phase3-ribbon-hardening-resequence]]).
+- **Next:** start **Tab 1 = Home**, section **Clipboard** — cut `fix/ribbon-home`, section kickoff (propose
+  in/out scope → user locks), set up the state-machine shared spine, run the loop.
+- **Blockers/notes:** docs are written but **NOT yet committed** (awaiting user go — per the never-work-on-main
+  rule, likely committed on the first `fix/ribbon-home` branch or a quick `docs/phase-3-rescope` branch).
+  Graphify refresh still deferred (Windows absolute-path bug). The three gates remain PM 326 / smoke 9 / roundtrip 27.
+
 ## 2026-06-14 — Slice 11 (legacy retirement) DONE: dual-world scaffolding retired — the PM engine is the ONLY editor (Phase 2 editing core COMPLETE)
 
 - **Branch:** `feature/phase-2-slice-11-legacy-retirement` (off `main` @ `18bd70b`); **PR pending** into `main`.

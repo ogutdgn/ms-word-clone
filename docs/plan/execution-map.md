@@ -23,14 +23,43 @@
 2. **Confirm the decision:** read its `OPEN_DECISIONS.md` recommendation + edge cases; confirm or
    adjust against the *real* code; if it changes a locked choice, add a superseding ADR.
 3. **Build** it (strangler-fig — behind the existing ribbon; never break the Word UI).
-4. **Test:** the 228-test in-renderer suite + the 9-test docx suite stay green; add a regression
+4. **Test:** the three gates (test:pm / test:smoke / test:roundtrip) stay green; add a regression
    test per change; check feature parity.
 5. **Checkpoint** (via the `plan-tracking` skill): **append** a dated entry to last-point.md and
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 2 editing core COMPLETE (all slices 0a–11) → Phase 3 (Logger) next
-> **Slice 11 (legacy retirement) is DONE** (`feature/phase-2-slice-11-legacy-retirement`, PR pending): the
+## CURRENT PHASE → Phase 3 — Editing-core hardening + scope finalization (ribbon tab-by-tab) → Phase 4 (Pagination / layout engine) next
+> **Phase 3 = the ribbon-hardening pass** (re-sequenced 2026-06-14; goal = a fully working env BEFORE
+> logger/verifier/MCP). Go **tab by tab, section by section.** Logger/Verifier/MCP slip to Phases 5/6/7;
+> the **pagination / layout engine is pulled up to Phase 4.**
+>
+> - **Section kickoff = a HUMAN GATE:** general research of the whole section → propose in/out scope →
+>   **user LOCKS scope** (recorded in [SCOPE.md](../SCOPE.md)). Out-of-scope sections (Acrobat, Voice,
+>   Add-ins) are cut here, not researched deeply.
+> - **Per in-scope feature (run autonomously):** (1) research Word's behavior **+ enablement/checked-state
+>   rules**; (2) compare **three-sided** — Word reference (COM oracle + live Word) vs the **clone's actual
+>   in-env behavior, driven live** (real effect + its *scope* + edge cases + control state); (3) decide
+>   **fix-now vs layout-flag**; (4) fix + **regression test** (logic + state) + eyeball the visuals; (5) three gates.
+> - **Ribbon STATE MACHINE = first-class, built concurrently.** Two facets per control: **enablement**
+>   (grey when unusable — Paste w/ empty clipboard, Table tools off-table, Undo w/ empty stack,
+>   Accept-change off-a-change, Decrease-indent at zero) + **checked/latch + current value**. Build the
+>   shared spine ONCE in the first section (a single evaluator recomputing enablement every transaction +
+>   a declarative per-control rule registry, extending `PM.queryState()`→ribbon); each section then registers
+>   its rules. Enablement IS `test:pm`-assertable (unlike pure-visual fixes).
+> - **Layout = FLAG-AS-SPEC, NEVER hack.** A bug needing the layout engine (multi-page / floating-object
+>   position / text-wrap / headers-footers-on-page / columns / vertical page geometry) is **flagged in
+>   [deferrals.md](deferrals.md) §A.1** (the accumulating Phase-4 spec), not faked in continuous-flow. The
+>   architecture is RIGHT (PM = a text-flow doc + anchored floating-object layer, like Word/OOXML); the gap is
+>   the missing layout engine. Phase 4 builds it model-driven (PM plugin + overlay) to **clear the flags**.
+> - **Git:** one branch/PR per **tab** (`fix/ribbon-<tab>`), **commit per section**, merge to `main`, delete
+>   branch. Split a big tab (Home) into section-group PRs only if review gets unwieldy. Every section ends gates-green.
+> - **Tests cover logic + state, NOT clicks/visual/arrangement** — those are eyeballed vs live Word.
+>
+> ---
+> **Phase 2 (editing core) is COMPLETE — slice history below (most recent first):**
+>
+> **Slice 11 (legacy retirement) is DONE** (`feature/phase-2-slice-11-legacy-retirement`, PR #34 merged): the
 > dual-world scaffolding is GONE — PM (ProseMirror/SuperDoc-fork) is the ONLY editor. Removed the `--legacy`
 > flag/boot + `bridge/mode.ts`, the legacy `WC.Editor`/`#editor` + leaf engines (formatting/comments/table-tools/
 > layout-tools/header-footer + the review-tools Track-Changes engine), the legacy docx converter
@@ -45,7 +74,7 @@
 > review → Ready to merge (zero Critical/Important). Process: 3 hidden conflicts (WC.Styles, the WC.Editor zoom/view
 > ownership, the lodash transitive dep) + 4 reachable E() leaks (equation dropdown, shapes/Excel/draw-table) were
 > caught by the gates+leak-audit and fixed; final audit = **zero reachable E()** (the rest is isBlocked-gated Phase-7
-> residue). **Phase 2 editing core COMPLETE → Phase 3 (Logger) next.**
+> residue). **Phase 2 editing core COMPLETE → Phase 3 (ribbon hardening) next** (re-scoped 2026-06-14 — see the CURRENT PHASE header above; Logger moved to Phase 5).
 >
 > **Phase 1 (Scaffold) is COMPLETE** — see the 2026-06-05 entry in [last-point.md](last-point.md).
 > The owned ProseMirror engine mounts/renders/edits a real `.docx` on `build/phase-1-scaffold`
@@ -273,6 +302,23 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-14 (Phase 3 planning — roadmap re-sequence + bug-fix methodology)
+- [x] **Strategic re-scope (user decision):** primary goal = a **fully working editing env first**.
+  Roadmap re-sequenced — Phase 3 = ribbon **tab-by-tab hardening pass** (bugs + scope + state machine);
+  **pagination/layout engine pulled up to Phase 4**; logger/verifier/MCP → 5/6/7.
+- [x] **Methodology agreed:** per-section loop (kickoff scope-lock HUMAN GATE → per-feature
+  research+state-rules → three-sided compare vs the live clone → fix-now/layout-flag → regression test → gates);
+  branch/PR per tab; **state machine** built concurrently (shared evaluator + per-control rule registry);
+  **layout bugs flagged as the Phase-4 spec, never hacked** (no new spacer-hack).
+- [x] **Architecture sanity check:** PM/OOXML/Word all = a text-flow doc + anchored floating-object layer →
+  architecture is RIGHT; the "real canvas" gap is the missing **layout engine** (= Phase 4), not the model.
+  Confirmed vs [PAGINATION.md](../PAGINATION.md) ("no `repaginate()` engine today").
+- [x] **Docs written:** `plan.md` roadmap re-sequence (+ "pagination LAST"→Phase 4); this `execution-map`
+  CURRENT PHASE rewritten; `last-point.md` entry; new `docs/SCOPE.md`; `deferrals.md` §A→Phase-4 + new §A.1
+  (layout-engine requirements); resume-point memory.
+- [ ] **Next:** start **Tab 1 = Home** — cut `fix/ribbon-home`, section kickoff (Clipboard first): general
+  research → propose in/out scope → user locks → run the loop. Set up the state-machine shared spine in this first section.
 
 ### 2026-06-14 (Phase 2 — slice 11: legacy retirement)
 - [x] **Orient + deep pre-verification** (ultracode 7-mapper workflow + synthesis): mapped the exact retirement

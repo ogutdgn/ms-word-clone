@@ -228,7 +228,7 @@ transaction:
   comments/track chrome (`comments-ui.ts`, `track-chrome.ts`) layer UI over the view.
 
 The page sheet is continuous-flow today; real model-driven multi-page sheets are
-Phase-7-gated (see [PAGINATION.md](PAGINATION.md)).
+Phase-4-gated — the pagination/layout engine (see [PAGINATION.md](PAGINATION.md)).
 
 ---
 
@@ -262,9 +262,9 @@ H.trackChanges = () => WC.PM.setTrackChanges();        // PM Track Changes
 ```
 
 The PM-only dispatch collapsed the old `pm ? PM : legacy` branches — there is no
-legacy `E()` fallback. The four Phase-7 deferred areas (layout-page, layout-arrange,
+legacy `E()` fallback. The four Phase-4 deferred areas (layout-page, layout-arrange,
 header-footer, text-effects) are gated by `isBlocked`/`notifyBlocked` and show a
-Word-like deferral toast; their handler bodies are dead stubs awaiting Phase 7.
+Word-like deferral toast; their handler bodies are dead stubs awaiting Phase 4 (the layout engine).
 Unknown / out-of-scope commands surface a uniform "not implemented" message — see
 `docs/NOT_IMPLEMENTED.md`.
 
