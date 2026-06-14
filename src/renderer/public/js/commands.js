@@ -26,7 +26,6 @@
   let lastHighlight = '#FFFF00';
   let lastShade = null;          // shading split button: no fill until one is picked
   let lastBorderEdge = 'bottom'; // borders split button: Word defaults to Bottom Border
-  let painter = null; // {styles, sticky}
 
   const H = {}; // handlers keyed by cmd
 
@@ -243,7 +242,7 @@
   }
   function equationMenu(node) {
     const eqs = ['a² + b² = c²', 'x = (−b ± √(b²−4ac)) / 2a', 'E = mc²', '∫ f(x) dx', 'Σ(i=1→n) i = n(n+1)/2'];
-    WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); eqs.forEach((e2) => fly.appendChild(WC.flyItem(e2, { onClick: () => E().insertHTML(`<span style="font-family:'Cambria Math',Cambria,serif;font-style:italic">${WC.escapeHtml(e2)}</span>&nbsp;`) }))); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Insert New Equation', { onClick: () => WC.Dialogs.equation() })); });
+    WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); eqs.forEach((e2) => fly.appendChild(WC.flyItem(e2, { onClick: () => WC.PM.insertEquation(e2) }))); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Insert New Equation', { onClick: () => WC.Dialogs.equation() })); });
   }
 
   // ---- View ----
@@ -1494,27 +1493,6 @@
     return { fontFamily: cs.fontFamily, fontSize: cs.fontSize, fontWeight: cs.fontWeight, fontStyle: cs.fontStyle,
       textDecoration: cs.textDecorationLine, color: cs.color, backgroundColor: cs.backgroundColor };
   }
-  function captureFormat() {
-    const sel = window.getSelection();
-    let n = sel && sel.anchorNode; n = n && n.nodeType === 3 ? n.parentNode : n;
-    if (!n) return { inline: {} };
-    const cs = getComputedStyle(n);
-    return { inline: {
-      fontFamily: cs.fontFamily, fontSize: cs.fontSize, fontWeight: cs.fontWeight, fontStyle: cs.fontStyle,
-      textDecorationLine: cs.textDecorationLine, textDecorationStyle: cs.textDecorationStyle, textDecorationColor: cs.textDecorationColor,
-      color: cs.color, verticalAlign: cs.verticalAlign, letterSpacing: cs.letterSpacing,
-      backgroundColor: (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') ? cs.backgroundColor : '',
-    } };
-  }
-  let painterHandler = null, painterEsc = null;
-  function disarmPainter() {
-    painter = null;
-    E().node.style.cursor = 'text';
-    const btn = WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node;
-    if (btn) btn.classList.remove('toggled');
-    if (painterHandler) { E().node.removeEventListener('mouseup', painterHandler); painterHandler = null; }
-    if (painterEsc) { document.removeEventListener('keydown', painterEsc); painterEsc = null; }
-  }
   // PM painter: the fork's FormatCommands owns capture/apply/release; this wrapper
   // adds Word's UX toasts. Esc lives in the bridge; button toggle + cursor live in
   // state-sync. Word arms from a CARET too (paragraph + caret-char formatting —
@@ -1524,42 +1502,6 @@
     WC.PM.armFormatPainter(sticky);
     WC.toast(sticky ? 'Format Painter locked — apply to multiple selections. Press Esc to stop.'
                     : 'Format Painter — select text to apply the copied formatting once.');
-  }
-
-  function armPainterFromSelection(node, sticky) {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !E().node.contains(sel.anchorNode)) { WC.toast('Select formatted text first, then click Format Painter.'); return; }
-    painter = Object.assign(captureFormat(), { sticky });
-    if (node) node.classList.add('toggled');
-    E().node.style.cursor = 'copy';
-    WC.toast(sticky ? 'Format Painter locked — apply to multiple selections. Press Esc to stop.' : 'Format Painter — select text to apply the copied formatting once.');
-    if (painterHandler) E().node.removeEventListener('mouseup', painterHandler);
-    painterHandler = () => {
-      const s = window.getSelection();
-      if (!painter || !s || s.isCollapsed) return;
-      const st = painter.inline;
-      const makeSpan = () => { const span = el('span'); Object.assign(span.style, { fontFamily: st.fontFamily, fontSize: st.fontSize, fontWeight: st.fontWeight, fontStyle: st.fontStyle, color: st.color, textDecorationLine: st.textDecorationLine, textDecorationStyle: st.textDecorationStyle, letterSpacing: st.letterSpacing, verticalAlign: st.verticalAlign }); if (st.backgroundColor) span.style.backgroundColor = st.backgroundColor; return span; };
-      // Wrap each selected TEXT NODE's portion in its own inline span. Wrapping the
-      // whole multi-block range in ONE span would put a <span> around <p> blocks
-      // and corrupt the document — apply per block instead, like Word.
-      const range = s.getRangeAt(0);
-      const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, { acceptNode: (nn) => range.intersectsNode(nn) ? 1 : 3 });
-      const nodes = []; let node; while ((node = walker.nextNode())) nodes.push(node);
-      nodes.forEach((tn) => {
-        let start = 0, end = tn.nodeValue.length;
-        if (tn === range.startContainer) start = range.startOffset;
-        if (tn === range.endContainer) end = range.endOffset;
-        if (start >= end || !tn.nodeValue.slice(start, end).trim()) return;
-        const r = document.createRange(); r.setStart(tn, start); r.setEnd(tn, end);
-        try { r.surroundContents(makeSpan()); } catch (e) { const sp2 = makeSpan(); sp2.appendChild(r.extractContents()); r.insertNode(sp2); }
-      });
-      E().dirty = true; E().repaginate(); E().updateStatus();
-      if (!painter.sticky) disarmPainter();
-    };
-    E().node.addEventListener('mouseup', painterHandler);
-    if (painterEsc) document.removeEventListener('keydown', painterEsc);
-    painterEsc = (e) => { if (e.key === 'Escape') disarmPainter(); };
-    document.addEventListener('keydown', painterEsc);
   }
 
   // Vertical alignment (sub/superscript) — function decl so H.subscript/H.superscript
@@ -1708,19 +1650,6 @@
       fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));
     });
   }
-  function selectSimilarFormatting() {
-    const sel = window.getSelection(); if (!sel.rangeCount) { WC.toast('Place the cursor in text first.'); return; }
-    let n = sel.anchorNode; n = n && n.nodeType === 3 ? n.parentNode : n;
-    if (!n) return;
-    const cs = getComputedStyle(n);
-    const key = cs.fontWeight + '|' + cs.fontStyle + '|' + cs.fontSize + '|' + cs.fontFamily;
-    const blocks = Array.from(E().node.querySelectorAll('p,h1,h2,h3,h4,li,span'));
-    const matches = blocks.filter((b) => { const c = getComputedStyle(b); return (c.fontWeight + '|' + c.fontStyle + '|' + c.fontSize + '|' + c.fontFamily) === key && b.textContent.trim(); });
-    if (!matches.length) { WC.toast('No similar formatting found.'); return; }
-    const r = document.createRange(); r.setStartBefore(matches[0]); r.setEndAfter(matches[matches.length - 1]);
-    sel.removeAllRanges(); sel.addRange(r);
-    WC.toast('Selected ' + matches.length + ' run(s) with similar formatting.');
-  }
   function findMenu(node) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('Find', { icon: 'find', onClick: () => WC.Dialogs.findPane(false) }));
@@ -1777,62 +1706,14 @@
     });
   }
 
-  function sortSelection(opts) {
-    opts = opts || { ascending: true, numeric: false, header: false };
-    const all = E().selectedBlocks();
-    if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
-    // Only sort sibling blocks that share a parent — reordering across different
-    // containers (e.g. a list item and a following paragraph) would corrupt the
-    // document, so we restrict to the first block's parent. insertBefore is then
-    // always given a ref that is a child of that parent (or null), never throwing.
-    const parent = all[0].parentNode;
-    const blocks = all.filter((b) => b.parentNode === parent);
-    if (blocks.length < 2) { WC.toast('Select multiple paragraphs at the same level to sort.'); return; }
-    const head = opts.header ? blocks.slice(0, 1) : [];
-    const toSort = opts.header ? blocks.slice(1) : blocks;
-    const cmp = (a, b) => {
-      let r;
-      if (opts.numeric) r = (parseFloat(a.textContent) || 0) - (parseFloat(b.textContent) || 0);
-      else r = a.textContent.localeCompare(b.textContent, undefined, { numeric: true, sensitivity: 'base' });
-      return opts.ascending === false ? -r : r;
-    };
-    const sorted = head.concat(toSort.slice().sort(cmp));
-    const ref = blocks[blocks.length - 1].nextSibling; // capture ONCE before moving nodes
-    sorted.forEach((n) => parent.insertBefore(n, ref));
-    E().dirty = true; E().updateStatus();
-  }
-
   function insertPageBreak() {
     E().insertHTML('<div class="manual-break" contenteditable="false" style="break-after:page;page-break-after:always"></div><p><br></p>');
-  }
-  function insertBlankPage() {
-    E().insertHTML('<div class="manual-break blank-page" contenteditable="false" style="break-after:page;page-break-after:always"></div><p><br></p>');
   }
   function insertWordArt() {
     const sel = window.getSelection();
     const txt = (sel && sel.toString()) || 'Your text here';
     WC.PM.xeWordArt(txt, {});
   }
-  function dropCap() {
-    const b = E().selectedBlocks()[0];
-    if (!b || !b.textContent) return;
-    // Wrap only the first character of the first text node, preserving all other
-    // inline formatting (bold/italic/links) in the paragraph.
-    const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT, { acceptNode: (n) => /\S/.test(n.nodeValue) ? 1 : 3 });
-    const first = walker.nextNode();
-    if (!first) return;
-    const ch = first.nodeValue.match(/\S/);
-    if (!ch) return;
-    const idx = first.nodeValue.indexOf(ch[0]);
-    const after = first.splitText(idx);            // after starts at the first non-space char
-    after.splitText(1);                             // isolate that single character
-    const span = el('span');
-    span.setAttribute('style', "float:left;font-size:46pt;line-height:38px;padding-right:6px;font-family:'Calibri Light'");
-    span.textContent = after.nodeValue;
-    after.parentNode.replaceChild(span, after);
-    E().dirty = true; E().repaginate(); E().updateStatus();
-  }
-
   // ---- Layout menus ----
   function setPageVar(name, value) { document.documentElement.style.setProperty(name, value); E().repaginate(); }
   function marginsMenu(node) {
