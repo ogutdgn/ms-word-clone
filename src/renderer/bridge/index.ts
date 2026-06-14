@@ -13,6 +13,7 @@ import { installMailMerge } from './mail'
 import { installDesign } from './design'
 import { installInsertExotica } from './insert-exotica'
 import { installDraw } from './draw'
+import { installInkOverlay } from './ink-overlay'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -181,6 +182,9 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
     w.WC.view = next.view
     w.WC.editor = next
     w.WC.PM.setClean()
+    // slice 10 PR4: re-attach the live-ink overlay to the freshly-mounted #pm-editor + render
+    // the loaded doc's ink (relink() rebuilds the layer against the new view, then renderInk()).
+    try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
   }
   try {
     // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
@@ -404,7 +408,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
