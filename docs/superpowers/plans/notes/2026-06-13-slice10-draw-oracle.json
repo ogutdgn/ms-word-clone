@@ -1,0 +1,40 @@
+{
+  "slice": "10 PR4 — draw (Draw tab) on the PM engine",
+  "date": "2026-06-13",
+  "reference": "Word for Windows 16.0 (COM oracle scripts/oracle/word-oracle-win.ps1, PID-safe, foreground/STA, unsandboxed)",
+  "probes": [
+    "scripts/oracle-probe-slice10-draw-ink.js (Task-1 early gate: single stroke, MODE inline|anchor)",
+    "scripts/oracle-probe-slice10-draw.js (full: 3 strokes + canvas frame)",
+    "scripts/oracle-probe-slice10-draw-legb.js (Word->clone reimport)"
+  ],
+  "constructs": ["ink stroke = real DrawingML freeform (a:custGeom/a:pathLst, moveTo+quadBezTo) + a:ln pen stroke, anchored wp:anchor (floats where drawn)", "Drawing Canvas = real bounded a:prstGeom rect shape + a:ln border"],
+  "earlyGate_task1": {
+    "purpose": "Prove the a:custGeom/wp:anchor blob opens in Word BEFORE building the overlay/flip (the PR3 cover-id lesson — only the COM oracle catches schema-fatal constructs).",
+    "inline": "EXIT=0 (clean) — proves the a:custGeom + a:ln blob is valid",
+    "anchor": "EXIT=0 (clean) — Word preserves a:custGeom/a:pathLst/wp:posOffset/srgbClr on resave",
+    "verdict": "anchor opens clean → kept the best-fidelity default INK_MODE='anchor' (ink floats where drawn)"
+  },
+  "legA": {
+    "verb": "roundtrip clone.docx (3 strokes: black pen, red pen, yellow highlighter + a canvas frame) -> Word resave",
+    "result": "EXIT=0 — Word opened WITHOUT repair and resaved (16975 bytes).",
+    "survivesWordResave": {
+      "a:custGeom (ink freeform)": "6 (3 strokes)",
+      "a:pathLst": 6,
+      "a:quadBezTo": 10,
+      "wp:anchor (floats where drawn)": 6,
+      "a:prstGeom + prst=rect (canvas)": "yes",
+      "C00000 (red pen) + FFFF00 (highlighter)": "both preserved",
+      "a:alpha (highlighter translucency)": "preserved"
+    }
+  },
+  "legB": {
+    "verb": "Word's resaved docx -> PM.openDocx (clone import)",
+    "result": "openDocx=true, importBlanked=false — clone imports Word's own serialization HEALTHY.",
+    "importedNodeTypes": { "vectorShape": 4, "paragraph": 2 },
+    "overlayRendered": "3 (the PM ink overlay rendered all 3 imported strokes from the importer's customGeometry.paths — K3 render-from-paths validated on Word's bytes)",
+    "reExport": { "custGeom": true, "rect": true }
+  },
+  "verdict": "BOTH LEGS PASS. Freehand ink + the canvas frame export real Word-native DrawingML (a:custGeom freeform + prstGeom rect) that opens without repair, survives Word's resave (incl. anchored positioning + the highlighter alpha), and re-imports into the clone healthy + renders. A strict upgrade over the legacy ink (which never exported to .docx).",
+  "gates": "PM 317/317, legacy 257/257 byte-identical, smoke 9/9 x2, roundtrip 27/0, docx 17/0.",
+  "manualVerify": "Live pointer-capture drawing (pointerdown/move/up) is ported from the proven legacy geometry but is not exercisable headlessly; the persist->render path (Task-4 probe) and the import->render path (Leg B) ARE validated programmatically. Recommend a manual draw in `npm start` to confirm the live UX + the page-position mapping (R3)."
+}
