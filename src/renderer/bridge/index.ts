@@ -12,6 +12,8 @@ import { installReferences } from './references'
 import { installMailMerge } from './mail'
 import { installDesign } from './design'
 import { installInsertExotica } from './insert-exotica'
+import { installDraw } from './draw'
+import { installInkOverlay } from './ink-overlay'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -42,7 +44,7 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes', 'insert-exotica']) // slices 1-6 + 8-10
+const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes', 'insert-exotica', 'draw']) // slices 1-6 + 8-10
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -180,6 +182,9 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
     w.WC.view = next.view
     w.WC.editor = next
     w.WC.PM.setClean()
+    // slice 10 PR4: re-attach the live-ink overlay to the freshly-mounted #pm-editor + render
+    // the loaded doc's ink (relink() rebuilds the layer against the new view, then renderInk()).
+    try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
   }
   try {
     // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
@@ -365,6 +370,10 @@ export function preinstallBridge() {
     xeScreenshot: async () => false, xeIcon: () => false, xeOnlinePicture: async () => false,
     xeTextBox: () => false, xeWordArt: () => false, xeOnlineVideo: () => false,
     xeChart: () => false, xeSmartArt: () => false, xeObject: () => false, xeSignatureLine: () => false,
+    // slice 10 PR4: draw pre-mount stubs (replaced by installDraw on mount)
+    dInsertInk: () => false, dInsertCanvas: () => false, dSetDrawing: () => false, dIsDrawing: () => false,
+    dSetEraser: () => false, dSetSelect: () => false, dSetLasso: () => false, dSetPen: () => false,
+    dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -399,7 +408,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

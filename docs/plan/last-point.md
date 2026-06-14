@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-06-13 — Slice 10 PR 4 (draw) DONE: Draw-tab ink FLIPPED to REAL exportable freeform shapes (oracle Leg A+B PASS)
+
+- **Branch:** `feature/phase-2-slice-10-draw` (off `main` after the insert-exotica merge); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 10 PR 4 (draw) DONE → slice 11 (legacy retirement) next** (slice 10 complete: mail-merge · themes · insert-exotica · draw all flipped).
+- **State summary:** area **`draw` FLIPPED** at **maximal real-MS-Word fidelity** — and a STRICT UPGRADE over legacy (whose
+  SVG ink never exported to .docx). Freehand strokes now persist as **real DrawingML freeform shapes**: net-new fork command
+  **`insertInkShape`** + `synthesizeInkDrawing` (`extensions/vector-shape/vector-shape.js`, NOTICE'd) builds a real
+  `a:custGeom`/`a:pathLst` (moveTo + quadBezTo from the smoothed points) + an `a:ln` pen stroke, wrapped **`wp:anchor`** (floats
+  where drawn) on a `vectorShape.drawingContent` blob the existing `translateVectorShape` replays verbatim (zero new exporter
+  code — the WordArt mechanism); docPr id via `generateDocxRandomId` (process-unique, avoids the PR3 cover-id collision class);
+  `VectorShapeView` renders empty for `isInk` (the overlay owns paint). New **`bridge/draw.ts`** (`d*` verbs: dInsertInk,
+  dInsertCanvas [a real bounded `prstGeom rect` shape], dSetDrawing/dIsDrawing/dSetEraser/dSetSelect/dSetLasso/dSetPen/dReplay/
+  dClearInk [non-dirtying tool state], dInkToShape/dInkToMath honest toasts) + new **`bridge/ink-overlay.ts`** (the PM-only live
+  ink overlay: a `.wc-ink-layer` `#pages`-sibling that captures strokes, persists each as a real shape on pointerup, and renders
+  ALL ink from the doc — both freshly-drawn `inkPoints` AND reopened importer `customGeometry.paths`, the K3 render-loss fix).
+  Legacy `WC.Draw`/`commands.js`/`ribbon.js` (incl. the pen-tile dispatch bypass, two-state preserved) re-pointed via `PMA()`
+  (legacy ELSE byte-identical; leak audit clean — the only WC.Draw mutations left are legacy-ELSE arms / pmGuard'd onDocLoad).
+- **Oracle vs Word for Windows 16.0 (PID-safe):** **Leg A+B PASS.** An EARLY Task-1 gate proved the custGeom blob opens in Word
+  (inline + anchor both EXIT=0) BEFORE building the overlay/flip — the PR3 lesson that only the COM oracle catches schema-fatal
+  constructs → kept `INK_MODE='anchor'`. Leg A: Word opens a 3-stroke (black/red/highlighter) + canvas doc **without repair** and
+  **preserves** `a:custGeom`/`a:pathLst`/`wp:anchor` + the pen colors + the **highlighter alpha** + the `prstGeom rect` on resave.
+  Leg B: clone re-imports Word's serialization healthy and the overlay renders all 3 imported strokes (render-from-paths validated
+  on Word's bytes). See `notes/2026-06-13-slice10-draw-oracle.json`.
+- **Done this session (per-commit):** `cd9a22f` critique-hardened plan · `b1dabde` red `[10dr]` tests · `cfeedd1` fork
+  `insertInkShape`+`synthesizeInkDrawing`+`isInk` (+ the early oracle gate) · `cb31e41` fork `VectorShapeView` empty-for-ink ·
+  `fcc43cc` `bridge/draw.ts` + wiring · `35287ef` `bridge/ink-overlay.ts` + CSS + relink · `15feaee` re-point
+  WC.Draw/commands.js/ribbon.js · `942f486` THE FLIP + leak audit · `7a33d0a` oracle probes + verdict.
+- **Gates:** PM **317/317**, legacy **257/257 byte-identical**, smoke **9/9 ×2**, roundtrip **27/0**, docx **17/0**.
+- **Deferrals recorded (deferrals.md):** real InkML `w14:contentPart` ink (net-new, no oracle); real `wpc:wpc` Drawing Canvas
+  (degraded to a real rect frame); inkToShape/inkToMath; `arcTo` in custGeom (parser drops it; the smoother never emits arcs);
+  highlighter = fat translucent freeform (not Word's true highlighter fill). **Manual-verify note:** live pointer-capture
+  drawing is ported from the proven legacy geometry but can't be exercised headlessly — recommend a manual draw in `npm start`.
+- **Next:** PR into `main`, merge, delete branch, refresh graph (/graphify). Then **slice 11 (legacy retirement)**.
+
 ## 2026-06-13 — Slice 10 PR 3 (insert-exotica) DONE: Insert-tab exotica FLIPPED at real-Word fidelity (oracle Leg A+B PASS)
 
 - **Branch:** `feature/phase-2-slice-10-insert-exotica` (off `main` after the themes merge); **PR pending** into `main`.

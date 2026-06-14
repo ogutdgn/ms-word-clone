@@ -200,11 +200,15 @@
         const pens = (draw.PENS || []).concat(draw.customPens || []);
         pens.forEach((pen) => {
           const tile = el('div', { class: 'pen-tile', title: pen.name });
-          const active = draw.pen && draw.pen.id === pen.id && draw.enabled;
+          const pmA = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+          // PM mode: the highlight reflects PM drawing state (the overlay owns ink); legacy ELSE byte-identical.
+          const active = pmA ? (pmA.dIsDrawing() && draw.pen && draw.pen.id === pen.id) : (draw.pen && draw.pen.id === pen.id && draw.enabled);
           if (active) tile.classList.add('active');
           tile.appendChild(el('span', { class: 'pen-swatch', style: { background: pen.color, opacity: String(pen.opacity), height: Math.max(3, Math.min(14, pen.width)) + 'px' } }));
           tile.addEventListener('mousedown', (e) => e.preventDefault());
           tile.addEventListener('click', () => {
+            const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+            if (pm) { const active = pm.dIsDrawing() && WC.Draw.pen && WC.Draw.pen.id === pen.id; pm.dSetPen(pen); pm.dSetDrawing(!active); render(); return; }
             if (draw.pen && draw.pen.id === pen.id && draw.enabled) { draw.toggle(); } // second click toggles drawing off
             else { draw.setPen(pen); }
             render();

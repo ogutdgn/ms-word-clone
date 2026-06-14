@@ -206,6 +206,20 @@
 .ink-stroke.sel { filter: drop-shadow(0 0 2px #2B579A); }
 #editor .wc-draw-canvas { position: relative; }
 
+/* ---- Slice 10 PR4: PM-only live-ink overlay (ink-overlay.ts). The <svg.wc-ink-layer>
+   mounts as a child of #pages (a SIBLING of #pm-editor — NOT inside the PM-reconciled
+   content), absolutely positioned over the page sheet via inline left/top/width/height.
+   pointer-events only while a draw/erase/select/lasso tool is active (.pm-ink-active).
+   The Hide-Ink toggle (track-chrome-pm.css ships #pm-editor.pm-hide-ink .wc-ink-layer)
+   targets a layer INSIDE #pm-editor; this overlay is a sibling, so consume the same latch
+   via a general-sibling combinator (NOT a duplicate of the descendant rule). ---- */
+body.pm-active .wc-ink-layer { position: absolute; z-index: 5; pointer-events: none; overflow: visible; }
+body.pm-active .wc-ink-layer.pm-ink-active { pointer-events: auto; cursor: crosshair; }
+body.pm-active #pm-editor.pm-hide-ink ~ .wc-ink-layer { display: none; }
+.wc-ink-layer .pm-ink-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
+.wc-ink-layer .pm-ink-stroke.sel { outline: 1px dashed #2b579a; filter: drop-shadow(0 0 2px #2B579A); }
+.wc-ink-layer .pm-ink-lasso { fill: rgba(43, 87, 154, 0.08); stroke: #2b579a; stroke-width: 1; stroke-dasharray: 4 3; }
+
 /* Design: page border overlay (inset within margins) + style sets */
 #editor .wc-page-border { position: absolute; top: 48px; left: 48px; right: 48px; bottom: 48px; pointer-events: none; z-index: 1; }
 #editor.styleset-lines-distinctive- h1, #editor.styleset-lines-distinctive- h2 { border-bottom: 2px solid currentColor; padding-bottom: 2px; }

@@ -26,7 +26,13 @@ Pen = round opaque stroke; Pencil = thin; Highlighter = wide, translucent (opaci
 - ❌ **Ink Replay** — stroke-timeline animation — documented stub
 
 ## Notes
-- **Persistence:** strokes are an `<svg class="ink-layer" contenteditable="false">` inside the document, so they save with `.html`. (`.docx` export via html-to-docx may drop inline SVG ink — a library limitation.)
+- **Persistence (PM mode, slice-10 PR4 — the active engine):** strokes are now **real DrawingML freeform shapes** in the
+  document. The Draw tab is flipped onto the PM engine: each stroke persists as a `vectorShape` carrying a real
+  `a:custGeom`/`a:pathLst` (+ `a:ln` pen stroke, `wp:anchor` floats-where-drawn) that **EXPORTS to .docx and round-trips Word**
+  (oracle Leg A+B PASS — `notes/2026-06-13-slice10-draw-oracle.json`). The Drawing Canvas is a real bounded `prstGeom` rect.
+  A PM-only `.wc-ink-layer` overlay captures live strokes + renders the persisted ink (fresh `inkPoints` AND reopened
+  importer `customGeometry.paths`). Real InkML `w14:contentPart` + real `wpc:wpc` canvas are deferred (see `docs/plan/deferrals.md`).
+- **Persistence (legacy `--legacy` mode only):** strokes are an `<svg class="ink-layer" contenteditable="false">` inside `#editor`, saved with `.html`; `.docx` export via html-to-docx drops the inline SVG ink (a library limitation — the reason PR4's PM-mode real export is a strict upgrade).
 ## Real-Word validation (`draw_probe.ps1`)
 
 What was actually checked against the user's real Word via COM:

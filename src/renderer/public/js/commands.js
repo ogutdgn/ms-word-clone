@@ -494,11 +494,11 @@
   }
 
   // ---- Draw tab ----
-  H.drawing = () => WC.Draw.toggle();
+  H.drawing = () => { const pm = PMA(); if (pm) { pm.dSetDrawing(!pm.dIsDrawing()); return; } WC.Draw.toggle(); };
   H.pensGallery = (c, node) => pensMenu(node);
   H.addPen = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyHeader('Add'));
-    const add = (type, name, color, width, opacity) => fly.appendChild(WC.flyItem(name, { onClick: () => { const pen = { id: type + '-' + (WC.Draw.customPens.length + 1), name, color, width, opacity, type }; WC.Draw.customPens.push(pen); WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } }));
+    const add = (type, name, color, width, opacity) => fly.appendChild(WC.flyItem(name, { onClick: () => { const pen = { id: type + '-' + (WC.Draw.customPens.length + 1), name, color, width, opacity, type }; WC.Draw.customPens.push(pen); const pm = PMA(); if (pm) { pm.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); return; } WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } }));
     add('pen', 'Pen', '#000000', 3, 1);
     add('pencil', 'Pencil', '#5b5b5b', 2, 0.85);
     add('highlighter', 'Highlighter', '#ffff00', 14, 0.4);
@@ -507,26 +507,26 @@
     fly.appendChild(WC.flyItem('Custom Pen…', { onClick: () => addPenDialog(node) }));
   });
   H.drawWithTrackpad = (c, node) => { if (node) node.classList.toggle('toggled'); WC.toast('Mouse/trackpad input is used for drawing in this clone.'); };
-  H.eraser = (c, node) => { WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); };
-  H.selectObjects = () => { WC.Draw.setEnabled(true); WC.Draw.setTool('select'); };
-  H.lassoSelect = () => { WC.Draw.setEnabled(true); WC.Draw.setTool('lasso'); };
-  H.drawingCanvas = () => WC.Draw.insertCanvas();
+  H.eraser = (c, node) => { const pm = PMA(); if (pm) { pm.dSetEraser(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); };
+  H.selectObjects = () => { const pm = PMA(); if (pm) { pm.dSetSelect(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('select'); };
+  H.lassoSelect = () => { const pm = PMA(); if (pm) { pm.dSetLasso(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('lasso'); };
+  H.drawingCanvas = () => { const pm = PMA(); if (pm) { pm.dInsertCanvas(); return; } WC.Draw.insertCanvas(); };
   H.inkToShape = () => WC.toast('Ink-to-Shape recognition is a handwriting/shape ML feature — not implemented.', 'See docs/NOT_IMPLEMENTED.md');
   H.inkToMath = () => WC.toast('Ink-to-Math (handwritten equation recognition) is not implemented.', 'See docs/NOT_IMPLEMENTED.md');
-  H.inkReplay = () => WC.Draw.replay();
+  H.inkReplay = () => { const pm = PMA(); if (pm) { pm.dReplay(); return; } WC.Draw.replay(); };
 
   function pensMenu(node) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Pens'));
       WC.Draw.PENS.concat(WC.Draw.customPens).forEach((pen) => {
-        const it = WC.flyItem(pen.name, { onClick: () => WC.Draw.setPen(pen) });
+        const it = WC.flyItem(pen.name, { onClick: () => { const pm = PMA(); if (pm) { pm.dSetPen(pen); return; } WC.Draw.setPen(pen); } });
         it.insertBefore(el('span', { style: { width: '24px', height: '4px', borderRadius: '2px', background: pen.color, opacity: pen.opacity, marginRight: '8px' } }), it.firstChild);
         fly.appendChild(it);
       });
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Add Pen…', { onClick: () => addPenDialog(node) }));
-      fly.appendChild(WC.flyItem(WC.Draw.enabled ? 'Stop Drawing' : 'Start Drawing', { onClick: () => WC.Draw.toggle() }));
-      fly.appendChild(WC.flyItem('Clear All Ink', { onClick: () => WC.Draw.clearAll() }));
+      fly.appendChild(WC.flyItem(WC.Draw.enabled ? 'Stop Drawing' : 'Start Drawing', { onClick: () => { const pm = PMA(); if (pm) { pm.dSetDrawing(!pm.dIsDrawing()); return; } WC.Draw.toggle(); } }));
+      fly.appendChild(WC.flyItem('Clear All Ink', { onClick: () => { const pm = PMA(); if (pm) { pm.dClearInk(); return; } WC.Draw.clearAll(); } }));
     });
   }
   function addPenDialog(node) {
@@ -535,7 +535,7 @@
     swatch.addEventListener('click', () => WC.flyout(swatch, (f) => f.appendChild(WC.colorPalette((c) => { color = c === 'inherit' ? '#000' : c; swatch.style.color = color; }))));
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Color:', style: { width: '60px' } }), swatch]), el('div', { class: 'row' }, [el('label', { text: 'Thickness:', style: { width: '60px' } }), width])]);
     WC.dialog({ title: 'Add Pen', width: '360px', body, footer: [
-      { label: 'Add', primary: true, onClick: () => { const pen = { id: 'custom-' + (WC.Draw.customPens.length + 1), name: 'Custom Pen', color, width: parseFloat(width.value), opacity: 1 }; WC.Draw.customPens.push(pen); WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } },
+      { label: 'Add', primary: true, onClick: () => { const pen = { id: 'custom-' + (WC.Draw.customPens.length + 1), name: 'Custom Pen', color, width: parseFloat(width.value), opacity: 1 }; WC.Draw.customPens.push(pen); const pm = PMA(); if (pm) { pm.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); return; } WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } },
       { label: 'Cancel' },
     ] });
   }
@@ -1420,14 +1420,14 @@
       if (cmd === 'pensGallery') return pensMenu(node);
       if (cmd === 'eraser') return WC.flyout(node, (fly) => {
         fly.appendChild(WC.flyHeader('Eraser'));
-        const setEraser = (radius, mode) => { WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); WC.Draw.eraseRadius = radius; WC.Draw.eraseMode = mode; };
+        const setEraser = (radius, mode) => { const pm = PMA(); if (pm) { pm.dSetEraser(radius, mode); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); WC.Draw.eraseRadius = radius; WC.Draw.eraseMode = mode; };
         fly.appendChild(WC.flyItem('Stroke Eraser', { onClick: () => setEraser(10, 'stroke') }));
         fly.appendChild(WC.flyItem('Small Eraser', { onClick: () => setEraser(6, 'point') }));
         fly.appendChild(WC.flyItem('Medium Eraser', { onClick: () => setEraser(12, 'point') }));
         fly.appendChild(WC.flyItem('Large Eraser', { onClick: () => setEraser(24, 'point') }));
         fly.appendChild(WC.flyItem('Segment Eraser', { onClick: () => setEraser(8, 'segment') }));
         fly.appendChild(WC.flySep());
-        fly.appendChild(WC.flyItem('Erase All Ink', { onClick: () => WC.Draw.clearAll() }));
+        fly.appendChild(WC.flyItem('Erase All Ink', { onClick: () => { const pm = PMA(); if (pm) { pm.dClearInk(); return; } WC.Draw.clearAll(); } }));
       });
       // Design tab
       if (cmd === 'themes' || cmd === 'styleSet' || cmd === 'colors' || cmd === 'fonts' || cmd === 'paragraphSpacing' || cmd === 'effects' || cmd === 'watermark') return H[cmd](control, node);
@@ -1881,7 +1881,7 @@
     if (pm) {
       WC.flyout(node, (fly) => {
         fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => pm.selectAll() }));
-        fly.appendChild(WC.flyItem('Select Objects', { onClick: () => WC.toast('Select Objects arrives with the Draw engine re-host (slice 10).') }));
+        fly.appendChild(WC.flyItem('Select Objects', { onClick: () => pm.dSetSelect() }));
         fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => { if (!pm.selectSimilarFormatting()) WC.toast('Place the cursor in text first.'); } }));
         fly.appendChild(WC.flySep());
         fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));

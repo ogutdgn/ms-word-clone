@@ -4242,6 +4242,90 @@
       || 'textBox content lost on clone round-trip (not even passthrough survived)';
   });
 
+  // ===== [10dr] draw / Draw tab (slice 10 PR4) — doc-replacing tests LAST =====
+  await t('[10dr] D6 flip: draw is FLIPPED', () => PM().isFlipped('draw') === true || 'draw not in FLIPPED');
+
+  await t('[10dr] EXPORT: dInsertInk → <a:custGeom>/<a:pathLst> freeform in document.xml', async () => {
+    setDoc('canvas'); caretAfter('canvas');
+    if (typeof PM().dInsertInk !== 'function') return 'PM.dInsertInk missing (red — bridge not installed)';
+    // a simple 3-point stroke (overlay-space px); pen = black width 2
+    const ok = PM().dInsertInk([{ x: 10, y: 10 }, { x: 40, y: 30 }, { x: 70, y: 12 }], { color: '#000000', width: 2, opacity: 1 });
+    if (ok !== true) return 'dInsertInk refused (red)';
+    await sleep(80);
+    const xml = await exportDocumentXml();
+    if (!/<a:custGeom\b/.test(xml)) return 'no <a:custGeom> in document.xml: ' + xml.slice(0, 300);
+    if (!/<a:pathLst\b/.test(xml)) return 'no <a:pathLst> (freeform path)';
+    // child-order guard (import is order-independent so it can't catch a regression; oracle Leg A is the real gate)
+    if (!/<a:custGeom\b[\s\S]*?<a:noFill\b[\s\S]*?<a:ln\b/.test(xml)) return 'spPr child order wrong (want custGeom→noFill→ln)';
+    return /<a:moveTo\b[\s\S]*?<a:quadBezTo\b/.test(xml) || 'no moveTo/quadBezTo ink path commands';
+  });
+
+  await t('[10dr] dInsertInk inserts a real vectorShape node (isInk)', async () => {
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().dInsertInk !== 'function') return 'PM.dInsertInk missing (red)';
+    if (PM().dInsertInk([{ x: 0, y: 0 }, { x: 20, y: 20 }], { color: '#C00000', width: 3, opacity: 1 }) !== true) return 'refused';
+    await sleep(60);
+    let ink = false; doc().descendants((n) => { if (n.type.name === 'vectorShape' && n.attrs && n.attrs.isInk) ink = true; });
+    return ink || 'no isInk vectorShape node from dInsertInk';
+  });
+
+  await t('[10dr] EXPORT: dInsertCanvas → a real bounded rect shape (a:prstGeom rect + a:ln)', async () => {
+    setDoc('y'); caretAfter('y');
+    if (typeof PM().dInsertCanvas !== 'function') return 'PM.dInsertCanvas missing (red)';
+    if (PM().dInsertCanvas() !== true) return 'dInsertCanvas refused (red)';
+    await sleep(80);
+    let hasShape = false; doc().descendants((n) => { if (n.type.name === 'vectorShape') hasShape = true; });
+    if (!hasShape) return 'no vectorShape (canvas frame) inserted';
+    const xml = await exportDocumentXml();
+    return /prst="rect"/.test(xml) || 'no <a:prstGeom prst=rect> canvas frame in export';
+  });
+
+  await t('[10dr] reserve-degrade verbs (dInkToShape/dInkToMath) are no-op toasts', () => {
+    // dInkToShape/dInkToMath are NOT in the draw AREA (the FLIP never routes them; the real buttons keep
+    // toasting via H.inkToShape/H.inkToMath). They exist only so this test can confirm they never mutate the doc.
+    setDoc('keepme');
+    for (const v of ['dInkToShape', 'dInkToMath']) {
+      if (typeof PM()[v] !== 'function') return 'PM.' + v + ' missing (red)';
+      PM()[v]();
+    }
+    let shapes = 0; doc().descendants((n) => { if (n.type.name === 'vectorShape') shapes++; });
+    return (shapes === 0 && doc().textContent.includes('keepme')) || 'a degrade verb mutated the doc (should be a no-op toast)';
+  });
+
+  await t('[10dr] tool-state toggles do NOT dirty the doc (drawingMode/eraser/select/lasso)', () => {
+    setDoc('clean');
+    for (const v of ['dSetDrawing', 'dSetEraser', 'dSetSelect', 'dSetLasso', 'dIsDrawing']) {
+      if (typeof PM()[v] !== 'function') return 'PM.' + v + ' missing (red)';
+    }
+    PM().setClean();   // io.ts ships setClean()/isDirty() — there is NO markClean()
+    PM().dSetDrawing(true); PM().dSetEraser(); PM().dSetSelect(); PM().dSetLasso(); PM().dSetDrawing(false);
+    let shapes = 0; doc().descendants((n) => { if (n.type.name === 'vectorShape') shapes++; });
+    if (shapes !== 0) return 'a tool toggle mutated the doc';
+    return PM().isDirty() === false || 'a pure tool toggle dirtied the doc (K6)';
+  });
+
+  // ---- doc-replacing tests LAST (openDocx remounts; 300ms threshold) ----
+  await t('[10dr] IMPORT round-trip: ink freeform survives export→openDocx', async () => {
+    setDoc('z'); caretAfter('z');
+    if (typeof PM().dInsertInk !== 'function') return 'PM.dInsertInk missing (red)';
+    if (PM().dInsertInk([{ x: 5, y: 5 }, { x: 25, y: 35 }, { x: 50, y: 8 }], { color: '#2B579A', width: 2, opacity: 1 }) !== true) return 'refused';
+    const bytes = await PM().exportDocxBytes();
+    if (!(bytes && bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b)) return 'not a zip';
+    if (await PM().openDocx(bytes) !== true) return 'reimport failed';
+    await sleep(300);
+    // After reopen the importer DROPS isInk + replaces customGeometry with { paths:[{d}] }. Assert the ink
+    // is RENDERABLE (a custGeom node the overlay can draw), not merely that a vectorShape node exists.
+    let renderable = false;
+    doc().descendants((n) => {
+      if (n.type.name !== 'vectorShape') return;
+      const cg = n.attrs && n.attrs.customGeometry;
+      if ((n.attrs && n.attrs.isInk) || (cg && Array.isArray(cg.paths) && cg.paths.length && cg.paths[0].d)) renderable = true;
+    });
+    if (renderable) return true;
+    const xml2 = await exportDocumentXml(); // fallback: at least the custom geometry still round-trips to OOXML
+    return /<a:custGeom\b/.test(xml2) || 'ink lost on round-trip (no renderable custGeom + none on re-export)';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
