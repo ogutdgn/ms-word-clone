@@ -179,7 +179,24 @@
 > merge resolver vs preview; checkErrors name read) — fixed in `e9e2242`. ⚠️ Ledger: rule-field IF
 > operator semantics (C) · composite-import placeholder (C) · envelopes/labels page geometry (A).
 >
-> **Slice 10 PR 3 (insert-exotica) is DONE** (`feature/phase-2-slice-10-insert-exotica`, PR pending): area
+> **Slice 10 PR 4 (draw) is DONE** (`feature/phase-2-slice-10-draw`, PR pending): area **`draw` FLIPPED** at MAXIMAL
+> real-MS-Word fidelity — a STRICT UPGRADE over legacy (whose SVG ink never exported to .docx). Freehand strokes persist as
+> REAL DrawingML freeform shapes: net-new fork `insertInkShape` + `synthesizeInkDrawing` (a:custGeom/a:pathLst moveTo+quadBezTo
+> + a:ln pen stroke, wp:anchor floats-where-drawn, on a vectorShape.drawingContent blob the existing translateVectorShape
+> replays — zero new exporter code, the WordArt mechanism; docPr id via generateDocxRandomId); `VectorShapeView` empty-for-isInk.
+> New `bridge/draw.ts` (d* verbs incl. dInsertCanvas = a real prstGeom rect frame; non-dirtying tool state) + `bridge/ink-overlay.ts`
+> (a `.wc-ink-layer` #pages-sibling overlay: captures strokes, persists each as a real shape on pointerup, renders ALL ink from
+> the doc — fresh inkPoints AND reopened importer customGeometry.paths). Legacy WC.Draw/commands.js/ribbon.js re-pointed (pen-tile
+> bypass + two-state; legacy byte-identical; leak audit clean). Gates (six): **PM 317/317**, legacy 257, smoke 9/9 × 2,
+> roundtrip 27/0, docx 17/0. Oracle vs Word 16 **Leg A+B PASS**: an EARLY Task-1 gate proved the custGeom blob opens in Word
+> (inline+anchor) BEFORE the flip (the PR3 lesson) → kept INK_MODE='anchor'; Leg A Word opens a 3-stroke+canvas doc without repair
+> + preserves custGeom/wp:anchor/pen-colors/highlighter-alpha/prstGeom-rect on resave; Leg B clone re-imports Word's serialization
+> healthy + the overlay renders all 3 imported strokes. `notes/2026-06-13-slice10-draw-oracle.json`. ⚠️ Ledger: real InkML
+> w14:contentPart + real wpc:wpc canvas deferred (net-new); inkToShape/inkToMath honest toasts; arcTo dropped; highlighter =
+> translucent freeform; live pointer-capture needs a manual `npm start` draw to confirm.
+> **Next: slice 11 = legacy retirement** (slice 10 complete).
+>
+> **Slice 10 PR 3 (insert-exotica) is DONE** (`feature/phase-2-slice-10-insert-exotica`, merged): area
 > **`insert-exotica` FLIPPED** at MAXIMAL real-MS-Word fidelity. The 14 exotic Insert commands dispatch to the
 > new **`bridge/insert-exotica.ts`** (15 `xe*` verbs): dropCap = real `w:framePr`; coverPage = real `w:sdt`
 > docPartObj (replace-existing); dateTime/quickParts = real `DATE`/`AUTHOR`/… `w:fldChar` fields
@@ -239,6 +256,24 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-13 (Phase 2 — slice 10 PR 4: draw)
+- [x] **Orient + deep pre-verification** (ultracode 4-agent fan-out + synthesis): mapped the 8 draw cmds, the fork ink
+  capability (real a:custGeom freeform achievable TODAY via the WordArt replay path; real InkML w14:contentPart + wpc:wpc canvas
+  are net-new/out-of-scope), the dispatch+leak surface (incl. the ribbon pen-tile bypass), the render gap, and the export baseline.
+- [x] **User scope decisions** (AskUserQuestion): real custGeom ink · full live ink chrome · real canvas frame.
+- [x] **Critique-hardened plan** (`cd9a22f`) — 3-critic adversarial pass folded in: the reopened-ink render-loss (importer drops
+  isInk + overwrites customGeometry → overlay renders from .paths too), missing dIsDrawing/dClearInk verbs, the pre-wired
+  .wc-ink-layer Hide-Ink rule, buggy bbox math, and an EARLY Task-1 oracle gate.
+- [x] **Subagent-driven execution (Tasks 0–6)**: `b1dabde` red [10dr] · `cfeedd1` fork insertInkShape (+ early oracle gate:
+  inline+anchor both open clean → INK_MODE='anchor') · `cb31e41` VectorShapeView empty-for-isInk · `fcc43cc` bridge/draw.ts ·
+  `35287ef` bridge/ink-overlay.ts (headless render probe: persisted ink renders) · `15feaee` re-point (legacy 257 byte-identical) ·
+  `942f486` THE FLIP + leak audit.
+- [x] **Six gates**: PM **317/317**, legacy **257/257 byte-identical**, smoke 9/9 ×2, roundtrip 27/0, docx 17/0.
+- [x] **Oracle vs Word 16** (`7a33d0a`, `notes/2026-06-13-slice10-draw-oracle.json`): Leg A — Word opens 3-stroke + canvas
+  without repair + preserves custGeom/wp:anchor/colors/highlighter-alpha/rect on resave; Leg B — clone re-imports Word's
+  serialization healthy + the overlay renders all 3 imported strokes. **Both legs PASS.**
+- [x] **Checkpoint + PR** (this entry). **Next:** slice 11 = legacy retirement.
 
 ### 2026-06-13 (Phase 2 — slice 10 PR 3: insert-exotica)
 - [x] **Orient + deep fork pre-verification** (5-agent + 3-agent verbatim gather): textBox is much cheaper than
