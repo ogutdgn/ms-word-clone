@@ -3924,7 +3924,7 @@
     if (/«FirstName»/.test(html)) return 'merged html kept the «FirstName» placeholder';
     return /Alice/.test(html) || 'merged html does not contain the record value Alice';
   });
-  await t('[10mm] D6 flip: mail-merge is FLIPPED', () => PM().isFlipped('mail-merge') === true || 'mail-merge not in FLIPPED');
+  await t('[10mm] D6: mail-merge is on the PM engine (not deferred)', () => PM().isBlocked('startMailMerge') === false || 'startMailMerge is D6-blocked (should be on PM engine)');
   await t('[10mm] merge resolver matches preview (_val: «Last_Name» field over a LastName column)', () => {
     // Regression (task-5 review): PM preview resolves via _val (squashed-name match);
     // the Finish&Merge resolver must too, else «Last_Name» over a LastName column
@@ -3957,7 +3957,7 @@
   });
 
   // ===== [10th] themes / Design tab (slice 10 PR2) — doc-replacing tests LAST =====
-  await t('[10th] D6 flip: themes is FLIPPED', () => PM().isFlipped('themes') === true || 'themes not in FLIPPED');
+  await t('[10th] D6: themes is on the PM engine (not deferred)', () => PM().isBlocked('themes') === false || 'themes is D6-blocked (should be on PM engine)');
 
   await t('[10th] EXPORT: deApplyTheme redefines Heading1 with literal w:rFonts ascii + w:color val in styles.xml', async () => {
     setDocs(['Heading One', 'body text']);
@@ -4109,7 +4109,7 @@
   });
 
   // ===== [10ex] insert-exotica (slice 10 PR3) — doc-replacing tests LAST =====
-  await t('[10ex] D6 flip: insert-exotica is FLIPPED', () => PM().isFlipped('insert-exotica') === true || 'insert-exotica not in FLIPPED');
+  await t('[10ex] D6: insert-exotica is on the PM engine (not deferred)', () => PM().isBlocked('coverPage') === false || 'coverPage is D6-blocked (should be on PM engine)');
 
   await t('[10ex] EXPORT: xeDropCap → <w:framePr w:dropCap> in document.xml', async () => {
     setDocs(['Dropped capital paragraph here', 'body']); caretAfter('Dropped');
@@ -4227,7 +4227,7 @@
   });
 
   // ===== [10dr] draw / Draw tab (slice 10 PR4) — doc-replacing tests LAST =====
-  await t('[10dr] D6 flip: draw is FLIPPED', () => PM().isFlipped('draw') === true || 'draw not in FLIPPED');
+  await t('[10dr] D6: draw is on the PM engine (not deferred)', () => PM().isBlocked('drawing') === false || 'drawing is D6-blocked (should be on PM engine)');
 
   await t('[10dr] EXPORT: dInsertInk → <a:custGeom>/<a:pathLst> freeform in document.xml', async () => {
     setDoc('canvas'); caretAfter('canvas');

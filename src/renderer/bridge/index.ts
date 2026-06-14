@@ -41,10 +41,12 @@ let replacing = false
 // would let Ctrl+S write a blank over the old file (spec §5.3 data loss).
 let lastImportBlanked = false
 
-// ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
+// ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the Phase-7 deferred set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
-// Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes', 'insert-exotica', 'draw']) // slices 1-6 + 8-10
+// Single-world (slice 11+): all areas are permanently on the PM engine. The only
+// meaningful distinction is the Phase-7 DEFERRED areas (layout/header/text-effects)
+// whose engine support is pending pagination — isBlocked honestly blocks those.
+const DEFERRED = new Set<string>(['text-effects', 'layout-page', 'layout-arrange', 'header-footer']) // Phase-7-deferred areas (not yet on the PM engine)
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -74,7 +76,7 @@ const AREA: Record<string, string> = {
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
   horizontalLine: 'insert-basics', pictures: 'insert-basics',
   // Table Tools (Table Layout + Table Design contextual tabs, slice 6 Task 10) — mapped
-  // to insert-basics (FLIPPED) so the dispatch audit stays honest and they un-block.
+  // to insert-basics so the dispatch audit stays honest and they are not deferred.
   tblInsertAbove: 'insert-basics', tblInsertBelow: 'insert-basics', tblInsertLeft: 'insert-basics',
   tblInsertRight: 'insert-basics', tblDeleteRow: 'insert-basics', tblDeleteColumn: 'insert-basics',
   tblDeleteTable: 'insert-basics', tblMerge: 'insert-basics', tblSplitCell: 'insert-basics',
@@ -139,8 +141,7 @@ const AREA: Record<string, string> = {
   docInfo: 'header-footer', differentFirstPage: 'header-footer', differentOddEven: 'header-footer',
   showDocText: 'header-footer', dateAndTime: 'header-footer', linkToPrevious: 'header-footer',
 }
-function isFlipped(area: string) { return FLIPPED.has(area) }
-function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.has(a) }
+function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
 // SAFETY: validate + PARSE before any teardown — a corrupt file must leave the
@@ -268,8 +269,7 @@ export function preinstallBridge() {
     ready: false,
     notifyBlocked,
     isBlocked,   // D6 §7.1a — consulted by the WC.Commands dispatch heads (Task 4B)
-    isFlipped,
-    AREA, FLIPPED, // exposed for tests/audit
+    AREA, DEFERRED, // exposed for tests/audit
     cmd: () => false,
     chain: () => false,
     getState: () => null,
