@@ -4,7 +4,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
   const D = {};
 
@@ -34,12 +33,7 @@
         WC.toast('Rows and columns must be whole numbers between 1 and 1000.');
         return false; // keep dialog open
       }
-      const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-      if (pm) { pm.insertTable({ rows, cols }); return true; }
-      let html = '<table><tbody>';
-      for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td><br></td>'; html += '</tr>'; }
-      html += '</tbody></table><p><br></p>';
-      E().insertHTML(html);
+      WC.PM.insertTable({ rows, cols }); return true;
     }
     const dlg = WC.dialog({ title: 'Insert Table', body, footer: [
       { label: 'OK', primary: true, onClick: () => build(+document.getElementById('trows').value, +document.getElementById('tcols').value) === false },
@@ -49,8 +43,7 @@
 
   // ---- Insert Link ----
   D.insertLink = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) pm.captureSelection(); // dialog steals focus; restore selection before inserting
+    if (WC.PM.ready) WC.PM.captureSelection(); // dialog steals focus; restore selection before inserting
     const sel = window.getSelection();
     const selText = sel && !sel.isCollapsed ? sel.toString() : '';
     const text = el('input', { type: 'text', value: selText, class: 'grow' });
@@ -63,10 +56,7 @@
       { label: 'OK', primary: true, onClick: () => {
         const raw = addr.value.trim(); if (!raw) return;
         const label = text.value.trim() || raw;
-        const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-        if (pm2) { pm2.insertLink({ href: raw, text: label }); return; }
-        const url = WC.safeUrl(raw);
-        E().insertHTML(`<a href="${WC.escapeHtml(url)}">${WC.escapeHtml(label)}</a>&nbsp;`);
+        WC.PM.insertLink({ href: raw, text: label });
       } },
       { label: 'Cancel' },
     ] });
@@ -81,9 +71,7 @@
         const cell = el('div', { text: s, style: { height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px', border: '1px solid #eee' } });
         cell.addEventListener('click', () => {
           WC.closeFlyouts();
-          const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-          if (pm) { pm.insertSymbol(s); return; }
-          E().insertHTML(s);
+          WC.PM.insertSymbol(s);
         });
         grid.appendChild(cell);
       });
@@ -103,116 +91,17 @@
     WC.dialog({ title: 'Insert Equation', width: '520px', body, footer: [
       { label: 'Insert', primary: true, onClick: () => {
         if (!ta.value.trim()) return;
-        const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-        if (pm) { pm.insertEquation(ta.value.trim()); return; }
-        E().insertHTML(`<span style="font-family:'Cambria Math',Cambria,serif;font-style:italic">${WC.escapeHtml(ta.value.trim())}</span>&nbsp;`);
+        WC.PM.insertEquation(ta.value.trim());
       } },
       { label: 'Cancel' },
     ] });
   };
 
   // ---- Find & Replace pane ----
-  let findState = { hits: [], idx: -1 };
+  // Drives the fork Search extension (non-destructive decoration highlights).
   D.findPane = function (replace, advanced) {
-    // PM mode (slice 5): drive the fork Search extension (non-destructive
-    // decoration highlights) instead of the legacy .find-hit TreeWalker rewrite.
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) return pmFindPane(replace, advanced, pm);
-    // ---- legacy arm (unchanged, byte-identical — frozen for --legacy) ----
-    clearHits();
-    let pane = document.getElementById('find-pane');
-    if (pane) pane.remove();
-    pane = el('div', { class: 'taskpane', id: 'find-pane' });
-    const input = el('input', { type: 'text', placeholder: 'Find in document' });
-    const replInput = el('input', { type: 'text', placeholder: 'Replace with' });
-    const counter = el('div', { style: { fontSize: '12px', color: '#666', padding: '4px 0' } });
-    const head = el('div', { class: 'tp-head' }, [
-      el('div', { class: 'tp-title', text: replace ? 'Replace' : 'Navigation' }),
-      el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => { clearHits(); pane.remove(); } }),
-    ]);
-    const body = el('div', { class: 'tp-body' });
-    const search = el('div', { class: 'tp-search' }, [input, el('span', { class: 'go', html: WC.icon('search', 14), onclick: () => doFind() })]);
-    body.appendChild(search);
-    body.appendChild(counter);
-    const nav = el('div', { class: 'row', style: { gap: '6px' } }, [
-      el('button', { class: 'btn', text: '▲ Prev', onclick: () => step(-1) }),
-      el('button', { class: 'btn', text: 'Next ▼', onclick: () => step(1) }),
-    ]);
-    body.appendChild(nav);
-    if (replace) {
-      body.appendChild(el('div', { class: 'tp-search', style: { marginTop: '8px' } }, [replInput]));
-      body.appendChild(el('div', { class: 'row', style: { gap: '6px' } }, [
-        el('button', { class: 'btn', text: 'Replace', onclick: () => doReplace(false) }),
-        el('button', { class: 'btn primary', text: 'Replace All', onclick: () => doReplace(true) }),
-      ]));
-    }
-    pane.appendChild(head); pane.appendChild(body);
-    document.getElementById('workarea').appendChild(pane);
-    input.focus();
-
-    let timer;
-    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doFind, 200); });
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); step(1); } });
-
-    function doFind() {
-      clearHits();
-      const term = input.value;
-      if (!term) { counter.textContent = ''; return; }
-      const re = new RegExp(escapeRe(term), 'gi');
-      const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, { acceptNode: (n) => /\S/.test(n.nodeValue) && !n.parentElement.closest('.pagebreak-guide') ? 1 : 2 });
-      const textNodes = []; let n;
-      while ((n = walker.nextNode())) textNodes.push(n);
-      textNodes.forEach((node) => {
-        const txt = node.nodeValue; let m, last = 0; const frag = document.createDocumentFragment(); let found = false;
-        re.lastIndex = 0;
-        while ((m = re.exec(txt))) {
-          found = true;
-          if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
-          const span = el('span', { class: 'find-hit', text: m[0] });
-          frag.appendChild(span); findState.hits.push(span);
-          last = m.index + m[0].length;
-          if (m[0].length === 0) re.lastIndex++;
-        }
-        if (found) { if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last))); node.parentNode.replaceChild(frag, node); }
-      });
-      findState.idx = findState.hits.length ? 0 : -1;
-      mark();
-      counter.textContent = findState.hits.length ? `${findState.idx + 1} of ${findState.hits.length}` : 'No matches';
-    }
-    function step(d) {
-      if (!findState.hits.length) return;
-      findState.idx = (findState.idx + d + findState.hits.length) % findState.hits.length;
-      mark(); counter.textContent = `${findState.idx + 1} of ${findState.hits.length}`;
-    }
-    function mark() {
-      findState.hits.forEach((h, i) => h.classList.toggle('current', i === findState.idx));
-      const cur = findState.hits[findState.idx];
-      if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-    function doReplace(all) {
-      if (!findState.hits.length) { doFind(); if (!findState.hits.length) return; }
-      const val = replInput.value;
-      if (all) {
-        findState.hits.forEach((h) => h.replaceWith(document.createTextNode(val)));
-        const count = findState.hits.length; findState.hits = []; findState.idx = -1;
-        E().node.normalize(); E().dirty = true; E().repaginate(); E().updateStatus();
-        counter.textContent = `Replaced ${count}`;
-        setTimeout(doFind, 50);
-      } else {
-        const cur = findState.hits[findState.idx]; if (!cur) return;
-        cur.replaceWith(document.createTextNode(val));
-        findState.hits.splice(findState.idx, 1); E().node.normalize(); E().dirty = true; E().repaginate();
-        if (findState.idx >= findState.hits.length) findState.idx = 0;
-        mark(); counter.textContent = findState.hits.length ? `${findState.idx + 1} of ${findState.hits.length}` : 'Replaced';
-      }
-    }
+    return pmFindPane(replace, advanced, WC.PM);
   };
-  function clearHits() {
-    document.querySelectorAll('#editor .find-hit').forEach((h) => { const t = document.createTextNode(h.textContent); h.replaceWith(t); });
-    if (E().node) E().node.normalize();
-    findState = { hits: [], idx: -1 };
-  }
-  function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   // ---- Find & Replace pane — PM (fork Search extension) branch ----
   // Same chrome/classes as the legacy pane (so CSS + layout match) but drives the
@@ -310,29 +199,19 @@
 
   // ---- Go To dialog ----
   D.goToDialog = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) {
-      const sel = el('select', {}, ['Heading', 'Bookmark', 'Page', 'Line'].map((o) => el('option', { text: o })));
-      const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter target' });
-      const body = el('div', {}, [
-        el('div', { class: 'row' }, [el('label', { text: 'Go to what:', style: { width: '110px' } }), sel]),
-        el('div', { class: 'row' }, [el('label', { text: 'Enter value:', style: { width: '110px' } }), input]),
-      ]);
-      WC.dialog({ title: 'Go To', width: '380px', body, footer: [
-        { label: 'Go To', primary: true, close: false, onClick: () => {
-          const target = sel.value.toLowerCase();
-          const ok = pm.goTo(target, input.value);
-          if (!ok) WC.toast('Go To ' + sel.value + ' is available after pagination (Phase 7)');
-        } },
-        { label: 'Close' },
-      ] });
-      setTimeout(() => input.focus(), 30);
-      return;
-    }
-    // ---- legacy arm (byte-identical to the former commands.js goToDialog) ----
-    const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter page number' });
-    WC.dialog({ title: 'Go To', width: '380px', body: el('div', {}, [el('div', { text: 'Go to page:' }), input]), footer: [
-      { label: 'Go To', primary: true, onClick: () => { const p = parseInt(input.value, 10); if (p > 0) { const top = (p - 1) * E().pageMetrics().pitch * E().zoom; document.getElementById('canvas').scrollTop = top; } } },
+    const pm = WC.PM;
+    const sel = el('select', {}, ['Heading', 'Bookmark', 'Page', 'Line'].map((o) => el('option', { text: o })));
+    const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter target' });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Go to what:', style: { width: '110px' } }), sel]),
+      el('div', { class: 'row' }, [el('label', { text: 'Enter value:', style: { width: '110px' } }), input]),
+    ]);
+    WC.dialog({ title: 'Go To', width: '380px', body, footer: [
+      { label: 'Go To', primary: true, close: false, onClick: () => {
+        const target = sel.value.toLowerCase();
+        const ok = pm.goTo(target, input.value);
+        if (!ok) WC.toast('Go To ' + sel.value + ' is available after pagination (Phase 7)');
+      } },
       { label: 'Close' },
     ] });
     setTimeout(() => input.focus(), 30);
@@ -340,18 +219,17 @@
 
   // ---- Paragraph dialog ----
   D.paragraph = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) pm.captureSelection(); // the dialog steals focus; restore before applying
-    const st = pm ? pm.getState() : null;
+    const pm = WC.PM;
+    if (pm.ready) pm.captureSelection(); // the dialog steals focus; restore before applying
+    const st = pm.getState();
     const fmtLine = (v) => (v == null ? '1.15' : (Number.isInteger(v) ? v + '.0' : String(v)));
     const align = el('select', {}, ['Left', 'Centered', 'Right', 'Justified'].map((o) => el('option', { text: o })));
-    if (st) align.value = st.justifyCenter ? 'Centered' : st.justifyRight ? 'Right' : st.justifyFull ? 'Justified' : 'Left';
-    const indL = el('input', { type: 'number', value: String(st ? (st.indentLeftIn != null ? st.indentLeftIn : 0) : 0), step: '0.1', style: { width: '70px' } });
-    const indR = el('input', { type: 'number', value: String(st ? (st.indentRightIn != null ? st.indentRightIn : 0) : 0), step: '0.1', style: { width: '70px' } });
-    const before = el('input', { type: 'number', value: String(st ? (st.spacingBeforePt != null ? st.spacingBeforePt : 0) : 0), style: { width: '70px' } });
-    const after = el('input', { type: 'number', value: String(st ? (st.spacingAfterPt != null ? st.spacingAfterPt : 8) : 8), style: { width: '70px' } });
-    // PM mode adds 2.5 (ribbon parity); the legacy option list is frozen UI.
-    const lineOpts = pm ? ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'] : ['1.0', '1.15', '1.5', '2.0', '3.0'];
+    align.value = st.justifyCenter ? 'Centered' : st.justifyRight ? 'Right' : st.justifyFull ? 'Justified' : 'Left';
+    const indL = el('input', { type: 'number', value: String(st.indentLeftIn != null ? st.indentLeftIn : 0), step: '0.1', style: { width: '70px' } });
+    const indR = el('input', { type: 'number', value: String(st.indentRightIn != null ? st.indentRightIn : 0), step: '0.1', style: { width: '70px' } });
+    const before = el('input', { type: 'number', value: String(st.spacingBeforePt != null ? st.spacingBeforePt : 0), style: { width: '70px' } });
+    const after = el('input', { type: 'number', value: String(st.spacingAfterPt != null ? st.spacingAfterPt : 8), style: { width: '70px' } });
+    const lineOpts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
     const line = el('select', {}, lineOpts.map((o) => el('option', { text: o })));
     // lineSpacing is null for exact/atLeast rules (no multiplier form) — leave the
     // select at its default rather than lie with a converted value.
@@ -365,28 +243,18 @@
     function row(label, ctrl) { return el('div', { class: 'row' }, [el('label', { text: label, style: { width: '160px' } }), ctrl]); }
     WC.dialog({ title: 'Paragraph', width: '460px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        if (pm) {
-          const steps = [
-            ['setTextAlign', { Left: 'left', Centered: 'center', Right: 'right', Justified: 'justify' }[align.value]],
-            ['updateAttributes', 'paragraph', {
-              'paragraphProperties.spacing.before': Math.round((parseFloat(before.value) || 0) * 20),
-              'paragraphProperties.spacing.after': Math.round((parseFloat(after.value) || 0) * 20),
-              'paragraphProperties.spacing.line': Math.round((parseFloat(line.value) || 1.15) * 240),
-              'paragraphProperties.spacing.lineRule': 'auto',
-              'paragraphProperties.indent.left': Math.round((parseFloat(indL.value) || 0) * 1440),
-              'paragraphProperties.indent.right': Math.round((parseFloat(indR.value) || 0) * 1440),
-            }],
-          ];
-          pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (Word)
-        } else {
-          const a = { Left: 'justifyLeft', Centered: 'justifyCenter', Right: 'justifyRight', Justified: 'justifyFull' }[align.value];
-          E().exec(a);
-          E().applyBlockStyle('marginTop', before.value + 'pt');
-          E().applyBlockStyle('marginBottom', after.value + 'pt');
-          E().applyBlockStyle('lineHeight', line.value);
-          E().applyBlockStyle('marginLeft', (parseFloat(indL.value) * 96) + 'px');
-          E().applyBlockStyle('marginRight', (parseFloat(indR.value) * 96) + 'px');
-        }
+        const steps = [
+          ['setTextAlign', { Left: 'left', Centered: 'center', Right: 'right', Justified: 'justify' }[align.value]],
+          ['updateAttributes', 'paragraph', {
+            'paragraphProperties.spacing.before': Math.round((parseFloat(before.value) || 0) * 20),
+            'paragraphProperties.spacing.after': Math.round((parseFloat(after.value) || 0) * 20),
+            'paragraphProperties.spacing.line': Math.round((parseFloat(line.value) || 1.15) * 240),
+            'paragraphProperties.spacing.lineRule': 'auto',
+            'paragraphProperties.indent.left': Math.round((parseFloat(indL.value) || 0) * 1440),
+            'paragraphProperties.indent.right': Math.round((parseFloat(indR.value) || 0) * 1440),
+          }],
+        ];
+        pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (Word)
       } },
       { label: 'Cancel' },
     ] });
@@ -394,19 +262,7 @@
 
   // ---- Word Count ----
   D.wordCount = function () {
-    const pmMode = WC.PM && WC.PM.active;
-    const c = pmMode
-      ? WC.PM.counts()
-      : (() => {
-          const ec = E().counts();
-          const text = E().node.innerText;
-          return Object.assign(ec, {
-            pages: E().pageCount(),
-            paras: E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length,
-            lines: (text.match(/\n/g) || []).length + 1,
-            charsNoSpace: text.replace(/\s/g, '').length,
-          });
-        })();
+    const c = WC.PM.counts();
     const rows = [['Pages', c.pages], ['Words', c.words], ['Characters (no spaces)', c.charsNoSpace], ['Characters (with spaces)', c.chars], ['Paragraphs', c.paras], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
     rows.forEach(([k, v]) => body.appendChild(el('div', { class: 'row', style: { borderBottom: '1px solid #f0f0f0', padding: '5px 0' } }, [el('span', { style: { width: '220px', color: '#444' }, text: k }), el('b', { text: String(v) })])));
@@ -443,7 +299,8 @@
     pane = el('div', { class: 'taskpane', id: 'nav-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Navigation' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body' });
-    const headings = E().node.querySelectorAll('h1,h2,h3');
+    const root = WC.PM.getEditor().view.dom;
+    const headings = root.querySelectorAll('h1,h2,h3');
     if (!headings.length) body.appendChild(el('div', { style: { color: '#888', padding: '12px 4px', fontSize: '13px' }, text: 'Create headings (Heading 1–3 styles) to populate the navigation map.' }));
     headings.forEach((h) => {
       const lvl = +h.tagName[1];
@@ -466,8 +323,8 @@
     let pane = document.getElementById('styles-pane'); if (pane) { pane.remove(); return; }
     // D6 (slice 3): the gallery chevron calls this directly (ribbon.js) with no
     // launcher gate — block here until the styles area flips.
-    if (window.WC.PM && window.WC.PM.active && window.WC.PM.isBlocked('stylesGallery')) { window.WC.PM.notifyBlocked('Styles'); return; }
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
+    if (WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
+    const pm = WC.PM.ready ? WC.PM : null;
     pane = el('div', { class: 'taskpane right', id: 'styles-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Styles' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body styles-list' });
@@ -479,16 +336,14 @@
     ]);
     function render() {
       list.innerHTML = '';
-      // slice 11: WC.Styles (formatting.js) retired — use PM bridge catalog in PM mode.
-      const styleList = pm ? pm.allStyleNames() : (WC.Styles ? WC.Styles.all() : ['Normal']);
+      // slice 11: WC.Styles (formatting.js) retired — read the PM bridge catalog.
+      const styleList = pm ? pm.allStyleNames() : ['Normal'];
       styleList.forEach((s) => {
         const item = el('div', { class: 'sl-item', text: s });
         if (preview) item.setAttribute('style', (STYLE_PREVIEW[s] || '') + ';');
         item.addEventListener('mousedown', (e) => e.preventDefault());
         item.addEventListener('click', () => {
-          const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-          if (pm2) { if (!pm2.applyStyleByName(s)) WC.toast('Style “' + s + '” is not available in this document.'); return; }
-          WC.applyNamedStyle(s);
+          if (WC.PM.ready && !WC.PM.applyStyleByName(s)) WC.toast('Style “' + s + '” is not available in this document.');
         });
         list.appendChild(item);
       });
@@ -497,51 +352,32 @@
     body.appendChild(previewRow);
     body.appendChild(list);
     const footer = el('div', { style: { display: 'flex', gap: '6px', padding: '10px 0 0', borderTop: '1px solid #eee', marginTop: '8px' } }, [
-      // Re-capture per click (the item-click pm2 pattern): failBridge can un-flip the
-      // mode while the pane is open — never act on a stale bridge reference.
-      el('button', { class: 'btn', text: 'New Style', onclick: () => { const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm2) { WC.toast("New Style isn't on the new engine yet", 'Custom styles land in a later slice — run with --legacy for the classic editor'); return; } D.createStyle(render); } }),
-      el('button', { class: 'btn', text: 'Clear All', onclick: () => { const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm2) { if (!pm2.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); return; } WC.applyNamedStyle('Normal'); } }),
+      el('button', { class: 'btn', text: 'New Style', onclick: () => { WC.toast("New Style isn't on the new engine yet", 'Custom styles land in a later slice.'); } }),
+      el('button', { class: 'btn', text: 'Clear All', onclick: () => { if (WC.PM.ready && !WC.PM.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); } }),
     ]);
     body.appendChild(footer);
     pane.appendChild(head); pane.appendChild(body);
     document.getElementById('workarea').appendChild(pane);
   };
 
-  // Create a Style from the current selection's formatting.
-  D.createStyle = function (onDone) {
-    const name = el('input', { type: 'text', class: 'grow', placeholder: 'Style name' });
-    const type = el('select', {}, [el('option', { value: 'character', text: 'Character (selected text)' }), el('option', { value: 'paragraph', text: 'Paragraph' })]);
-    const body = el('div', {}, [
-      el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '70px' } }), name]),
-      el('div', { class: 'row' }, [el('label', { text: 'Type:', style: { width: '70px' } }), type]),
-      el('div', { style: { fontSize: '12px', color: '#666', marginTop: '6px' }, text: 'Captures the current selection’s formatting into a reusable style.' }),
-    ]);
-    WC.dialog({ title: 'Create New Style from Formatting', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const nm = name.value.trim(); if (!nm) return; WC.Styles.createFromSelection(nm, type.value); if (onDone) onDone(); WC.toast('Style “' + nm + '” created.'); } },
-      { label: 'Cancel' },
-    ] });
-  };
-
   // Apply Styles combo (Ctrl+Shift+S)
   D.applyStyles = function () {
-    const pm2 = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    const dl = el('datalist', { id: 'apply-styles-list' }, (pm2 ? pm2.allStyleNames() : WC.Styles ? WC.Styles.all() : []).map((s) => el('option', { value: s })));
+    const pm2 = WC.PM.ready ? WC.PM : null;
+    const dl = el('datalist', { id: 'apply-styles-list' }, (pm2 ? pm2.allStyleNames() : []).map((s) => el('option', { value: s })));
     const input = el('input', { type: 'text', class: 'grow', list: 'apply-styles-list', placeholder: 'Style name' });
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Style Name:', style: { width: '90px' } }), input, dl])]);
     WC.dialog({ title: 'Apply Styles', width: '360px', body, footer: [
-      { label: 'Apply', primary: true, onClick: () => { if (input.value.trim()) WC.applyNamedStyle(input.value.trim()); } },
+      { label: 'Apply', primary: true, onClick: () => { if (input.value.trim() && pm2) pm2.applyStyleByName(input.value.trim()); } },
       { label: 'Cancel' },
     ] });
   };
 
   // ---- Font dialog (Ctrl+D / Font group launcher) ----
   D.font = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) pm.captureSelection(); // the dialog steals focus; restore before applying
-    const saved = pm ? null : E().savedRange;
-    const st = pm ? pm.getState() : E().queryState();
+    const pm = WC.PM;
+    if (pm.ready) pm.captureSelection(); // the dialog steals focus; restore before applying
+    const st = pm.getState();
     let colorVal = '';
-    const mk = (tag, props, ch) => el(tag, props, ch);
     const fam = el('select', { class: 'grow' }, (WC.FONTS || ['Calibri']).map((f) => el('option', { value: f, text: f, selected: (st.computedFontFamily === f ? 'selected' : null) })));
     const styleSel = el('select', {}, ['Regular', 'Italic', 'Bold', 'Bold Italic'].map((s) => el('option', { text: s, selected: ((st.bold && st.italic && s === 'Bold Italic') || (st.bold && !st.italic && s === 'Bold') || (!st.bold && st.italic && s === 'Italic') || (!st.bold && !st.italic && s === 'Regular')) ? 'selected' : null })));
     const size = el('input', { type: 'number', value: String(st.computedFontSizePt || 11), step: '1', style: { width: '70px' } });
@@ -564,7 +400,7 @@
     const positionBy = el('input', { type: 'number', value: '3', step: '1', style: { width: '60px' } });
     [scale, spacing, spacingBy, position, positionBy].forEach((n) => { n.addEventListener('change', update); n.addEventListener('input', update); });
 
-    const previewSpan = el('span', { text: (saved && saved.toString && saved.toString()) || 'AaBbCc — The quick brown fox' });
+    const previewSpan = el('span', { text: 'AaBbCc — The quick brown fox' });
     const previewBox = el('div', { class: 'font-preview' }, [previewSpan]);
 
     function buildStyle() {
@@ -607,27 +443,22 @@
 
     WC.dialog({ title: 'Font', width: '540px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        if (pm) {
-          const steps = [['setFontFamily', fam.value], ['setFontSize', (parseFloat(size.value) || 11) + 'pt']];
-          steps.push([/Bold/.test(styleSel.value) ? 'setBold' : 'unsetBold']);
-          steps.push([/Italic/.test(styleSel.value) ? 'setItalic' : 'unsetItalic']);
-          if (colorVal) steps.push(['setColor', colorVal]);
-          if (underline.value !== 'none') {
-            steps.push(['setUnderline']);
-            // 'single' is deliberately absent: setUnderline's default attr IS underlineType:'single' (probe-verified).
-            const UL = { double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' };
-            if (UL[underline.value]) steps.push(['setMark', 'underline', { underlineType: UL[underline.value] }]);
-          } else steps.push(['unsetUnderline']);
-          steps.push([strike.c.checked ? 'setStrike' : 'unsetStrike']);
-          if (sup.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'superscript' }]);
-          else if (sub.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'subscript' }]);
-          pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (matches Word)
-          if (small.c.checked || allc.c.checked || scale.value !== '100' || spacing.value !== 'Normal' || position.value !== 'Normal') {
-            pm.notifyBlocked('Caps and Advanced font effects');
-          }
-        } else {
-          E().savedRange = saved; E().applyInlineStyles(buildStyle());
-          if (sup.c.checked) E().exec('superscript'); else if (sub.c.checked) E().exec('subscript');
+        const steps = [['setFontFamily', fam.value], ['setFontSize', (parseFloat(size.value) || 11) + 'pt']];
+        steps.push([/Bold/.test(styleSel.value) ? 'setBold' : 'unsetBold']);
+        steps.push([/Italic/.test(styleSel.value) ? 'setItalic' : 'unsetItalic']);
+        if (colorVal) steps.push(['setColor', colorVal]);
+        if (underline.value !== 'none') {
+          steps.push(['setUnderline']);
+          // 'single' is deliberately absent: setUnderline's default attr IS underlineType:'single' (probe-verified).
+          const UL = { double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' };
+          if (UL[underline.value]) steps.push(['setMark', 'underline', { underlineType: UL[underline.value] }]);
+        } else steps.push(['unsetUnderline']);
+        steps.push([strike.c.checked ? 'setStrike' : 'unsetStrike']);
+        if (sup.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'superscript' }]);
+        else if (sub.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'subscript' }]);
+        pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (matches Word)
+        if (small.c.checked || allc.c.checked || scale.value !== '100' || spacing.value !== 'Normal' || position.value !== 'Normal') {
+          pm.notifyBlocked('Caps and Advanced font effects');
         }
         WC.Ribbon.setComboValue('font', fam.value); WC.Ribbon.setComboValue('fontSize', String(parseFloat(size.value) || 11));
       } },
@@ -724,7 +555,7 @@
   function scanSpelling(root) {
     const issues = [];
     const ignored = D._ignoredSpelling || (D._ignoredSpelling = {});
-    const walker = document.createTreeWalker(root || E().node, NodeFilter.SHOW_TEXT, null);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     let node;
     while ((node = walker.nextNode())) {
       const re = /[A-Za-z]+/g; let m;
@@ -747,8 +578,8 @@
     pane = el('div', { class: 'taskpane right', id: 'editor-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Editor' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body' });
-    const pm = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
-    const root = () => { const p = pm(); return p ? p.getEditor().view.dom : E().node; };
+    const pm = () => (WC.PM.ready ? WC.PM : null);
+    const root = () => WC.PM.getEditor().view.dom;
     function pmReplaceWord(word, suggestion) {
       const ed = pm().getEditor();
       let hit = null;
@@ -765,45 +596,36 @@
     function render() {
       body.innerHTML = '';
       const issues = scanSpelling(root());
-      if (pm()) {
-        // Word's cloud Editor Score, degraded to the local spelling signal (P4).
-        const pct = issues.length ? Math.max(40, 100 - issues.length * 10) : 100;
-        body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 4px' } }, [
-          el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: pct + '%' }),
-          el('div', { style: { color: '#444', fontWeight: '600' }, text: 'Editor Score' }),
-          el('div', { style: { fontSize: '11px', color: '#888', margin: '2px 0 6px' }, text: 'Local proofing only — cloud refinements require Microsoft 365.' }),
-        ]));
-        const section = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px', fontSize: '12px' }, text: t });
-        const row = (label, badge, disabled) => {
-          const r = el('div', { class: 'tp-result', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: disabled ? '.55' : '1' } }, [
-            el('span', { text: label }),
-            el('b', { text: badge, style: { color: badge === '✓' ? '#107C10' : (disabled ? '#888' : '#b85c00') } }),
-          ]);
-          if (disabled) r.title = 'Requires the Microsoft 365 cloud Editor service — not available in this clone.';
-          return r;
-        };
-        body.appendChild(section('Corrections'));
-        body.appendChild(row('Spelling', issues.length ? String(issues.length) : '✓'));
-        body.appendChild(row('Grammar', '✓'));
-        body.appendChild(section('Refinements'));
-        ['Clarity', 'Conciseness', 'Formality', 'Punctuation Conventions', 'Resume', 'Vocabulary'].forEach((t) => body.appendChild(row(t, '—', true)));
-        body.appendChild(section('Similarity'));
-        body.appendChild(row('Similarity check', '—', true));
-        if (issues.length) body.appendChild(section('Spelling'));
-      } else {
-        // legacy header kept VERBATIM — the frozen gate pins '<N> spelling issue(s)'.
-        body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 12px' } }, [
-          el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: issues.length ? String(issues.length) : '✓' }),
-          el('div', { style: { color: '#444' }, text: issues.length ? (issues.length + ' spelling issue' + (issues.length > 1 ? 's' : '') + ' found') : 'No issues. Looks good!' }),
-        ]));
-        if (issues.length) body.appendChild(el('div', { style: { fontWeight: '600', margin: '4px 0 6px' }, text: 'Spelling' }));
-      }
+      // Word's cloud Editor Score, degraded to the local spelling signal (P4).
+      const pct = issues.length ? Math.max(40, 100 - issues.length * 10) : 100;
+      body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 4px' } }, [
+        el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: pct + '%' }),
+        el('div', { style: { color: '#444', fontWeight: '600' }, text: 'Editor Score' }),
+        el('div', { style: { fontSize: '11px', color: '#888', margin: '2px 0 6px' }, text: 'Local proofing only — cloud refinements require Microsoft 365.' }),
+      ]));
+      const section = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px', fontSize: '12px' }, text: t });
+      const row = (label, badge, disabled) => {
+        const r = el('div', { class: 'tp-result', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: disabled ? '.55' : '1' } }, [
+          el('span', { text: label }),
+          el('b', { text: badge, style: { color: badge === '✓' ? '#107C10' : (disabled ? '#888' : '#b85c00') } }),
+        ]);
+        if (disabled) r.title = 'Requires the Microsoft 365 cloud Editor service — not available in this clone.';
+        return r;
+      };
+      body.appendChild(section('Corrections'));
+      body.appendChild(row('Spelling', issues.length ? String(issues.length) : '✓'));
+      body.appendChild(row('Grammar', '✓'));
+      body.appendChild(section('Refinements'));
+      ['Clarity', 'Conciseness', 'Formality', 'Punctuation Conventions', 'Resume', 'Vocabulary'].forEach((t) => body.appendChild(row(t, '—', true)));
+      body.appendChild(section('Similarity'));
+      body.appendChild(row('Similarity check', '—', true));
+      if (issues.length) body.appendChild(section('Spelling'));
       issues.forEach((iss) => {
         const card = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px', marginBottom: '8px' } });
         card.appendChild(el('div', {}, [el('span', { style: { textDecoration: 'underline wavy #d13438', color: '#d13438', fontWeight: '600' }, text: iss.word })]));
         card.appendChild(el('div', { style: { fontSize: '12px', color: '#666', margin: '4px 0' }, text: 'Suggestion:' }));
         const sug = el('button', { class: 'btn', style: { display: 'block', width: '100%', textAlign: 'left', marginBottom: '4px' }, text: iss.suggestion });
-        sug.addEventListener('click', () => { pm() ? pmReplaceWord(iss.word, iss.suggestion) : changeWord(iss); render(); });
+        sug.addEventListener('click', () => { pmReplaceWord(iss.word, iss.suggestion); render(); });
         card.appendChild(sug);
         const row2 = el('div', { style: { display: 'flex', gap: '6px' } }, [
           el('button', { class: 'btn', text: 'Ignore', onclick: () => { (D._ignoredSpelling[iss.word.toLowerCase()] = true); render(); } }),
@@ -816,12 +638,6 @@
       const cbk = el('input', { type: 'checkbox', checked: on ? 'checked' : null });
       cbk.addEventListener('change', () => root().setAttribute('spellcheck', cbk.checked ? 'true' : 'false'));
       body.appendChild(el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', fontSize: '12px' } }, [cbk, el('span', { text: 'Check spelling as you type' })]));
-    }
-    function changeWord(iss) {
-      // legacy branch: re-locate (the node may have shifted) and replace the first occurrence
-      const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, null); let n;
-      while ((n = walker.nextNode())) { const re = new RegExp('\\b' + iss.word + '\\b'); if (re.test(n.nodeValue)) { n.nodeValue = n.nodeValue.replace(re, iss.suggestion); break; } }
-      E().dirty = true; E().updateStatus(); E().emit();
     }
     render();
     pane.appendChild(head); pane.appendChild(body);
@@ -1012,8 +828,7 @@
     pane = el('div', { class: 'taskpane right', id: 'restrict-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Restrict Editing' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body' });
-    const pm = pmActive();
-    const enforced = () => { const p = pmActive(); try { return p ? p.getEditor().view.editable === false : E().node.getAttribute('contenteditable') === 'false'; } catch (e) { return false; } };
+    const enforced = () => { const p = pmActive(); try { return p ? p.getEditor().view.editable === false : false; } catch (e) { return false; } };
     function render() {
       body.innerHTML = '';
       const sec = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px' }, text: t });
@@ -1045,8 +860,6 @@
           } else if (p) {
             try { p.getEditor().setEditable(false, false); } catch (e) { /* engine unavailable */ }
             WC.toast('Protection started: the document is read-only.');
-          } else {
-            WC.Review.restrictEditing();
           }
           render();
         });
@@ -1057,7 +870,6 @@
         stop.addEventListener('click', () => {
           const p = pmActive();
           if (p) { try { p.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } }
-          else WC.Review.restrictEditing();
           render();
         });
         body.appendChild(stop);
@@ -1082,7 +894,7 @@
   D.compareDocuments = function (mode) {
     const combine = mode === 'combine';
     const htmlToText = (html) => { const d = document.createElement('div'); d.innerHTML = html; return (d.innerText || '').replace(/ /g, ' '); };
-    const currentText = () => { const pm = pmActive(); return pm ? pm.getText() : E().node.innerText; };
+    const currentText = () => WC.PM.getText();
     const mkSource = (labelText) => {
       const selEl = el('select', { class: 'grow' }, [
         el('option', { text: '(Current document)', value: 'current' }),
@@ -1180,7 +992,7 @@
       el('div', { class: 'row' }, [el('label', { text: 'Color:', style: { width: '60px' } }), colorBtn, el('label', { style: { marginLeft: '12px' } }, [diag, el('span', { text: ' Diagonal' })])]),
     ]);
     WC.dialog({ title: 'Custom Watermark', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.deWatermark(text.value, { color, diagonal: diag.checked }); return; } WC.Design.watermark(text.value, { color, diagonal: diag.checked }); } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.deWatermark(text.value, { color, diagonal: diag.checked }); } },
       { label: 'Cancel' },
     ] });
   };
@@ -1198,21 +1010,18 @@
       el('div', { class: 'row' }, [el('label', { text: 'Width (px):', style: { width: '60px' } }), width]),
     ]);
     WC.dialog({ title: 'Borders and Shading — Page Border', width: '440px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.dePageBorders({ style: style.value, color, width: parseFloat(width.value) }); return; } WC.Design.pageBorders({ style: style.value, color, width: parseFloat(width.value) }); } },
-      { label: 'Remove', onClick: () => { const pm = (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null; if (pm) { pm.dePageBordersRemove(); return; } WC.Design.pageBorders({ remove: true }); } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.dePageBorders({ style: style.value, color, width: parseFloat(width.value) }); } },
+      { label: 'Remove', onClick: () => { WC.PM.dePageBordersRemove(); } },
       { label: 'Cancel' },
     ] });
   };
 
   // ---- Add Source / Manage Sources ----
-  // opts (PM-only, additive — legacy callers pass only `onAdd`): { prefill, onSubmit }.
-  // When `onSubmit` is supplied (the Source Manager → Edit flow, slice-9 FIX 5) it
-  // OVERRIDES the default add/insert behavior and receives the flat source `s`, so the
-  // caller can route to pm.refUpdateSource. `prefill` seeds the inputs for editing.
+  // opts (additive): { prefill, onSubmit }. When `onSubmit` is supplied (the Source
+  // Manager → Edit flow, slice-9 FIX 5) it OVERRIDES the default add/insert behavior
+  // and receives the flat source `s`, so the caller can route to refUpdateSource.
+  // `prefill` seeds the inputs for editing.
   D.addSource = function (onAdd, opts) {
-    // pre = null under --legacy (legacy callers pass only onAdd). Pass `undefined`
-    // (NOT '') for value so el() omits the attribute entirely → the legacy Create
-    // Source dialog stays byte-identical (el sets any non-null value, FIX 4).
     const pre = (opts && opts.prefill) || null;
     const type = el('select', {}, ['Book', 'Journal Article', 'Web Site', 'Report'].map((t) => el('option', { text: t, selected: (pre && pre.type === t) ? 'selected' : undefined })));
     const author = el('input', { type: 'text', class: 'grow', placeholder: 'Last, First', value: pre ? (pre.author || '') : undefined });
@@ -1224,38 +1033,28 @@
     WC.dialog({ title: pre ? 'Edit Source' : 'Create Source', width: '480px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
         const s = { type: type.value, author: author.value.trim() || 'Unknown', title: title.value.trim(), year: year.value.trim(), publisher: publisher.value.trim() };
-        // PM-only Edit override: route to the supplied onSubmit (refUpdateSource) and
+        // Edit override: route to the supplied onSubmit (refUpdateSource) and
         // skip the add/insert default entirely.
         if (opts && typeof opts.onSubmit === 'function') { opts.onSubmit(s); return; }
-        const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-        if (pm) {
-          // refAddSource accepts the flat legacy shape and maps author/title/year/
-          // publisher into the fork CitationSourceFields (so the source EXPORTS its
-          // real values). It MINTS + returns the engine sourceId.
-          const id = pm.refAddSource(s);
-          if (onAdd) onAdd(s, id);
-          else if (id) pm.refInsertCitation(id);
-          return;
-        }
-        WC.Ref.addSource(s); if (onAdd) onAdd(s); else WC.Ref.insertCitation(s);
+        // refAddSource accepts the flat shape and maps author/title/year/publisher
+        // into the fork CitationSourceFields (so the source EXPORTS its real values).
+        // It MINTS + returns the engine sourceId.
+        const id = WC.PM.refAddSource(s);
+        if (onAdd) onAdd(s, id);
+        else if (id) WC.PM.refInsertCitation(id);
       } },
       { label: 'Cancel' },
     ] });
   };
   D.manageSources = function () {
     const list = el('div', { style: { border: '1px solid #c8c6c4', maxHeight: '200px', overflowY: 'auto', margin: '8px 0' } });
-    const pm = () => (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    // PM provenance: normalize a fork source { sourceId, type, fields } into the
-    // flat display shape this dialog renders. Legacy uses WC.Ref.sources directly.
+    // Normalize a fork source { sourceId, type, fields } into the flat display shape.
     function sourceLabel(s) {
-      if (s.fields !== undefined) {
-        const f = s.fields || {};
-        const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : 'Unknown';
-        return author + ' (' + (f.year || 'n.d.') + ') — ' + (f.title || '');
-      }
-      return s.author + ' (' + (s.year || 'n.d.') + ') — ' + (s.title || '');
+      const f = s.fields || {};
+      const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : 'Unknown';
+      return author + ' (' + (f.year || 'n.d.') + ') — ' + (f.title || '');
     }
-    // PM Edit prefill (FIX 5): map a fork source { sourceId, type, fields } into the
+    // Edit prefill (FIX 5): map a fork source { sourceId, type, fields } into the
     // flat Create-Source shape the D.addSource inputs expect.
     function editPrefill(s) {
       const f = s.fields || {};
@@ -1266,18 +1065,16 @@
     }
     function render() {
       list.innerHTML = '';
-      const p = pm();
-      const sources = p ? (p.refListSources() || []) : WC.Ref.sources;
+      const sources = WC.PM.refListSources() || [];
       if (!sources.length) list.appendChild(el('div', { style: { padding: '8px', color: '#888' }, text: 'No sources yet.' }));
-      sources.forEach((s, i) => {
+      sources.forEach((s) => {
         const actions = [];
-        // PM-only Edit affordance (FIX 5): legacy manageSources had Delete only.
         // Edit opens D.addSource prefilled and routes OK → refUpdateSource so the
         // edit reaches the engine (and the exported source reflects it).
-        if (p) actions.push(el('span', { style: { color: '#0066cc', cursor: 'pointer', marginRight: '12px' }, text: 'Edit', onclick: () => {
-          D.addSource(null, { prefill: editPrefill(s), onSubmit: (patch) => { const q = pm(); if (q) q.refUpdateSource(s.sourceId, patch); render(); } });
+        actions.push(el('span', { style: { color: '#0066cc', cursor: 'pointer', marginRight: '12px' }, text: 'Edit', onclick: () => {
+          D.addSource(null, { prefill: editPrefill(s), onSubmit: (patch) => { WC.PM.refUpdateSource(s.sourceId, patch); render(); } });
         } }));
-        actions.push(el('span', { style: { color: '#c0392b', cursor: 'pointer' }, text: 'Delete', onclick: () => { const q = pm(); if (q) { q.refRemoveSource(s.sourceId); } else { WC.Ref.sources.splice(i, 1); } render(); } }));
+        actions.push(el('span', { style: { color: '#c0392b', cursor: 'pointer' }, text: 'Delete', onclick: () => { WC.PM.refRemoveSource(s.sourceId); render(); } }));
         list.appendChild(el('div', { style: { padding: '6px 8px', borderBottom: '1px solid #f0f0f0', display: 'flex' } }, [
           el('span', { style: { flex: 1 }, text: sourceLabel(s) }),
         ].concat(actions)));
@@ -1285,9 +1082,7 @@
     }
     render();
     WC.dialog({ title: 'Source Manager', width: '560px', body: el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Current List' }), list]), footer: [
-      // FIX 4: branch the New… handler. PM re-renders the list on add; legacy stays
-      // byte-identical to the original HEAD (D.addSource(() => {})).
-      { label: 'New…', onClick: () => { const p = pm(); if (p) { D.addSource(() => { render(); }); } else { D.addSource(() => {}); } return true; } },
+      { label: 'New…', onClick: () => { D.addSource(() => { render(); }); return true; } },
       { label: 'Close', primary: true },
     ] });
   };

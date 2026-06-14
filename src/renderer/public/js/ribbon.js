@@ -5,43 +5,15 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
-  // ---- Styles-gallery live preview (apply on hover, revert on leave) ----
-  let gallerySnap = null;
-  function selPath(node) { const path = []; const root = E().node; while (node && node !== root) { const p = node.parentNode; if (!p) break; path.unshift(Array.prototype.indexOf.call(p.childNodes, node)); node = p; } return path; }
-  function nodeAtPath(path) { let n = E().node; for (const i of path) { if (!n || !n.childNodes[i]) return n; n = n.childNodes[i]; } return n; }
-  function serializeSel() { const s = window.getSelection(); if (!s.rangeCount || !E().node.contains(s.anchorNode)) return null; const r = s.getRangeAt(0); return { sp: selPath(r.startContainer), so: r.startOffset, ep: selPath(r.endContainer), eo: r.endOffset }; }
-  function restoreSel(d) { if (!d) return; try { const r = document.createRange(); r.setStart(nodeAtPath(d.sp), d.so); r.setEnd(nodeAtPath(d.ep), d.eo); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); E().saveRange(); } catch (e) { /* selection drifted */ } }
-  function stylePreviewEnter(name) {
-    if (window.WC.PM && window.WC.PM.active) {
-      // PM mode (2026-06-12 product decision): NO hover Live Preview — styles apply
-      // on CLICK only, scoped to the selection (else the caret paragraph). The
-      // bridge preview mechanism (style-preview.ts) stays for a possible opt-in
-      // later, but the gallery no longer drives it on hover. (--legacy keeps its
-      // snapshot preview below.)
-      return;
-    }
-    if (!E() || !E().node) return;
-    if (!gallerySnap) gallerySnap = { html: E().node.innerHTML, sel: serializeSel(), dirty: E().dirty };
-    WC.applyNamedStyle(name);
-  }
-  function stylePreviewLeave() {
-    if (window.WC.PM && window.WC.PM.active) return; // PM mode: nothing previewed on hover
-    if (!gallerySnap) return;
-    E().node.innerHTML = gallerySnap.html;
-    restoreSel(gallerySnap.sel);
-    E().dirty = gallerySnap.dirty;
-    E().repaginate();
-    gallerySnap = null;
-  }
-  function stylePreviewCommit() {
-    if (window.WC.PM && window.WC.PM.active) {
-      if (window.WC.PM.ready) window.WC.PM.stylePreviewCommitRestore();
-      return;
-    }
-    gallerySnap = null;
-  }
+  // ---- Styles-gallery live preview ----
+  // PM mode (2026-06-12 product decision): NO hover Live Preview — styles apply on
+  // CLICK only, scoped to the selection (else the caret paragraph). The bridge
+  // preview mechanism (style-preview.ts) stays for a possible opt-in later, but the
+  // gallery no longer drives it on hover, so enter/leave are no-ops.
+  function stylePreviewEnter() { /* no hover preview in PM mode */ }
+  function stylePreviewLeave() { /* nothing previewed on hover */ }
+  function stylePreviewCommit() { if (WC.PM && WC.PM.ready) WC.PM.stylePreviewCommitRestore(); }
 
   // Commands rendered as large buttons (the prominent button in each group).
   const LARGE = new Set([
@@ -201,18 +173,16 @@
         const pens = (draw.PENS || []).concat(draw.customPens || []);
         pens.forEach((pen) => {
           const tile = el('div', { class: 'pen-tile', title: pen.name });
-          const pmA = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-          // PM mode: the highlight reflects PM drawing state (the overlay owns ink); legacy ELSE byte-identical.
-          const active = pmA ? (pmA.dIsDrawing() && draw.pen && draw.pen.id === pen.id) : (draw.pen && draw.pen.id === pen.id && draw.enabled);
+          const pmA = (window.WC.PM && window.WC.PM.ready) ? window.WC.PM : null;
+          // The highlight reflects PM drawing state (the overlay owns ink).
+          const active = pmA ? (pmA.dIsDrawing() && draw.pen && draw.pen.id === pen.id) : false;
           if (active) tile.classList.add('active');
           tile.appendChild(el('span', { class: 'pen-swatch', style: { background: pen.color, opacity: String(pen.opacity), height: Math.max(3, Math.min(14, pen.width)) + 'px' } }));
           tile.addEventListener('mousedown', (e) => e.preventDefault());
           tile.addEventListener('click', () => {
-            const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-            if (pm) { const active = pm.dIsDrawing() && WC.Draw.pen && WC.Draw.pen.id === pen.id; pm.dSetPen(pen); pm.dSetDrawing(!active); render(); return; }
-            if (draw.pen && draw.pen.id === pen.id && draw.enabled) { draw.toggle(); } // second click toggles drawing off
-            else { draw.setPen(pen); }
-            render();
+            const pm = (window.WC.PM && window.WC.PM.ready) ? window.WC.PM : null;
+            if (!pm) return;
+            const isOn = pm.dIsDrawing() && WC.Draw.pen && WC.Draw.pen.id === pen.id; pm.dSetPen(pen); pm.dSetDrawing(!isOn); render();
           });
           grid.appendChild(tile);
         });
