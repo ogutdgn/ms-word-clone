@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Guidance for Claude Code (and other AI agents) working in **ms-word-clone** — a
-from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
+from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + TypeScript).
 
 > **Start here:** read [AGENTS.md](AGENTS.md) for the full orientation (directory
 > map, run/test commands, conventions, and critical gotchas). The deep references
@@ -18,54 +18,41 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
 >   **Target architecture/tech-stack:** [docs/architecture/](docs/architecture/).
 >   **Research (incl. the green de-risk spike):** [docs/research/](docs/research/).
 >
-> **Phase 1 (Scaffold) is BUILT** (branch `build/phase-1-scaffold`, PR #10): the renderer now
-> builds with **electron-vite + TypeScript**, and the new document core is an **owned, vendored
+> **The app is now a SINGLE world: the PM/SuperDoc-fork engine is the ONLY editor.**
+> Phase 1 (Scaffold) built the renderer on **electron-vite + TypeScript** with an **owned, vendored
 > ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`, no `superdoc` npm
-> dep). **Phase 2 slices 0a–8 are DONE** (merged to `main` via PRs #11–#15, #17, #19, #21–#25):
-> the PM core is the active visible editor; **file-io** (docx/html/txt/csv open + docx/html/txt
-> save; `test:roundtrip` is THE docx gate), character formatting, **paragraph + lists**,
-> **styles**, **clipboard + editing-misc** (incl. Word-scope Format Painter), **find-replace**
-> (fork decoration Search), **insert-basics + full Table Tools** (incl. minted real-Word table
-> styles), and **review** (slice 8 — fork-engine Track Changes with the lock dialog; tracked
-> ins/del/format render + changed-line bars + format balloons + the Revisions pane; modern
-> contextual comment cards on the Document-API path so comments EXPORT; accept/reject(+advance);
-> 4 display modes; Track Changes Options/Advanced + Change User Name; Compare → REAL
-> tracked-changes diff; Restrict Editing via engine `setEditable`; proofing re-points; the
-> titlebar mode pill) are on the engine. Slices 1–7 were oracle-validated vs Word for Mac
-> 16.77.1; **since slice 8 the parity reference is Word for Windows 16.0** (COM oracle
-> `scripts/oracle/word-oracle-win.ps1`; slice-8 legs A+B PASS — `w:ins`/`w:del`/`w:rPrChange` +
-> comments survive Word's own resave). Flipped ribbon areas: `character`, `paragraph`, `lists`,
-> `styles`, `clipboard`, `editing-misc`, `find-replace`, `insert-basics`, `review`, `references`; the legacy
-> app runs only under `--legacy`. **Slice 9 (references) is DONE** — TOC · footnotes/endnotes (+ a continuous-flow notes area) ·
-> citations/bibliography · captions/index · cross-reference, all wired to the fork's SuperDoc
-> Document API (`editor.doc.*`) via `bridge/references.ts` + `bridge/notes-area.ts` so they EXPORT
-> (§9.1 row 9; oracle Leg A clone→Word PASS, Leg B Word→clone partial — footnotes+TOC import,
-> SEQ/CITATION import a recorded fork-converter follow-up). **Slice 10
-> (themes/mail-merge/draw/insert-exotica) next.**
+> dep). Phase 2 wired every ribbon area onto that engine through the `WC.PM` bridge
+> (`src/renderer/bridge/*.ts`): character/paragraph/lists/styles, clipboard + editing-misc, find-replace,
+> insert-basics + full Table Tools, file-io (docx/html/txt/csv open + docx/html/txt save), review (Track
+> Changes + comments that EXPORT), references (TOC, footnotes/endnotes, citations/bibliography,
+> captions/index, cross-reference), and slice 10 (themes, mail-merge, draw, insert-exotica). **Slice 11
+> RETIRED the legacy world entirely** — the `--legacy` boot flag, the `contenteditable` `WC.Editor`, the
+> leaf legacy engines, and the `mammoth`/`html-to-docx` converter are all gone. The fork's `super-converter`
+> is the sole `.docx` path. The parity reference is **Word for Windows 16.0** (COM oracle
+> `scripts/oracle/word-oracle-win.ps1`).
 > Exact state: [docs/plan/](docs/plan/).
 
 ## TL;DR
 
-- **Stack:** Electron 31 shell; renderer built by **electron-vite + TypeScript** (since Phase 1).
-  **Two worlds (slice 0a):** the **new owned ProseMirror core** (`#pm-editor`, TS/ESM: `src/renderer/main.ts`
-  → vendored fork in `src/renderer/core/superdoc-fork/`, single `prosemirror-model` copy, telemetry off)
-  is now the **active visible editor**. The legacy vanilla-JS app (`window.WC` namespace, classic `<script>`
-  tags under `src/renderer/public/js/`) boots only under the **`--legacy`** flag; it runs alongside the new
-  core as a frozen regression target. Main process (plain CJS) owns fs + `.docx` via the `window.wordAPI`
-  `contextBridge` bridge.
-- **Document (PM mode, active since slice 0a):** `#pm-editor` driven by the `WC.PM` bridge (commands/io/
-  state-sync/focus). Pagination fakes page sheets in continuous flow — see [docs/PAGINATION.md](docs/PAGINATION.md).
-  *(Legacy `#editor` contenteditable is hidden in PM mode; `--legacy` restores it.)*
+- **Stack:** Electron 31 shell; renderer built by **electron-vite + TypeScript**. The **owned ProseMirror
+  core** (`#pm-editor`, TS/ESM: `src/renderer/main.ts` → vendored fork in `src/renderer/core/superdoc-fork/`,
+  single `prosemirror-model` copy, telemetry off) is the **only** editor. The shared chrome (ribbon,
+  dialogs, backstage, statusbar) is still vanilla JS on the `window.WC` namespace — classic `<script>` tags
+  under `src/renderer/public/js/` — kept as-is; its WC→TS/ESM migration is DEFERRED to a future slice. Main
+  process (plain CJS) owns fs + `.docx` via the `window.wordAPI` `contextBridge` bridge.
+- **Document:** `#pm-editor` driven by the `WC.PM` bridge (`src/renderer/bridge/*.ts` — commands/io/
+  state-sync/focus). The page sheet is continuous-flow; real multi-page sheets are Phase-7-gated — see
+  [docs/PAGINATION.md](docs/PAGINATION.md).
 - **Ribbon:** data-driven from `WC.RIBBON` (10 tabs / 212 controls) →
-  `WC.Ribbon` renders → `WC.Commands` dispatches `H[cmd]`. See
-  [docs/RIBBON.md](docs/RIBBON.md).
+  `WC.Ribbon` renders → `WC.Commands` dispatches `H[cmd]` (PM-only — each handler drives the `WC.PM` bridge).
+  See [docs/RIBBON.md](docs/RIBBON.md).
 
 ## Where to look
 
 | Task | Read |
 |------|------|
 | Big picture, module map, dispatch | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Libraries / versions / why no bundler | [docs/TECH_STACK.md](docs/TECH_STACK.md) |
+| Libraries / versions / the build (electron-vite + TS) | [docs/TECH_STACK.md](docs/TECH_STACK.md) |
 | Add/change a ribbon control | [docs/RIBBON.md](docs/RIBBON.md) |
 | Add/remap an icon | [docs/ICONS.md](docs/ICONS.md) |
 | Touch pagination/page breaks | [docs/PAGINATION.md](docs/PAGINATION.md) |
@@ -82,30 +69,25 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + vanilla JS).
    never the user's window (see AGENTS.md → COM oracle). On this machine the
    in-repo macOS oracle (`scripts/oracle/word-oracle.js` — see its README) drives
    Word via AppleScript and supersedes the WSL COM oracle.
-2. **Every fix ships a regression test.** PM-mode features go in `scripts/test-suite-pm.js`;
-   `scripts/test-suite.js` is **frozen** (legacy gate, run under `--legacy`) until legacy
-   retirement. Run all **six gates** before committing: `test:legacy`, `test:pm`,
-   `test:smoke`, `test:smoke:legacy`, `test:roundtrip` (the PM-converter docx gate), and
-   `test:docx` (frozen legacy-converter gate; retires with legacy at slice 11).
+2. **Every fix ships a regression test** in `scripts/test-suite-pm.js`. Run all **three gates**
+   before committing (after `npm run build`): `test:pm` (PM functional suite), `test:smoke`
+   (PM-core smoke), and `test:roundtrip` (the PM-converter docx gate).
 3. **Commits:** follow `.claude/skills/commit-style/SKILL.md` —
    `type(scope): summary`, a what/why body, explicit `git add <path>`, and **no
    `Co-Authored-By`/AI trailer**. Branch for non-trivial work; PR for
    save/docx-format, harness, or 5+ file changes.
-4. **Don't hand-edit generated files:** `src/renderer/js/ribbon-data.js`
-   (`scripts/gen.js`) and `src/renderer/js/icons-fluent.js` (`scripts/gen-icons.js`).
-5. **Mind the gotchas** in AGENTS.md (html-to-docx integer margins, `insertNodeHTML`
-   vs `insertHTML`, no `window.prompt`, pagination caret preservation).
+4. **Don't hand-edit generated files:** `src/renderer/public/js/ribbon-data.js`
+   (`scripts/gen.js`) and `src/renderer/public/js/icons-fluent.js` (`scripts/gen-icons.js`).
+5. **Mind the gotchas** in AGENTS.md (no `window.prompt`, the `WC.PM` bridge is the only
+   document-write path, generated files).
 
 ## Quick commands
 
 ```bash
-npm start                                   # run the app (PM mode, default)
-npm start -- --legacy                       # run in legacy mode
+npm start                                   # build (electron-vite) + run the app
 
 # Gate suites — always build first:
-npm run build && npm run test:legacy        # frozen legacy gate (257) — runs under --legacy
 npm run build && npm run test:pm            # PM functional suite (grows per slice)
-npm run build && npm run test:smoke && npm run test:smoke:legacy  # 9 + 9
+npm run build && npm run test:smoke         # PM-core smoke (9)
 npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
-npm run test:docx                           # frozen legacy-converter gate (--legacy html-to-docx; retires at slice 11)
 ```

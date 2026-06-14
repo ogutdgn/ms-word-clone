@@ -49,8 +49,14 @@ bare-PM core (ADR-0003 fallback).
   + the handler set; round-trip is excellent but not byte-identical. Track diffs.
 
 ## Consequences
-- The `.docx` layer is the forked converter; `mammoth`/`html-to-docx` (current pipeline) are
+- The `.docx` layer is the forked converter; `mammoth`/`html-to-docx` (the old pipeline) are
   retired once the fork is in place.
+
+> **EXECUTED (slice 11, 2026-06):** the migration this ADR + the strangler-fig plan
+> (OPEN_DECISIONS I2) describe is **done**. The legacy world was retired — `mammoth`/`html-to-docx`,
+> the `--legacy` boot flag, and the `contenteditable` editor are removed, and the fork's
+> `super-converter` is the **sole** `.docx` path (guarded by `npm run test:roundtrip`). The
+> dual-world / strangler-fig phase is complete; the app is single-world on the PM engine.
 - Gold task documents are minted **offline** with the real-Word oracle and checked into task
   fixtures; the verifier never calls Word at runtime (fast, reproducible, OS-independent).
 

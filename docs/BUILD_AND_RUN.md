@@ -1,11 +1,14 @@
 # Build & Run
 
-How to build, run, and operate the Word clone — an Electron 31 desktop app with a
-vanilla-JS renderer (no bundler, no transpile step). This is reference material for
-engineers working on the app: the dev loop, the WSL/WSLg specifics, the headless
+How to build, run, and operate the Word clone — an Electron 31 desktop app whose
+renderer is built by **electron-vite + TypeScript** (the document core is the
+owned ProseMirror engine forked from SuperDoc; the chrome is vanilla JS). This is
+reference material for engineers working on the app: the dev loop, the headless
 screenshot/QA harness, and the real-Microsoft-Word COM oracle used for validation.
 
-All paths are relative to the repo root unless noted: `/home/ogutd/msword-clone`.
+> **Single world (slice 11):** the legacy `--legacy` boot flag, the `contenteditable`
+> editor, and the `mammoth`/`html-to-docx` converter are gone. The PM engine is the
+> only editor and the fork's `super-converter` is the only `.docx` path.
 
 ---
 
@@ -15,42 +18,43 @@ All paths are relative to the repo root unless noted: `/home/ogutd/msword-clone`
   Electron 31's bundled runtime is fine; Node is only used to run npm scripts and the
   standalone test scripts, not as the app's own runtime (the app runs inside Electron's
   own Node).
-- **Electron 31** — pinned as a devDependency (`"electron": "^31.7.6"`, currently
-  `31.7.6`). Installed locally by `npm install`; you do **not** need a global Electron.
-- **Runtime libraries** (production deps, installed by `npm install`): `mammoth`
-  (`.docx` → HTML import), `html-to-docx` (HTML → `.docx` export), `jszip` (OOXML
-  inspection in the round-trip test), `dompurify` (sanitizes imported HTML),
-  `@fluentui/svg-icons` (icon source for `scripts/gen-icons.js`).
+- **Electron 31** — pinned as a devDependency (`"electron": "^31.7.6"`). Installed locally
+  by `npm install`; you do **not** need a global Electron. Built with **electron-vite**
+  (`electron-vite`, `vite`, `typescript` devDependencies).
+- **Runtime libraries** (production deps, installed by `npm install`): `prosemirror-*`
+  (the document model), `dompurify` (sanitizes imported HTML), `jszip` (OOXML packaging
+  for the fork converter), `@fluentui/svg-icons` (icon source for `scripts/gen-icons.js`),
+  `lodash`, plus the vendored SuperDoc fork (checked in under
+  `src/renderer/core/superdoc-fork/`, no npm dep).
 
 Install once:
 
 ```bash
-cd /home/ogutd/msword-clone
 npm install
 ```
 
-There is **no build/compile/bundle step**. The renderer is a set of classic `<script>`
-tags loaded in dependency order from `src/renderer/index.html`; everything attaches to a
-global `WC` namespace. Editing a renderer file and relaunching (or reloading) is the
-entire "build".
+The renderer is a **real build** (electron-vite). The document core (`src/renderer/core/`,
+`bridge/`, `main.ts`) is TypeScript/ESM; the shared chrome under `src/renderer/public/` is
+served verbatim as classic `<script>` tags on the global `WC` namespace.
 
 ---
 
 ## Running the app
 
 ```bash
-cd /home/ogutd/msword-clone
-npm start          # == electron .
+npm start          # == electron-vite dev (builds, then launches)
 ```
 
-`npm start` runs `electron .`, which loads `src/main/main.js` (the `"main"` field in
-`package.json`). The main process creates a frameless 1440×920 `BrowserWindow`
-(`createWindow()` in `src/main/main.js`) and loads `src/renderer/index.html`.
+`npm start` runs `electron-vite dev`, which builds and loads `src/main/main.js` (`out/main/index.js`).
+The main process creates a frameless 1440×920 `BrowserWindow` (`createWindow()` in
+`src/main/main.js`) and loads the built renderer.
 
-Dev mode (adds Chromium logging and auto-opens detached DevTools):
+Dev / build / preview are the electron-vite scripts:
 
 ```bash
-npm run dev        # == electron . --enable-logging
+npm run dev        # electron-vite dev (watch)
+npm run build      # electron-vite build → out/{main,preload,renderer}
+npm run preview    # electron-vite preview
 ```
 
 `isDev` is true when `--dev` **or** `--enable-logging` is present
@@ -160,91 +164,75 @@ The probe is the workhorse for automated checks. Point `--shot-evalfile` at a sc
 that returns a value (an object is fine), and collect it via `--probe-out`:
 
 ```bash
-# Run the in-app functional battery; write {summary, results[]} to JSON
+# Run the PM functional battery; write {summary, results[]} to JSON
 npm run build && npx electron . \
-  --no-sandbox --disable-gpu \
-  --shot-evalfile=scripts/test-suite.js \
-  --probe-out=/tmp/results.json
+  --shot-evalfile=scripts/test-suite-pm.js \
+  --probe-out=/tmp/wc-pm.json
 ```
 
-`scripts/test-suite.js` is an IIFE that exercises real command paths through
-`window.WC.Editor` and `window.WC.Commands` and **returns** `{summary, results[]}`,
-which `maybeScreenshot()` writes to `--probe-out`. Its own header documents the exact
-invocation:
-
-```js
-/* In-renderer functional test battery. Run via:
-   npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
-   Returns JSON {summary, results[]} as the executeJavaScript result. */
-```
+`scripts/test-suite-pm.js` is an IIFE that exercises real command paths through the
+`window.WC.PM` bridge and `window.WC.Commands` and **returns** `{summary, results[]}`,
+which `maybeScreenshot()` writes to `--probe-out`. (`npm run test:pm` wraps this exact
+invocation.)
 
 You can combine a probe with a screenshot to get both a result file and a picture of the
 final state:
 
 ```bash
-npm run build && npx electron . --no-sandbox --disable-gpu \
-  --shot-evalfile=scripts/test-suite.js \
-  --probe-out=/tmp/results.json \
+npm run build && npx electron . \
+  --shot-evalfile=scripts/test-suite-pm.js \
+  --probe-out=/tmp/wc-pm.json \
   --shot=/tmp/after.png
 ```
 
-A quick one-liner probe (no file) reads live editor state:
+A quick one-liner probe (no file) reads live editor state via the bridge:
 
 ```bash
-npm run build && npx electron . --no-sandbox --disable-gpu \
-  --shot-eval="JSON.stringify(window.WC.Editor.queryState())" \
+npm run build && npx electron . \
+  --shot-eval="JSON.stringify(window.WC.PM.queryState())" \
   --probe-out=/tmp/state.json
 ```
 
 ---
 
-## The `.docx` round-trip tests
+## The gate suites
 
-**Six gate suites since slice 7:** `test:legacy`, `test:pm`, `test:smoke`,
-`test:smoke:legacy`, `test:roundtrip`, `test:docx` — run all six before committing.
+**Three gates (always `npm run build` first):**
 
-**`npm run test:roundtrip` — the PM-converter docx gate (since slice 7).**
+| Gate | Script | What it covers |
+|---|---|---|
+| `test:pm` | `scripts/test-suite-pm.js` | PM in-renderer functional suite (the real `WC.PM` command paths) |
+| `test:smoke` | `scripts/smoke-pm.js` | PM-core smoke (9) |
+| `test:roundtrip` | `scripts/test-roundtrip-pm.js` | PM-converter docx round-trip — THE docx gate |
+
+**`npm run test:roundtrip` — the PM-converter docx gate.**
 `scripts/test-roundtrip-pm.js` spawns Electron with the renderer probe
 `scripts/test-roundtrip-pm-probe.js` and runs docx → PM → docx per fixture on the
 fork converter (import, zip export to `/tmp/wc-rt-*.docx`, `exportXmlOnly` grep
 invariants, re-import + zip-level asserts via `scripts/docx-inspect.js`). See
-[docs/TESTING.md](TESTING.md) §2a and decision D7.6 there.
+[docs/TESTING.md](TESTING.md) §2a.
 
 ```bash
+npm run build && npm run test:pm
+npm run build && npm run test:smoke
 npm run build && npm run test:roundtrip
 ```
-
-**`node scripts/test_docx.js` — the frozen legacy-converter gate** (guards the
-`--legacy` mammoth/html-to-docx path; retires with legacy at slice 11). Runs in
-plain Node and validates the legacy file pipeline end-to-end:
-HTML → DOCX (html-to-docx) → HTML (mammoth), with an **OOXML regression guard**.
-
-```bash
-node scripts/test_docx.js          # currently 17/17 content checks pass
-```
-
-It uses the exact same complete `margins` object the app uses in `writeDocx`
-(`main.js:328`), and after generating the `.docx` it unzips `word/document.xml` with
-JSZip and **fails** if the XML contains a literal `"undefined"` or a non-integer
-`<w:pgMar>` (`scripts/test_docx.js:25`). This guards the single most important interop
-bug found during validation (see below): a partial `margins` object made `html-to-docx`
-emit `w:header="undefined"`, which real Microsoft Word refuses to open.
 
 ---
 
 ## Real-Word COM oracle workflow
 
-Because the dev machine (Windows host under WSL2) has genuine Microsoft 365 Word
+Because the dev machine (Windows 11 + Word 16.0) has genuine Microsoft 365 Word
 installed, features are validated **differentially against the real Word object model**
-via PowerShell COM automation. This is the ground-truth oracle — it caught the
-`w:header="undefined"` bug that mammoth and LibreOffice silently tolerated.
+via PowerShell COM automation. This is the ground-truth oracle; the parity reference
+is **Word for Windows 16.0**. The in-repo driver is `scripts/oracle/word-oracle-win.ps1`.
 
 ### How it works
 
-From WSL you can invoke the Windows PowerShell and drive Word through COM:
+Drive Word through COM from PowerShell:
 
-```bash
-powershell.exe -ComObject Word.Application
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/oracle/word-oracle-win.ps1
 ```
 
 In practice the oracle is a `.ps1` script that:
@@ -261,42 +249,19 @@ The extracted ground truth is archived as JSON under `docs/research/`, e.g.
 `_source` / `_method` — the genuine Word version (`16.0`, build `16.0.19929`, Aptos
 theme) and that values were read via `powershell.exe -ComObject Word.Application`.
 
-### Script location and the WSL ↔ Windows path bridge
+### Two-leg differential validation
 
-The oracle/probe `.ps1` scripts live on the Windows side at:
+`.docx` fidelity is validated in two legs:
 
-```
-C:\Users\Public\wcprobe\
-```
+- **Leg A — clone → Word.** The PM converter exports a `.docx` (the same `WC.PM.exportDocxBytes()`
+  path the app uses); the oracle opens it in real Word over COM and reads the object model back,
+  confirming the construct survives Word's own parse + resave.
+- **Leg B — Word → clone.** A real-Word-authored `.docx` is imported through the fork
+  `super-converter` and the resulting model is asserted.
 
-referenced as `C:\Users\Public\wcprobe\oracle.ps1` in
-`docs/VALIDATION_home_insert.md` and `docs/research/word-oracle-home-insert.json`. From
-WSL that directory is the same files under:
-
-```
-/mnt/c/Users/Public/wcprobe/
-```
-
-This shared directory is the handoff point between the Node/WSL side and the
-Windows/Word side. The clone's two round-trip helper scripts read/write there directly:
-
-- `scripts/export_ref.js` — generates a `.docx` from rich HTML through the clone's exact
-  export pipeline (html-to-docx) and writes it to
-  `/mnt/c/Users/Public/wcprobe/ref_from_clone.docx` for **real Word to open and read
-  back** (clone → Word fidelity).
-- `scripts/analyze_import.js` — opens a real-Word-authored `.docx`
-  (`/mnt/c/Users/Public/wcprobe/ref_from_word.docx`) through the clone's exact import
-  pipeline (mammoth + the app `styleMap`) and reports which features survive (Word →
-  clone fidelity).
-
-```bash
-# Clone -> real Word: emit a .docx into the shared probe dir for Word to open
-node scripts/export_ref.js
-# (then a .ps1 in C:\Users\Public\wcprobe opens ref_from_clone.docx via COM and reads it back)
-
-# Real Word -> clone: analyze a Word-authored .docx through the import pipeline
-node scripts/analyze_import.js /mnt/c/Users/Public/wcprobe/ref_from_word.docx
-```
+The archived oracle output (per slice) lives under `notes/` and `docs/research/`; older `.ps1`
+probes live at `C:\Users\Public\wcprobe\`. (The pre-rebuild `export_ref.js`/`analyze_import.js`
+helpers — which used `html-to-docx`/`mammoth` — were removed with the legacy converter.)
 
 ### The PID-safe pattern (don't kill the user's open Word)
 
@@ -315,13 +280,11 @@ execute on a machine where the user has live Word documents open.
 ### What the oracle validated
 
 The COM oracle is what produced the per-tab validation in
-`docs/VALIDATION_home_insert.md` (26/28 sampled features matched real Word) and the Aptos
-theme corrections in `docs/research/real-word-groundtruth.json` (body Aptos 12pt,
-Heading 1 = 20pt navy `#0E2841`, the Aptos accent palette, etc.). Most importantly, the
-**clone → Word** direction surfaced the critical `w:header="undefined"` OOXML defect that
-made every saved file unopenable in real Word — fixed by always passing the complete
-integer margin set in `writeDocx` (`src/main/main.js:328`) and now regression-guarded by
-`scripts/test_docx.js`.
+`docs/VALIDATION_home_insert.md` and the Aptos theme corrections in
+`docs/research/real-word-groundtruth.json` (body Aptos 12pt, Heading 1 = 20pt navy
+`#0E2841`, the Aptos accent palette, etc.). Since slice 8 it validates the PM converter's
+`.docx` output construct-by-construct (track changes, comments, fields, themes, …) — each
+slice's Leg A/Leg B results are recorded under `notes/`.
 
 ---
 
@@ -329,21 +292,18 @@ integer margin set in `writeDocx` (`src/main/main.js:328`) and now regression-gu
 
 ```bash
 # Run
-npm start                                   # launch the app (electron .)
-npm run dev                                 # launch with logging + DevTools
-npm start -- --no-sandbox --disable-gpu     # software-render fallback (WSL)
+npm start                                   # build + launch (electron-vite dev)
+npm run build                               # electron-vite build → out/
 npm start -- --win=1280x800 --start-maximized
 
 # Screenshot / probe (one-shot, auto-quits)
-npm start -- --shot=/tmp/word.png
-npm run build && npx electron . --shot-evalfile=scripts/test-suite.js --probe-out=/tmp/results.json
+npx electron . --shot=/tmp/word.png
 
-# File-pipeline tests
+# Gate suites (build first)
+npm run build && npm run test:pm            # PM functional suite
+npm run build && npm run test:smoke         # PM-core smoke (9)
 npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
-node scripts/test_docx.js                   # frozen legacy-converter gate (--legacy html-to-docx; retires at slice 11)
-node scripts/export_ref.js                  # emit .docx into the COM probe dir
-node scripts/analyze_import.js <word.docx>  # import-fidelity report
 
-# Real-Word COM oracle (Windows side)
-powershell.exe -ComObject Word.Application   # scripts live in C:\Users\Public\wcprobe\
+# Real-Word COM oracle
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/oracle/word-oracle-win.ps1
 ```

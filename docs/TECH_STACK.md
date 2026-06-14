@@ -7,130 +7,82 @@ This document describes the technologies, runtime, and third-party libraries tha
 | Layer | Technology | Version | Source |
 | --- | --- | --- | --- |
 | Desktop shell | Electron | `^31.7.6` | `package.json` (devDependency) |
+| Build | electron-vite + TypeScript | `^5.0.0` / `^6.0.3` | `package.json`, `electron.vite.config.ts` |
 | Main process | Node.js (bundled with Electron) | — | `src/main/main.js` |
-| Renderer | Vanilla JS, no bundler, classic `<script>` tags | — | `src/renderer/index.html` |
-| DOCX import (**legacy mode only** since slice 7) | `mammoth` | `^1.8.0` | `package.json`, `src/main/main.js` |
-| DOCX export (**legacy mode only** since slice 7) | `html-to-docx` | `^1.8.0` | `package.json`, `src/main/main.js` |
-| HTML sanitize | `dompurify` | `^3.4.7` | `package.json`, `src/renderer/vendor/purify.min.js` |
+| Document model | ProseMirror (`prosemirror-*`) | see `package.json` | `src/renderer/core/superdoc-fork/`, `src/renderer/pm/index.ts` |
+| Schema + `.docx` converter | Vendored SuperDoc fork (`super-converter`) | (vendored, no npm dep) | `src/renderer/core/superdoc-fork/` |
+| Renderer chrome | Vanilla JS, classic `<script>` tags on `window.WC` | — | `src/renderer/index.html`, `src/renderer/public/js/` |
+| HTML sanitize | `dompurify` | `^3.4.7` | `package.json`, `src/renderer/public/vendor/purify.min.js` |
 | Office icons | `@fluentui/svg-icons` | `^1.1.328` | `package.json`, `scripts/gen-icons.js` (build-time) |
-| ZIP (tooling) | `jszip` | `^3.10.1` | `package.json`, `scripts/test_docx.js` |
-| Default theme | Aptos (Microsoft 365) | — | `src/renderer/styles/base.css`, `src/main/main.js` |
+| ZIP | `jszip` | `^3.10.1` | `package.json` (used by the fork converter) |
+| Default theme | Aptos (Microsoft 365) | — | `src/renderer/public/styles/base.css`, `src/main/main.js` |
 
 ## Electron
 
-The app targets **Electron `^31.7.6`** (the only `devDependency`). There are no other build dependencies — there is no webpack, Vite, Rollup, esbuild, Babel, or TypeScript compiler in the toolchain. The npm scripts launch Electron directly:
+The app targets **Electron `^31.7.6`**, built with **electron-vite + TypeScript** (`electron-vite`, `vite`, `typescript` devDependencies). The npm scripts run electron-vite:
 
 ```json
 "scripts": {
-  "start": "electron .",
-  "dev": "electron . --enable-logging"
+  "dev": "electron-vite dev",
+  "build": "electron-vite build",
+  "start": "electron-vite dev"
 }
 ```
 
 The process model is the standard Electron split:
 
-- **Main process** (`src/main/main.js`) — owns the `BrowserWindow`, the filesystem, native dialogs, printing/PDF export, and the heavy docx conversion libraries.
+- **Main process** (`src/main/main.js`, plain CJS) — owns the `BrowserWindow`, the filesystem, native dialogs, and printing/PDF export. It passes `.docx` as raw bytes; the OOXML conversion runs renderer-side in the vendored fork.
 - **Preload** (`src/main/preload.js`) — a secure `contextBridge` that exposes a single typed surface, `window.wordAPI`, to the renderer.
-- **Renderer** (`src/renderer/`) — the entire Word UI, loaded from `index.html`.
+- **Renderer** (`src/renderer/`) — the PM core + `WC.PM` bridge (TS/ESM) plus the vanilla-JS chrome, loaded from `index.html`.
 
-The window is created with hardened `webPreferences` — `contextIsolation: true`, `nodeIntegration: false` — so the renderer never touches Node directly. Anything needing the filesystem, dialogs, docx conversion, or window control goes through `wordAPI`:
+The window is created with hardened `webPreferences` — `contextIsolation: true`, `nodeIntegration: false` — so the renderer never touches Node directly. Anything needing the filesystem, dialogs, or window control goes through `wordAPI`:
 
 ```js
 // src/main/preload.js
 contextBridge.exposeInMainWorld('wordAPI', {
-  open:    (presetPath) => ipcRenderer.invoke('doc:open', presetPath),
-  save:    (payload)    => ipcRenderer.invoke('doc:save', payload),
-  saveAs:  (payload)    => ipcRenderer.invoke('doc:saveAs', payload),
-  exportPdf: (payload)  => ipcRenderer.invoke('doc:exportPdf', payload),
+  openBytes:    (presetPath) => ipcRenderer.invoke('doc:openBytes', presetPath),
+  saveBytes:    (payload)    => ipcRenderer.invoke('doc:saveBytes', payload),
+  saveTextFile: (payload)    => ipcRenderer.invoke('doc:saveTextFile', payload),
+  exportPdf:    (payload)    => ipcRenderer.invoke('doc:exportPdf', payload),
   // window controls, recent files, image/screenshot inserts, ...
 });
 ```
 
-## The vanilla-JS, no-bundler choice
+## The build: electron-vite + TypeScript
 
-The renderer is deliberately built **without any bundler or framework**. `src/renderer/index.html` loads the entire application as a sequence of classic `<script>` tags in explicit dependency order:
+The renderer is built by **electron-vite** (which wraps Vite for Electron's three targets — main, preload, renderer). The document core (`src/renderer/core/superdoc-fork/`, the `WC.PM` bridge, `main.ts`) is **TypeScript / ESM**; the editor pulls in ESM ProseMirror + SuperDoc-fork modules, which is what forced the move off the original no-bundler setup. `electron.vite.config.ts` wires the `@superdoc/*` + `@core`/`@converter` aliases, a single `prosemirror-model` copy (`resolve.dedupe`), and dev-only CSP/`.vue`-stub plugins. `npm run build` is a real build step (`out/{main,preload,renderer}`).
+
+The shared chrome, by contrast, is still **vanilla JS** — served verbatim from `src/renderer/public/` (untransformed static assets) and loaded as classic `<script>` tags in dependency order, attaching to a single global namespace `window.WC`:
 
 ```html
-<!-- vendor -->
-<script src="vendor/purify.min.js"></script>
-<!-- app modules (classic scripts, dependency order) -->
-<script src="js/icons-fluent.js"></script>
-<script src="js/icons.js"></script>
-<script src="js/util.js"></script>
-<script src="js/ribbon-data.js"></script>
-<script src="js/editor.js"></script>
-<script src="js/formatting.js"></script>
-<!-- ... home/insert/table/layout/references/review tools ... -->
-<script src="js/app.js"></script>
+<!-- shared-chrome classic scripts, then the ESM entry LAST -->
+<script src="/js/ribbon-data.js"></script>
+<script src="/js/commands.js"></script>
+<script src="/js/ribbon.js"></script>
+<script src="/js/app.js"></script>
+<script type="module" src="./main.ts"></script>   <!-- constructs the Editor, installs WC.PM -->
 ```
 
-There are no ES module `import`/`export` statements between renderer files. Instead, every module attaches itself to a single global namespace, `window.WC` (Word Clone):
+For the chrome there is no module resolver, so **load order in `index.html` is the dependency graph**; `main.ts` loads last (after `window.WC` is built) and mounts the PM editor. Migrating the `WC` chrome to TS/ESM modules is deferred to a future slice.
 
-```js
-// e.g. src/renderer/js/files.js
-window.WC = window.WC || {};
-const WC = window.WC;
-```
-
-Cross-module references happen through `WC.*` (for example `WC.Editor`, `WC.dialog`, `WC.el`). Because there is no module resolver, **load order in `index.html` is the dependency graph** — utilities and data (`util.js`, `ribbon-data.js`) load before the features that consume them, and `app.js` loads last to wire everything together.
-
-Why this approach:
-
-- **Zero build step.** `npm start` runs the source as-is. There is no compile/transpile/bundle phase to maintain, no source maps, and no stale-build class of bugs.
-- **Direct debugging.** The files the editor runs are the files on disk; DevTools shows real line numbers (`isDev` opens DevTools detached automatically).
-- **Browser-native primitives.** The editor is a `contenteditable` `<div>` driven by the DOM and `document.execCommand`-style formatting — a bundler buys nothing here.
-
-The single concession is the **`vendor/` folder**: DOMPurify ships as a pre-built UMD file (`src/renderer/vendor/purify.min.js`) and is loaded first, before any app module, so `window.DOMPurify` is available to everything downstream.
+DOMPurify ships as a pre-built UMD file (`src/renderer/public/vendor/purify.min.js`), loaded before any chrome module so `window.DOMPurify` is available downstream.
 
 ## Libraries and what each is for
 
-### `mammoth` (`^1.8.0`) — DOCX import
+### ProseMirror + the vendored SuperDoc fork — the document model & `.docx` converter
 
-> **Legacy-mode only since Phase 2 slice 7:** the default (PM) engine never touches
-> mammoth/html-to-docx/docx-utils — `.docx` converts renderer-side in the vendored fork
-> (`doc:openBytes`/`doc:saveBytes`), and html/txt/csv IO is renderer-side too
-> (`doc:saveTextFile` + the bridge import legs). These libraries serve only the frozen
-> `--legacy` app and are removed with it at slice 11.
+The document is a **ProseMirror editor** built on an **owned, vendored fork of SuperDoc's `super-editor`** core, checked into `src/renderer/core/superdoc-fork/` (schema + `super-converter` + the editing extensions; no `superdoc` npm dep, Vue UI and `DomPainter` dropped, telemetry stripped). The ProseMirror packages themselves are normal dependencies (`prosemirror-model/-state/-view/-transform/-commands/-keymap/-history/-tables/…`), funnelled through a single barrel (`src/renderer/pm/index.ts`) and deduped to one `prosemirror-model` copy by `electron.vite.config.ts`.
 
-Used in the **main process** to convert opened `.docx` files into HTML for the `contenteditable` editor. It is lazy-required on first use to keep startup fast:
+`.docx` import **and** export both go through the fork's **`super-converter`**, renderer-side: the main process hands raw bytes across the bridge (`doc:openBytes` / `doc:saveBytes`), and `bridge/io.ts` calls `WC.PM.openDocx(bytes)` / `WC.PM.exportDocxBytes()`. The converter does a **structural OOXML↔model round-trip** — sections, styles, numbering, tables, fields/TOC, footnotes, comments, track changes — rebuilding the package rather than HTML-flattening it. The legacy `mammoth` (import) and `html-to-docx` (export) libraries were retired with the legacy world in slice 11; html/txt/csv IO is also handled renderer-side (`doc:saveTextFile` + the bridge import legs).
 
-```js
-// src/main/main.js — let mammoth = null; (loaded on first use)
-if (!mammoth) mammoth = require('mammoth');
-```
-
-`openPath()` calls `mammoth.convertToHtml()` with a custom `styleMap` that translates Word's named paragraph styles into the renderer's expected markup (`Title -> h1.doc-title`, `Heading 1 -> h1`, `Quote -> blockquote`, `Strong -> strong`, etc.) and an image converter that inlines pictures as base64 `data:` URLs:
-
-```js
-const result = await mammoth.convertToHtml(
-  { path: filePath },
-  { styleMap, includeDefaultStyleMap: true,
-    convertImage: mammoth.images.imgElement(async (image) => {
-      const buf = await image.read('base64');
-      return { src: `data:${image.contentType};base64,${buf}` };
-    }) }
-);
-```
-
-### `html-to-docx` (`^1.8.0`) — DOCX export
-
-Used in the **main process** to turn the editor's HTML back into a real `.docx` file on save/Save As. Also lazy-required:
-
-```js
-// src/main/main.js
-if (!htmlToDocx) htmlToDocx = require('html-to-docx');
-const buffer = await htmlToDocx(fullHtml, null, docxOpts);
-await fsp.writeFile(filePath, buffer);
-```
-
-The export options in `writeDocx()` are tuned to match real Word defaults — `font: 'Aptos'`, `fontSize: 24` (half-points, i.e. 12 pt), and 1-inch (1440 twip) page margins. A code comment flags a real-world quirk: **all margin keys must be integers**, because `html-to-docx` stringifies missing keys as the literal `"undefined"`, which makes real Word reject the file.
+> **Round-trip is rebuild-not-byte-identical.** The export normalizes/drops unmodeled XML; fidelity rests on the handler set + passthrough. `npm run test:roundtrip` (the PM-converter docx gate) is the regression guard — see [TESTING.md](TESTING.md).
 
 ### `dompurify` (`^3.4.7`) — HTML sanitization
 
-Loaded in the **renderer** (vendored at `src/renderer/vendor/purify.min.js`, loaded first in `index.html`). It sanitizes incoming/pasted HTML before it enters the editor, via `WC.Files.sanitize()`:
+Loaded in the **renderer** (vendored at `src/renderer/public/vendor/purify.min.js`, loaded before the chrome modules in `index.html`). It sanitizes incoming/pasted HTML before it enters the editor, via `WC.Files.sanitize()`:
 
 ```js
-// src/renderer/js/files.js
+// src/renderer/public/js/files.js
 return window.DOMPurify.sanitize(html, {
   ALLOWED_ATTR: ['style', 'href', 'src', 'alt', 'class', 'colspan', 'rowspan',
                  'width', 'height', 'title', 'align', 'data-comment'],
@@ -151,11 +103,11 @@ window.WC = window.WC || {};
 window.WC.FLUENT = { /* { iconName: "<path .../>" } */ };
 ```
 
-The output, `src/renderer/js/icons-fluent.js`, is checked in and loaded as the first app module in `index.html`. This gives the ribbon genuine Microsoft Fluent UI iconography while shipping only the handful of icons the app actually uses (the script reports generated vs. missing counts against `scripts/icon-map.json`).
+The output, `src/renderer/public/js/icons-fluent.js`, is checked in and loaded as the first chrome icon module in `index.html`. This gives the ribbon genuine Microsoft Fluent UI iconography while shipping only the handful of icons the app actually uses (the script reports generated vs. missing counts against `scripts/icon-map.json`).
 
-### `jszip` (`^3.10.1`) — DOCX inspection (tooling)
+### `jszip` (`^3.10.1`) — OOXML packaging
 
-Used by the developer tooling rather than the app itself — `scripts/test_docx.js` loads exported `.docx` buffers with `JSZip.loadAsync()` to inspect the OOXML inside (a docx is a ZIP). It also transitively backs `html-to-docx`.
+A docx is a ZIP. `jszip` is used by the fork's `super-converter` to read and write the OOXML package on `.docx` open/save, and by the round-trip test tooling (`scripts/docx-inspect.js`) to assert zip-level invariants.
 
 ## WSL / WSLg runtime notes
 
@@ -207,14 +159,14 @@ The IPC `window:toggleMaximize` and `window:isMaximized` handlers both go throug
 The default document theme matches modern Word's **Aptos** look. Aptos is proprietary and unavailable on Linux, so the renderer defines fallback chains in CSS custom properties:
 
 ```css
-/* src/renderer/styles/base.css */
+/* src/renderer/public/styles/base.css */
 --doc-font: "Aptos", Calibri, Carlito, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
 --doc-heading-font: "Aptos Display", "Aptos", Calibri, Carlito, "Segoe UI", system-ui, sans-serif;
 --heading-color: #0E2841;   /* Aptos theme Text 2 (navy) */
 ```
 
-The body default is **Aptos 12 pt** (`src/renderer/styles/editor.css`: `font-size: 12pt; /* Aptos 12 (real Word default) */`). The Aptos theme colors used throughout (heading navy `#0E2841`, accent palette) were extracted from the user's real Word build (`16.0.19929`, noted in `src/renderer/js/util.js`). The Design tab exposes Aptos as a named theme (`src/renderer/js/design-tools.js`), and the DOCX export pins `font: 'Aptos'` so saved files carry the same default.
+The body default is **Aptos 12 pt** (`src/renderer/public/styles/editor.css`: `font-size: 12pt; /* Aptos 12 (real Word default) */`). The Aptos theme colors used throughout (heading navy `#0E2841`, accent palette) were extracted from the user's real Word build (`16.0.19929`, noted in `src/renderer/public/js/util.js`). The Design tab exposes Aptos as a named theme (`src/renderer/public/js/design-tools.js`), and `.docx` export carries the Aptos default through the fork converter's `docDefaults`/Normal style.
 
 ## Summary
 
-A deliberately minimal, build-step-free stack: Electron 31 for the desktop shell, a framework-free renderer that loads ordered classic scripts onto a global `WC` namespace, and four runtime/build libraries each with a single clear job — `mammoth` in, `html-to-docx` out, `dompurify` for safety, `@fluentui/svg-icons` for authentic icons — all tuned around a WSL-friendly runtime and a default Aptos theme that mirrors real Microsoft 365 Word.
+Electron 31 for the desktop shell; an electron-vite + TypeScript renderer whose document core is an owned ProseMirror engine forked from SuperDoc (schema + `super-converter` doing the bidirectional `.docx` round-trip), with the ribbon chrome still loading ordered classic scripts onto a global `WC` namespace. The runtime libraries each have a single clear job — ProseMirror for the model, the fork converter (+ `jszip`) for `.docx`, `dompurify` for safety, `@fluentui/svg-icons` for authentic icons — tuned around a default Aptos theme that mirrors real Microsoft 365 Word.

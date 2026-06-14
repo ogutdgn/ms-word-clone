@@ -4,9 +4,9 @@ This is the top-level map of what the Word clone does. It is an **index**, not a
 re-statement of the per-tab docs: each row links to a dedicated `*_TAB.md` that lists every
 control and its status. The clone renders the full Microsoft 365 ribbon — **10 tabs, 62
 groups, 216 controls** (counting dialog-box launchers) — driven by
-[`src/renderer/js/ribbon-data.js`](../src/renderer/js/ribbon-data.js), which is
+[`src/renderer/public/js/ribbon-data.js`](../src/renderer/public/js/ribbon-data.js), which is
 auto-generated from the feature research and is the single source of truth for the ribbon
-layout.
+layout. Every command drives the single **PM/SuperDoc-fork engine** through the `WC.PM` bridge.
 
 ## Legend
 
@@ -41,38 +41,36 @@ the test count, and the MS Word COM-oracle validation notes.
 > per-tab `*_TAB.md` docs reflect what actually ships. Use those docs, not the raw
 > feasibility tags, as the source of truth for status.
 
-**File IO (Backstage, not a ribbon tab)** — on the default PM engine (since Phase 2
-slice 7): open `.docx` (fork converter), `.html`/`.htm` (semantic import), `.txt`
-(line-per-paragraph), `.csv`/`.tsv` (imported as a real table — a recorded deviation:
-real Word opens csv as delimited plain text; a csv import opens as an *unsaved* document
-since the table form can't be written back); save/Save As `.docx`, `.html`, `.txt`;
-PDF export. `.md`/`.rtf` open only under `--legacy`. Oracle-validated vs Word 16.77.1
-(slice-7 legs A–D).
+**File IO (Backstage, not a ribbon tab)** — on the PM engine: open `.docx` (fork
+converter), `.html`/`.htm` (semantic import), `.txt` (line-per-paragraph),
+`.csv`/`.tsv` (imported as a real table — a recorded deviation: real Word opens csv as
+delimited plain text; a csv import opens as an *unsaved* document since the table form
+can't be written back); save/Save As `.docx`, `.html`, `.txt`; PDF export. Oracle-validated
+(slice-7 legs A–D). (`.md`/`.rtf` open was a legacy-only path, removed in slice 11.)
 
 ## What "works" means here — two layers of verification
 
 There are two distinct claims this project makes, documented separately:
 
 1. **Each control exists and runs** — covered by the per-tab `*_TAB.md` docs and the
-   functional test suite (`scripts/test-suite.js`). Many tabs were additionally checked
-   against **real Microsoft Word via COM probes** (`*_probe.ps1`) — e.g. page geometry,
-   caption format, MailMerge type enums, Track-Changes revision counts — and the docs note
-   where the clone matches the oracle and where it diverges.
+   PM functional suite (`scripts/test-suite-pm.js`). Many tabs were additionally checked
+   against **real Microsoft Word via COM** (`scripts/oracle/word-oracle-win.ps1` + the
+   archived `*_probe.ps1`) — e.g. page geometry, caption format, MailMerge type enums,
+   Track-Changes revision counts — and the docs note where the clone matches the oracle
+   and where it diverges.
 
 2. **What visibly happens on screen matches Word** — the *on-screen-outcome parity* work,
    recorded in **[UI_FIDELITY_AUDIT.md](UI_FIDELITY_AUDIT.md)**. A multi-agent audit of all
    **212 controls across 10 tabs** flagged 81 divergences, adversarially confirmed 53, and
-   fixed all of them (suite grew from 162 to 213 passing functional tests + 9/9 docx). Read
-   this for the parity fixes per tab (e.g. Focus/Side-to-Side/Read-Mode behaviors, split
-   menus, live-preview-on-hover, contextual Header & Footer tab).
+   fixed all of them. Read this for the parity fixes per tab (e.g. Focus/Side-to-Side/
+   Read-Mode behaviors, split menus, contextual tabs). *(This audit ran on the pre-rebuild
+   app; its outcomes carried forward as the parity bar the PM engine is held to.)*
 
 ## Features that need a cloud or host runtime
 
 Everything deliberately left as a placeholder — because it requires a server, a proprietary
 runtime, or an Office-grade engine — is cataloged in
-**[NOT_IMPLEMENTED.md](NOT_IMPLEMENTED.md)**, which also explains the architecture tradeoffs
-(`contenteditable` + a custom command layer rather than a from-scratch Range engine; `.docx`
-export via `html-to-docx` rather than the programmatic `docx` library). The major ❌ buckets:
+**[NOT_IMPLEMENTED.md](NOT_IMPLEMENTED.md)**. The major ❌ buckets:
 
 - **Add-ins** — Office.js task panes / store (Home, Insert).
 - **Macros / VBA** — no VBA runtime (View ▸ Macros).
@@ -87,22 +85,21 @@ UI but not fully functional" section) and the area-by-area feasibility matrix.
 
 ## Known architectural approximations
 
-A few outcomes are faithful in shape but bounded by the single-`contenteditable`
-architecture and the lack of a true pagination engine:
+A few outcomes are faithful in shape but bounded by the page-sheet rendering being
+continuous-flow today (real multi-page sheets are Phase-7-gated):
 
-- **Headers/footers** appear once on screen (not repeated per sheet); they paginate
-  correctly only at print/PDF time. (Insert tab, "Known approximations".)
+- **Headers/footers, on-page page-number fields, and multi-page View modes** are
+  Phase-7-deferred — those commands honestly block until the PM pagination engine lands.
 - **Asymmetric column widths** (Left/Right) and **mirrored margins** render with the
-  dominant value; **Side-to-Side** paging is a CSS-column approximation. (UI Fidelity Audit,
-  "Known approximations".)
+  dominant value; **Side-to-Side** paging is approximate. (UI Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.
-- **`.docx` export** aims for semantic preservation, not byte-identical round-trip; inline
-  SVG ink may be dropped by `html-to-docx`. (Draw tab notes; `NOT_IMPLEMENTED.md`.)
+- **`.docx` export** is a structural rebuild (the fork `super-converter`), not a
+  byte-identical round-trip. (`NOT_IMPLEMENTED.md`; guarded by `test:roundtrip`.)
 
 ## Where to look
 
 - Per-tab control inventories: the `*_TAB.md` files linked in the table above.
 - On-screen parity vs Word and the fix log: [`UI_FIDELITY_AUDIT.md`](UI_FIDELITY_AUDIT.md).
 - Stubs, feasibility matrix, and architecture tradeoffs: [`NOT_IMPLEMENTED.md`](NOT_IMPLEMENTED.md).
-- The ribbon definition (source of the counts above): [`src/renderer/js/ribbon-data.js`](../src/renderer/js/ribbon-data.js).
-- Functional tests: `scripts/test-suite.js`; real-Word COM oracles: `scripts/*_probe.ps1`.
+- The ribbon definition (source of the counts above): [`src/renderer/public/js/ribbon-data.js`](../src/renderer/public/js/ribbon-data.js).
+- Functional tests: `scripts/test-suite-pm.js`; real-Word COM oracle: `scripts/oracle/word-oracle-win.ps1`.

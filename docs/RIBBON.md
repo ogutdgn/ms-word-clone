@@ -2,9 +2,11 @@
 
 The ribbon is the tab strip and command surface at the top of the window. It is
 **fully data-driven**: a single generated table (`WC.RIBBON`) describes every tab,
-group and control, and `WC.Ribbon` (in `src/renderer/js/ribbon.js`) turns that
+group and control, and `WC.Ribbon` (in `src/renderer/public/js/ribbon.js`) turns that
 table into DOM and wires every control to the command dispatcher
-`WC.Commands` (in `src/renderer/js/commands.js`).
+`WC.Commands` (in `src/renderer/public/js/commands.js`). The ribbon + dispatcher are
+shared chrome (still classic `WC` scripts); each handler drives the **`WC.PM` bridge**
+(the PM editor is the only document model — dispatch is PM-only, no legacy fallback).
 
 Nothing in the ribbon is hand-built per control — to change what appears you change
 the data; to change what a control *does* you change a handler in `commands.js`.
@@ -13,9 +15,9 @@ the data; to change what a control *does* you change a handler in `commands.js`.
 
 | File | Role |
 | --- | --- |
-| `src/renderer/js/ribbon-data.js` | The generated `WC.RIBBON` table — 10 tabs, 212 controls. **Auto-generated, do not hand-edit.** |
-| `src/renderer/js/ribbon.js` | `WC.Ribbon` — renders the tab strip + ribbon body, builds each control type, handles tab switching, toggle-state sync, the Styles gallery, and runtime contextual tabs. |
-| `src/renderer/js/commands.js` | `WC.Commands` — the dispatcher (`run` / `dropdown`) plus the `H` handler table that maps each `cmd` id to real editor behavior. |
+| `src/renderer/public/js/ribbon-data.js` | The generated `WC.RIBBON` table — 10 tabs, 212 controls. **Auto-generated, do not hand-edit.** |
+| `src/renderer/public/js/ribbon.js` | `WC.Ribbon` — renders the tab strip + ribbon body, builds each control type, handles tab switching, toggle-state sync, the Styles gallery, and runtime contextual tabs. |
+| `src/renderer/public/js/commands.js` | `WC.Commands` — the dispatcher (`run` / `dropdown`) plus the `H` handler table that maps each `cmd` id to a `WC.PM` bridge call (PM-only). |
 
 ## The data model: `WC.RIBBON`
 
@@ -73,7 +75,7 @@ init() {
   this.renderTabStrip();
   this.renderBody();
   this.activate(WC.RIBBON[0].id);                 // Home is active first
-  WC.Editor.onStateChange((st) => this.syncToggles(st));
+  WC.PM.onStateChange((st) => this.syncToggles(st));   // bridge pushes state per transaction
 }
 ```
 
@@ -164,8 +166,8 @@ selection's font/size back into the box.
 ### Spinners — `renderSpinner(c)`
 
 Numeric `<input type=number>` with an icon and a unit (`"` for indents, `pt` for
-spacing). On change it calls `WC.Commands.spinner(c.cmd, value)`, which maps to
-`E().applyBlockStyle(...)` (indent in inches, spacing in points).
+spacing). On change it calls `WC.Commands.spinner(c.cmd, value)`, which maps to a
+`WC.PM` bridge call (indent in inches, spacing in points).
 
 ## Command dispatch (`commands.js`)
 
@@ -185,13 +187,13 @@ run(control, node) {
 }
 ```
 
-`H` is a flat object keyed by `cmd`. Each handler receives `(control, node)`.
-Examples:
+`H` is a flat object keyed by `cmd`. Each handler receives `(control, node)` and
+drives the `WC.PM` bridge (or opens a dialog). Examples:
 
 ```js
-H.bold = () => E().exec('bold');
-H.table = (c, node) => WC.Dialogs.insertTable();
-H.header = (c, node) => WC.HeaderFooter.headerMenu(node);
+H.bold = () => WC.PM.toggleMark('bold');
+H.table = (c, node) => WC.Dialogs.insertTable();   // dialog → WC.PM.insertTable
+H.header = (c, node) => WC.notifyBlocked('header');  // Phase-7-deferred area
 ```
 
 A `cmd` with no handler and no menu surfaces `WC.notImplemented(...)`, which shows a
@@ -223,7 +225,7 @@ not-yet-implemented) menu — the generic path covers it.
 
 - `comboCommit(c, value)` / `comboDropdown(c, combo, input)` — font name, font size,
   display-for-review.
-- `applyStyle(name)` → `WC.applyNamedStyle(name)` (the Styles gallery commit).
+- `applyStyle(name)` → `WC.PM.applyNamedStyle(name)` (the Styles gallery commit).
 - `spinner(cmd, value)` — indent/spacing block styles.
 - `launcher(groupId, control, node)` — dialog-box launchers, keyed by **group id**
   (not `cmd`) to avoid collisions like the Font launcher sharing `'font'` with the
@@ -232,7 +234,7 @@ not-yet-implemented) menu — the generic path covers it.
 ## Flyout menus
 
 All menus use the shared helper `WC.flyout(anchor, builder, opts)`
-(`src/renderer/js/util.js`). It closes any open flyout, builds a positioned
+(`src/renderer/public/js/util.js`). It closes any open flyout, builds a positioned
 `.flyout` under the anchor (flipping above if it would overflow the viewport), and
 auto-closes on the next outside `mousedown`. Builders compose menus from:
 
@@ -258,10 +260,11 @@ const TOGGLE_MAP = {
 };
 ```
 
-maps a control `cmd` to a `document.queryCommandState` key. During render, any
-control whose `cmd` is in `TOGGLE_MAP` is pushed onto `this.toggleNodes`. The editor
-fires state changes (`WC.Editor.onStateChange`), and `syncToggles(st)` flips the
-`.toggled` class on each node:
+maps a control `cmd` to a key in the state object the `WC.PM` bridge derives from
+the active marks/node attributes on each transaction. During render, any control
+whose `cmd` is in `TOGGLE_MAP` is pushed onto `this.toggleNodes`. The bridge fires
+state changes (`WC.PM.onStateChange`), and `syncToggles(st)` flips the `.toggled`
+class on each node:
 
 ```js
 syncToggles(st) {
@@ -282,41 +285,18 @@ control's `items[]` (`Normal`, `Heading 1`, `Title`, …), filtering out the tra
 *Create a Style / Clear Formatting / Apply Styles* commands. Each `.style-cell`
 carries a small inline-CSS preview of how that style looks.
 
-**Live preview** mirrors Word: hovering a cell applies the style to the current
-selection, and leaving reverts it. This is done with a snapshot/restore pair at the
-top of `ribbon.js`:
+**Apply-on-click (PM mode).** Clicking a cell commits the style via
+`WC.Commands.applyStyle(name)` → `WC.PM.applyNamedStyle(name)`, which applies the
+named style as a ProseMirror transaction (selection → selection; caret → current
+paragraph). The Styles gallery is **click-only** in PM mode: the hover live-preview
+was a recorded deviation (the transient restyle read as a bug — see
+`docs/plan/deferrals.md`), so the gallery's hover wiring is disabled, though the
+underlying `bridge/style-preview.ts` is intact. The gallery's More button (`▼`)
+opens the full styles pane (`WC.Dialogs.stylesPane()`).
 
-```js
-function stylePreviewEnter(name) {
-  if (!gallerySnap) gallerySnap = { html: E().node.innerHTML, sel: serializeSel(), dirty: E().dirty };
-  WC.applyNamedStyle(name);                 // apply for preview
-}
-function stylePreviewLeave() {
-  E().node.innerHTML = gallerySnap.html;    // revert document + selection + dirty flag
-  restoreSel(gallerySnap.sel);
-  E().dirty = gallerySnap.dirty;
-  E().repaginate();
-  gallerySnap = null;
-}
-```
-
-The cell wiring:
-
-```js
-cell.addEventListener('mouseenter', () => stylePreviewEnter(s));
-cell.addEventListener('mouseleave', () => stylePreviewLeave());
-cell.addEventListener('click', () => { stylePreviewCommit(); WC.Commands.applyStyle(s); });
-```
-
-Clicking commits by clearing the snapshot (`stylePreviewCommit`) and applying for
-real via `WC.Commands.applyStyle` → `WC.applyNamedStyle` (in
-`src/renderer/js/formatting.js`, which maps style names to `formatBlock` / inline
-styles / injected custom-style classes). The gallery's More button (`▼`) opens the
-full styles pane (`WC.Dialogs.stylesPane()`).
-
-A similar hover-preview-then-commit pattern (`livePreviewCell`) powers the Design
-tab galleries (themes, colors, fonts, style sets) via `WC.Design.snapshot()` /
-`WC.Design.restore()`.
+Design-tab galleries (themes, colors, fonts) **do** hover-preview via the bridge's
+linked-styles decoration; Style Sets + Paragraph Spacing are commit-only (also
+recorded in the deferrals ledger).
 
 ## Runtime contextual tabs
 
@@ -348,32 +328,25 @@ hideContextualTab(id) {
 The injected panel is built by the **same** `renderGroup` used for static tabs, so a
 contextual tab is just a tab definition object — no special rendering path.
 
-Callers: the Header & Footer feature (`header-footer.js`, single tab, auto-selected)
-and the PM-mode Table Tools (`table-tools-pm.js`, two passive tabs — **Table Design**
-+ **Layout** — shown/hidden by `syncContextualTabs(inTable)` from the bridge
-state-sync as the caret enters/leaves a table). Header & Footer's `contextualTab()`
-returns the def:
+The live caller is the **PM-mode Table Tools** (`table-tools-pm.js`): two passive
+tabs — **Table Design** + **Layout** — shown/hidden by `syncContextualTabs(inTable)`
+driven from the `WC.PM` bridge state-sync as the caret enters/leaves a table. Each is
+just a tab definition object (id/name/groups/controls), e.g.:
 
 ```js
-contextualTab() {
-  return {
-    id: 'header-footer', name: 'Header & Footer', contextual: true,
-    groups: [
-      { id: 'hf-headerfooter', name: 'Header & Footer', controls: [
-        { cmd: 'header', label: 'Header', type: 'dropdown' },
-        { cmd: 'footer', label: 'Footer', type: 'dropdown' },
-        { cmd: 'pageNumber', label: 'Page Number', type: 'dropdown' },
-      ] },
-      … // Insert, Navigation, Options, Close groups
-    ],
-  };
-}
+// table-tools-pm.js (shape)
+{ id: 'table-design', name: 'Table Design', contextual: true,
+  groups: [ { id: 'table-styles', name: 'Table Styles', controls: [ /* … */ ] }, … ] }
 ```
 
-`HeaderFooter.enterMode()` calls `WC.Ribbon.showContextualTab(this.contextualTab())`;
-`exitMode()` calls `WC.Ribbon.hideContextualTab()`. The contextual controls reuse
-ordinary `cmd`s whose handlers live in `commands.js` (`H.header`, `H.goToHeader`,
-`H.differentFirstPage`, `H.closeHeaderFooter`, …).
+`table-tools-pm.js` calls `WC.Ribbon.showContextualTab(def, { activate: false })` to
+add the passive tabs and `WC.Ribbon.hideContextualTab(id)` to remove them; the
+contextual controls reuse ordinary `cmd`s whose handlers in `commands.js` drive the
+`WC.PM` bridge.
+
+> The legacy single-tab Header & Footer contextual tab (the old `header-footer.js`
+> `enterMode()`/`exitMode()` example) was removed in slice 11 — header/footer editing
+> is a Phase-7-deferred area (its commands honestly block).
 
 ## How to add or change a control
 
@@ -394,17 +367,19 @@ the bold button does, edit `H.bold`. To change a menu, edit the matching `if (cm
    you can edit `ribbon-data.js` directly, but it will be overwritten on the next
    generate.)
 2. **Add a handler** in `commands.js`: `H.myCmd = (c, node) => { … }`. Use
-   `E()` (= `WC.Editor`) for document edits, `WC.flyout(node, …)` for a menu, and
-   `WC.toast` / `WC.notImplemented` for status.
+   `WC.PM.*` (the bridge) for document edits, `WC.flyout(node, …)` for a menu, and
+   `WC.toast` / `WC.notImplemented` for status. (Add the actual PM transaction in
+   `src/renderer/bridge/*.ts` and expose it on `WC.PM`.)
 3. **For a menu** (`type: "dropdown"` or the arrow of a `type: "split"`): either
    provide an `items[]` array in the data (handled automatically by the generic
    path in `Commands.dropdown`) or add a custom `if (cmd === 'myCmd')` branch.
-4. **For a toggle that mirrors editor state:** add `myCmd: 'queryCommandKey'` to
-   `TOGGLE_MAP` in `ribbon.js` — it will then sync automatically via
+4. **For a toggle that mirrors editor state:** add `myCmd: 'stateKey'` to
+   `TOGGLE_MAP` in `ribbon.js` (where `stateKey` is a field the bridge's
+   `state-sync.ts` puts on the state object) — it will then sync automatically via
    `syncToggles`. For ad-hoc on/off state, just call
    `node.classList.toggle('toggled')` inside the handler.
 5. **Icon:** `renderControl` calls `WC.icon(c.cmd, size)`
-   (`src/renderer/js/icons.js`); add an SVG for the new `cmd` there, or it falls
+   (`src/renderer/public/js/icons.js`); add an SVG for the new `cmd` there, or it falls
    back to a generic glyph.
 
 No change to `ribbon.js` is needed for an ordinary button/dropdown/split — the

@@ -1,15 +1,20 @@
 # Pagination Engine
 
-The pagination engine turns one continuous `contenteditable` flow into the
-illusion of discrete page sheets — line by line, like real Microsoft Word. It is
-the trickiest subsystem in the clone: it does live DOM surgery on every edit
-while preserving the caret, splits even a single long paragraph across pages, and
-strips all of its own artifacts before anything is saved.
-
-All of the code lives in `src/renderer/js/editor.js` (the `WC.Editor` object);
-the supporting CSS is in `src/renderer/styles/editor.css`; the page-geometry CSS
-variables are in `src/renderer/styles/base.css`; manual breaks are inserted from
-`src/renderer/js/commands.js`.
+> ⚠️ **RETIRED ENGINE — historical reference.** Everything below describes the
+> **legacy `contenteditable` pagination engine** (`WC.Editor.repaginate()` in the old
+> `editor.js`), which was **removed in slice 11** along with the rest of the legacy world.
+> It is kept here because the *geometry* (US-Letter 816×1056 @96dpi, 1″ margins, the
+> ~26-Aptos-12-lines-per-page calibration validated against real Word) and the page-sheet
+> CSS still inform the current design.
+>
+> **Current state (single PM world):** the document is a **ProseMirror editor** mounted
+> at `#pm-editor` rendered into a **continuous-flow page sheet** (`.page` in
+> `src/renderer/public/styles/editor.css`; geometry vars in `.../styles/base.css`). There
+> is **no `repaginate()` engine today** — real, model-driven multi-page sheets (line-level
+> splitting, per-sheet headers/footers, page-number fields) are **Phase-7-gated**, to be
+> rebuilt as an owned PM decoration/plugin validated against the oracle (see
+> [docs/decisions/](decisions/) C1 and `docs/plan/deferrals.md` class A). The rest of this
+> document is the prior art for that work.
 
 ---
 
