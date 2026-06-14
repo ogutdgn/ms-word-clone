@@ -193,7 +193,7 @@ drives the `WC.PM` bridge (or opens a dialog). Examples:
 ```js
 H.bold = () => WC.PM.toggleMark('bold');
 H.table = (c, node) => WC.Dialogs.insertTable();   // dialog → WC.PM.insertTable
-H.header = (c, node) => WC.notifyBlocked('header');  // Phase-7-deferred area
+H.header = (c, node) => WC.notifyBlocked('header');  // Phase-4-deferred area (layout engine)
 ```
 
 A `cmd` with no handler and no menu surfaces `WC.notImplemented(...)`, which shows a
@@ -346,7 +346,7 @@ contextual controls reuse ordinary `cmd`s whose handlers in `commands.js` drive 
 
 > The legacy single-tab Header & Footer contextual tab (the old `header-footer.js`
 > `enterMode()`/`exitMode()` example) was removed in slice 11 — header/footer editing
-> is a Phase-7-deferred area (its commands honestly block).
+> is a Phase-4-deferred area (layout engine; its commands honestly block).
 
 ## How to add or change a control
 

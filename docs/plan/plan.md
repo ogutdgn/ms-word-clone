@@ -27,11 +27,12 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
   it, on its own branch**, against the now-real code — not up front on paper.
 - **Each subsystem branch:** (1) read its recommendation + edge cases in
   [../decisions/OPEN_DECISIONS.md](../decisions/OPEN_DECISIONS.md); (2) confirm or adjust it
-  against the real code; (3) build; (4) gate on the test suite (228 in-renderer + 9 docx) +
+  against the real code; (3) build; (4) gate on the three suites (test:pm / test:smoke / test:roundtrip) +
   feature-parity; (5) **update the plan docs via the `plan-tracking` skill**; (6) PR for review.
 - **Strangler-fig migration:** stand ProseMirror up *behind* the existing ribbon and flip one
   feature area at a time; never a big-bang rewrite.
-- **Pagination is done LAST**, validated against the macOS Word AppleScript oracle.
+- **Pagination / layout engine is Phase 4** (re-sequenced 2026-06-14 from "last"): built to clear
+  the layout-coupled bugs flagged during the Phase-3 ribbon-hardening pass; validated against the Word oracle.
 - **Decisions are append-only ADRs.** To change a locked decision, add a superseding ADR.
 
 ## Branching model
@@ -42,22 +43,29 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
 - One **feature branch per phase/subsystem** (e.g. `build/phase-1-scaffold`, `feature/logger`,
   `feature/verifier`, `feature/mcp`) → PR → integration line → `main` at a milestone.
 
+> **Re-sequenced 2026-06-14 (user decision):** primary goal = a **fully working editing env first**.
+> So Phase 3 is now a **ribbon tab-by-tab hardening pass** (bugs + scope finalization + the ribbon
+> **state machine**), Phase 4 is the **pagination / layout engine** pulled up from old "last", and
+> logger/verifier/MCP follow at 5/6/7. Layout-coupled bugs found in Phase 3 are **flagged as the Phase-4
+> spec** (`deferrals.md` §A.1), never hacked. See `execution-map.md` CURRENT PHASE + `SCOPE.md`.
+
 ## Phase roadmap
-(Order may adjust; logger/verifier/MCP can follow once the editing core is real.)
+(Order may adjust; logger/verifier/MCP follow once the editing core is hardened.)
 
 | Phase | What | Status |
 |------|------|--------|
 | **0** | Research + architecture decisions (ADR-0001…0005) + de-risk spike | ✅ done |
 | **1** | Scaffold: electron-vite + TS; vendor the SuperDoc fork (strip Vue/painter/telemetry); mount the model in our own `EditorView` (closes Q1 last mile) | ✅ done (engine owned, gates green; branch pushed) |
-| **2** | Editing core behind the existing ribbon (strangler-fig): commands → PM transactions | ✅ **done (all slices 0a–11).** PM core is the only editor; character/paragraph/lists/styles/clipboard+editing-misc/find-replace/insert-basics+full-Table-Tools/file-io/review/references/mail-merge/themes/insert-exotica/draw flipped & oracle-validated; **slice 11 retired the dual-world scaffolding** (legacy editor/converter/`--legacy` flag/3 legacy gates removed; −4229 lines; gates PM 326 · smoke 9 · roundtrip 27). Editing core COMPLETE → Phase 3 (Logger) next. |
-| **3** | **Logger** (branch) — `dispatchTransaction` tap + raw capture + outcome serialize + firewall | |
-| **4** | **Verifier** (branch) — headless predicates + reward + QA harness + oracle gold | |
-| **5** | **MCP server** (branch) — tools/resources, transports, episodes; + pixel RPC | |
-| **6** | Hard Word constructs — sections, headers/footers remaining (wiring half absorbed into Phase 2 slices 8–9 per the 2026-06-05 spec; Phase 6 = verification of sections/headers-footers) | |
-| **7** | **Pagination** (branch, LAST) — model-driven plugin or borrow layout-engine; validate vs oracle | |
-| **8** | `.docx` per-construct round-trip tests vs the Word oracle | |
-| **9** | RL env loop + determinism mode + observation bundle + task framework | |
-| **10** | Merge into `cua-bench` (resolve relation to its native Qt/LOK `apps/ms-word`) | |
+| **2** | Editing core behind the existing ribbon (strangler-fig): commands → PM transactions | ✅ **done (all slices 0a–11).** PM core is the only editor; character/paragraph/lists/styles/clipboard+editing-misc/find-replace/insert-basics+full-Table-Tools/file-io/review/references/mail-merge/themes/insert-exotica/draw flipped & oracle-validated; **slice 11 retired the dual-world scaffolding** (legacy editor/converter/`--legacy` flag/3 legacy gates removed; −4229 lines; gates PM 326 · smoke 9 · roundtrip 27). Editing core COMPLETE → Phase 3 (ribbon hardening) next. |
+| **3** | **Editing-core hardening + scope finalization** (branch-per-tab) — ribbon **tab-by-tab** bug-fix pass (research → compare-vs-live-clone → fix), the ribbon **state machine** (enablement + latch), `docs/SCOPE.md` (in/out scope), and **flagging layout-coupled bugs as the Phase-4 spec** (`deferrals.md` §A.1) | ◀ **current** |
+| **4** | **Pagination / layout engine** (branch; pulled up from old "last") — model-driven PM plugin + overlay: multi-page + floating-object positioning + text-wrap; built to **clear the Phase-3 layout flags**; validate vs the Word oracle | |
+| **5** | **Logger** (branch) — `dispatchTransaction` tap + raw capture + outcome serialize + firewall | |
+| **6** | **Verifier** (branch) — headless predicates + reward + QA harness + oracle gold | |
+| **7** | **MCP server** (branch) — tools/resources, transports, episodes; + pixel RPC | |
+| **8** | Hard Word constructs — sections, headers/footers verification (wiring half absorbed into Phase 2 slices 8–9 per the 2026-06-05 spec) | |
+| **9** | `.docx` per-construct round-trip tests vs the Word oracle | |
+| **10** | RL env loop + determinism mode + observation bundle + task framework | |
+| **11** | Merge into `cua-bench` (resolve relation to its native Qt/LOK `apps/ms-word`) | |
 
 ## Pointers
 - Decisions: [../decisions/](../decisions/) (ADRs + `OPEN_DECISIONS.md`)
