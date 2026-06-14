@@ -100,7 +100,7 @@
 
     local(e) {
       const r = this.layer.getBoundingClientRect();
-      const z = E().zoom || 1;
+      const z = (window.WC.PM && window.WC.PM.zoom) || 1;
       return { x: (e.clientX - r.left) / z, y: (e.clientY - r.top) / z };
     },
 

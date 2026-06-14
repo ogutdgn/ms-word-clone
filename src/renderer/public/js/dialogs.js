@@ -429,9 +429,9 @@
     WC.dialog({ title: 'Zoom', width: '320px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
         const sel = body.querySelector('input:checked'); const v = sel.closest('.row').dataset.zoom;
-        if (v === 'pw') E().setZoom((document.getElementById('canvas').clientWidth - 40) / 816);
-        else if (v === 'wp') E().setZoom((document.getElementById('canvas').clientHeight - 40) / E().pageH);
-        else E().setZoom(parseFloat(v));
+        if (v === 'pw') WC.PM.setZoom((document.getElementById('canvas').clientWidth - 40) / 816);
+        else if (v === 'wp') WC.PM.setZoom((document.getElementById('canvas').clientHeight - 40) / ((window.WC.PM && window.WC.PM.pageH) || 1056));
+        else WC.PM.setZoom(parseFloat(v));
       } },
       { label: 'Cancel' },
     ] });

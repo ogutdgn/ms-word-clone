@@ -88,26 +88,10 @@
   // ---------- slice 0a: infrastructure ----------
   await t('[0a] PM mode active + body flipped', () =>
     !!PM() && PM().active === true && document.body.classList.contains('pm-active'));
-  await t('[0a] legacy #editor hidden but laid out', () => {
-    const ed = document.getElementById('editor'); const cs = getComputedStyle(ed);
-    return cs.visibility === 'hidden' && cs.position === 'absolute' && ed.offsetHeight > 0;
-  });
   await t('[0a] #pm-editor is the visible page', () => {
     const pe = document.getElementById('pm-editor');
     return !!pe && getComputedStyle(pe).visibility !== 'hidden' && pe.offsetWidth > 600;
   });
-  await t('[0a] D6 guard: legacy exec is blocked, returns false, mutates nothing', () => {
-    const ed = document.getElementById('editor'); const before = ed.innerHTML;
-    const ok = window.WC.Editor.exec('bold');
-    return ok === false && ed.innerHTML === before;
-  });
-  await t('[0a] D6 guard: legacy setHTML/applyBlockStyle blocked', () => {
-    const ed = document.getElementById('editor'); const before = ed.innerHTML;
-    window.WC.Editor.setHTML('<p>should not land</p>');
-    window.WC.Editor.applyBlockStyle('marginLeft', '48px');
-    return ed.innerHTML === before;
-  });
-  await t('[0a] D6 guard: legacy undo blocked', () => window.WC.Editor.undo() === false);
   await t('[0a] dirty flag tracks PM edits', async () => {
     const d0 = PM().isDirty();
     v().dispatch(v().state.tr.insertText('x', 1));
@@ -157,7 +141,7 @@
     return rs.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: r.left + rs.clientWidth + 4, clientY: r.top + 4 })) === true;
   });
   await t('[0a] invariants: telemetry off, WC intact', () =>
-    (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
+    (window.__NET_LOG || []).length === 0 && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     // Repointed slice 10: startMailMerge flips this slice → run-block probe moves to
     // `margins` (AREA layout-page, Phase-7-gated, stays blocked through slice 11).

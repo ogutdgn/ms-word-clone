@@ -99,9 +99,9 @@
         if (k === 'f') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false));
         if (k === 'h') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true));
         if (k === 'k') return pmBlockedOr('insert-basics', () => WC.Dialogs.insertLink());
-        if (k === '=' && !shift) return () => E().zoomIn();
-        if (k === '-') return () => E().zoomOut();
-        if (k === '0') return () => E().zoomReset();
+        if (k === '=' && !shift) return () => WC.PM.zoomIn();
+        if (k === '-') return () => WC.PM.zoomOut();
+        if (k === '0') return () => WC.PM.zoomReset();
         if (k === 'l' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
         if (k === 'e' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
         // slice 8: review chords (Word: Ctrl+Shift+E = Track Changes, Ctrl+Alt+M =
@@ -153,7 +153,7 @@
         'file.new': () => WC.Files.newDoc(), 'file.open': () => WC.Files.open(), 'file.save': () => WC.Files.save(),
         'file.saveAs': () => WC.Files.saveAs(), 'file.print': () => WC.Files.print(),
         'edit.find': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false)), 'edit.replace': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true)),
-        'view.zoomIn': () => E().zoomIn(), 'view.zoomOut': () => E().zoomOut(), 'view.zoomReset': () => E().zoomReset(),
+        'view.zoomIn': () => WC.PM.zoomIn(), 'view.zoomOut': () => WC.PM.zoomOut(), 'view.zoomReset': () => WC.PM.zoomReset(),
       };
       if (m[action]) m[action]();
     });
@@ -184,7 +184,6 @@
   function boot() {
     buildTitleBar();
     buildRuler();
-    WC.Editor.init();
     WC.StatusBar.init();
     WC.Ribbon.init();
     WC.Backstage.init();
@@ -195,9 +194,8 @@
     if (!(WC.PM && WC.PM.active) && WC.Review && WC.Review.init) WC.Review.init();
     bindKeys();
     bindMisc();
-    if (!(WC.PM && WC.PM.active)) WC.Editor.focus(); // PM mode: bridge focuses the PM view post-mount
-    // initial state sync
-    WC.Editor.emit();
+    // WC.Editor retired (slice 11): PM is the only editor — the bridge focuses the
+    // PM view post-mount and the fork engine drives state sync.
     console.log('WORD_CLONE_READY tabs=' + WC.RIBBON.length);
   }
 

@@ -376,6 +376,31 @@ export function preinstallBridge() {
     dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
     // slice 11: WC.Styles (formatting.js) is retired — expose the canonical PM style list here.
     allStyleNames: (): string[] => Object.keys(STYLE_NAME_TO_ID),
+    // slice 11: zoom + view ownership migrated off the retired WC.Editor. The
+    // #pages host carries the scale() transform; the content node is #pm-editor.
+    // Lives in the preinstall stub (DOM-driven) so it works pre- and post-mount.
+    zoom: 1,
+    view: 'print',
+    pageH: 1056,
+    setZoom(z: number) {
+      const ww = window as any
+      const pages = document.getElementById('pages'); if (!pages) return
+      const zoom = Math.max(0.1, Math.min(5, z))
+      ww.WC.PM.zoom = zoom
+      pages.style.transform = `scale(${zoom})`
+      const content = document.getElementById('pm-editor') || pages
+      pages.style.marginBottom = (zoom < 1 ? 0 : ((content as HTMLElement).scrollHeight * (zoom - 1))) + 'px'
+      if (ww.WC?.StatusBar?.updateZoom) ww.WC.StatusBar.updateZoom()
+    },
+    zoomIn() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom + 0.1) * 10) / 10) },
+    zoomOut() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom - 0.1) * 10) / 10) },
+    zoomReset() { (window as any).WC.PM.setZoom(1) },
+    setView(v: string) {
+      ;(window as any).WC.PM.view = v
+      const wa = document.getElementById('workarea'); if (!wa) return
+      wa.classList.remove('view-print', 'view-web', 'view-read', 'view-outline', 'view-draft')
+      wa.classList.add('view-' + v)
+    },
   }
   document.body.classList.add('pm-active')
 }
@@ -623,11 +648,9 @@ function lcsOps(a: string[], b: string[]): Array<{ type: 'eq' | 'del' | 'ins'; t
 
 // Mount failure (spec §7.2): un-flip BEFORE toasting — never a blank page.
 export function failBridge(err: unknown) {
+  console.error('[wc] PM bridge mount failed', err)
   const w = window as any
   document.body.classList.remove('pm-active')
   if (w.WC?.PM) w.WC.PM.active = false
-  w.WC?.toast?.('New engine failed to start — using the classic editor', String((err as any)?.message || err))
-  // May run pre-DOMContentLoaded (sync mount failure): WC.Editor.node is null
-  // until init() — never let the fallback itself throw and kill __WC_READY.
-  try { if (w.WC?.Editor?.node) w.WC.Editor.focus() } catch { /* fallback must never throw */ }
+  try { w.WC?.toast?.('Editor failed to load — please restart the app.') } catch { /* toast must never throw */ }
 }

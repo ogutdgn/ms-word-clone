@@ -74,7 +74,8 @@
       this.renderTabStrip();
       this.renderBody();
       this.activate(WC.RIBBON[0].id);
-      WC.Editor.onStateChange((st) => this.syncToggles(st));
+      // WC.Editor retired (slice 11): in PM mode the bridge's state-sync drives
+      // syncToggles via the fork engine; there is no legacy onStateChange to bind.
     },
 
     renderTabStrip() {

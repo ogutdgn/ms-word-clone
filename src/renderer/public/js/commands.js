@@ -274,17 +274,18 @@
 
   // ---- View ----
   H.readMode = () => readMode();
-  H.printLayout = () => E().setView('print');
-  H.webLayout = () => E().setView('web');
+  H.printLayout = () => WC.PM.setView('print');
+  H.webLayout = () => WC.PM.setView('web');
   H.zoom = () => WC.Dialogs.zoom();
-  H.onePage = () => E().setZoom(fitZoom(1));
-  H.multiplePages = () => E().setZoom(fitZoom(2));
-  H.pageWidth = () => E().setZoom(fitWidthZoom());
-  H.zoom100 = () => E().setZoom(1);
+  H.onePage = () => WC.PM.setZoom(fitZoom(1));
+  H.multiplePages = () => WC.PM.setZoom(fitZoom(2));
+  H.pageWidth = () => WC.PM.setZoom(fitWidthZoom());
+  H.zoom100 = () => WC.PM.setZoom(1);
   H.ruler = (c, node) => { document.getElementById('ruler').classList.toggle('hidden-ruler'); markChecked(node); };
   H.gridlines = (c, node) => {
-    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
-    target.classList.toggle('show-grid');
+    // WC.Editor retired (slice 11): toggle the gridlines class on the PM page.
+    const target = document.getElementById('pm-editor');
+    if (target) target.classList.toggle('show-grid');
     markChecked(node);
   };
   H.navigationPane = (c, node) => WC.Dialogs.navPane();
@@ -339,8 +340,8 @@
   // ---- Home: Text Effects, Multilevel List, Dictate, extras ----
   H.textEffectsAndTypography = (c, node) => textEffectsMenu(node);
   H.multilevelList = (c, node) => multilevelMenu(node);
-  H.dictate = (c, node) => WC.Dictate.toggle(node);
-  H.sensitivity = (c, node) => sensitivityMenu(node);
+  H.dictate = () => WC.toast("Dictate isn't available in this clone");
+  H.sensitivity = () => WC.toast("Sensitivity labels aren't available in this clone");
   H.editor = () => WC.Dialogs.editorPane();
   H.addIns = (c, node) => addInsMenu(node);
   H.getAddIns = (c, node) => addInsMenu(node);
@@ -1223,12 +1224,12 @@
   };
 
   // ---- View tab ----
-  H.outline = () => { E().setView('outline'); WC.StatusBar && WC.StatusBar.setActiveView && WC.StatusBar.setActiveView('print'); WC.toast('Outline view'); };
-  H.draft = () => { E().setView('draft'); WC.toast('Draft view'); };
+  H.outline = () => { WC.PM.setView('outline'); WC.StatusBar && WC.StatusBar.setActiveView && WC.StatusBar.setActiveView('print'); WC.toast('Outline view'); };
+  H.draft = () => { WC.PM.setView('draft'); WC.toast('Draft view'); };
   H.immersiveReader = () => immersiveReader();
-  H.vertical = (c, node) => { E().workarea.classList.remove('movement-side'); markRadio(node, 'sideToSide'); };
-  H.sideToSide = (c, node) => { E().workarea.classList.add('movement-side'); markRadio(node, 'vertical'); WC.toast('Side to Side page movement'); };
-  H['100'] = () => E().setZoom(1);
+  H.vertical = (c, node) => { document.getElementById('workarea').classList.remove('movement-side'); markRadio(node, 'sideToSide'); };
+  H.sideToSide = (c, node) => { document.getElementById('workarea').classList.add('movement-side'); markRadio(node, 'vertical'); WC.toast('Side to Side page movement'); };
+  H['100'] = () => WC.PM.setZoom(1);
   H.split = () => { document.getElementById('app').classList.toggle('split-view'); WC.toast('Split — a second pane of the document.'); };
   H.properties = () => propertiesDialog();
   H.newWindow = () => WC.toast('New Window opens another view of the document — multi-window is not supported in this single-window clone.', 'See docs/NOT_IMPLEMENTED.md');
@@ -1390,8 +1391,8 @@
       if (cmd === 'columns') return columnsMenu(node);
       if (cmd === 'textEffectsAndTypography') return textEffectsMenu(node);
       if (cmd === 'multilevelList') return multilevelMenu(node);
-      if (cmd === 'dictate') return WC.Dictate.menu(node);
-      if (cmd === 'sensitivity') return sensitivityMenu(node);
+      if (cmd === 'dictate') return WC.toast("Dictate isn't available in this clone");
+      if (cmd === 'sensitivity') return WC.toast("Sensitivity labels aren't available in this clone");
       if (cmd === 'addIns' || cmd === 'getAddIns' || cmd === 'myAddIns') return addInsMenu(node);
       // Insert tab dropdowns / split arrows
       if (cmd === 'coverPage') return WC.Insert.coverPageMenu(node);
@@ -2129,7 +2130,7 @@
       { label: 'Cancel' },
     ] });
   }
-  function fitZoom(pages) { pages = pages || 1; const a = document.getElementById('canvas'); return Math.max(0.2, (a.clientHeight - 40) / (E().pageH * pages)); }
+  function fitZoom(pages) { pages = pages || 1; const a = document.getElementById('canvas'); const pageH = (window.WC.PM && window.WC.PM.pageH) || 1056; return Math.max(0.2, (a.clientHeight - 40) / (pageH * pages)); }
   function fitWidthZoom() { const a = document.getElementById('canvas'); const pw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-w')) || 816; return Math.max(0.2, (a.clientWidth - 40) / pw); }
   function markChecked(node) { if (node) node.classList.toggle('toggled'); }
 

@@ -106,7 +106,7 @@
     ed.style.cursor = 'crosshair';
     WC.toast('Draw Table: drag on the page to draw the table’s outer border.');
     let start = null, rect = null;
-    const z = () => E().zoom || 1;
+    const z = () => (window.WC.PM && window.WC.PM.zoom) || 1;
     const down = (e) => { start = { x: e.clientX, y: e.clientY }; rect = el('div', { style: { position: 'fixed', border: '2px solid #2b579a', background: 'rgba(43,87,154,.08)', zIndex: '9000', pointerEvents: 'none' } }); document.body.appendChild(rect); e.preventDefault(); };
     const move = (e) => { if (!start) return; const x = Math.min(start.x, e.clientX), y = Math.min(start.y, e.clientY), w = Math.abs(e.clientX - start.x), h = Math.abs(e.clientY - start.y); Object.assign(rect.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' }); };
     const up = (e) => {

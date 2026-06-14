@@ -29,17 +29,17 @@
         b.addEventListener('click', () => {
           if (v === 'read') { WC.Commands.run({ cmd: 'readMode', label: 'Read Mode' }); return; }
           if (WC.closeReadMode) WC.closeReadMode();
-          E().setView(v); this.setActiveView(v);
+          WC.PM.setView(v); this.setActiveView(v);
         });
         this.viewBtns[v] = b; right.appendChild(b);
       });
       right.appendChild(el('span', { class: 'sb-sep' }));
 
       const zoom = el('div', { class: 'zoom-control' });
-      const minus = el('span', { class: 'zbtn', text: '−', onclick: () => E().zoomOut() });
+      const minus = el('span', { class: 'zbtn', text: '−', onclick: () => WC.PM.zoomOut() });
       this.zslider = el('input', { type: 'range', min: '10', max: '500', value: '100' });
-      this.zslider.addEventListener('input', () => E().setZoom(parseInt(this.zslider.value, 10) / 100));
-      const plus = el('span', { class: 'zbtn', text: '+', onclick: () => E().zoomIn() });
+      this.zslider.addEventListener('input', () => WC.PM.setZoom(parseInt(this.zslider.value, 10) / 100));
+      const plus = el('span', { class: 'zbtn', text: '+', onclick: () => WC.PM.zoomIn() });
       this.zlevel = el('span', { class: 'zlevel', text: '100%', onclick: () => WC.Dialogs.zoom() });
       zoom.appendChild(minus); zoom.appendChild(this.zslider); zoom.appendChild(plus); zoom.appendChild(this.zlevel);
       right.appendChild(zoom);
@@ -58,7 +58,11 @@
 
     update() {
       if (!this.node) return;
-      if (WC.PM && WC.PM.active && WC.PM.ready) {
+      // WC.Editor retired (slice 11): in PM mode the PM bridge owns counts. Gate on
+      // `active` (not `ready`) so the boot-time call — which runs before the async
+      // mount sets PM.ready — never falls through to the deleted legacy E() arm.
+      // The pre-mount counts() stub returns zeros, which is the correct boot display.
+      if (WC.PM && WC.PM.active) {
         // Continuous flow until Phase 7 — report honestly (spec §7.8).
         this.pageEl.textContent = 'Page 1 of 1';
         const c = WC.PM.counts();
@@ -73,7 +77,7 @@
     },
     updateZoom() {
       if (!this.zlevel) return;
-      const pct = Math.round(E().zoom * 100);
+      const pct = Math.round(((window.WC.PM && window.WC.PM.zoom) || 1) * 100);
       this.zlevel.textContent = pct + '%';
       this.zslider.value = String(pct);
     },
