@@ -96,6 +96,15 @@ export class VectorShapeView {
   createElement() {
     const attrs = this.node.attrs;
 
+    // isInk nodes are painted by the PM ink overlay; return a zero-size placeholder
+    // so the NodeView occupies no visual space and does not paint over the overlay.
+    if (attrs.isInk) {
+      const element = document.createElement('span');
+      element.setAttribute('data-ink-anchor', '');
+      element.style.cssText = 'width:0;height:0;overflow:hidden;display:inline-block';
+      return { element };
+    }
+
     const element = document.createElement('span');
     element.classList.add('sd-vector-shape');
     element.setAttribute('data-vector-shape', '');
