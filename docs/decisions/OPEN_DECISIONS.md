@@ -124,5 +124,5 @@ of this spike (run via a standalone Node project) — still to do for the real m
   is complete: Phase 1 scaffold → Phase 2 wired every ribbon area onto the PM engine (slices 0a–10)
   → **slice 11 retired the legacy world** (the `--legacy` flag, the `contenteditable` editor, the
   leaf legacy engines, and the `mammoth`/`html-to-docx` converter are gone; gates collapsed from six
-  to three). Remaining sequencing items still open: pagination (Phase 7), the logger, and the
+  to three). Remaining sequencing items still open: pagination (Phase 4 — pulled up 2026-06-14), the logger, and the
   verifier. The `WC` chrome → TS/ESM migration is deferred to a future slice.

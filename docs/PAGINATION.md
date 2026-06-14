@@ -11,7 +11,8 @@
 > at `#pm-editor` rendered into a **continuous-flow page sheet** (`.page` in
 > `src/renderer/public/styles/editor.css`; geometry vars in `.../styles/base.css`). There
 > is **no `repaginate()` engine today** — real, model-driven multi-page sheets (line-level
-> splitting, per-sheet headers/footers, page-number fields) are **Phase-7-gated**, to be
+> splitting, per-sheet headers/footers, page-number fields) are **Phase-4-gated** (the
+> pagination / layout engine; re-sequenced 2026-06-14 from old "Phase 7 / last"), to be
 > rebuilt as an owned PM decoration/plugin validated against the oracle (see
 > [docs/decisions/](decisions/) C1 and `docs/plan/deferrals.md` class A). The rest of this
 > document is the prior art for that work.

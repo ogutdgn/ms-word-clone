@@ -1,7 +1,9 @@
 # Deferrals & exclusions ledger
 
 > The single place for everything the build must NOT chase right now. Three classes:
-> **(A) Phase-7 / pagination-gated** — lands when real page sheets land, after Phase 2.
+> **(A) Phase-4 / layout-engine-gated** (was "Phase-7 / pagination-gated"; re-sequenced 2026-06-14) — lands
+> when the pagination/layout engine is built (Phase 4). **§A.1 below accumulates the layout-engine
+> requirements** flagged during the Phase-3 ribbon-hardening pass — i.e. the Phase-4 spec.
 > **(B) Cloud-runtime stubs** — physically need Microsoft cloud services; get graceful
 > Word-like degraded behavior, final hide-vs-keep list presented to the user at Phase-2 end.
 > **(C) Recorded product decisions / known deviations** — deliberate, evidence-backed.
@@ -10,7 +12,7 @@
 > *(Moved from `docs/loop/` 2026-06-11 when the short-lived loop process was retired —
 > the ledger itself is process-independent and stays live.)*
 
-## A — Phase-7 / pagination-gated (spec §9.3)
+## A — Phase-4 / layout-engine-gated (was Phase 7; spec §9.3)
 
 - Page-setup *visual* geometry: margins, orientation, size, columns (model attrs may land earlier).
 - Header/footer **editing** (needs live child editors); page-number fields' visual effect.
@@ -22,10 +24,22 @@
 - **Mail-merge envelopes/labels page geometry (slice 10, D10.10).** PM mode inserts REAL
   content honestly — envelopes prepend a real PM page (`PM.openHtml(env + getHTML())`,
   existing content preserved); Labels → New Document builds a real PM label grid
-  (`PM.openHtml(gridHtml)`). DEFERRED to Phase 7: Avery-grid page fidelity (true
+  (`PM.openHtml(gridHtml)`). DEFERRED to Phase 4: Avery-grid page fidelity (true
   envelope/label sheet geometry), Labels → **Print** (PM path toasts, no E() mutation),
   and `updateLabels` «Next Record» propagation across a PM label table (PM path toasts,
   no E() mutation). NO `E()` mutation is reachable in PM mode (leak audit clean).
+
+### A.1 — Layout-engine requirements (flagged during the Phase-3 ribbon-hardening pass)
+
+> **The Phase-4 spec, accumulated bug-by-bug.** When the Phase-3 ribbon pass hits a feature whose correct
+> behavior needs the layout engine, record it HERE with its *specific requirement* — and **never hack-fix it
+> in continuous-flow** (the legacy spacer-hack was deleted in slice 11; do not grow a new one). Phase 4 is
+> built to CLEAR this list (clearing = its acceptance test). **Flag classifier:** multi-page · floating-object
+> position · text-wrap · headers/footers-on-page · columns · vertical page geometry.
+
+| Tab/section | Feature | Required layout capability | Flagged |
+|---|---|---|---|
+| _(filled as the Phase-3 pass surfaces them)_ | | | |
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 
@@ -86,7 +100,7 @@ state of areas that previously leaned on the legacy engine.
 |---|---|---|
 | **`window.WC` chrome → TS/ESM module migration is DEFERRED** — the shared chrome (`commands.js`, `ribbon.js`, `dialogs.js`, `util.js`, `app.js`, `files.js`, `backstage.js`, `statusbar.js`, `*-tools.js` value tables, `home-features.js`, `table-tools-pm.js`, `icons*.js`, gen'd `ribbon-data.js`) stays as classic `<script>` tags on `window.WC`; only the editor core + bridge are TS/ESM. A future slice may migrate the chrome. | recorded decision (slice 11, decision 4); the editor core migration is what forced the bundler, the chrome migration is independent | slice 11 |
 | **Shapes / Excel-Spreadsheet / Draw-Table inserts now show an honest toast** — there is no PM construct for them; they were silently-broken in PM since slice 10 (the legacy `E()`-mutating path was the only impl). Each now degrades to an honest "available in a future update" toast (no false success, no `E()` leak). Real PM constructs are a future follow-up. | recorded decision (slice 11) | slice 11 |
-| **The 4 Phase-7 DEFERRED areas remain honestly `isBlocked`** — layout-page, layout-arrange, header-footer, text-effects. Their `commands.js` handler bodies are gated Phase-7 stubs (dead bodies that still reference the deleted `WC.HeaderFooter`/`WC.Layout`/`E()`, never reached because `isBlocked`/`notifyBlocked` short-circuits first). They show a Word-like deferral toast and await Phase 7 (pagination + live child editors). `isBlocked`/`notifyBlocked` stay as the permanent Phase-7 gate (the D6 `FLIPPED`/`isFlipped` flip-tracking was retired in slice 11). | recorded decision (slice 11; Phase-7 class A) | slice 11 |
+| **The 4 Phase-7 DEFERRED areas remain honestly `isBlocked`** — layout-page, layout-arrange, header-footer, text-effects. Their `commands.js` handler bodies are gated Phase-7 stubs (dead bodies that still reference the deleted `WC.HeaderFooter`/`WC.Layout`/`E()`, never reached because `isBlocked`/`notifyBlocked` short-circuits first). They show a Word-like deferral toast and await Phase 4 (pagination/layout engine + live child editors). `isBlocked`/`notifyBlocked` stay as the permanent Phase-7 gate (the D6 `FLIPPED`/`isFlipped` flip-tracking was retired in slice 11). | recorded decision (slice 11; Phase-7 class A) | slice 11 |
 | **Office Clipboard pane opens but auto-capture is best-effort in PM** — the pane (`WC.Clipboard`) opens and manual paste works, but the auto-capture of cut/copy history was `editor.js`-wired in legacy; in PM it is best-effort. Full PM auto-capture is a follow-up. | recorded deviation (slice 11) | slice 11 |
 | **Dictate / sensitivity-labels → honest toasts** — Dictate (Web Speech) and sensitivity labels show honest toasts in PM (the legacy `WC.Dictate`/sensitivity-bar wiring was retired with `editor.js`). Cloud-runtime class for sensitivity; Dictate is a possible future PM follow-up. | recorded deviation (slice 11; cloud/runtime class B for sensitivity) | slice 11 |
 

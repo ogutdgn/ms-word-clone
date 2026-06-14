@@ -86,10 +86,10 @@ UI but not fully functional" section) and the area-by-area feasibility matrix.
 ## Known architectural approximations
 
 A few outcomes are faithful in shape but bounded by the page-sheet rendering being
-continuous-flow today (real multi-page sheets are Phase-7-gated):
+continuous-flow today (real multi-page sheets are Phase-4-gated — the layout engine):
 
 - **Headers/footers, on-page page-number fields, and multi-page View modes** are
-  Phase-7-deferred — those commands honestly block until the PM pagination engine lands.
+  Phase-4-deferred — those commands honestly block until the PM pagination/layout engine lands.
 - **Asymmetric column widths** (Left/Right) and **mirrored margins** render with the
   dominant value; **Side-to-Side** paging is approximate. (UI Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.
