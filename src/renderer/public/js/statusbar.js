@@ -3,7 +3,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
   const StatusBar = {
     node: null, pageEl: null, wordEl: null, zlevel: null, zslider: null,
@@ -58,21 +57,12 @@
 
     update() {
       if (!this.node) return;
-      // WC.Editor retired (slice 11): in PM mode the PM bridge owns counts. Gate on
-      // `active` (not `ready`) so the boot-time call — which runs before the async
-      // mount sets PM.ready — never falls through to the deleted legacy E() arm.
-      // The pre-mount counts() stub returns zeros, which is the correct boot display.
-      if (WC.PM && WC.PM.active) {
-        // Continuous flow until Phase 7 — report honestly (spec §7.8).
-        this.pageEl.textContent = 'Page 1 of 1';
-        const c = WC.PM.counts();
-        this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
-        return;
-      }
-      const count = E().pageCount();
-      const cur = E().currentPage();
-      this.pageEl.textContent = `Page ${cur} of ${count}`;
-      const c = E().counts();
+      // WC.Editor retired (slice 11): the PM bridge owns counts. The pre-mount
+      // counts() stub returns zeros (the correct boot display) before PM.ready.
+      if (!(WC.PM && WC.PM.active)) return;
+      // Continuous flow until Phase 7 — report honestly (spec §7.8).
+      this.pageEl.textContent = 'Page 1 of 1';
+      const c = WC.PM.counts();
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
     updateZoom() {
