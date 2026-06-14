@@ -4326,6 +4326,21 @@
     return /<a:custGeom\b/.test(xml2) || 'ink lost on round-trip (no renderable custGeom + none on re-export)';
   });
 
+  // [11] Legacy retirement — single-world invariants + conflict-file/feature survival guards.
+  await t('[11] PM is the only world', () => window.WC.PM && window.WC.PM.active === true && window.WC.PM.ready === true);
+  await t('[11] body is pm-active', () => document.body.classList.contains('pm-active'));
+  await t('[11] legacy WC.Editor is retired', () => typeof window.WC.Editor === 'undefined');
+  await t('[11] Design themes table survives', () => Array.isArray(window.WC.Design.THEMES) && window.WC.Design.THEMES.length > 0);
+  await t('[11] Design color/font/spacing/styleset tables survive', () => Array.isArray(window.WC.Design.COLOR_SCHEMES) && window.WC.Design.COLOR_SCHEMES.length > 0 && Array.isArray(window.WC.Design.FONT_PAIRS) && !!window.WC.Design.SPACING && !!window.WC.Design.STYLE_SETS);
+  await t('[11] setThemeColors survives (bridge/design.ts dep)', () => typeof window.WC.setThemeColors === 'function');
+  await t('[11] Draw pen registry survives', () => Array.isArray(window.WC.Draw.PENS) && window.WC.Draw.PENS.length > 0 && Array.isArray(window.WC.Draw.customPens));
+  await t('[11] Ref shared-state slots survive', () => typeof window.WC.Ref.citationStyle === 'string' && Array.isArray(window.WC.Ref.sources));
+  await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
+  await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
+  await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('margins') === true);
+  await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
