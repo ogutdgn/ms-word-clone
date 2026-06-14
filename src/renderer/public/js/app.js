@@ -177,7 +177,6 @@
     WC.Ribbon.init();
     WC.Backstage.init();
     WC.Files.init();
-    if (WC.Layout && WC.Layout.initSelection) WC.Layout.initSelection();
     bindKeys();
     bindMisc();
     // WC.Editor retired (slice 11): PM is the only editor — the bridge focuses the

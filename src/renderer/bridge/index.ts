@@ -598,16 +598,13 @@ export function installBridge(editor: AnyEditor) {
     }
   }
   installStateSync(editor)
-  // slice 8 task 4: comments cards/composer/pane chrome. AFTER the legacyBoot
-  // early-return above, so the UI module never runs (and its DOM never exists)
-  // under --legacy (D8.3 PM-only constraint).
+  // slice 8 task 4: comments cards/composer/pane chrome (D8.3 PM-only constraint).
   installCommentsUI(editor)
   // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
-  // Revisions pane). Same PM-only-by-construction placement as comments-ui.
+  // Revisions pane).
   installTrackChrome(editor)
   // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
-  // page sheet). Same PM-only-by-construction placement — its DOM never exists under
-  // --legacy (this runs AFTER the legacyBoot early-return above).
+  // page sheet).
   installNotesArea(editor)
   installFocusGuards()
   PM.ready = true
