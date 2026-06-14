@@ -351,6 +351,7 @@ The following upstream packages are included in this directory tree:
   command (slice 10 PR3): inserts a vectorShape with a synthesized DrawingML blob (wps:wsp + bodyPr fromWordArt +
   a:prstTxWarp + w14:textFill) on drawingContent; the replay exporter re-emits it (round-trips Word + fork). Sets
   textContent for a flat in-app SVG render (warp renders in Word only).
+- extensions/vector-shape/vector-shape.js — NET-NEW isInk attr + synthesizeInkDrawing + insertInkShape command (slice 10 PR4): inserts a real a:custGeom freeform ink shape (wp:anchor|wp:inline) replayed by translateVectorShape.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 
