@@ -12,6 +12,7 @@ import { installReferences } from './references'
 import { installMailMerge } from './mail'
 import { installDesign } from './design'
 import { installInsertExotica } from './insert-exotica'
+import { installDraw } from './draw'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -365,6 +366,10 @@ export function preinstallBridge() {
     xeScreenshot: async () => false, xeIcon: () => false, xeOnlinePicture: async () => false,
     xeTextBox: () => false, xeWordArt: () => false, xeOnlineVideo: () => false,
     xeChart: () => false, xeSmartArt: () => false, xeObject: () => false, xeSignatureLine: () => false,
+    // slice 10 PR4: draw pre-mount stubs (replaced by installDraw on mount)
+    dInsertInk: () => false, dInsertCanvas: () => false, dSetDrawing: () => false, dIsDrawing: () => false,
+    dSetEraser: () => false, dSetSelect: () => false, dSetLasso: () => false, dSetPen: () => false,
+    dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
   }
   if (!legacyBoot) document.body.classList.add('pm-active')
 }
@@ -399,7 +404,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
