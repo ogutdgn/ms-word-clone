@@ -1,7 +1,6 @@
 // WC.PM — the bridge between the vanilla-JS Word chrome and the vendored
 // ProseMirror engine (spec §4/§5). Grafted onto the existing WC namespace;
 // NEVER reassign window.WC or window.WC.Editor (main.ts invariant).
-import { legacyBoot } from './mode'
 import { installCommands } from './commands'
 import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
@@ -255,7 +254,7 @@ function notifyBlocked(what: string) {
   if (now - lastToast < 1500) return // throttle: leaf-closure paths can fire bursts
   lastToast = now
   const w = window as any
-  w.WC?.toast?.("This action isn't on the new engine yet", what + ' — run with --legacy for the classic editor')
+  w.WC?.toast?.("This action isn't available on the new engine yet", what)
 }
 
 // Synchronous, pre-mount (spec §4.2): the D6 guards consult WC.PM.active before
@@ -264,7 +263,7 @@ export function preinstallBridge() {
   const w = window as any
   w.WC = w.WC || {}
   w.WC.PM = {
-    active: !legacyBoot,
+    active: true,
     ready: false,
     notifyBlocked,
     isBlocked,   // D6 §7.1a — consulted by the WC.Commands dispatch heads (Task 4B)
@@ -375,7 +374,7 @@ export function preinstallBridge() {
     dSetEraser: () => false, dSetSelect: () => false, dSetLasso: () => false, dSetPen: () => false,
     dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
   }
-  if (!legacyBoot) document.body.classList.add('pm-active')
+  document.body.classList.add('pm-active')
 }
 
 // Re-entrant by design: replaceEditor (slice 0b) re-runs this on Open/New —
@@ -384,7 +383,6 @@ export function installBridge(editor: AnyEditor) {
   const w = window as any
   current = editor
   const PM = w.WC.PM
-  if (legacyBoot) { PM.ready = true; return PM } // §4.3-3: passive under --legacy — zero listeners
   if (!painterEscInstalled) {
     painterEscInstalled = true
     // slice 4: Esc cancels an armed format painter (Word). Capture-phase so the PM

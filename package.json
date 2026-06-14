@@ -11,10 +11,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite dev",
-    "test:legacy": "electron . --legacy --probe-out=/tmp/wc-legacy.json --shot-evalfile=scripts/test-suite.js --shot-delay=800",
     "test:pm": "electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js",
     "test:smoke": "electron . --probe-out=/tmp/wc-smoke.json --shot-evalfile=scripts/smoke-pm.js",
-    "test:smoke:legacy": "electron . --legacy --probe-out=/tmp/wc-smoke-legacy.json --shot-evalfile=scripts/smoke-pm.js",
     "test:docx": "node scripts/test_docx.js",
     "test:roundtrip": "node scripts/test-roundtrip-pm.js"
   },

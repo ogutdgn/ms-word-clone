@@ -113,16 +113,11 @@ function createWindow() {
   mainWindow.webContents.session.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture' || perm === 'microphone'));
   mainWindow.webContents.session.setPermissionCheckHandler(() => true);
 
-  // Phase 2 (spec §4.2): `electron . --legacy` boots the classic pre-PM app.
-  // The renderer reads ?legacy=1 synchronously, so the page flip never flashes.
-  const legacyBoot = process.argv.includes('--legacy');
+  // PM is the only boot mode (slice 11: --legacy retired).
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL + (legacyBoot ? '?legacy=1' : ''));
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, '..', 'renderer', 'index.html'),
-      legacyBoot ? { query: { legacy: '1' } } : undefined,
-    );
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {
