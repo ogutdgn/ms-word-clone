@@ -31,35 +31,23 @@
   const H = {}; // handlers keyed by cmd
 
   // ---- Clipboard ----
-  H.cut = () => { const pm = PMA(); pm ? pm.cutSelection() : E().exec('cut'); };
-  H.copy = () => { const pm = PMA(); pm ? pm.copySelection() : E().exec('copy'); };
-  H.paste = () => { const pm = PMA(); pm ? pm.pasteDefault() : E().exec('paste'); };
-  H.formatPainter = (c, node) => {
-    const pm = PMA();
-    if (pm) { armPainterPM(node, false); return; }
-    armPainterFromSelection(node, false);
-  };
-  H.formatPainterLock = (c, node) => {
-    const pm = PMA();
-    if (pm) { armPainterPM(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true); return; }
-    armPainterFromSelection(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true);
-  };
+  H.cut = () => { WC.PM.cutSelection(); };
+  H.copy = () => { WC.PM.copySelection(); };
+  H.paste = () => { WC.PM.pasteDefault(); };
+  H.formatPainter = (c, node) => { armPainterPM(node, false); };
+  H.formatPainterLock = (c, node) => { armPainterPM(node || (WC.Ribbon.controlIndex.formatPainter && WC.Ribbon.controlIndex.formatPainter.node), true); };
 
   // ---- Font ----
-  H.bold = () => { const pm = PMA(); pm ? pm.cmd('toggleBold') : E().exec('bold'); };
-  H.italic = () => { const pm = PMA(); pm ? pm.cmd('toggleItalic') : E().exec('italic'); };
-  H.underline = () => { const pm = PMA(); pm ? pm.cmd('toggleUnderline') : E().exec('underline'); };
-  H.strikethrough = () => { const pm = PMA(); pm ? pm.cmd('toggleStrike') : E().exec('strikethrough'); };
+  H.bold = () => { WC.PM.cmd('toggleBold'); };
+  H.italic = () => { WC.PM.cmd('toggleItalic'); };
+  H.underline = () => { WC.PM.cmd('toggleUnderline'); };
+  H.strikethrough = () => { WC.PM.cmd('toggleStrike'); };
   // No dedicated engine command for vertical alignment, but textStyle carries
   // vertAlign with sub/superscript rendering — drive it via the generic setMark,
   // toggling off when already set and keeping the pair mutually exclusive (Word).
   H.subscript = () => vertAlign('subscript');
   H.superscript = () => vertAlign('superscript');
-  H.clearAllFormatting = () => {
-    const pm = PMA();
-    if (pm) { pm.cmd('clearFormat'); return; }
-    E().exec('removeFormat'); E().selectedBlocks().forEach((b) => b.removeAttribute('style')); WC.formatBlock('p');
-  };
+  H.clearAllFormatting = () => { WC.PM.cmd('clearFormat'); };
   H.increaseFontSize = () => stepFont(1);
   H.decreaseFontSize = () => stepFont(-1);
   H.font = (c, node) => openFontList(node);
@@ -68,36 +56,30 @@
   H.fontColor = (c, node) => applyColor('fore', lastFontColor);
 
   // ---- Paragraph ----
-  H.alignLeft = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
-  H.center = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
-  H.alignRight = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
+  H.alignLeft = () => { WC.PM.cmd('setTextAlign', 'left'); };
+  H.center = () => { WC.PM.cmd('setTextAlign', 'center'); };
+  H.alignRight = () => { WC.PM.cmd('setTextAlign', 'right'); };
   // Word stores justify as w:jc="both"; setTextAlign('justify') does that mapping —
   // never pass 'both' (the alignments whitelist rejects it).
-  H.justify = () => { const pm = PMA(); pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
-  H.bullets = () => { const pm = PMA(); pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
-  H.numbering = () => { const pm = PMA(); pm ? pm.cmd('toggleOrderedList') : E().exec('insertOrderedList'); };
+  H.justify = () => { WC.PM.cmd('setTextAlign', 'justify'); };
+  H.bullets = () => { WC.PM.cmd('toggleBulletList'); };
+  H.numbering = () => { WC.PM.cmd('toggleOrderedList'); };
   H.decreaseIndent = () => stepIndent(-48);
   H.increaseIndent = () => stepIndent(48);
   function stepIndent(px) {
-    const pm = PMA();
-    if (pm) {
-      // Word behavior: inside a list the ribbon indent buttons change the LIST LEVEL;
-      // otherwise they step the paragraph text indent by 0.5" (engine: 36pt = 720tw).
-      const para = pm.getEditor().getAttributes('paragraph') || {};
-      // NOTE: style-inherited list paragraphs carry no INLINE numberingProperties —
-      // they reach the list branch via listRendering (computed by numberingPlugin).
-      // Both arms are needed; do not simplify to one.
-      const inList = !!(para.paragraphProperties && para.paragraphProperties.numberingProperties) || !!para.listRendering;
-      if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
-      else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
-      return;
-    }
-    if (E().currentListItem && E().currentListItem()) { if (px > 0) E().demoteListItem(); else E().promoteListItem(); return; }
-    E().selectedBlocks().forEach((b) => { const cur = parseFloat(b.style.marginLeft) || 0; const next = Math.max(0, cur + px); b.style.marginLeft = next ? next + 'px' : ''; });
-    E().dirty = true; E().repaginate(); E().updateStatus(); E().emit();
+    const pm = WC.PM;
+    // Word behavior: inside a list the ribbon indent buttons change the LIST LEVEL;
+    // otherwise they step the paragraph text indent by 0.5" (engine: 36pt = 720tw).
+    const para = pm.getEditor().getAttributes('paragraph') || {};
+    // NOTE: style-inherited list paragraphs carry no INLINE numberingProperties —
+    // they reach the list branch via listRendering (computed by numberingPlugin).
+    // Both arms are needed; do not simplify to one.
+    const inList = !!(para.paragraphProperties && para.paragraphProperties.numberingProperties) || !!para.listRendering;
+    if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
+    else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
   }
   H.showHide = (c, node) => {
-    const target = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor') : E().node;
+    const target = document.getElementById('pm-editor');
     const on = target.classList.toggle('show-marks');
     if (node) node.classList.toggle('toggled', on);
   };
@@ -186,18 +168,14 @@
       .forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableAutoFit(mode); } })));
   });
   H.pictures = async () => {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
     const r = await window.wordAPI.pickImage();
     if (!r || !r.ok) return;
-    if (pm) { pm.insertImage({ src: r.dataUrl, alt: r.name || 'Picture' }); return; }
-    E().insertHTML(`<img src="${r.dataUrl}" alt="${WC.escapeHtml(r.name || '')}">`);
-    // the new image decodes asynchronously — repaginate once it has a real height
-    E().node.querySelectorAll('img').forEach((img) => { if (!img.complete) img.addEventListener('load', () => E().repaginate(), { once: true }); });
+    WC.PM.insertImage({ src: r.dataUrl, alt: r.name || 'Picture' });
   };
   H.link = () => WC.Dialogs.insertLink();
   H.symbol = (c, node) => WC.Dialogs.symbol(node);
-  H.pageBreak = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertPageBreak(); return; } insertPageBreak(); };
-  H.blankPage = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertBlankPage(); return; } insertBlankPage(); };
+  H.pageBreak = () => { WC.PM.insertPageBreak(); };
+  H.blankPage = () => { WC.PM.insertBlankPage(); };
   // ---- Header & Footer contextual tab ----
   H.goToHeader = () => WC.HeaderFooter.goTo('header');
   H.goToFooter = () => WC.HeaderFooter.goTo('footer');
@@ -208,21 +186,17 @@
   H.differentOddEven = (c, node) => { const on = E().node.classList.toggle('hf-diff-oddeven'); if (node) node.classList.toggle('toggled', on); WC.toast('Different Odd & Even Pages ' + (on ? 'on' : 'off') + '.'); };
   H.showDocText = (c, node) => { const on = !E().node.classList.toggle('hf-hide-body'); if (node) node.classList.toggle('toggled', !on); };
   H.dateAndTime = () => E().insertHTML(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
-  H.horizontalLine = () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertHr(); return; } E().insertHTML('<hr>'); };
+  H.horizontalLine = () => { WC.PM.insertHr(); };
   H.wordArt = (c, node) => insertWordArt();
-  H.textBox = () => { const pm = PMA(); if (pm) { pm.xeTextBox(''); return; } E().insertHTML('<div style="border:1px solid #888;padding:8px;margin:6px 0;display:inline-block;min-width:200px">Text box — type here</div>&nbsp;'); };
-  H.dropCap = () => { const pm = PMA(); if (pm) { pm.xeDropCap('drop', 3); return; } dropCap(); };
+  H.textBox = () => { WC.PM.xeTextBox(''); };
+  H.dropCap = () => { WC.PM.xeDropCap('drop', 3); };
   H.equation = () => WC.Dialogs.equation();
   H.comment = (c, node) => WC.Commands.run({ cmd: 'newComment' });
   // PM branch: the contextual composer card (slice-8 task 4) owns text entry —
   // pm.cmd('addComment') with empty text is WRONG (A2: comments need real content).
   // Until WC.CommentsUI lands, the PM branch is a guarded no-op (review is D6-blocked
   // pre-flip, and the flip [task 7] lands after the composer [task 4]).
-  H.newComment = () => {
-    const pm = PMA();
-    if (pm) { if (WC.CommentsUI && WC.CommentsUI.compose) WC.CommentsUI.compose(); return; }
-    WC.Comments && WC.Comments.add();
-  };
+  H.newComment = () => { if (WC.CommentsUI && WC.CommentsUI.compose) WC.CommentsUI.compose(); };
 
   // ---- Insert tab ----
   H.coverPage = (c, node) => WC.Insert.coverPageMenu(node);
@@ -235,7 +209,7 @@
   H.myAddIns = (c, node) => addInsMenu(node);
   H.onlineVideo = () => WC.Insert.onlineVideoDialog();
   H.bookmark = () => WC.Insert.bookmarkDialog();
-  H.crossReference = () => { const pm = PMA(); pm ? crossRefDialogPM(pm) : WC.Insert.crossRefDialog(); };
+  H.crossReference = () => { crossRefDialogPM(WC.PM); };
   H.header = (c, node) => WC.HeaderFooter.headerMenu(node);
   H.footer = (c, node) => WC.HeaderFooter.footerMenu(node);
   H.pageNumber = (c, node) => WC.HeaderFooter.pageNumberMenu(node);
@@ -262,9 +236,9 @@
   }
   function dropCapMenu(node) {
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('None', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('none', 0); return; } const b = E().selectedBlocks()[0]; if (b) { const s = b.querySelector('span[style*="float:left"]'); if (s) s.replaceWith(...s.childNodes); } } }));
-      fly.appendChild(WC.flyItem('Dropped', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('drop', 3); return; } H.dropCap(); } }));
-      fly.appendChild(WC.flyItem('In Margin', { onClick: () => { const pm = PMA(); if (pm) { pm.xeDropCap('margin', 3); return; } H.dropCap(); } }));
+      fly.appendChild(WC.flyItem('None', { onClick: () => { WC.PM.xeDropCap('none', 0); } }));
+      fly.appendChild(WC.flyItem('Dropped', { onClick: () => { WC.PM.xeDropCap('drop', 3); } }));
+      fly.appendChild(WC.flyItem('In Margin', { onClick: () => { WC.PM.xeDropCap('margin', 3); } }));
     });
   }
   function equationMenu(node) {
@@ -296,21 +270,15 @@
   H.readAloud = () => toggleReadAloud(); // PM branch reads the PM doc + per-word ::highlight (task 6)
   // P3: the Spelling and Grammar BUTTON opens the Editor/spelling flow (modern Word);
   // the squiggle toggle lives in the Editor pane + the Language dialog.
-  H.spellingGrammar = () => { const pm = PMA(); pm ? WC.Dialogs.editorPane() : runSpellCheck(); };
+  H.spellingGrammar = () => { WC.Dialogs.editorPane(); };
   // T1/T3: the toggle respects the D8.7 lock — Word disables turning tracking off
   // while locked ("not a security feature": a UI gate, not crypto).
   H.trackChanges = () => {
-    const pm = PMA();
-    if (!pm) { WC.Review.setTrackChanges(); return; }
     if (WC.pmTrackLock && WC.pmTrackLock.locked) { WC.toast('Track Changes is locked.', 'Lock Tracking (with the password) to turn it off.'); return; }
-    pm.cmd('toggleTrackChanges');
+    WC.PM.cmd('toggleTrackChanges');
   };
   // D8.7 Lock Tracking: dialog-driven (lock → password pair; re-invoke → unlock).
-  H.trackChangesLock = () => {
-    const pm = PMA();
-    if (pm) { WC.Dialogs.lockTracking(); return; }
-    WC.toast('Lock Tracking needs a password — not implemented.');
-  };
+  H.trackChangesLock = () => { WC.Dialogs.lockTracking(); };
 
   // ---- Layout ----
   H.margins = (c, node) => marginsMenu(node);
@@ -415,14 +383,12 @@
     'Upper Roman (I. A. 1.)': { listType: 'orderedList', levels: mlLevels((i) => ({ fmt: ['upperRoman', 'upperLetter', 'decimal'][i % 3], text: '%' + (i + 1) + '.' })) },
   };
   function multilevelMenu(node) {
-    // [label, legacyKey] — the PM branch keys ML_PATTERNS by label; legacy uses key.
-    const lib = [['Decimal (1. 1.1. 1.1.1.)', 'decimal'], ['Legal (1 1.1 1.1.1)', 'decimal'], ['Bullet hierarchy', 'bullet'], ['Outline (1) a) i))', 'outline'], ['Upper Roman (I. A. 1.)', 'outline']];
+    // The PM path keys ML_PATTERNS by label.
+    const lib = [['Decimal (1. 1.1. 1.1.1.)'], ['Legal (1 1.1 1.1.1)'], ['Bullet hierarchy'], ['Outline (1) a) i))'], ['Upper Roman (I. A. 1.)']];
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('List Library'));
-      lib.forEach(([label, key]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
-        const pm = PMA();
-        if (pm) pm.cmd('applyListDefinition', ML_PATTERNS[label]);
-        else E().applyMultilevelPattern(key);
+      lib.forEach(([label]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
+        WC.PM.cmd('applyListDefinition', ML_PATTERNS[label]);
       } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Change List Level', { onClick: () => changeListLevelMenu(node) }));
@@ -432,8 +398,7 @@
   function changeListLevelMenu(node) {
     WC.flyout(node, (fly) => {
       for (let i = 1; i <= 5; i++) fly.appendChild(WC.flyItem('Level ' + i, { onClick: () => {
-        const pm = PMA();
-        if (!pm) { E().setListLevel(i); return; }
+        const pm = WC.PM;
         // ONE full-delta call = one transaction = one undo step (changeListLevelBy).
         // NEVER chain repeated increase/decreaseListIndent — changeListLevel reads
         // editor.state, so chained ±1 steps land one short.
@@ -495,11 +460,11 @@
   }
 
   // ---- Draw tab ----
-  H.drawing = () => { const pm = PMA(); if (pm) { pm.dSetDrawing(!pm.dIsDrawing()); return; } WC.Draw.toggle(); };
+  H.drawing = () => { WC.PM.dSetDrawing(!WC.PM.dIsDrawing()); };
   H.pensGallery = (c, node) => pensMenu(node);
   H.addPen = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyHeader('Add'));
-    const add = (type, name, color, width, opacity) => fly.appendChild(WC.flyItem(name, { onClick: () => { const pen = { id: type + '-' + (WC.Draw.customPens.length + 1), name, color, width, opacity, type }; WC.Draw.customPens.push(pen); const pm = PMA(); if (pm) { pm.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); return; } WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } }));
+    const add = (type, name, color, width, opacity) => fly.appendChild(WC.flyItem(name, { onClick: () => { const pen = { id: type + '-' + (WC.Draw.customPens.length + 1), name, color, width, opacity, type }; WC.Draw.customPens.push(pen); WC.PM.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } }));
     add('pen', 'Pen', '#000000', 3, 1);
     add('pencil', 'Pencil', '#5b5b5b', 2, 0.85);
     add('highlighter', 'Highlighter', '#ffff00', 14, 0.4);
@@ -508,26 +473,26 @@
     fly.appendChild(WC.flyItem('Custom Pen…', { onClick: () => addPenDialog(node) }));
   });
   H.drawWithTrackpad = (c, node) => { if (node) node.classList.toggle('toggled'); WC.toast('Mouse/trackpad input is used for drawing in this clone.'); };
-  H.eraser = (c, node) => { const pm = PMA(); if (pm) { pm.dSetEraser(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); };
-  H.selectObjects = () => { const pm = PMA(); if (pm) { pm.dSetSelect(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('select'); };
-  H.lassoSelect = () => { const pm = PMA(); if (pm) { pm.dSetLasso(); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('lasso'); };
-  H.drawingCanvas = () => { const pm = PMA(); if (pm) { pm.dInsertCanvas(); return; } WC.Draw.insertCanvas(); };
+  H.eraser = (c, node) => { WC.PM.dSetEraser(); };
+  H.selectObjects = () => { WC.PM.dSetSelect(); };
+  H.lassoSelect = () => { WC.PM.dSetLasso(); };
+  H.drawingCanvas = () => { WC.PM.dInsertCanvas(); };
   H.inkToShape = () => WC.toast('Ink-to-Shape recognition is a handwriting/shape ML feature — not implemented.', 'See docs/NOT_IMPLEMENTED.md');
   H.inkToMath = () => WC.toast('Ink-to-Math (handwritten equation recognition) is not implemented.', 'See docs/NOT_IMPLEMENTED.md');
-  H.inkReplay = () => { const pm = PMA(); if (pm) { pm.dReplay(); return; } WC.Draw.replay(); };
+  H.inkReplay = () => { WC.PM.dReplay(); };
 
   function pensMenu(node) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Pens'));
       WC.Draw.PENS.concat(WC.Draw.customPens).forEach((pen) => {
-        const it = WC.flyItem(pen.name, { onClick: () => { const pm = PMA(); if (pm) { pm.dSetPen(pen); return; } WC.Draw.setPen(pen); } });
+        const it = WC.flyItem(pen.name, { onClick: () => { WC.PM.dSetPen(pen); } });
         it.insertBefore(el('span', { style: { width: '24px', height: '4px', borderRadius: '2px', background: pen.color, opacity: pen.opacity, marginRight: '8px' } }), it.firstChild);
         fly.appendChild(it);
       });
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Add Pen…', { onClick: () => addPenDialog(node) }));
-      fly.appendChild(WC.flyItem(WC.Draw.enabled ? 'Stop Drawing' : 'Start Drawing', { onClick: () => { const pm = PMA(); if (pm) { pm.dSetDrawing(!pm.dIsDrawing()); return; } WC.Draw.toggle(); } }));
-      fly.appendChild(WC.flyItem('Clear All Ink', { onClick: () => { const pm = PMA(); if (pm) { pm.dClearInk(); return; } WC.Draw.clearAll(); } }));
+      fly.appendChild(WC.flyItem(WC.Draw.enabled ? 'Stop Drawing' : 'Start Drawing', { onClick: () => { WC.PM.dSetDrawing(!WC.PM.dIsDrawing()); } }));
+      fly.appendChild(WC.flyItem('Clear All Ink', { onClick: () => { WC.PM.dClearInk(); } }));
     });
   }
   function addPenDialog(node) {
@@ -536,19 +501,19 @@
     swatch.addEventListener('click', () => WC.flyout(swatch, (f) => f.appendChild(WC.colorPalette((c) => { color = c === 'inherit' ? '#000' : c; swatch.style.color = color; }))));
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Color:', style: { width: '60px' } }), swatch]), el('div', { class: 'row' }, [el('label', { text: 'Thickness:', style: { width: '60px' } }), width])]);
     WC.dialog({ title: 'Add Pen', width: '360px', body, footer: [
-      { label: 'Add', primary: true, onClick: () => { const pen = { id: 'custom-' + (WC.Draw.customPens.length + 1), name: 'Custom Pen', color, width: parseFloat(width.value), opacity: 1 }; WC.Draw.customPens.push(pen); const pm = PMA(); if (pm) { pm.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); return; } WC.Draw.setPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } },
+      { label: 'Add', primary: true, onClick: () => { const pen = { id: 'custom-' + (WC.Draw.customPens.length + 1), name: 'Custom Pen', color, width: parseFloat(width.value), opacity: 1 }; WC.Draw.customPens.push(pen); WC.PM.dSetPen(pen); if (WC.Ribbon._renderPens) WC.Ribbon._renderPens(); } },
       { label: 'Cancel' },
     ] });
   }
 
   // ---- Design tab ----
-  H.themes = (c, node) => galleryMenu(node, 'Office Themes', WC.Design.THEMES, (t, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('theme', t); else pm.deApplyTheme(t); return; } WC.Design.applyTheme(t, silent); }, (t) => firstFont(t.body) === currentDocFont());
+  H.themes = (c, node) => galleryMenu(node, 'Office Themes', WC.Design.THEMES, (t, silent) => { if (silent) WC.PM.dePreviewTheme('theme', t); else WC.PM.deApplyTheme(t); }, (t) => firstFont(t.body) === currentDocFont());
   H.styleSet = (c, node) => styleSetGallery(node);
-  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Colors')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => { const pm = PMA(); if (pm) return; /* PM: livePreviewCell's click owns the commit (dePreviewCommit + apply) — returning here avoids a double deApplyColors/double toast */ WC.Design.applyColorScheme(s); } }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('colors', item); else pm.deApplyColors(item); return; } WC.Design.applyColorScheme(item, silent); }); fly.appendChild(it); }); });
-  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fonts')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => { const pm = PMA(); if (pm) { if (silent) pm.dePreviewTheme('fonts', item); else pm.deApplyFonts(item); return; } WC.Design.applyFontPairing(item, silent); }); fly.appendChild(it); }); });
+  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Colors')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} /* livePreviewCell's click owns the commit (dePreviewCommit + apply) */ }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => { if (silent) WC.PM.dePreviewTheme('colors', item); else WC.PM.deApplyColors(item); }); fly.appendChild(it); }); });
+  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fonts')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => { if (silent) WC.PM.dePreviewTheme('fonts', item); else WC.PM.deApplyFonts(item); }); fly.appendChild(it); }); });
   // PM: paragraph spacing is COMMIT-ONLY (no hover preview) — spacing changes are applied via
   // docDefaults/Normal redefinition; a transient live preview isn't wired (honest degrade). Click commits.
-  H.paragraphSpacing = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); WC.Design.SPACING.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} }); livePreviewCell(it, s, (item, silent) => { const pm = PMA(); if (pm) { if (!silent) pm.deParagraphSpacing(item); return; } WC.Design.applyParagraphSpacing(item, silent); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Paragraph Spacing…', { onClick: () => WC.Dialogs.paragraph() })); });
+  H.paragraphSpacing = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); WC.Design.SPACING.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} }); livePreviewCell(it, s, (item, silent) => { if (!silent) WC.PM.deParagraphSpacing(item); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Paragraph Spacing…', { onClick: () => WC.Dialogs.paragraph() })); });
   H.effects = (c, node) => effectsMenu(node);
   function firstFont(chain) { return String(chain).split(',')[0].replace(/['"]/g, '').trim(); }
   function currentDocFont() { return firstFont(getComputedStyle(document.documentElement).getPropertyValue('--doc-font') || 'Aptos'); }
@@ -564,7 +529,7 @@
         cell.appendChild(el('div', { text: name, style: { fontSize: '9px', marginTop: '3px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }));
         // PM: style sets are COMMIT-ONLY (no hover preview) — the clone's style sets map to Normal
         // paragraph spacing, which isn't wired for transient live preview (honest degrade). Click commits.
-        livePreviewCell(cell, name, (n, silent) => { const pm = PMA(); if (pm) { if (!silent) pm.deApplyStyleSet(n); return; } WC.Design.applyStyleSet(n, silent); });
+        livePreviewCell(cell, name, (n, silent) => { if (!silent) WC.PM.deApplyStyleSet(n); });
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
@@ -588,24 +553,17 @@
       fly.appendChild(grid);
     });
   }
-  function applyShapeEffect(shadow) {
-    const pm = PMA(); if (pm) { pm.deEffects(shadow); return; }
-    const objs = E().node.querySelectorAll('img, .wc-shape, .wc-wordart');
-    objs.forEach((o) => { o.style.boxShadow = shadow === 'none' ? '' : shadow; });
-    E().dirty = true;
-    WC.toast(objs.length ? ('Theme effect applied to ' + objs.length + ' object(s).') : 'Theme effect set (applies to shapes/pictures).');
-  }
-  H.setAsDefault = () => { const pm = PMA(); if (pm) { pm.deSetAsDefault(); return; } WC.Design.setAsDefault(); };
+  function applyShapeEffect(shadow) { WC.PM.deEffects(shadow); }
+  H.setAsDefault = () => { WC.PM.deSetAsDefault(); };
   H.watermark = (c, node) => watermarkMenu(node);
   H.pageBorders = () => WC.Dialogs.pageBorders();
 
   // Wire a gallery cell so hovering live-previews the choice (Word behavior) and
   // the pointer leaving reverts it; clicking commits. `apply(item, silent)`.
   function livePreviewCell(cell, item, apply) {
-    let snap = null;
-    cell.addEventListener('mouseenter', () => { if (!PMA() && !snap) snap = WC.Design.snapshot(); apply(item, true); });
-    cell.addEventListener('mouseleave', () => { const pm = PMA(); if (pm) { pm.dePreviewRestore(); return; } if (snap) { WC.Design.restore(snap); } });
-    cell.addEventListener('click', () => { const pm = PMA(); if (pm) { pm.dePreviewCommit(); } else { snap = null; } WC.closeFlyouts(); apply(item, false); });
+    cell.addEventListener('mouseenter', () => { apply(item, true); });
+    cell.addEventListener('mouseleave', () => { WC.PM.dePreviewRestore(); });
+    cell.addEventListener('click', () => { WC.PM.dePreviewCommit(); WC.closeFlyouts(); apply(item, false); });
   }
   function galleryMenu(node, title, items, apply, isActive) {
     WC.flyout(node, (fly) => {
@@ -640,14 +598,14 @@
           const label = text.replace(/ 1$/, '');
           const cell = el('div', { title: text, style: { border: '1px solid #e1dfdd', borderRadius: '2px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' } });
           cell.appendChild(el('div', { text: label, style: { transform: 'rotate(-18deg)', color: '#c8c8c8', fontWeight: '700', fontSize: '11px', whiteSpace: 'nowrap' } }));
-          cell.addEventListener('click', () => { WC.closeFlyouts(); const pm = PMA(); if (pm) { pm.deWatermark(label, {}); return; } WC.Design.watermark(label); });
+          cell.addEventListener('click', () => { WC.closeFlyouts(); WC.PM.deWatermark(label, {}); });
           grid.appendChild(cell);
         });
         fly.appendChild(grid);
       });
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Custom Watermark…', { onClick: () => WC.Dialogs.watermark() }));
-      fly.appendChild(WC.flyItem('Remove Watermark', { onClick: () => { const pm = PMA(); if (pm) { pm.deWatermarkRemove(); return; } WC.Design.removeWatermark(); } }));
+      fly.appendChild(WC.flyItem('Remove Watermark', { onClick: () => { WC.PM.deWatermarkRemove(); } }));
     });
   }
 
@@ -692,17 +650,17 @@
   // ---- References tab ----
   H.tableOfContents = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyHeader('Built-In'));
-    fly.appendChild(WC.flyItem('Automatic Table 1', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ title: 'Contents' }) : WC.Ref.insertTOC(false, { title: 'Contents' }); } }));
-    fly.appendChild(WC.flyItem('Automatic Table 2', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ title: 'Table of Contents' }) : WC.Ref.insertTOC(false, { title: 'Table of Contents' }); } }));
+    fly.appendChild(WC.flyItem('Automatic Table 1', { onClick: () => { WC.PM.refInsertTOC({ title: 'Contents' }); } }));
+    fly.appendChild(WC.flyItem('Automatic Table 2', { onClick: () => { WC.PM.refInsertTOC({ title: 'Table of Contents' }); } }));
     // Manual Table: Word's manual TOC is a type-it-yourself table with NO heading
     // collection. refInsertTOC always builds from headings, so in PM mode this
     // degrades to an auto TOC (recorded in the slice ledger). FIX 3: refInsertTOC
     // reads `showLevels` (NOT `levels`), so `{levels:3}` was ignored and produced a
     // default-config auto TOC anyway — pass the correct key so the level count lands.
-    fly.appendChild(WC.flyItem('Manual Table', { onClick: () => { const pm = PMA(); pm ? pm.refInsertTOC({ showLevels: 3 }) : WC.Ref.insertTOC(true); } }));
+    fly.appendChild(WC.flyItem('Manual Table', { onClick: () => { WC.PM.refInsertTOC({ showLevels: 3 }); } }));
     fly.appendChild(WC.flySep());
     fly.appendChild(WC.flyItem('Custom Table of Contents…', { onClick: () => customTOCDialog() }));
-    fly.appendChild(WC.flyItem('Remove Table of Contents', { onClick: () => { const pm = PMA(); if (pm) { pm.refRemoveTOC(); return; } const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); E().repaginate(); } }));
+    fly.appendChild(WC.flyItem('Remove Table of Contents', { onClick: () => { WC.PM.refRemoveTOC(); } }));
   });
   function customTOCDialog() {
     const showPg = el('input', { type: 'checkbox', checked: 'checked' });
@@ -717,63 +675,53 @@
     ]);
     WC.dialog({ title: 'Table of Contents', width: '440px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        const pm = PMA();
-        if (pm) {
-          // Map the dialog controls to the fork TOC config (references.ts
-          // refInsertTOC reads includePageNumbers / showLevels / rightAlignPageNumbers).
-          pm.refInsertTOC({ includePageNumbers: showPg.checked, showLevels: parseInt(levels.value, 10), rightAlignPageNumbers: rightAlign.checked });
-          return;
-        }
-        const t = E().node.querySelector('.wc-toc:not(.wc-tof):not(.wc-toa)'); if (t) t.remove(); WC.Ref.insertTOC(false, { showPageNumbers: showPg.checked, levels: parseInt(levels.value, 10) });
+        // Map the dialog controls to the fork TOC config (references.ts
+        // refInsertTOC reads includePageNumbers / showLevels / rightAlignPageNumbers).
+        WC.PM.refInsertTOC({ includePageNumbers: showPg.checked, showLevels: parseInt(levels.value, 10), rightAlignPageNumbers: rightAlign.checked });
       } },
       { label: 'Cancel' },
     ] });
   }
   H.addText = (c, node) => WC.flyout(node, (fly) => {
-    const addText = (lvl) => { const pm = PMA(); pm ? pm.refSetOutlineLevel(lvl) : WC.Ref.addText(lvl); };
+    const addText = (lvl) => { WC.PM.refSetOutlineLevel(lvl); };
     fly.appendChild(WC.flyItem('Do Not Show in Table of Contents', { onClick: () => addText(0) }));
     fly.appendChild(WC.flyItem('Level 1', { onClick: () => addText(1) }));
     fly.appendChild(WC.flyItem('Level 2', { onClick: () => addText(2) }));
     fly.appendChild(WC.flyItem('Level 3', { onClick: () => addText(3) }));
   });
-  H.updateTable = () => { const pm = PMA(); pm ? pm.refUpdateTable() : WC.Ref.updateAny(); };
-  H.insertFootnote = () => { const pm = PMA(); pm ? pm.refInsertFootnote() : WC.Ref.insertNote('footnote'); };
-  H.insertEndnote = () => { const pm = PMA(); pm ? pm.refInsertEndnote() : WC.Ref.insertNote('endnote'); };
-  H.nextFootnote = () => { const pm = PMA(); pm ? pm.refNextNote() : WC.Ref.nextNote(); };
-  H.showNotes = () => { const pm = PMA(); pm ? pm.refShowNotes() : WC.Ref.showNotes(); };
+  H.updateTable = () => { WC.PM.refUpdateTable(); };
+  H.insertFootnote = () => { WC.PM.refInsertFootnote(); };
+  H.insertEndnote = () => { WC.PM.refInsertEndnote(); };
+  H.nextFootnote = () => { WC.PM.refNextNote(); };
+  H.showNotes = () => { WC.PM.refShowNotes(); };
   H.insertCaption = () => captionDialog();
-  H.insertTableOfFigures = () => { const pm = PMA(); pm ? pm.refInsertTOF('Figure') : WC.Ref.insertTableOfFigures('Figure'); };
-  H.markEntry = () => { const pm = PMA(); pm ? pm.refMarkIndexEntry() : WC.Ref.markEntry(); };
-  H.insertIndex = () => { const pm = PMA(); pm ? pm.refInsertIndex() : WC.Ref.insertIndex(); };
-  H.updateIndex = () => { const pm = PMA(); pm ? pm.refUpdateIndex() : WC.Ref.insertIndex(); };
-  H.markCitation = () => { const pm = PMA(); pm ? markCitationPM() : WC.Ref.markCitation(); };
-  H.insertTableOfAuthorities = () => { const pm = PMA(); pm ? pm.refInsertTOA() : WC.Ref.insertTableOfAuthorities(); };
+  H.insertTableOfFigures = () => { WC.PM.refInsertTOF('Figure'); };
+  H.markEntry = () => { WC.PM.refMarkIndexEntry(); };
+  H.insertIndex = () => { WC.PM.refInsertIndex(); };
+  H.updateIndex = () => { WC.PM.refUpdateIndex(); };
+  H.markCitation = () => { markCitationPM(); };
+  H.insertTableOfAuthorities = () => { WC.PM.refInsertTOA(); };
   H.search = () => WC.toast('Smart Lookup / Search uses a cloud knowledge service — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
   H.researcher = () => WC.toast('Researcher uses a cloud research service — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
   H.insertCitation = (c, node) => WC.flyout(node, (fly) => {
-    const pm = PMA();
+    const pm = WC.PM;
     fly.appendChild(WC.flyItem('Add New Source…', { onClick: () => WC.Dialogs.addSource() }));
-    fly.appendChild(WC.flyItem('Add New Placeholder…', { onClick: () => { const p = PMA(); if (p) { WC.toast('Add a source via Add New Source… to insert a citation.'); return; } E().insertHTML('<span class="wc-citation">(Placeholder1)</span> '); } }));
-    if (pm) {
-      const sources = pm.refListSources() || [];
-      if (sources.length) {
-        fly.appendChild(WC.flySep());
-        sources.forEach((s) => {
-          const f = s.fields || {};
-          const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : (f.title || s.sourceId);
-          const label = author + (f.year ? ', ' + f.year : '');
-          fly.appendChild(WC.flyItem(label, { onClick: () => pm.refInsertCitation(s.sourceId) }));
-        });
-      }
-    } else if (WC.Ref.sources.length) {
+    fly.appendChild(WC.flyItem('Add New Placeholder…', { onClick: () => { WC.toast('Add a source via Add New Source… to insert a citation.'); } }));
+    const sources = pm.refListSources() || [];
+    if (sources.length) {
       fly.appendChild(WC.flySep());
-      WC.Ref.sources.forEach((s) => fly.appendChild(WC.flyItem(s.author + ', ' + s.year, { onClick: () => WC.Ref.insertCitation && WC.Ref.insertCitation(s) })));
+      sources.forEach((s) => {
+        const f = s.fields || {};
+        const author = (Array.isArray(f.authors) && f.authors[0] && f.authors[0].last) ? f.authors[0].last : (f.title || s.sourceId);
+        const label = author + (f.year ? ', ' + f.year : '');
+        fly.appendChild(WC.flyItem(label, { onClick: () => pm.refInsertCitation(s.sourceId) }));
+      });
     }
   });
   H.manageSources = () => WC.Dialogs.manageSources();
-  H.style = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Citation Style')); ['APA', 'Chicago', 'IEEE', 'ISO 690', 'MLA', 'Turabian'].forEach((s) => fly.appendChild(WC.flyItem((WC.Ref.citationStyle === s ? '✓ ' : '   ') + s, { onClick: () => { const pm = PMA(); if (pm) { WC.Ref.citationStyle = s; pm.refSetCitationStyle(s); WC.toast('Citation style: ' + s); return; } WC.Ref.citationStyle = s; WC.Ref.restyle(); WC.toast('Citation style: ' + s); } }))); });
+  H.style = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Citation Style')); ['APA', 'Chicago', 'IEEE', 'ISO 690', 'MLA', 'Turabian'].forEach((s) => fly.appendChild(WC.flyItem((WC.Ref.citationStyle === s ? '✓ ' : '   ') + s, { onClick: () => { WC.Ref.citationStyle = s; WC.PM.refSetCitationStyle(s); WC.toast('Citation style: ' + s); } }))); });
   H.bibliography = (c, node) => WC.flyout(node, (fly) => {
-    const insertBib = (t) => { const pm = PMA(); pm ? pm.refInsertBibliography(t) : (WC.Ref.insertBibliography && WC.Ref.insertBibliography(t)); };
+    const insertBib = (t) => { WC.PM.refInsertBibliography(t); };
     fly.appendChild(WC.flyHeader('Built-In'));
     ['Bibliography', 'References', 'Works Cited'].forEach((t) => fly.appendChild(WC.flyItem(t, { onClick: () => insertBib(t) })));
     fly.appendChild(WC.flySep());
@@ -784,11 +732,7 @@
     const label = el('select', {}, ['Figure', 'Table', 'Equation'].map((l) => el('option', { text: l })));
     const text = el('input', { type: 'text', class: 'grow', placeholder: 'Caption text' });
     WC.dialog({ title: 'Caption', width: '420px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Label:', style: { width: '60px' } }), label]), el('div', { class: 'row' }, [el('label', { text: 'Caption:', style: { width: '60px' } }), text])]), footer: [
-      { label: 'OK', primary: true, onClick: () => {
-        const pm = PMA();
-        if (pm) { pm.refInsertCaption(label.value, text.value.trim()); return; }
-        WC.Ref.insertCaption(label.value); if (text.value.trim()) { const caps = E().node.querySelectorAll('.wc-caption[data-label="' + label.value + '"]'); const last = caps[caps.length - 1]; if (last) last.lastChild.textContent = ': ' + text.value.trim(); }
-      } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.refInsertCaption(label.value, text.value.trim()); } },
       { label: 'Cancel' },
     ] });
   }
@@ -881,7 +825,7 @@
   H.greetingLine = () => WC.Mail.greetingLine();
   H.insertMergeField = (c, node) => WC.Mail.insertMergeFieldMenu(node);
   H.rules = (c, node) => WC.flyout(node, (fly) => {
-    const insertField = (code) => { const pm = PMA(); if (pm) { pm.mmInsertRule(code, code); return; } E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> '); };
+    const insertField = (code) => { WC.PM.mmInsertRule(code, code); };
     fly.appendChild(WC.flyItem('If…Then…Else…', { onClick: () => ifThenElseDialog() }));
     fly.appendChild(WC.flyItem('Fill-in…', { onClick: () => { const t = el('input', { type: 'text', class: 'grow', placeholder: 'Prompt' }); WC.dialog({ title: 'Insert Word Field: Fill-in', width: '420px', body: el('div', {}, [el('div', { text: 'Prompt:' }), t]), footer: [{ label: 'OK', primary: true, onClick: () => insertField('FILLIN "' + (t.value || 'Enter text') + '"') }, { label: 'Cancel' }] }); } }));
     fly.appendChild(WC.flyItem('Ask…', { onClick: () => { const b = el('input', { type: 'text', class: 'grow', placeholder: 'Bookmark' }); const p = el('input', { type: 'text', class: 'grow', placeholder: 'Prompt' }); WC.dialog({ title: 'Insert Word Field: Ask', width: '420px', body: el('div', {}, [el('div', { text: 'Bookmark:' }), b, el('div', { text: 'Prompt:' }), p]), footer: [{ label: 'OK', primary: true, onClick: () => insertField('ASK ' + (b.value || 'Bookmark') + ' "' + (p.value || 'Prompt') + '"') }, { label: 'Cancel' }] }); } }));
@@ -906,7 +850,7 @@
       el('div', { class: 'row' }, [el('label', { text: 'Else:', style: { width: '90px' } }), tElse]),
     ]);
     WC.dialog({ title: 'Insert Word Field: IF', width: '480px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const code = 'IF «' + (fld.value || 'Field') + '» ' + op.value + ' "' + val.value + '" "' + tThen.value + '" "' + tElse.value + '"'; const pm = PMA(); if (pm) { pm.mmInsertRule(code, code); return; } E().insertNodeHTML('<span class="wc-mergefield" contenteditable="false" data-field-code="' + WC.escapeHtml(code) + '">{ ' + WC.escapeHtml(code) + ' }</span> '); } },
+      { label: 'OK', primary: true, onClick: () => { const code = 'IF «' + (fld.value || 'Field') + '» ' + op.value + ' "' + val.value + '" "' + tThen.value + '" "' + tElse.value + '"'; WC.PM.mmInsertRule(code, code); } },
       { label: 'Cancel' },
     ] });
   }
@@ -922,8 +866,8 @@
   H.finishMerge = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Edit Individual Documents…', { onClick: () => WC.Mail.finishMerge('edit') })); fly.appendChild(WC.flyItem('Print Documents…', { onClick: () => WC.Mail.finishMerge('print') })); fly.appendChild(WC.flyItem('Send Email Messages…', { onClick: () => WC.Mail.finishMerge('email') })); });
 
   // ---- Review tab ----
-  H.thesaurus = () => { const pm = PMA(); pm ? pmThesaurus() : WC.Review.thesaurus(); };
-  H.checkAccessibility = () => { const pm = PMA(); pm ? pmAccessibility() : WC.Review.checkAccessibility(); };
+  H.thesaurus = () => { pmThesaurus(); };
+  H.checkAccessibility = () => { pmAccessibility(); };
 
   // PM word-at-caret (or selection text) + its document range. Mirrors the
   // review.ts expandCaretToWord walk: run-node boundaries add PM tokens without
@@ -1067,8 +1011,7 @@
   // mode — drives the OS spellchecker locale + squiggle gating). Doc-level only:
   // per-run w:lang isn't on the fork command surface (recorded deviation, ledger C).
   WC.setProofingLanguage = (code, noCheck) => {
-    const pm = PMA();
-    const node = pm ? pm.getEditor().view.dom : E().node;
+    const node = WC.PM.getEditor().view.dom;
     node.setAttribute('lang', code);
     node.setAttribute('spellcheck', noCheck ? 'false' : 'true');
     return node.getAttribute('lang') === code;
@@ -1076,13 +1019,13 @@
   // P9: the Word Language dialog — scope radios, language list (en-US first),
   // no-proof + detect checkboxes, Set As Default.
   function languageDialog() {
-    const pm = PMA();
+    const pm = WC.PM;
     const langs = [['English (United States)', 'en-US'], ['English (United Kingdom)', 'en-GB'], ['French (France)', 'fr-FR'], ['German (Germany)', 'de-DE'], ['Spanish (Spain)', 'es-ES'], ['Italian (Italy)', 'it-IT'], ['Portuguese (Brazil)', 'pt-BR'], ['Turkish', 'tr-TR'], ['Dutch (Netherlands)', 'nl-NL'], ['Japanese', 'ja-JP']];
-    const node = pm ? pm.getEditor().view.dom : E().node;
+    const node = pm.getEditor().view.dom;
     let defLang = 'en-US';
     try { defLang = localStorage.getItem('wc-default-lang') || 'en-US'; } catch (e) { /* default stands */ }
     const cur = node.getAttribute('lang') || defLang;
-    const hasSel = pm ? !pm.getEditor().state.selection.empty : !(window.getSelection() || { isCollapsed: true }).isCollapsed;
+    const hasSel = !pm.getEditor().state.selection.empty;
     const rSel = el('input', { type: 'radio', name: 'wcLangScope' });
     const rDoc = el('input', { type: 'radio', name: 'wcLangScope', checked: 'checked' });
     if (!hasSel) rSel.disabled = true;
@@ -1112,25 +1055,18 @@
   // PM: delete the ACTIVE thread (caret/nav-selected), else the first thread —
   // Word disables the button with no comments; enablement polish lands with task 4's UI.
   H.deleteComment = () => {
-    const pm = PMA();
-    if (pm) { const rows = pm.getComments(); const hit = rows.find((r) => r.active) || rows[0]; if (hit) pm.cmd('deleteComment', hit.id); return; }
-    WC.Review.deleteComment();
+    const rows = WC.PM.getComments(); const hit = rows.find((r) => r.active) || rows[0]; if (hit) WC.PM.cmd('deleteComment', hit.id);
   };
-  H.previousComment = () => { const pm = PMA(); pm ? pm.cmd('prevComment') : WC.Review.prevComment(); };
-  H.nextComment = () => { const pm = PMA(); pm ? pm.cmd('nextComment') : WC.Review.nextComment(); };
+  H.previousComment = () => { WC.PM.cmd('prevComment'); };
+  H.nextComment = () => { WC.PM.cmd('nextComment'); };
   // Show Comments ▾ (parity C10): Contextual | List. The card/pane UI lands in task 4 —
   // the PM branch latches the chosen view on a WC-level flag the task-4 UI will consume
-  // (no bridge 'setCommentsView' cmd exists yet); legacy keeps the pane toggle.
+  // (no bridge 'setCommentsView' cmd exists yet).
   H.showComments = (c, node) => WC.flyout(node, (fly) => {
-    const pm = PMA();
     const mode = WC.commentsViewMode || 'contextual';
-    const pick = (m) => {
-      if (PMA()) { WC.commentsViewMode = m; return; } // consumed by the task-4 comments UI
-      WC.Review.showComments();
-    };
+    const pick = (m) => { WC.commentsViewMode = m; }; // consumed by the task-4 comments UI
     fly.appendChild(WC.flyItem((mode === 'contextual' ? '✓ ' : '   ') + 'Contextual', { onClick: () => pick('contextual') }));
     fly.appendChild(WC.flyItem((mode === 'list' ? '✓ ' : '   ') + 'List', { onClick: () => pick('list') }));
-    if (!pm) { fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Toggle Comments Pane', { onClick: () => WC.Review.showComments() })); }
   });
   // ---- Markup group ----
   // PM-side Show Markup latches (T9/T10). Render effects (task 5): insDel/formatting
@@ -1140,45 +1076,26 @@
   WC.pmMarkup = pmMarkup; // task 5: track-chrome.ts reads the latches at render time
   const chromeRefresh = () => { if (WC.TrackChrome && WC.TrackChrome.refresh) WC.TrackChrome.refresh(); };
   H.showMarkup = (c, node) => {
-    const pm = PMA();
-    if (pm) {
-      return WC.flyout(node, (fly) => {
-        const reopen = () => WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node);
-        const check = (on, label) => (on ? '✓ ' : '   ') + label;
-        fly.appendChild(WC.flyItem(check(pmMarkup.insDel, 'Insertions and Deletions'), { onClick: () => { pmMarkup.insDel = !pmMarkup.insDel; document.getElementById('pm-editor').classList.toggle('pm-hide-insdel', !pmMarkup.insDel); chromeRefresh(); reopen(); } }));
-        fly.appendChild(WC.flyItem(check(pmMarkup.formatting, 'Formatting'), { onClick: () => { pmMarkup.formatting = !pmMarkup.formatting; document.getElementById('pm-editor').classList.toggle('pm-hide-format', !pmMarkup.formatting); chromeRefresh(); reopen(); } }));
-        const balloons = WC.flyItem('Balloons', { onClick: () => WC.flyout(node, (sub) => {
-          const bal = (label, m) => sub.appendChild(WC.flyItem(check(pmMarkup.balloons === m, label), { onClick: () => { pmMarkup.balloons = m; chromeRefresh(); } }));
-          bal('Show Revisions in Balloons', 'revisions');
-          bal('Show All Revisions Inline', 'inline');
-          bal('Show Only Formatting in Balloons', 'formatting');
-        }) });
-        balloons.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
-        fly.appendChild(balloons);
-        const people = WC.flyItem('Specific People', { onClick: () => WC.flyout(node, (sub) => {
-          sub.appendChild(WC.flyItem('✓ All Reviewers', { onClick: () => {} }));
-        }) });
-        people.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
-        fly.appendChild(people);
-        fly.appendChild(WC.flyItem('Highlight Updates', { disabled: true }));
-        fly.appendChild(WC.flyItem('Other Authors', { disabled: true }));
-      });
-    }
-    // legacy menu kept verbatim (frozen --legacy gate exercises it)
-    WC.flyout(node, (fly) => {
-      const mk = WC.Review.markup;
-      const item = (label, key, onToggle) => {
-        const it = WC.flyItem((mk[key] ? '✓ ' : '   ') + label, { onClick: () => { mk[key] = !mk[key]; onToggle(mk[key]); WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node); } });
-        return it;
-      };
-      fly.appendChild(item('Comments', 'comments', (on) => { E().node.classList.toggle('hide-comments', !on); const p = document.getElementById('comments-pane'); if (p) p.hidden = !on; }));
-      fly.appendChild(item('Insertions and Deletions', 'inserts', (on) => WC.Review.setDisplayMode(on ? 'all' : 'none')));
-      fly.appendChild(item('Formatting', 'formatting', () => {}));
-      fly.appendChild(WC.flySep());
-      fly.appendChild(item('Balloons', 'balloons', (on) => E().node.classList.toggle('review-balloons', on)));
-      fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Specific People', { onClick: () => WC.toast('All reviewers shown (single-author clone).') }));
-      fly.appendChild(WC.flyItem('Reviewing Pane', { onClick: () => WC.Review.reviewingPane() }));
+    return WC.flyout(node, (fly) => {
+      const reopen = () => WC.Commands.dropdown({ cmd: 'showMarkup', type: 'dropdown' }, node);
+      const check = (on, label) => (on ? '✓ ' : '   ') + label;
+      fly.appendChild(WC.flyItem(check(pmMarkup.insDel, 'Insertions and Deletions'), { onClick: () => { pmMarkup.insDel = !pmMarkup.insDel; document.getElementById('pm-editor').classList.toggle('pm-hide-insdel', !pmMarkup.insDel); chromeRefresh(); reopen(); } }));
+      fly.appendChild(WC.flyItem(check(pmMarkup.formatting, 'Formatting'), { onClick: () => { pmMarkup.formatting = !pmMarkup.formatting; document.getElementById('pm-editor').classList.toggle('pm-hide-format', !pmMarkup.formatting); chromeRefresh(); reopen(); } }));
+      const balloons = WC.flyItem('Balloons', { onClick: () => WC.flyout(node, (sub) => {
+        const bal = (label, m) => sub.appendChild(WC.flyItem(check(pmMarkup.balloons === m, label), { onClick: () => { pmMarkup.balloons = m; chromeRefresh(); } }));
+        bal('Show Revisions in Balloons', 'revisions');
+        bal('Show All Revisions Inline', 'inline');
+        bal('Show Only Formatting in Balloons', 'formatting');
+      }) });
+      balloons.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
+      fly.appendChild(balloons);
+      const people = WC.flyItem('Specific People', { onClick: () => WC.flyout(node, (sub) => {
+        sub.appendChild(WC.flyItem('✓ All Reviewers', { onClick: () => {} }));
+      }) });
+      people.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
+      fly.appendChild(people);
+      fly.appendChild(WC.flyItem('Highlight Updates', { disabled: true }));
+      fly.appendChild(WC.flyItem('Other Authors', { disabled: true }));
     });
   };
   // Filter All Markup (parity R1): real Word opens a markup-filter menu (capture
@@ -1189,37 +1106,29 @@
   // (D8.4/T11 -- live count, collapse chevron, refresh, entry-click navigation).
   // The main button toggles the pane in its last-used orientation; the split menu
   // (Commands.dropdown 'reviewingPane') picks Vertical/Horizontal explicitly.
-  H.reviewingPane = () => {
-    const pm = PMA();
-    if (!pm) { WC.Review.reviewingPane(); return; }
-    if (WC.TrackChrome) WC.TrackChrome.togglePane();
-  };
+  H.reviewingPane = () => { if (WC.TrackChrome) WC.TrackChrome.togglePane(); };
   // ---- Tracking group ----
   // Word's main Accept/Reject buttons ACCEPT-AND-ADVANCE (parity T14); with the
   // caret on no change they jump to the first one without applying (T16) — the
   // bare cmd returns false in that case and the chained nextChange supplies the
   // jump. "Accept This Change" (menu item) stays the bare non-advancing cmd.
-  H.accept = () => { const pm = PMA(); if (pm) { pm.cmd('acceptChange'); pm.cmd('nextChange'); } else WC.Review.acceptOne(); };
-  H.reject = () => { const pm = PMA(); if (pm) { pm.cmd('rejectChange'); pm.cmd('nextChange'); } else WC.Review.rejectOne(); };
-  H.previousChange = () => { const pm = PMA(); pm ? pm.cmd('prevChange') : WC.Review.prevChange(); };
-  H.nextChange = () => { const pm = PMA(); pm ? pm.cmd('nextChange') : WC.Review.nextChange(); };
-  // X1/X2: PM routes to the parity Compare dialog (real tracked-changes diff);
-  // legacy keeps the old textarea dialog (A8 — the frozen gate exercises it).
+  H.accept = () => { WC.PM.cmd('acceptChange'); WC.PM.cmd('nextChange'); };
+  H.reject = () => { WC.PM.cmd('rejectChange'); WC.PM.cmd('nextChange'); };
+  H.previousChange = () => { WC.PM.cmd('prevChange'); };
+  H.nextChange = () => { WC.PM.cmd('nextChange'); };
+  // X1/X2: PM routes to the parity Compare dialog (real tracked-changes diff).
   H.compare = (c, node) => WC.flyout(node, (fly) => {
-    const go = (mode) => { const pm = PMA(); pm ? WC.Dialogs.compareDocuments(mode) : WC.Review.compare(mode); };
+    const go = (mode) => { WC.Dialogs.compareDocuments(mode); };
     fly.appendChild(WC.flyItem('Compare…', { onClick: () => go('compare') }));
     fly.appendChild(WC.flyItem('Combine…', { onClick: () => go('combine') }));
     fly.appendChild(WC.flyItem('Show Source Documents', { disabled: true }));
   });
   H.blockAuthors = () => WC.toast('Block Authors requires cloud co-authoring — not available in this clone.', 'See docs/NOT_IMPLEMENTED.md');
   // X3: PM opens the Restrict Editing pane (enforcement = engine setEditable).
-  H.restrictEditing = () => { const pm = PMA(); pm ? WC.Dialogs.restrictEditingPane() : WC.Review.restrictEditing(); };
-  // Hide Ink ▾ (parity X4 — Word menu capture pending; ink layer is the legacy/slice-10
-  // Draw canvas). PM branch latches a container class; legacy keeps the layer toggle.
+  H.restrictEditing = () => { WC.Dialogs.restrictEditingPane(); };
+  // Hide Ink ▾ (parity X4 — Word menu capture pending; ink layer is the slice-10 Draw canvas).
   H.hideInk = (c, node) => {
-    const pm = PMA();
-    if (pm) { document.getElementById('pm-editor').classList.toggle('pm-hide-ink'); }
-    else WC.Review.hideInk();
+    document.getElementById('pm-editor').classList.toggle('pm-hide-ink');
     if (node) node.classList.toggle('toggled');
   };
 
@@ -1244,7 +1153,7 @@
   function immersiveReader() {
     let ov = document.getElementById('immersive'); if (ov) { ov.remove(); return; }
     let size = 20;
-    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
+    const docHtml = document.getElementById('pm-editor').innerHTML;
     const content = el('div', { class: 'ir-content' }); content.innerHTML = docHtml;
     content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
     content.style.fontSize = size + 'px';
@@ -1271,7 +1180,7 @@
       b.addEventListener('click', (ev) => { ev.stopPropagation(); WC.flyout(b, (fly) => items.forEach((it) => fly.appendChild(WC.flyItem(it.label, { onClick: it.onClick })))); });
       return b;
     };
-    const docHtml = (WC.PM && WC.PM.active) ? document.getElementById('pm-editor').innerHTML : E().getHTML();
+    const docHtml = document.getElementById('pm-editor').innerHTML;
     const content = el('div', { class: 'rm-content' });
     content.innerHTML = docHtml;
     content.querySelectorAll('[contenteditable]').forEach((n) => n.removeAttribute('contenteditable'));
@@ -1297,9 +1206,7 @@
   }
   WC.closeReadMode = closeReadMode;
   function propertiesDialog() {
-    const pmMode = WC.PM && WC.PM.active;
-    const c = pmMode ? WC.PM.counts()
-                     : Object.assign(E().counts(), { pages: E().pageCount(), paras: E().node.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote').length, lines: (E().node.innerText.match(/\n/g) || []).length + 1, charsNoSpace: E().node.innerText.replace(/\s/g, '').length });
+    const c = WC.PM.counts();
     const f = WC.Files;
     const rows = [['Title', (f.name || 'Document1').replace(/\.[^.]+$/, '')], ['Author', 'Word User'], ['Words', c.words], ['Characters', c.chars], ['Paragraphs', c.paras], ['Pages', c.pages], ['Lines', c.lines]];
     const body = el('div', { class: 'info-props' });
@@ -1421,14 +1328,14 @@
       if (cmd === 'pensGallery') return pensMenu(node);
       if (cmd === 'eraser') return WC.flyout(node, (fly) => {
         fly.appendChild(WC.flyHeader('Eraser'));
-        const setEraser = (radius, mode) => { const pm = PMA(); if (pm) { pm.dSetEraser(radius, mode); return; } WC.Draw.setEnabled(true); WC.Draw.setTool('eraser'); WC.Draw.eraseRadius = radius; WC.Draw.eraseMode = mode; };
+        const setEraser = (radius, mode) => { WC.PM.dSetEraser(radius, mode); };
         fly.appendChild(WC.flyItem('Stroke Eraser', { onClick: () => setEraser(10, 'stroke') }));
         fly.appendChild(WC.flyItem('Small Eraser', { onClick: () => setEraser(6, 'point') }));
         fly.appendChild(WC.flyItem('Medium Eraser', { onClick: () => setEraser(12, 'point') }));
         fly.appendChild(WC.flyItem('Large Eraser', { onClick: () => setEraser(24, 'point') }));
         fly.appendChild(WC.flyItem('Segment Eraser', { onClick: () => setEraser(8, 'segment') }));
         fly.appendChild(WC.flySep());
-        fly.appendChild(WC.flyItem('Erase All Ink', { onClick: () => { const pm = PMA(); if (pm) { pm.dClearInk(); return; } WC.Draw.clearAll(); } }));
+        fly.appendChild(WC.flyItem('Erase All Ink', { onClick: () => { WC.PM.dClearInk(); } }));
       });
       // Design tab
       if (cmd === 'themes' || cmd === 'styleSet' || cmd === 'colors' || cmd === 'fonts' || cmd === 'paragraphSpacing' || cmd === 'effects' || cmd === 'watermark') return H[cmd](control, node);
@@ -1437,28 +1344,18 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.Layout.bringForward() })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.Layout.bringToFront() })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.Layout.wrapText('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.Layout.sendBackward() })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.Layout.sendToBack() })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.Layout.wrapText('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
-      // References tab — Footnotes split-button ▾ flyout. PM-mode routes every
-      // item to the bridge (the H.* button handlers + dialogs were re-pointed by
-      // the flip, but this Commands.dropdown flyout was missed — slice-9 FIX 1).
-      // The bridge refNextNote takes a direction ('next'/'prev'); refShowNotes
-      // reveals the clone-owned notes area. Legacy ELSE branch is verbatim.
+      // References tab — Footnotes split-button ▾ flyout. Routes every item to the
+      // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
+      // the clone-owned notes area.
       if (cmd === 'nextFootnote') return WC.flyout(node, (fly) => {
-        const pm = PMA();
-        if (pm) {
-          fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => pm.refNextNote('next') }));
-          fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => pm.refNextNote('prev') }));
-          fly.appendChild(WC.flySep());
-          fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => pm.refNextNote('next') }));
-          fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => pm.refNextNote('prev') }));
-          fly.appendChild(WC.flySep());
-          fly.appendChild(WC.flyItem('Show Notes', { onClick: () => pm.refShowNotes() }));
-          return;
-        }
-        fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => WC.Ref.nextNote('footnote', 1) }));
-        fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => WC.Ref.nextNote('footnote', -1) }));
+        const pm = WC.PM;
+        fly.appendChild(WC.flyItem('Next Footnote', { onClick: () => pm.refNextNote('next') }));
+        fly.appendChild(WC.flyItem('Previous Footnote', { onClick: () => pm.refNextNote('prev') }));
         fly.appendChild(WC.flySep());
-        fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => WC.Ref.nextNote('endnote', 1) }));
-        fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => WC.Ref.nextNote('endnote', -1) }));
+        fly.appendChild(WC.flyItem('Next Endnote', { onClick: () => pm.refNextNote('next') }));
+        fly.appendChild(WC.flyItem('Previous Endnote', { onClick: () => pm.refNextNote('prev') }));
+        fly.appendChild(WC.flySep());
+        fly.appendChild(WC.flyItem('Show Notes', { onClick: () => pm.refShowNotes() }));
       });
       if (cmd === 'tableOfContents' || cmd === 'addText' || cmd === 'insertCitation' || cmd === 'style' || cmd === 'bibliography') return H[cmd](control, node);
       // Mailings tab
@@ -1471,7 +1368,7 @@
       // Track Changes ▾ (parity T2/D8.7): For Everyone | Just Mine | Lock Tracking.
       // Just Mine === For Everyone in this single-author clone (recorded note).
       if (cmd === 'trackChanges') {
-        const tcOn = (WC.PM && WC.PM.active) ? !!(WC.PM.reviewState && WC.PM.reviewState().tracking) : WC.Review.trackOn;
+        const tcOn = !!(WC.PM.reviewState && WC.PM.reviewState().tracking);
         const locked = !!(WC.pmTrackLock && WC.pmTrackLock.locked);
         return WC.flyout(node, (fly) => {
           fly.appendChild(WC.flyItem((tcOn ? '✓ ' : '   ') + 'For Everyone', { onClick: () => H.trackChanges() }));
@@ -1484,38 +1381,37 @@
       // the same treatment as C8's "Delete All Comments Shown"; task-5 filters
       // enable it.
       if (cmd === 'accept') return WC.flyout(node, (fly) => {
-        const pm = PMA();
+        const pm = WC.PM;
         fly.appendChild(WC.flyItem('Accept and Move to Next', { onClick: () => H.accept() }));
-        fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { if (pm) { pm.cmd('acceptChange'); return; } const n = WC.Review.currentRevision(); if (n) { WC.Review.acceptNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } }));
+        fly.appendChild(WC.flyItem('Accept This Change', { onClick: () => { pm.cmd('acceptChange'); } }));
         fly.appendChild(WC.flyItem('Accept All Changes Shown', { disabled: true }));
-        fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => { const p = PMA(); p ? p.cmd('acceptAll') : WC.Review.acceptAll(); } }));
-        fly.appendChild(WC.flyItem('Accept All Changes and Stop Tracking', { onClick: () => { const p = PMA(); if (p) { p.cmd('acceptAll'); p.cmd('disableTrackChanges'); } else { WC.Review.acceptAll(); WC.Review.setTrackChanges(false); } } }));
+        fly.appendChild(WC.flyItem('Accept All Changes', { onClick: () => { pm.cmd('acceptAll'); } }));
+        fly.appendChild(WC.flyItem('Accept All Changes and Stop Tracking', { onClick: () => { pm.cmd('acceptAll'); pm.cmd('disableTrackChanges'); } }));
       });
       if (cmd === 'reject') return WC.flyout(node, (fly) => {
-        const pm = PMA();
+        const pm = WC.PM;
         fly.appendChild(WC.flyItem('Reject and Move to Next', { onClick: () => H.reject() }));
-        fly.appendChild(WC.flyItem('Reject Change', { onClick: () => { if (pm) { pm.cmd('rejectChange'); return; } const n = WC.Review.currentRevision(); if (n) { WC.Review.rejectNode(n); E().dirty = true; E().repaginate(); E().updateStatus(); E().emit(); } } }));
+        fly.appendChild(WC.flyItem('Reject Change', { onClick: () => { pm.cmd('rejectChange'); } }));
         fly.appendChild(WC.flyItem('Reject All Changes Shown', { disabled: true }));
-        fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => { const p = PMA(); p ? p.cmd('rejectAll') : WC.Review.rejectAll(); } }));
-        fly.appendChild(WC.flyItem('Reject All Changes and Stop Tracking', { onClick: () => { const p = PMA(); if (p) { p.cmd('rejectAll'); p.cmd('disableTrackChanges'); } else { WC.Review.rejectAll(); WC.Review.setTrackChanges(false); } } }));
+        fly.appendChild(WC.flyItem('Reject All Changes', { onClick: () => { pm.cmd('rejectAll'); } }));
+        fly.appendChild(WC.flyItem('Reject All Changes and Stop Tracking', { onClick: () => { pm.cmd('rejectAll'); pm.cmd('disableTrackChanges'); } }));
       });
       // Delete ▾ (parity C8). "Shown" stays disabled until markup/comment filters
       // exist (task 4+, Word disables it un-filtered too).
       if (cmd === 'deleteComment') return WC.flyout(node, (fly) => {
-        const pm = PMA();
+        const pm = WC.PM;
         fly.appendChild(WC.flyItem('Delete', { onClick: () => H.deleteComment() }));
         fly.appendChild(WC.flyItem('Delete All Comments Shown', { disabled: true }));
-        fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => { if (pm) { pm.getComments().forEach((r) => pm.cmd('deleteComment', r.id)); return; } WC.Review.deleteAllComments(); } }));
-        fly.appendChild(WC.flyItem('Delete All Resolved Comments', { onClick: () => { if (pm) { pm.getComments().filter((r) => r.resolved).forEach((r) => pm.cmd('deleteComment', r.id)); return; } E().node.querySelectorAll('.wc-comment-anchor.resolved').forEach((a) => a.replaceWith(...a.childNodes)); } }));
+        fly.appendChild(WC.flyItem('Delete All Comments in Document', { onClick: () => { pm.getComments().forEach((r) => pm.cmd('deleteComment', r.id)); } }));
+        fly.appendChild(WC.flyItem('Delete All Resolved Comments', { onClick: () => { pm.getComments().filter((r) => r.resolved).forEach((r) => pm.cmd('deleteComment', r.id)); } }));
       });
       // Reviewing Pane split menu (T11): PM picks the dock explicitly (Horizontal =
-      // the same pane bottom-docked); legacy keeps its single pane toggle.
+      // the same pane bottom-docked).
       if (cmd === 'reviewingPane') return WC.flyout(node, (fly) => {
-        const pm = PMA();
-        fly.appendChild(WC.flyItem('Reviewing Pane Vertical…', { onClick: () => { if (pm && WC.TrackChrome) WC.TrackChrome.showPane('vertical'); else H.reviewingPane(); } }));
-        fly.appendChild(WC.flyItem('Reviewing Pane Horizontal…', { onClick: () => { if (pm && WC.TrackChrome) WC.TrackChrome.showPane('horizontal'); else H.reviewingPane(); } }));
+        fly.appendChild(WC.flyItem('Reviewing Pane Vertical…', { onClick: () => { if (WC.TrackChrome) WC.TrackChrome.showPane('vertical'); else H.reviewingPane(); } }));
+        fly.appendChild(WC.flyItem('Reviewing Pane Horizontal…', { onClick: () => { if (WC.TrackChrome) WC.TrackChrome.showPane('horizontal'); else H.reviewingPane(); } }));
       });
-      if (cmd === 'checkAccessibility') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Check Accessibility', { onClick: () => WC.Review.checkAccessibility() })); });
+      if (cmd === 'checkAccessibility') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Check Accessibility', { onClick: () => pmAccessibility() })); });
       // Hide Ink ▾ (parity X4 — Word menu capture pending): single toggle item.
       if (cmd === 'hideInk') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Hide Ink', { onClick: () => H.hideInk(control, WC.Ribbon.controlIndex.hideInk && WC.Ribbon.controlIndex.hideInk.node) })); });
       // View tab
@@ -1539,20 +1435,15 @@
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(c.cmd === 'font' || c.cmd === 'fontSize' ? 'font' : c.cmd)) { WC.PM.withSelection(() => WC.PM.notifyBlocked(c.label || c.cmd)); return; }
       if (c.cmd === 'font') openFontList(combo);
       else if (c.cmd === 'fontSize') openSizeList(combo);
-      else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { const pm = PMA(); pm ? pm.cmd('setReviewView', m) : WC.Review.setDisplayMode(m); input.value = l; } }))); });
+      else if (c.cmd === 'displayForReview') WC.flyout(combo, (fly) => { [['Simple Markup', 'simple'], ['All Markup', 'all'], ['No Markup', 'none'], ['Original', 'original']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.PM.cmd('setReviewView', m); input.value = l; } }))); });
     },
 
     applyStyle(name) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
-      const pm = PMA();
-      if (pm) {
-        // setStyleById path (one transaction; Word gallery = plain apply). false =
-        // style missing from this doc's catalog (foreign docs beyond the import
-        // defaults — recorded deviation: real Word mints built-ins on demand).
-        if (!pm.applyStyleByName(name)) WC.toast('Style “' + name + '” is not available in this document.');
-        return;
-      }
-      WC.applyNamedStyle(name);
+      // setStyleById path (one transaction; Word gallery = plain apply). false =
+      // style missing from this doc's catalog (foreign docs beyond the import
+      // defaults — recorded deviation: real Word mints built-ins on demand).
+      if (!WC.PM.applyStyleByName(name)) WC.toast('Style “' + name + '” is not available in this document.');
     },
 
     // Layout Paragraph spinners (indent in inches, spacing in points; model = twips).
@@ -1560,19 +1451,14 @@
     // can't go negative — the ribbon inputs enforce min:0 (ribbon.js renderSpinner).
     spinner(cmd, value) {
       if (WC.PM && WC.PM.active && WC.PM.isBlocked(cmd)) { WC.PM.notifyBlocked(cmd); return; }
-      const pm = PMA();
-      if (pm && PARA_SPIN[cmd]) {
+      if (PARA_SPIN[cmd]) {
         // withSelection: the spinner input took real focus — focus.ts snapshotted the
         // PM selection on focusin (.rspinner is in its capture list); restore it first.
         const [path, conv] = PARA_SPIN[cmd];
-        pm.withSelection(() => pm.cmd('updateAttributes', 'paragraph', { [path]: conv(value) }));
+        WC.PM.withSelection(() => WC.PM.cmd('updateAttributes', 'paragraph', { [path]: conv(value) }));
         return;
       }
-      if (cmd === 'indentLeft') E().applyBlockStyle('marginLeft', value ? value + 'in' : '');
-      else if (cmd === 'indentRight') E().applyBlockStyle('marginRight', value ? value + 'in' : '');
-      else if (cmd === 'spacingBefore') E().applyBlockStyle('marginTop', value + 'pt');
-      else if (cmd === 'spacingAfter') E().applyBlockStyle('marginBottom', value + 'pt');
-      else if (cmd === 'goToRecord') WC.Mail.go((value || 1) - 1);
+      if (cmd === 'goToRecord') WC.Mail.go((value || 1) - 1);
     },
 
     // Dialog-box-launcher dispatch, keyed by group id (avoids cmd collisions
@@ -1635,7 +1521,7 @@
   // oracle 2.3 probe B3); no empty-selection refusal.
   function armPainterPM(node, sticky) {
     // The fork's copyFormat always arms (caret-arming, oracle B3) — no failure path.
-    PMA().armFormatPainter(sticky);
+    WC.PM.armFormatPainter(sticky);
     WC.toast(sticky ? 'Format Painter locked — apply to multiple selections. Press Esc to stop.'
                     : 'Format Painter — select text to apply the copied formatting once.');
   }
@@ -1679,11 +1565,9 @@
   // Vertical alignment (sub/superscript) — function decl so H.subscript/H.superscript
   // can reference it before the declaration site (hoisting).
   function vertAlign(kind) {
-    const pm = PMA();
-    if (!pm) { E().exec(kind); return; }
-    const st = pm.getState();
+    const st = WC.PM.getState();
     const on = kind === 'subscript' ? st.subscript : st.superscript;
-    pm.cmd('setMark', 'textStyle', { vertAlign: on ? null : kind });
+    WC.PM.cmd('setMark', 'textStyle', { vertAlign: on ? null : kind });
   }
   function stepFont(dir) {
     const cur = currentSizePt() || 11;
@@ -1693,59 +1577,44 @@
     setFontSize(next);
   }
   function currentSizePt() {
-    const pm = PMA();
-    if (pm) { const st = pm.getState(); const v = parseFloat(st && st.fontSize); return v || 12; }
-    const sel = window.getSelection();
-    let n = sel && sel.anchorNode; n = n && n.nodeType === 3 ? n.parentNode : n;
-    if (n && n.getBoundingClientRect) { const px = parseFloat(getComputedStyle(n).fontSize); if (px) return Math.round(px / 1.3333 * 10) / 10; }
-    return E().queryState().computedFontSizePt || 12;
+    const st = WC.PM.getState(); const v = parseFloat(st && st.fontSize); return v || 12;
   }
   function setFontSize(pt) {
     if (!pt) return;
-    const pm = PMA();
     // withSelection: combo commits arrive with focus in the combo input — the
     // focusin capture (focus.ts) snapshotted the PM selection; restore it first.
-    if (pm) pm.withSelection(() => pm.cmd('setFontSize', pt + 'pt'));
-    else E().applyInlineStyle('fontSize', pt + 'pt');
+    WC.PM.withSelection(() => WC.PM.cmd('setFontSize', pt + 'pt'));
     WC.Ribbon.setComboValue('fontSize', String(pt));
   }
   function setFontName(name) {
-    const pm = PMA();
-    if (pm) pm.withSelection(() => pm.cmd('setFontFamily', name));
-    else E().exec('fontName', name);
+    WC.PM.withSelection(() => WC.PM.cmd('setFontFamily', name));
     WC.Ribbon.setComboValue('font', name);
   }
 
   function applyColor(kind, color) {
-    const pm = PMA();
+    const pm = WC.PM;
     if (kind === 'fore') {
       lastFontColor = color;
-      pm ? pm.cmd('setColor', color) : E().exec('foreColor', color);
+      pm.cmd('setColor', color);
       WC.Ribbon.setColorBar('fontColor', color);
     } else if (kind === 'hilite') {
       lastHighlight = color;
-      if (pm) { color === 'transparent' ? pm.cmd('unsetHighlight') : pm.cmd('setHighlight', color); }
-      else { E().exec('hiliteColor', color) || E().exec('backColor', color); }
+      color === 'transparent' ? pm.cmd('unsetHighlight') : pm.cmd('setHighlight', color);
       WC.Ribbon.setColorBar('textHighlightColor', color);
     } else if (kind === 'shade') {
       if (color && color !== 'transparent') lastShade = color;
-      if (pm) {
-        if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
-        else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
-      } else {
-        E().applyBlockStyle('backgroundColor', color || 'transparent');
-      }
+      if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+      else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
       WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
     } else if (kind === 'page') {
-      if (pm) { pm.dePageColor(color); return; } // design area — slice 10 PR2 (real w:background)
-      E().node.style.backgroundColor = color; // not 'background' — that wipes a watermark's background-image
+      pm.dePageColor(color); // design area — slice 10 PR2 (real w:background)
     }
   }
 
   function colorMenu(node, kind) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = PMA(); if (pm) { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } return; } if (kind === 'hilite') E().exec('hiliteColor', 'transparent'); else if (kind === 'shade') E().applyBlockStyle('backgroundColor', 'transparent'); else if (kind === 'page') E().node.style.backgroundColor = '#ffffff'; return; }
+        if (color === null) { const pm = WC.PM; if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });
@@ -1755,63 +1624,25 @@
     const cases = [['Sentence case.', 'sentence'], ['lowercase', 'lower'], ['UPPERCASE', 'upper'], ['Capitalize Each Word', 'caps'], ['tOGGLE cASE', 'toggle']];
     WC.flyout(node, (fly) => cases.forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => changeCase(mode) }))));
   }
-  function changeCase(mode) {
-    const pm = PMA(); if (pm) { pm.changeCase(mode); return; }
-    const sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) return;
-    const range = sel.getRangeAt(0);
-    const xform = (t) => {
-      if (mode === 'lower') return t.toLowerCase();
-      if (mode === 'upper') return t.toUpperCase();
-      if (mode === 'caps') return t.replace(/\b\w/g, (m) => m.toUpperCase());
-      if (mode === 'sentence') return t.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase());
-      if (mode === 'toggle') return t.replace(/./g, (ch) => ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase());
-      return t;
-    };
-    // Transform the TEXT NODES inside the selection in place — never round-trip
-    // through execCommand('insertText'), which injects literal newlines for a
-    // multi-paragraph selection and strips run formatting. Case maps are
-    // length-preserving, so the selection range stays valid.
-    const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, { acceptNode: (n) => range.intersectsNode(n) ? 1 : 3 });
-    const nodes = []; let n; while ((n = walker.nextNode())) nodes.push(n);
-    nodes.forEach((node) => {
-      const v = node.nodeValue;
-      let s = 0, e = v.length;
-      if (node === range.startContainer) s = range.startOffset;
-      if (node === range.endContainer) e = range.endOffset;
-      node.nodeValue = v.slice(0, s) + xform(v.slice(s, e)) + v.slice(e);
-    });
-    E().dirty = true; E().updateStatus(); E().emit();
-  }
+  function changeCase(mode) { WC.PM.changeCase(mode); }
 
   function lineSpacingMenu(node) {
     const opts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
-    // pm/st snapshot at MENU OPEN drives the dynamic labels; each click re-guards
-    // with a fresh PMA() (pm2) because failBridge can un-flip the mode while the
-    // flyout is open — never act on a stale mode through a captured pm.
-    const pm = PMA();
-    const st = pm ? pm.getState() : null;
+    // st snapshot at MENU OPEN drives the dynamic labels.
+    const st = WC.PM.getState();
     WC.flyout(node, (fly) => {
-      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => {
-        const pm2 = PMA();
-        if (pm2) pm2.cmd('setLineHeight', parseFloat(o));
-        else E().applyBlockStyle('lineHeight', o);
-      } })));
+      opts.forEach((o) => fly.appendChild(WC.flyItem(o, { onClick: () => { WC.PM.cmd('setLineHeight', parseFloat(o)); } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Line Spacing Options…', { onClick: () => WC.Dialogs.paragraph() }));
-      if (pm) {
-        // Word-fidelity: labels flip with the caret paragraph's current spacing.
-        const hasBefore = !!(st && st.spacingBeforePt > 0);
-        const hasAfter = !!(st && st.spacingAfterPt > 0);
-        fly.appendChild(WC.flyItem(hasBefore ? 'Remove Space Before Paragraph' : 'Add Space Before Paragraph', {
-          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.before': hasBefore ? 0 : 240 }); },
-        }));
-        fly.appendChild(WC.flyItem(hasAfter ? 'Remove Space After Paragraph' : 'Add Space After Paragraph', {
-          onClick: () => { const p2 = PMA(); if (p2) p2.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.after': hasAfter ? 0 : 240 }); },
-        }));
-      } else {
-        fly.appendChild(WC.flyItem('Add Space Before Paragraph', { onClick: () => E().applyBlockStyle('marginTop', '12pt') }));
-        fly.appendChild(WC.flyItem('Remove Space After Paragraph', { onClick: () => E().applyBlockStyle('marginBottom', '0') }));
-      }
+      // Word-fidelity: labels flip with the caret paragraph's current spacing.
+      const hasBefore = !!(st && st.spacingBeforePt > 0);
+      const hasAfter = !!(st && st.spacingAfterPt > 0);
+      fly.appendChild(WC.flyItem(hasBefore ? 'Remove Space Before Paragraph' : 'Add Space Before Paragraph', {
+        onClick: () => { WC.PM.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.before': hasBefore ? 0 : 240 }); },
+      }));
+      fly.appendChild(WC.flyItem(hasAfter ? 'Remove Space After Paragraph' : 'Add Space After Paragraph', {
+        onClick: () => { WC.PM.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.spacing.after': hasAfter ? 0 : 240 }); },
+      }));
     });
   }
 
@@ -1825,31 +1656,22 @@
   }
   function applyBorder(edge) {
     if (edge && edge !== 'none' && edge !== 'all' && edge !== 'outside') lastBorderEdge = edge;
-    const pm = PMA();
-    if (pm) {
-      if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
-      // Word's default paragraph border: single, 0.5pt (size is in EIGHTH-points: 4),
-      // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
-      // for single paragraphs (no inside-border concept yet; recorded deferral).
-      const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
-      const defCopy = () => ({ val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space });
-      // getAttributes reads ONE paragraph (selection head) — multi-paragraph selections
-      // seed single-edge accumulation from that paragraph only (recorded simplification).
-      const attrs = pm.getEditor().getAttributes('paragraph') || {};
-      const pp = attrs.paragraphProperties || {};
-      const cur = pp.borders || {};
-      const borders = (edge === 'all' || edge === 'outside')
-        ? { top: defCopy(), bottom: defCopy(), left: defCopy(), right: defCopy() }
-        : Object.assign({}, cur, { [edge]: defCopy() }); // Word ACCUMULATES single edges
-      pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
-      return;
-    }
-    const b = '1px solid #000';
-    E().selectedBlocks().forEach((el2) => {
-      if (edge === 'none') { el2.style.border = ''; el2.style.borderTop = el2.style.borderBottom = el2.style.borderLeft = el2.style.borderRight = ''; }
-      else if (edge === 'all' || edge === 'outside') el2.style.border = b;
-      else el2.style['border' + edge.charAt(0).toUpperCase() + edge.slice(1)] = b;
-    });
+    const pm = WC.PM;
+    if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
+    // Word's default paragraph border: single, 0.5pt (size is in EIGHTH-points: 4),
+    // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
+    // for single paragraphs (no inside-border concept yet; recorded deferral).
+    const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
+    const defCopy = () => ({ val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space });
+    // getAttributes reads ONE paragraph (selection head) — multi-paragraph selections
+    // seed single-edge accumulation from that paragraph only (recorded simplification).
+    const attrs = pm.getEditor().getAttributes('paragraph') || {};
+    const pp = attrs.paragraphProperties || {};
+    const cur = pp.borders || {};
+    const borders = (edge === 'all' || edge === 'outside')
+      ? { top: defCopy(), bottom: defCopy(), left: defCopy(), right: defCopy() }
+      : Object.assign({}, cur, { [edge]: defCopy() }); // Word ACCUMULATES single edges
+    pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
   }
 
   // Library glyph → engine style names (toggleOrderedListStyle / toggleBulletListStyle);
@@ -1865,8 +1687,7 @@
         const cell = el('div', { text: b, style: { border: '1px solid #ddd', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } });
         cell.addEventListener('click', () => {
           WC.closeFlyouts();
-          const pm = PMA();
-          if (!pm) { E().exec(ordered ? 'insertOrderedList' : 'insertUnorderedList'); return; }
+          const pm = WC.PM;
           if (ordered) pm.cmd('toggleOrderedListStyle', ORDERED_STYLE[b]);
           else if (BULLET_STYLE[b]) pm.cmd('toggleBulletListStyle', BULLET_STYLE[b]);
           else pm.cmd('applyListDefinition', { listType: 'bulletList', levels: [{ fmt: 'bullet', text: b }] });
@@ -1878,23 +1699,13 @@
   }
 
   function selectMenu(node) {
-    const pm = PMA();
-    if (pm) {
-      WC.flyout(node, (fly) => {
-        fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => pm.selectAll() }));
-        fly.appendChild(WC.flyItem('Select Objects', { onClick: () => pm.dSetSelect() }));
-        fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => { if (!pm.selectSimilarFormatting()) WC.toast('Place the cursor in text first.'); } }));
-        fly.appendChild(WC.flySep());
-        fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));
-      });
-      return;
-    }
+    const pm = WC.PM;
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => E().exec('selectAll') }));
-      fly.appendChild(WC.flyItem('Select Objects', { onClick: () => { if (WC.Draw) { WC.Draw.setEnabled(true); WC.Draw.setTool('select'); } WC.toast('Click objects to select them.'); } }));
-      fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => selectSimilarFormatting() }));
+      fly.appendChild(WC.flyItem('Select All', { key: 'Ctrl+A', onClick: () => pm.selectAll() }));
+      fly.appendChild(WC.flyItem('Select Objects', { onClick: () => pm.dSetSelect() }));
+      fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => { if (!pm.selectSimilarFormatting()) WC.toast('Place the cursor in text first.'); } }));
       fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.Layout.selectionPane() }));
+      fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));
     });
   }
   function selectSimilarFormatting() {
@@ -1918,13 +1729,7 @@
     });
   }
   function sortDialog() {
-    const pmOpen = PMA();
-    if (!pmOpen) {
-      const all = E().selectedBlocks();
-      if (all.length < 2) { WC.toast('Select multiple paragraphs to sort.'); return; }
-    } else {
-      pmOpen.captureSelection(); // the dialog steals focus; restore before sorting
-    }
+    WC.PM.captureSelection(); // the dialog steals focus; restore before sorting
     const type = el('select', {}, ['Text', 'Number', 'Date'].map((t) => el('option', { text: t })));
     const dir = el('select', {}, ['Ascending', 'Descending'].map((t) => el('option', { text: t })));
     const hdr = el('input', { type: 'checkbox' });
@@ -1938,39 +1743,27 @@
         // 'Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral;
         // real Word does true date parsing.
         const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
-        const pm = PMA();
-        if (pm) { let ok = false; pm.withSelection(() => { ok = pm.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.'); }
-        else sortSelection(opts);
+        let ok = false; WC.PM.withSelection(() => { ok = WC.PM.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.');
       } },
       { label: 'Cancel' },
     ] });
   }
 
   function pasteMenu(node) {
-    const pm = PMA();
-    if (pm) {
-      pm.clipboardFlavors().then((fl) => {
-        fl = fl || { hasText: false, hasHtml: false, hasImage: false };
-        WC.flyout(node, (fly) => {
-          const item = (label, enabled, onClick) =>
-            fly.appendChild(WC.flyItem(label, enabled ? { onClick } : { disabled: true }));
-          item('Keep Source Formatting', fl.hasHtml || fl.hasText, () => pm.pasteDefault());
-          item('Merge Formatting', false, () => {}); // recorded deferral — destination-formatting rules engine
-          item('Picture', fl.hasImage, () => pm.pastePicture());
-          item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
-          fly.appendChild(WC.flySep());
-          fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
-          fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.toast('Set Default Paste is not implemented (recorded deferral).') }));
-        });
+    const pm = WC.PM;
+    pm.clipboardFlavors().then((fl) => {
+      fl = fl || { hasText: false, hasHtml: false, hasImage: false };
+      WC.flyout(node, (fly) => {
+        const item = (label, enabled, onClick) =>
+          fly.appendChild(WC.flyItem(label, enabled ? { onClick } : { disabled: true }));
+        item('Keep Source Formatting', fl.hasHtml || fl.hasText, () => pm.pasteDefault());
+        item('Merge Formatting', false, () => {}); // recorded deferral — destination-formatting rules engine
+        item('Picture', fl.hasImage, () => pm.pastePicture());
+        item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
+        fly.appendChild(WC.flySep());
+        fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
+        fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.toast('Set Default Paste is not implemented (recorded deferral).') }));
       });
-      return;
-    }
-    WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('Keep Source Formatting', { onClick: () => E().exec('paste') }));
-      fly.appendChild(WC.flyItem('Merge Formatting', { onClick: () => E().exec('paste') }));
-      fly.appendChild(WC.flyItem('Keep Text Only', { onClick: async () => { try { const t = await navigator.clipboard.readText(); E().exec('insertText', t); } catch (e) { WC.toast('Clipboard read blocked.'); } } }));
-      fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.notImplemented('Paste Special') }));
     });
   }
 
@@ -1979,9 +1772,7 @@
     const UL_TYPE = { solid: 'single', double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' }; // OOXML w:u values
     WC.flyout(node, (fly) => {
       styles.forEach(([label, s]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
-        const pm = PMA();
-        if (pm) { pm.chain([['setUnderline'], ['setMark', 'underline', { underlineType: UL_TYPE[s] }]]); return; }
-        E().exec('underline'); E().applyInlineStyle('textDecorationStyle', s);
+        WC.PM.chain([['setUnderline'], ['setMark', 'underline', { underlineType: UL_TYPE[s] }]]);
       } })));
     });
   }
@@ -2020,8 +1811,7 @@
   function insertWordArt() {
     const sel = window.getSelection();
     const txt = (sel && sel.toString()) || 'Your text here';
-    const pm = PMA(); if (pm) { pm.xeWordArt(txt, {}); return; }
-    E().insertHTML(`<span style="font:bold 36pt Calibri;color:#2B579A;text-shadow:1px 1px 2px rgba(0,0,0,.3)">${WC.escapeHtml(txt)}</span>`);
+    WC.PM.xeWordArt(txt, {});
   }
   function dropCap() {
     const b = E().selectedBlocks()[0];
@@ -2187,13 +1977,7 @@
   function speakReadAloud() {
     speechSynthesis.cancel();
     const pmSrc = pmReadAloudSource();
-    let text;
-    if (pmSrc) { text = pmSrc.text; raMap = pmSrc.map; raText = text; }
-    else {
-      const sel = window.getSelection();
-      text = (sel && !sel.isCollapsed ? sel.toString() : E().node.innerText).slice(0, 8000);
-      raMap = null;
-    }
+    const text = pmSrc.text; raMap = pmSrc.map; raText = text;
     const u = new SpeechSynthesisUtterance(text);
     u.rate = readAloudRate;
     u.onboundary = (ev) => { if (ev.name === 'word') raHighlight(ev.charIndex, ev.charLength); };
@@ -2225,8 +2009,7 @@
   function closeReadAloud() { speechSynthesis.cancel(); speaking = false; raPaused = false; raClearHighlight(); const bar = document.getElementById('read-aloud-bar'); if (bar) bar.remove(); }
   WC.closeReadAloud = closeReadAloud;
   function runSpellCheck() {
-    const pm = PMA();
-    const node = pm ? pm.getEditor().view.dom : E().node;
+    const node = WC.PM.getEditor().view.dom;
     node.setAttribute('spellcheck', node.getAttribute('spellcheck') === 'false' ? 'true' : 'false');
     const on = node.getAttribute('spellcheck') !== 'false';
     WC.toast('Spell check ' + (on ? 'on (red squiggles via the OS spellchecker)' : 'off') + '.', 'Open the Editor pane for suggestions.');
