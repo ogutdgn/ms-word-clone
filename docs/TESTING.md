@@ -1,26 +1,22 @@
 # Testing & QA Strategy
 
 This clone has no Jest/Mocha runner and no headless DOM mock. Instead, every
-test runs **inside the real renderer**, driving the actual `WC` command paths
-against a live Chromium DOM, and (where ground truth matters) is checked against
-**genuine Microsoft Word** via PowerShell COM automation.
+test runs **inside the real renderer**, driving the actual command paths against a
+live Chromium DOM, and (where ground truth matters) is checked against **genuine
+Microsoft Word** via PowerShell COM automation.
 
 There are three layers:
 
-1. **In-renderer functional harness** — `scripts/test-suite.js` (257 tests, frozen legacy gate run under `--legacy`) and `scripts/test-suite-pm.js` (the PM functional suite, grows per slice). Runs the real command dispatcher and asserts on the resulting DOM/state.
-2. **docx suites** — `scripts/test-roundtrip-pm.js` (+ its renderer probe `scripts/test-roundtrip-pm-probe.js`): the **PM-converter docx round-trip suite, THE product docx gate** since slice 7 (`npm run test:roundtrip`); and `scripts/test_docx.js` (17 content checks + 2 OOXML regression guards — the frozen legacy-converter gate; pure Node, no Electron).
-3. **Real-Word COM oracle differential tests** — `*_probe.ps1` / `oracle.ps1` scripts that drive the user's installed Word and emit ground-truth JSON under `docs/research/`. (On the current macOS box: `scripts/oracle/word-oracle.js` via AppleScript.)
+1. **In-renderer functional harness** — `scripts/test-suite-pm.js` (the PM functional suite; grows per slice). Runs the real command dispatcher against the `WC.PM` bridge + PM editor and asserts on the resulting model/DOM/state.
+2. **docx round-trip suite** — `scripts/test-roundtrip-pm.js` (+ its renderer probe `scripts/test-roundtrip-pm-probe.js`): the **PM-converter docx round-trip suite, THE docx gate** (`npm run test:roundtrip`), running docx → PM → docx on the fork `super-converter`.
+3. **Real-Word COM oracle differential tests** — `scripts/oracle/word-oracle-win.ps1` (+ the archived `*_probe.ps1` scripts) that drive the installed Word over COM and emit ground-truth JSON; per-slice Leg A/Leg B results recorded under `notes/` and `docs/research/`.
 
-**Gate suites (six, since slice 7):** `test:legacy` (257), `test:pm`, `test:smoke` (9),
-`test:smoke:legacy` (9), `test:roundtrip` (the PM-converter docx gate), and `test:docx`
-(17, frozen legacy-converter gate). Run all six before committing.
+**Gate suites (three):** `test:pm`, `test:smoke` (9), and `test:roundtrip` (the
+PM-converter docx gate). Run all three (after `npm run build`) before committing.
 
-> **Decision D7.6 (gate transition, slice 7):** `test_docx.js` (17) is KEPT but demoted to
-> the frozen *legacy-converter gate* (guards `--legacy`'s mammoth/html-to-docx path; retires
-> with legacy at slice 11, per spec §8.2's "legacy tests retire only with their legacy
-> implementation"). The NEW `test:roundtrip` PM-converter suite takes over as THE product
-> docx gate — the spec's "replaces / retired at slice 7" wording is honored as a ROLE
-> transfer; the script lives on frozen. Gates become SIX.
+> **Slice 11 (legacy retirement):** the old `test:legacy`/`test:smoke:legacy`/`test:docx`
+> gates and their scripts (`scripts/test-suite.js`, `scripts/test_docx.js`) were removed with
+> the legacy world. The six gates collapsed to three; `test:roundtrip` remains THE docx gate.
 
 ---
 
@@ -28,19 +24,19 @@ There are three layers:
 
 ### What it is
 
-`scripts/test-suite.js` is one big async IIFE that runs **in the page context**
+`scripts/test-suite-pm.js` is one big async IIFE that runs **in the page context**
 of the running app. It never imports app modules — it reaches into the live
 globals the renderer already exposes:
 
 ```js
-const E  = window.WC.Editor;   // the editor instance (contenteditable + commands)
-const WC = window.WC;          // the global namespace (Commands, Dialogs, Styles, …)
+const PM = window.WC.PM;       // the bridge (commands, io, state) over the PM editor
+const WC = window.WC;          // the global namespace (Commands, Dialogs, …)
 ```
 
 Because it executes the genuine `WC.Commands.run(...)`, `WC.Dialogs.*`,
-`WC.applyNamedStyle(...)` etc., it exercises the same code path a user click
-takes — not a stub. Assertions then read back the DOM (`E.node.innerHTML`,
-`E.queryState()`, `document.queryCommandState(...)`, `E.pageCount()`, …).
+`WC.PM.*` etc., it exercises the same code path a user click takes — not a stub.
+Assertions then read back the PM model/state and the rendered DOM (e.g.
+`PM.queryState()`, `WC.view.state.doc`, `#pm-editor` DOM).
 
 ### The `t()` helper
 
@@ -67,10 +63,8 @@ Helpers available inside the suite:
 
 | Helper | Purpose |
 |---|---|
-| `selectText(substr)` | TreeWalk the editor, place a `Range` over the first match, `E.saveRange()` |
-| `caretIn(block)` | Collapse a caret to the start of a block |
-| `selectBlock(block)` | Select an entire block's contents |
-| `H()` | Shorthand for `E.node.innerHTML` |
+| `selectText(substr)` | place a PM selection over the first match in `#pm-editor` |
+| `caretIn(...)` | collapse a caret into a block |
 | `sleep(ms)` | `setTimeout` promise for debounce waits |
 
 ### How it is run (exact command)
@@ -101,15 +95,13 @@ return JSON.stringify({ summary: { total: results.length, pass, fail }, results 
 **Run command:**
 
 ```bash
-npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
-# in headless / CI environments add the usual Electron flags:
-npm run build && npx electron . --no-sandbox --disable-gpu --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
+npm run build && npm run test:pm
+# (== electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js)
 ```
 
-The app launches, runs all 257 tests in the renderer, writes
-`/tmp/results.json`, prints `PROBE_SAVED /tmp/results.json` to stdout, and
-`app.quit()`s. (If the eval throws before returning, you get `PROBE_FAIL` on
-stderr and no file.)
+The app launches, runs the PM suite in the renderer, writes `/tmp/wc-pm.json`,
+prints `PROBE_SAVED /tmp/wc-pm.json` to stdout, and `app.quit()`s. (If the eval
+throws before returning, you get `PROBE_FAIL` on stderr and no file.)
 
 ### How to read results
 
@@ -117,11 +109,10 @@ The output file is `{ summary, results[] }`:
 
 ```json
 {
-  "summary": { "total": 257, "pass": 257, "fail": 0 },
+  "summary": { "total": 326, "pass": 326, "fail": 0 },
   "results": [
     { "name": "Bold applies to selection", "pass": true, "detail": "" },
-    { "name": "Find highlights all matches", "pass": true, "detail": "3 hits" },
-    { "name": "[word-validated] ~26 single-line paragraphs per page (matches Word COM oracle)", "pass": true, "detail": "per-page=26" }
+    { "name": "Find highlights all matches", "pass": true, "detail": "3 hits" }
   ]
 }
 ```
@@ -130,44 +121,26 @@ Quick triage with `jq`:
 
 ```bash
 # overall tally
-jq .summary /tmp/results.json
+jq .summary /tmp/wc-pm.json
 
 # just the failures, with their diagnostic detail
-jq '.results[] | select(.pass==false) | {name, detail}' /tmp/results.json
+jq '.results[] | select(.pass==false) | {name, detail}' /tmp/wc-pm.json
 ```
 
 A `detail` beginning with `ERR:` means the test body **threw** (likely a real
 regression, not just a soft assertion miss). A plain `false`-return failure
-usually means the asserted DOM/state condition was not met.
+usually means the asserted model/state condition was not met.
 
 ### Test categories
 
-The suite is grouped by tab / concern with banner comments
-(`// ================= HOME TAB feature tests =================`). Tests are
-also self-labelling via a bracket prefix in their name, which makes filtering
-trivial. Current counts (257 total):
-
-| Prefix / group | ~Count | Covers |
-|---|---|---|
-| (unprefixed core) | — | Bold/Italic/Underline, color, font/size ladder, alignment, lists, headings/styles, tables, page/blank break, symbols, Find/Replace, word count, pagination, zoom, views, ribbon, sort, change case |
-| `[fix]` | 24 | **Regression tests** for confirmed QA/review defects (see §4) |
-| `[home]` | 20 | Text effects, multilevel lists, clipboard pane, format painter, Font dialog, dictate, sensitivity bar, custom styles |
-| `[insert]` | 29 | Tables, pictures/shapes, links, bookmarks, header/footer, page-number/date fields, symbols, screenshot bridge |
-| `[layout]` | 10 | Margins, orientation, size, columns, breaks, line numbers, hyphenation, indent/spacing |
-| `[ref]` | 11 | TOC, footnotes/endnotes, captions, citations/bibliography, index |
-| `[review]` | 10 | Track Changes, comments, accessibility checker, thesaurus, compare |
-| `[mail]` | 9 | Mail-merge fields, recipients, preview, envelopes/labels |
-| `[design]` | 9 | Themes, style sets, page color/borders, watermark |
-| `[draw]` | 8 | Ink/drawing tools |
-| `[view]` | 8 | Read mode, focus mode, web/print layout, navigation |
-| `[help]` | 3 | Help pane wiring |
-| `[ui]` | — | UI-outcome fidelity regressions (read mode overlay, focus hides ribbon, dropdown wiring not "not implemented") |
-| `[page]` | 7 | Real per-page separation (gap spacers, `pageOfElement`, line-level mid-block splits) |
-| `[word-validated]` | 1 | Asserts against a numeric value taken from the real-Word COM oracle (≈26 single-line paragraphs/page) |
-
-Many `[fix]` and `[ui]` tests assert the **negative** — e.g. an Insert-Link XSS
-payload must *not* produce an `<img>` and must neutralise `javascript:` URLs to
-`#`; a "Breaks" dropdown must *not* contain the text "not implemented".
+The PM suite is grouped by ribbon area / concern with banner comments and
+self-labelling bracket prefixes in the test names (`[fix]`, `[home]`, `[insert]`,
+`[review]`, `[ref]`, `[mail]`, `[design]`, `[draw]`, `[ui]`, …), which makes
+filtering trivial. It grows per slice as each ribbon area is wired onto the
+`WC.PM` bridge; the bracket prefixes double as the filter (there is no `--grep`,
+so filter the result JSON). Many `[fix]`/`[ui]` tests assert the **negative** —
+e.g. an Insert-Link XSS payload must *not* produce an `<img>` and must neutralise
+`javascript:` URLs to `#`; a dropdown must *not* contain the text "not implemented".
 
 ### Cleanup contract
 
@@ -180,10 +153,9 @@ state.
 
 ---
 
-## 2. `.docx` suites
+## 2. `.docx` round-trip suite — THE docx gate
 
-### 2a. PM-converter round-trip suite (`npm run test:roundtrip`) — THE docx gate
-
+`npm run test:roundtrip` (the PM-converter round-trip).
 `scripts/test-roundtrip-pm.js` (Node driver) spawns Electron with the renderer
 probe `scripts/test-roundtrip-pm-probe.js` and judges only from the probe JSON
 (`/tmp/wc-roundtrip.json`). Per fixture (`negation-run`, `basic-list`,
@@ -200,57 +172,10 @@ a matching definition in `word/styles.xml` — the slice-6 minting-fix pin).
 npm run build && npm run test:roundtrip    # read the RESULT: line; exit 1 on any failure
 ```
 
-### 2b. Legacy `.docx` round-trip suite (frozen legacy-converter gate)
-
-`scripts/test_docx.js` is a plain Node script (no Electron) that proves the
-**legacy** (`--legacy` mammoth/html-to-docx) file pipeline survives a full round
-trip and, critically, that the emitted OOXML is openable by **real** Microsoft
-Word. Frozen per D7.6 above; retires with legacy at slice 11.
-
-**Run command:**
-
-```bash
-node scripts/test_docx.js     # currently 17/17 content checks pass
-```
-
-What it does:
-
-1. **HTML → DOCX** via `html-to-docx`, using the *exact same complete margins
-   the app uses* (`{ top, right, bottom, left, header, footer, gutter }`) and
-   writes `/tmp/test.docx`.
-2. **OOXML regression guards** — unzips the result with `jszip`, reads
-   `word/document.xml`, and asserts:
-   - **no literal `undefined`** (`/="undefined"|>undefined</`), and
-   - **integer `pgMar`** (`w:header`/`w:footer`/`w:gutter` are numeric).
-
-   ```js
-   const hasUndefined = /="undefined"|>undefined</.test(docXml);
-   const pgMarOk = /<w:pgMar[^>]*w:header="\d+"[^>]*w:footer="\d+"[^>]*w:gutter="\d+"/.test(docXml);
-   if (hasUndefined || !pgMarOk) { console.log('RESULT: docx would be REJECTED by real Word'); process.exit(1); }
-   ```
-
-   This guard exists because of a real interop bug: passing **partial** margins
-   made `html-to-docx` emit `w:header="undefined"`, which mammoth and
-   LibreOffice silently tolerated but real Word **refused to open** (see
-   `docs/VALIDATION_home_insert.md`).
-3. **DOCX → HTML** via `mammoth`, then 17 content checks (title, bold, italic,
-   heading, bullet, number, table cell `R1C1`, `<table>` tag, coloured
-   paragraph).
-
-**Interpreting output** — it prints to stdout, not JSON:
-
-```
-   OOXML guard: no "undefined" = PASS, integer pgMar = PASS
-    PASS Round Trip Test
-    ...
-RESULT: 17 pass / 0 fail
-```
-
-Exit code is **non-zero** if the OOXML guard fails (`process.exit(1)`) or any
-exception is thrown (`TEST_ERROR`). The 9 content checks are tallied but do not
-themselves set the exit code — read the `RESULT:` line. Round-trip is **lossy by
-design** (the HTML and OOXML document models differ); these checks assert that
-*content survives*, not byte-for-byte fidelity.
+Round-trip is **rebuild-not-byte-identical** (the export normalizes/drops unmodeled
+XML); the suite asserts that constructs and content survive, not byte-for-byte
+fidelity. The pre-rebuild legacy `scripts/test_docx.js` (the `html-to-docx`/`mammoth`
+converter gate) was removed with the legacy world in slice 11.
 
 ---
 
@@ -284,20 +209,19 @@ These oracles are used two ways:
    `docs/VALIDATION_home_insert.md` (✅ matches · 🟡 metric differs · ❌ wrong)
    were built by diffing the clone against these values. This is how the default
    red was corrected from `#C00000` to `#FF0000`, the indent step to 0.5″, etc.
-2. **As assertions baked into the harness** — the `[word-validated]` tests
-   encode an oracle number directly. Example (test-suite.js): "≈26 single-line
-   paragraphs per page" asserts the clone's pagination matches what real Word
-   produced (`Word=26`), throwing with the measured `per-page` if it drifts.
+2. **As Leg A/Leg B construct checks** — since slice 8 the oracle opens the PM
+   converter's exported `.docx` in real Word (Leg A) and imports Word-authored
+   `.docx` through the fork (Leg B), confirming each construct (track changes,
+   comments, fields, themes, …) survives. Per-slice results are recorded under `notes/`.
 
-This differential approach caught the **critical `w:header="undefined"` interop
-defect** above — the clone's saved files looked fine everywhere except the one
-program that matters.
+This differential approach is the ground truth for `.docx` fidelity — the clone's
+saved files are validated in the one program that ultimately matters.
 
 ---
 
 ## 4. Regression-test convention
 
-**Every confirmed fix gets a regression test in `scripts/test-suite.js`.** This
+**Every confirmed fix gets a regression test in `scripts/test-suite-pm.js`.** This
 is a hard rule, not a nicety — the project went through two multi-agent review
 workflows (an adversarial correctness pass and a 5-dimension QA pass covering
 fidelity, security, CSS, robustness, and file IO), and every verified defect was
@@ -316,12 +240,12 @@ Conventions:
 - Raw review findings are archived in `docs/research/qa-findings.json`,
   `docs/research/review-findings.json`, and `docs/research/final-review.json`.
 
-The bracketed prefixes (`[fix]`, `[home]`, `[insert]`, `[ui]`, `[page]`,
-`[word-validated]`, …) double as a lightweight filter — there is no test runner
-to pass `--grep` to, so filter the result JSON instead:
+The bracketed prefixes (`[fix]`, `[home]`, `[insert]`, `[ui]`, …) double as a
+lightweight filter — there is no test runner to pass `--grep` to, so filter the
+result JSON instead:
 
 ```bash
-jq '.results[] | select(.name | startswith("[fix]"))' /tmp/results.json
+jq '.results[] | select(.name | startswith("[fix]"))' /tmp/wc-pm.json
 ```
 
 ---
@@ -329,20 +253,17 @@ jq '.results[] | select(.name | startswith("[fix]"))' /tmp/results.json
 ## Quick reference
 
 ```bash
-# Functional harness (257 tests) → /tmp/results.json {summary,results[]}
-npm run build && npx electron . --probe-out=/tmp/results.json --shot-evalfile=scripts/test-suite.js
-jq .summary /tmp/results.json
-jq '.results[] | select(.pass==false)' /tmp/results.json   # show failures
+# PM functional harness → /tmp/wc-pm.json {summary,results[]}
+npm run build && npm run test:pm
+jq .summary /tmp/wc-pm.json
+jq '.results[] | select(.pass==false)' /tmp/wc-pm.json   # show failures
+
+# PM-core smoke (9) → /tmp/wc-smoke.json
+npm run build && npm run test:smoke
 
 # PM-converter docx round-trip — THE docx gate (read the RESULT: line; exit≠0 on fail)
 npm run build && npm run test:roundtrip
 
-# legacy .docx round-trip + OOXML guards — frozen legacy-converter gate (retires at slice 11)
-node scripts/test_docx.js
-
-# ProseMirror smoke test (9 assertions) → /tmp/smoke.json
-npm run build && npx electron . --probe-out=/tmp/smoke.json --shot-evalfile=scripts/smoke-pm.js
-
-# Real-Word oracles: captured under docs/research/*-oracle.json + real-word-groundtruth.json
-#   (drive scripts live from C:\Users\Public\wcprobe\ on a Windows box with Word installed)
+# Real-Word oracle: scripts/oracle/word-oracle-win.ps1 (Windows + Word 16.0);
+#   captured ground truth under docs/research/*-oracle.json + notes/ (per-slice Leg A/B)
 ```

@@ -29,7 +29,24 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 2: Editing core behind the existing ribbon (strangler-fig)
+## CURRENT PHASE → Phase 2 editing core COMPLETE (all slices 0a–11) → Phase 3 (Logger) next
+> **Slice 11 (legacy retirement) is DONE** (`feature/phase-2-slice-11-legacy-retirement`, PR pending): the
+> dual-world scaffolding is GONE — PM (ProseMirror/SuperDoc-fork) is the ONLY editor. Removed the `--legacy`
+> flag/boot + `bridge/mode.ts`, the legacy `WC.Editor`/`#editor` + leaf engines (formatting/comments/table-tools/
+> layout-tools/header-footer + the review-tools Track-Changes engine), the legacy docx converter
+> (html-to-docx/mammoth/docx-utils + copyDocxUtilsPlugin + the doc:save/saveAs IPC + wordAPI.save/saveAs), and the
+> 3 frozen legacy gates (test:legacy/test:smoke:legacy/test:docx; test-suite.js archived in git tag
+> `legacy-suite-257-archive`). Collapsed every dual-world `pm?PM:legacy` branch to PM-only; migrated zoom/view +
+> the styles catalog (`WC.Styles`→`WC.PM.allStyleNames`) + Office-Clipboard paste + equation built-ins onto the
+> `WC.PM` bridge; retired D6 `FLIPPED`/`isFlipped` and rewrote `isBlocked` against a static `DEFERRED` set (kept as
+> the permanent Phase-7 deferral gate for layout-page/layout-arrange/header-footer/text-effects). KEPT the shared
+> `window.WC` chrome as classic scripts (TS/ESM migration deferred). Net **−4229 lines / 54 files**. **Gates (now
+> THREE): PM 326/326, smoke 9/9, roundtrip 27/0**; converter-removal oracle Leg A PASS; 2-reviewer whole-branch
+> review → Ready to merge (zero Critical/Important). Process: 3 hidden conflicts (WC.Styles, the WC.Editor zoom/view
+> ownership, the lodash transitive dep) + 4 reachable E() leaks (equation dropdown, shapes/Excel/draw-table) were
+> caught by the gates+leak-audit and fixed; final audit = **zero reachable E()** (the rest is isBlocked-gated Phase-7
+> residue). **Phase 2 editing core COMPLETE → Phase 3 (Logger) next.**
+>
 > **Phase 1 (Scaffold) is COMPLETE** — see the 2026-06-05 entry in [last-point.md](last-point.md).
 > The owned ProseMirror engine mounts/renders/edits a real `.docx` on `build/phase-1-scaffold`
 > (all gates green: smoke 9/9, functional 257/257, docx 17/17; single PM copy; telemetry off; no
@@ -256,6 +273,31 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-14 (Phase 2 — slice 11: legacy retirement)
+- [x] **Orient + deep pre-verification** (ultracode 7-mapper workflow + synthesis): mapped the exact retirement
+  surface — the `--legacy` boot path, the public/js legacy-vs-shared classification, the docx-converter decoupling,
+  the strangler-scaffolding tallies (~148 PMA / ~177 ELSE), the gate coupling, the **adversarial PM→legacy
+  dependency audit**, the docs. Surfaced 5 conflict files; reported the inventory + the 4 scope decisions (AskUserQuestion).
+- [x] **Critique-hardened plan** (`8f882fe`) — a 3-critic adversarial workflow caught 3 BLOCKERS the naive plan would
+  have shipped (kept test:pm had live `[0a]` legacy assertions; the D6 block-gate is a LIVE Phase-7 feature, not dead
+  scaffolding; `review-tools.js`/`home-features.js` own `WC.Review.THES`/`WC.Clipboard`) + majors (preload save/saveAs,
+  oracle positional args, CSS visual gate) — all folded.
+- [x] **Subagent-driven execution** (fresh agent/task; coordinator review + leak audit + gates after each):
+  `481b50c` `[11]` guards · `4959334` flag/boot · `dfb0d9a` leaf engines + WC.Styles reroute · `d01c3bf` WC.Editor +
+  zoom/view migration · `21e46f6`/`7e4ea76` converter + oracle · `e22c5a8` commands.js collapse · `17939a0`
+  conflict-file prune · `735e144`/`87854d1` remaining-dispatch collapse · `2f07560` D6 reframe · `c1e76d2`/`ccf790c`
+  E() leak sweep · `1080d4f` docs · `a065ae8` review cleanup.
+- [x] **Discoveries** (gates + leak-audit, not the up-front critique): 3 hidden conflicts (`WC.Styles`; the `WC.Editor`
+  zoom/view ownership — deleting it aborted boot via `StatusBar`→`E().zoom`; the `lodash` transitive dep) + **4
+  reachable `E()` leaks** (equation dropdown, shapes/Excel/draw-table) — all fixed (PM verb or honest toast).
+  Final audit: **zero reachable `E()`**.
+- [x] **Three gates green** (idle): PM **326/326**, smoke **9/9**, roundtrip **27/0**. Converter-removal COM oracle
+  Leg A PASS (`notes/2026-06-14-slice11-converter-oracle.json`).
+- [x] **2-reviewer whole-branch review** (feature-preservation + leak/correctness) → both **Ready to merge** (zero
+  Critical/Important); cosmetic minors folded (`a065ae8`).
+- [x] **Checkpoint + PR** (this entry). **Next:** PR → user merge approval → branch delete → graph refresh
+  (/graphify). Then **Phase 3 (Logger)**.
 
 ### 2026-06-13 (Phase 2 — slice 10 PR 4: draw)
 - [x] **Orient + deep pre-verification** (ultracode 4-agent fan-out + synthesis): mapped the 8 draw cmds, the fork ink

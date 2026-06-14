@@ -4,7 +4,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
   const Insert = {};
   WC.Insert = Insert;
@@ -31,58 +30,19 @@
     });
   };
   Insert.insertCover = function (t) {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { pm.xeCoverPage(t.name); return; }
-    // Word replaces an existing cover page; it never stacks two. Strip the old
-    // one (and its trailing page break) before inserting the new one.
-    const old = E().node.querySelector('.cover-page');
-    if (old) { const brk = old.nextElementSibling; old.remove(); if (brk && brk.classList && brk.classList.contains('manual-break')) brk.remove(); }
-    const sel = window.getSelection(); const r = document.createRange(); r.setStart(E().node, 0); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); E().saveRange();
-    // insertNodeHTML (not insertHTML): execCommand strips the .cover-page class, which
-    // then breaks both replace-on-insert and Remove Cover Page.
-    E().insertNodeHTML(t.build());
-    WC.toast('Cover page “' + t.name + '” inserted — click the [fields] to edit.');
+    WC.PM.xeCoverPage(t.name);
   };
   Insert.removeCover = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { pm.xeRemoveCoverPage(); return; }
-    const cover = E().node.querySelector('.cover-page');
-    if (!cover) { WC.toast('No cover page found.'); return; }
-    const brk = cover.nextElementSibling; cover.remove(); if (brk && brk.classList.contains('manual-break')) brk.remove();
-    E().dirty = true; E().repaginate(); E().updateStatus(); WC.toast('Cover page removed.');
+    WC.PM.xeRemoveCoverPage();
   };
 
   // ===================== Table dropdown =====================
   Insert.buildTable = function (rows, cols) {
     rows = Math.max(1, Math.min(1000, rows | 0)); cols = Math.max(1, Math.min(1000, cols | 0));
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { pm.insertTable({ rows, cols }); return; }
-    let html = '<table><tbody>';
-    for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td><br></td>'; html += '</tr>'; }
-    html += '</tbody></table><p><br></p>';
-    E().insertHTML(html);
+    WC.PM.insertTable({ rows, cols });
   };
   Insert.convertTextToTable = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { WC.toast('Convert Text to Table is available in Table Tools (slice 6b)'); return; }
-    const blocks = E().selectedBlocks();
-    if (!blocks.length) { WC.toast('Select lines of text (tab or comma separated) to convert.'); return; }
-    const rows = blocks.map((b) => (b.textContent || '').split(/\t|,/).map((s) => s.trim()));
-    const cols = Math.max(...rows.map((r) => r.length));
-    let html = '<table><tbody>';
-    rows.forEach((cells) => { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td>' + WC.escapeHtml(cells[c] || '') + '</td>'; html += '</tr>'; });
-    html += '</tbody></table>';
-    const wrap = document.createElement('div'); wrap.innerHTML = html;
-    const table = wrap.firstChild;
-    const first = blocks[0];
-    const list = first.closest && first.closest('ul, ol');
-    // A <table> can't live inside a <ul>/<ol>; if the selection is list items,
-    // place the table after the list (and drop the list if it ends up empty).
-    if (list && blocks.every((b) => b.tagName === 'LI')) { list.parentNode.insertBefore(table, list.nextSibling); }
-    else { first.parentNode.insertBefore(table, first); }
-    blocks.forEach((b) => b.remove());
-    if (list && !list.querySelector('li')) list.remove();
-    E().dirty = true; E().repaginate(); E().updateStatus();
+    WC.toast('Convert Text to Table is available in Table Tools (slice 6b)');
   };
   Insert.tableMenu = function (node) {
     WC.flyout(node, (fly) => {
@@ -102,11 +62,11 @@
   // Draw Table — cursor becomes a pen; drag a rectangle on the page to create a
   // table whose rows/columns derive from the size you draw (Word behavior).
   Insert.drawTableMode = function () {
-    const ed = E().node; const canvas = document.getElementById('canvas');
+    const ed = WC.PM.getEditor().view.dom; const canvas = document.getElementById('canvas');
     ed.style.cursor = 'crosshair';
     WC.toast('Draw Table: drag on the page to draw the table’s outer border.');
     let start = null, rect = null;
-    const z = () => E().zoom || 1;
+    const z = () => (window.WC.PM && window.WC.PM.zoom) || 1;
     const down = (e) => { start = { x: e.clientX, y: e.clientY }; rect = el('div', { style: { position: 'fixed', border: '2px solid #2b579a', background: 'rgba(43,87,154,.08)', zIndex: '9000', pointerEvents: 'none' } }); document.body.appendChild(rect); e.preventDefault(); };
     const move = (e) => { if (!start) return; const x = Math.min(start.x, e.clientX), y = Math.min(start.y, e.clientY), w = Math.abs(e.clientX - start.x), h = Math.abs(e.clientY - start.y); Object.assign(rect.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' }); };
     const up = (e) => {
@@ -121,14 +81,9 @@
     canvas.addEventListener('mousedown', down, true); window.addEventListener('mousemove', move, true); window.addEventListener('mouseup', up, true);
   };
   Insert.insertExcelSheet = function () {
-    const COLS = 5, ROWS = 6;
-    let html = '<table class="wc-xl-sheet" contenteditable="true" style="border-collapse:collapse;margin:8px 0;font-size:10pt"><tr><td style="width:24px;background:#e9eef4;border:1px solid #b7c2d0"></td>';
-    for (let c = 0; c < COLS; c++) html += '<td style="background:#e9eef4;border:1px solid #b7c2d0;text-align:center;font-weight:600;width:70px">' + String.fromCharCode(65 + c) + '</td>';
-    html += '</tr>';
-    for (let r = 0; r < ROWS; r++) { html += '<tr><td style="background:#e9eef4;border:1px solid #b7c2d0;text-align:center;font-weight:600">' + (r + 1) + '</td>'; for (let c = 0; c < COLS; c++) html += '<td style="border:1px solid #d0d7de;height:22px"></td>'; html += '</tr>'; }
-    html += '</table><p><br></p>';
-    E().insertNodeHTML(html); E().dirty = true; E().repaginate();
-    WC.toast('Excel-style spreadsheet inserted (editable grid).');
+    // Embedded Excel sheets are OLE objects with no PM-engine equivalent; honest
+    // degrade until/unless an embed subsystem lands.
+    WC.toast('Embedding an Excel spreadsheet needs a host runtime — not available on the new engine yet.');
   };
   Insert.quickTablesMenu = function (node) {
     WC.flyout(node, (fly) => {
@@ -161,9 +116,9 @@
     });
   };
   Insert.insertShape = function (name, svg) {
-    const color = '#5B9BD5';
-    E().insertHTML(`<span class="wc-shape" contenteditable="false" data-shape="${WC.escapeHtml(name)}" style="display:inline-block;vertical-align:middle;width:120px;height:120px"><svg viewBox="0 0 50 50" width="120" height="120" style="overflow:visible">${svg.replace(/COL/g, color)}</svg></span>&nbsp;`);
-    WC.toast(name + ' inserted. Click to select; Delete to remove.');
+    // No PM verb for auto-shapes (DrawingML wps:sp) yet; honest degrade rather
+    // than the deleted WC.Editor legacy inline-SVG path.
+    WC.toast('Inserting “' + name + '” shapes isn\'t available on the new engine yet.');
   };
 
   // ===================== Icons picker =====================
@@ -179,7 +134,7 @@
         const cell = el('div', { title: n, style: { border: '1px solid #eee', borderRadius: '3px', padding: '8px 4px', textAlign: 'center', cursor: 'pointer' }, html: WC.icon(n, 24) });
         cell.addEventListener('mouseenter', () => cell.style.background = 'var(--word-blue-tint)');
         cell.addEventListener('mouseleave', () => cell.style.background = '');
-        cell.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { dlg.close(); pm.xeIcon(n); return; } dlg.close(); E().insertHTML(`<span class="wc-shape" contenteditable="false" style="display:inline-block;vertical-align:middle;width:32px;height:32px;color:#2B579A">${WC.icon(n, 32)}</span>&nbsp;`); });
+        cell.addEventListener('click', () => { dlg.close(); WC.PM.xeIcon(n); });
         grid.appendChild(cell);
       });
     }
@@ -193,15 +148,7 @@
     WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('SmartArt Graphics')); layouts.forEach(([l, k]) => fly.appendChild(WC.flyItem(l, { onClick: () => Insert.insertSmartArt(k) }))); });
   };
   Insert.insertSmartArt = function (kind) {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { pm.xeSmartArt(); return; }
-    const box = (t) => `<div contenteditable="true" style="flex:1;background:#4472C4;color:#fff;padding:14px 10px;border-radius:4px;text-align:center;min-width:80px">${t}</div>`;
-    let html;
-    if (kind === 'list') html = `<div class="wc-smartart" style="display:flex;gap:10px;margin:8px 0">${box('Item 1')}${box('Item 2')}${box('Item 3')}</div><p><br></p>`;
-    else if (kind === 'process') html = `<div class="wc-smartart" style="display:flex;align-items:center;gap:6px;margin:8px 0">${box('Step 1')}<span style="font-size:24px;color:#4472C4">▶</span>${box('Step 2')}<span style="font-size:24px;color:#4472C4">▶</span>${box('Step 3')}</div><p><br></p>`;
-    else if (kind === 'cycle') html = `<div class="wc-smartart" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 0">${box('Phase 1')}<span style="font-size:22px;color:#4472C4">↻</span>${box('Phase 2')}<span style="font-size:22px;color:#4472C4">↻</span>${box('Phase 3')}</div><p><br></p>`;
-    else html = `<div class="wc-smartart" style="margin:8px 0;text-align:center">${box('Top')}<div style="display:flex;gap:10px;justify-content:center;margin-top:10px">${box('Child A')}${box('Child B')}${box('Child C')}</div></div><p><br></p>`;
-    E().insertHTML(html); WC.toast('SmartArt inserted — click any box to edit its text.');
+    WC.PM.xeSmartArt();
   };
 
   // ===================== Chart =====================
@@ -214,7 +161,7 @@
       el('div', { style: { fontSize: '12px', color: '#666', margin: '6px 0' }, text: 'Data (label, value per line):' }), data,
     ]);
     WC.dialog({ title: 'Insert Chart', width: '460px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeChart(); return; } const rows = data.value.trim().split(/\n/).map((l) => l.split(',')).map(([l, v]) => [l.trim(), parseFloat(v) || 0]); E().insertHTML(Insert.chartSVG(type.value, rows) + '&nbsp;'); } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.xeChart(); } },
       { label: 'Cancel' },
     ] });
   };
@@ -243,7 +190,7 @@
     const upd = el('input', { type: 'checkbox' });
     const body = el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Available formats:' }), list, el('label', { style: { display: 'flex', gap: '6px', marginTop: '8px' } }, [upd, el('span', { text: 'Update automatically' })])]);
     WC.dialog({ title: 'Date and Time', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeDateTime(['MMMM d, yyyy','M/d/yyyy','yyyy-MM-dd','dddd, MMMM d, yyyy','h:mm AM/PM','M/d/yyyy h:mm AM/PM'][+list.value] || 'M/d/yyyy'); return; } const t = fmts[+list.value]; E().insertHTML(upd.checked ? `<span class="wc-field" data-field="date">${WC.escapeHtml(t)}</span>` : WC.escapeHtml(t)); } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.xeDateTime(['MMMM d, yyyy', 'M/d/yyyy', 'yyyy-MM-dd', 'dddd, MMMM d, yyyy', 'h:mm AM/PM', 'M/d/yyyy h:mm AM/PM'][+list.value] || 'M/d/yyyy'); } },
       { label: 'Cancel' },
     ] });
   };
@@ -264,9 +211,8 @@
   };
   Insert.insertWordArt = function (style) {
     const sel = window.getSelection(); const txt = (sel && sel.toString()) || 'Your text here';
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { const mc = /color:\s*(#[0-9a-fA-F]{3,6})/.exec(style); pm.xeWordArt(txt, { color: mc ? mc[1] : '#2B579A' }); return; }
-    E().insertHTML(`<span class="wc-wordart" style="font:bold 36pt Calibri;${style}">${WC.escapeHtml(txt)}</span>&nbsp;`);
+    const mc = /color:\s*(#[0-9a-fA-F]{3,6})/.exec(style);
+    WC.PM.xeWordArt(txt, { color: mc ? mc[1] : '#2B579A' });
   };
 
   // ===================== Signature Line =====================
@@ -275,7 +221,7 @@
     const title = el('input', { type: 'text', class: 'grow', placeholder: 'Suggested signer’s title' });
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Signer:', style: { width: '60px' } }), name]), el('div', { class: 'row' }, [el('label', { text: 'Title:', style: { width: '60px' } }), title])]);
     WC.dialog({ title: 'Signature Setup', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeSignatureLine(); return; } E().insertHTML(`<div class="wc-signature" contenteditable="false" style="display:inline-block;margin:10px 0"><div style="border-top:1px solid #000;width:240px;padding-top:4px"><span style="font-size:9pt;color:#555">✕ ${WC.escapeHtml(name.value || 'Signature')}</span><br><span style="font-size:8pt;color:#888">${WC.escapeHtml(title.value || '')}</span></div></div>&nbsp;`); } },
+      { label: 'OK', primary: true, onClick: () => { WC.PM.xeSignatureLine(); } },
       { label: 'Cancel' },
     ] });
   };
@@ -294,36 +240,11 @@
     const sel = el('select', { size: '6', class: 'grow', style: { height: 'auto' } }, [['Page', 'page'], ['NumPages', 'numpages'], ['Date', 'date'], ['Author', 'author'], ['FileName', 'filename'], ['Title', 'title']].map(([l, k]) => el('option', { value: k, text: l })));
     WC.dialog({ title: 'Field', width: '380px', body: el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Field names:' }), sel]), footer: [{ label: 'OK', primary: true, onClick: () => Insert.insertField(sel.value) }, { label: 'Cancel' }] });
   };
-  Insert.fieldValue = function (k) {
-    if (k === 'page') return String(E().currentPage());
-    if (k === 'numpages') return String(E().pageCount());
-    if (k === 'date') return new Date().toLocaleDateString();
-    if (k === 'author') return 'Word User';
-    if (k === 'filename') return (WC.Files && WC.Files.name) || 'Document1';
-    if (k === 'title') return ((WC.Files && WC.Files.name) || 'Document1').replace(/\.[^.]+$/, '');
-    return '';
-  };
-  Insert.insertField = function (k) { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeQuickPart(k); return; } E().insertHTML(`<span class="wc-field" data-field="${k}">${WC.escapeHtml(Insert.fieldValue(k))}</span>&nbsp;`); };
-  Insert.refreshFields = function () { (E().node ? E().node.querySelectorAll('.wc-field') : []).forEach((f) => { const k = f.dataset.field; if (k === 'page') f.textContent = String(E().pageOfElement(f)); else if (k === 'numpages') f.textContent = String(E().pageCount()); }); };
+  Insert.insertField = function (k) { WC.PM.xeQuickPart(k); };
 
   // ===================== Bookmark =====================
   Insert.bookmarkDialog = function () {
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm) { pm.captureSelection(); Insert._bookmarkDialogPM(pm); return; }
-    // ---- legacy arm (byte-identical to original) ----
-    const name = el('input', { type: 'text', class: 'grow', placeholder: 'Bookmark name' });
-    const listBox = el('div', { style: { border: '1px solid #c8c6c4', maxHeight: '140px', overflowY: 'auto', margin: '8px 0' } });
-    function renderList() {
-      listBox.innerHTML = '';
-      const bms = E().node.querySelectorAll('[data-bookmark]');
-      if (!bms.length) listBox.appendChild(el('div', { style: { padding: '8px', color: '#888' }, text: 'No bookmarks yet.' }));
-      bms.forEach((b) => { const row = el('div', { style: { padding: '5px 8px', cursor: 'pointer', display: 'flex' } }, [el('span', { style: { flex: 1 }, text: b.dataset.bookmark }), el('span', { style: { color: '#2B579A', marginRight: '8px' }, text: 'Go', onclick: () => { b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }), el('span', { style: { color: '#c0392b' }, text: 'Delete', onclick: () => { b.replaceWith(...b.childNodes); renderList(); } })]); row.querySelector('span').addEventListener('click', () => name.value = b.dataset.bookmark); listBox.appendChild(row); });
-    }
-    renderList();
-    WC.dialog({ title: 'Bookmark', width: '380px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '60px' } }), name]), listBox]), footer: [
-      { label: 'Add', primary: true, onClick: () => { const n = name.value.trim().replace(/\s+/g, '_'); if (!n) return; E().focus(); E().restoreRange(); const sel = window.getSelection(); const dup = E().node.querySelector('[data-bookmark="' + n + '"]'); if (dup) dup.replaceWith(...dup.childNodes); /* move, don't duplicate the id */ const span = el('span', { dataset: { bookmark: n }, id: 'bm_' + n }); if (sel.rangeCount && !sel.isCollapsed) { const r = sel.getRangeAt(0); try { r.surroundContents(span); } catch (e) { span.appendChild(r.extractContents()); r.insertNode(span); } } else { span.appendChild(document.createTextNode('​')); if (sel.rangeCount) sel.getRangeAt(0).insertNode(span); else E().node.appendChild(span); } E().dirty = true; WC.toast('Bookmark “' + n + '” added.'); } },
-      { label: 'Close' },
-    ] });
+    WC.PM.captureSelection(); Insert._bookmarkDialogPM(WC.PM);
   };
   // M2: full PM bookmark dialog — lists, adds, goes-to, deletes, re-renders on mutation.
   Insert._bookmarkDialogPM = function (pm) {
@@ -351,18 +272,9 @@
   };
 
   // ===================== Cross-reference =====================
-  Insert.crossRefDialog = function () {
-    const type = el('select', {}, ['Heading', 'Bookmark'].map((t) => el('option', { text: t })));
-    const refType = el('select', {}, ['Page number', 'Text', 'Above/below'].map((t) => el('option', { text: t })));
-    const targets = el('select', { size: '6', class: 'grow', style: { height: 'auto' } });
-    function fillTargets() { targets.innerHTML = ''; const items = type.value === 'Heading' ? Array.from(E().node.querySelectorAll('h1,h2,h3')) : Array.from(E().node.querySelectorAll('[data-bookmark]')); items.forEach((it, i) => { const label = type.value === 'Heading' ? it.textContent : it.dataset.bookmark; if (!it.id) it.id = 'xref_' + Date.now() + '_' + i; targets.appendChild(el('option', { value: it.id, text: label || '(empty)' })); }); if (!items.length) targets.appendChild(el('option', { text: '(none — create headings/bookmarks first)' })); }
-    type.addEventListener('change', fillTargets); fillTargets();
-    const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Type:', style: { width: '90px' } }), type, el('label', { text: 'Insert:' }), refType]), el('div', { style: { fontSize: '12px', color: '#666', margin: '6px 0' }, text: 'For which item:' }), targets]);
-    WC.dialog({ title: 'Cross-reference', width: '460px', body, footer: [
-      { label: 'Insert', primary: true, onClick: () => { const id = targets.value; const tgt = document.getElementById(id); if (!tgt) return; let text; if (refType.value === 'Page number') text = 'page ' + E().pageOfElement(tgt); else if (refType.value === 'Above/below') text = (E().pageOfElement(tgt) <= E().currentPage() ? 'above' : 'below'); else text = (tgt.textContent || tgt.dataset.bookmark || '').slice(0, 60); E().insertHTML(`<a class="wc-xref" href="#${id}" onclick="">${WC.escapeHtml(text)}</a>&nbsp;`); } },
-      { label: 'Cancel' },
-    ] });
-  };
+  // (legacy Insert.crossRefDialog removed at slice 11 — H.crossReference dispatches
+  //  to the PM dialog crossRefDialogPM(WC.PM) in commands.js; this DOM-walking arm
+  //  referenced the deleted WC.Editor and had no caller.)
 
   // ===================== Symbol map dialog =====================
   const SUBSETS = {
@@ -379,10 +291,9 @@
     const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(12,30px)', gap: '2px', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e1dfdd', padding: '4px' } });
     const recentRow = el('div', { style: { display: 'flex', gap: '2px', flexWrap: 'wrap', minHeight: '24px', marginTop: '4px' } });
     function pushRecent(ch) { const r = JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]').filter((x) => x !== ch); r.unshift(ch); sessionStorage.setItem('wc-recent-sym', JSON.stringify(r.slice(0, 16))); renderRecent(); }
-    function renderRecent() { recentRow.innerHTML = ''; (JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]')).forEach((ch) => { const c = el('div', { text: ch, style: { width: '24px', height: '24px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } }); c.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertSymbol(ch); return; } E().insertHTML(WC.escapeHtml(ch)); }); recentRow.appendChild(c); }); }
-    function render() { grid.innerHTML = ''; SUBSETS[subset.value].split(' ').forEach((ch) => { if (!ch) return; const c = el('div', { text: ch, style: { width: '30px', height: '30px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px' } }); c.addEventListener('mouseenter', () => c.style.background = 'var(--word-blue-tint)'); c.addEventListener('mouseleave', () => c.style.background = ''); c.addEventListener('click', () => { const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.insertSymbol(ch); pushRecent(ch); return; } E().focus(); E().restoreRange(); E().insertHTML(WC.escapeHtml(ch)); pushRecent(ch); }); grid.appendChild(c); }); }
+    function renderRecent() { recentRow.innerHTML = ''; (JSON.parse(sessionStorage.getItem('wc-recent-sym') || '[]')).forEach((ch) => { const c = el('div', { text: ch, style: { width: '24px', height: '24px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' } }); c.addEventListener('click', () => { WC.PM.insertSymbol(ch); }); recentRow.appendChild(c); }); }
+    function render() { grid.innerHTML = ''; SUBSETS[subset.value].split(' ').forEach((ch) => { if (!ch) return; const c = el('div', { text: ch, style: { width: '30px', height: '30px', border: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px' } }); c.addEventListener('mouseenter', () => c.style.background = 'var(--word-blue-tint)'); c.addEventListener('mouseleave', () => c.style.background = ''); c.addEventListener('click', () => { WC.PM.insertSymbol(ch); pushRecent(ch); }); grid.appendChild(c); }); }
     subset.addEventListener('change', render); render(); renderRecent();
-    E().saveRange();
     const body = el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Subset:', style: { width: '60px' } }), subset]), grid, el('div', { style: { fontSize: '11px', color: '#666', marginTop: '8px' }, text: 'Recently used symbols:' }), recentRow]);
     WC.dialog({ title: 'Symbol', width: '480px', body, footer: [{ label: 'Close', primary: true }] });
   };
@@ -397,24 +308,20 @@
   Insert.textFromFile = async function () {
     const r = await window.wordAPI.open();
     if (r && r.ok) {
-      const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-      if (pm) { pm.pasteHTMLString(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name); return; }
-      E().focus(); E().restoreRange(); E().insertHTML(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name);
+      WC.PM.pasteHTMLString(WC.Files.sanitize(r.html)); WC.toast('Inserted contents of ' + r.name);
     }
   };
   Insert.onlineVideoDialog = function () {
     const url = el('input', { type: 'text', class: 'grow', placeholder: 'Paste a video URL (YouTube, Vimeo…)' });
     WC.dialog({ title: 'Insert Online Video', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'URL:', style: { width: '50px' } }), url]), el('div', { style: { fontSize: '12px', color: '#666', marginTop: '6px' }, text: 'A clickable video thumbnail is inserted (embedded playback is restricted by the app sandbox).' })]), footer: [
-      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null; if (pm) { pm.xeOnlineVideo(u); return; } E().insertHTML(`<a class="wc-video" href="${WC.escapeHtml(u)}" contenteditable="false" style="display:inline-block;width:320px;height:180px;background:#000;color:#fff;text-decoration:none;position:relative;vertical-align:middle"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">▶</span><span style="position:absolute;bottom:6px;left:8px;font-size:11px;opacity:.85">${WC.escapeHtml(u).slice(0, 40)}</span></a>&nbsp;`); } },
+      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; WC.PM.xeOnlineVideo(u); } },
       { label: 'Cancel' },
     ] });
   };
   Insert.screenshot = async function () {
     if (!window.wordAPI.screenshot) { WC.toast('Screenshot capture is not available in this build.'); return; }
     const r = await window.wordAPI.screenshot();
-    const pm = (window.WC.PM && window.WC.PM.active && window.WC.PM.ready) ? window.WC.PM : null;
-    if (pm && r && r.ok) { pm.insertImage({ src: r.dataUrl, alt: 'Screenshot' }); return; }
-    if (r && r.ok) E().insertHTML(`<img src="${r.dataUrl}" alt="Screenshot" style="max-width:100%">`);
-    else WC.toast('Screenshot ' + (r && r.error ? 'failed: ' + r.error : 'canceled') + '.');
+    if (r && r.ok) { WC.PM.insertImage({ src: r.dataUrl, alt: 'Screenshot' }); return; }
+    WC.toast('Screenshot ' + (r && r.error ? 'failed: ' + r.error : 'canceled') + '.');
   };
 })();

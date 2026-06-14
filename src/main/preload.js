@@ -3,8 +3,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Secure bridge: the renderer never touches Node directly. Everything that
-// needs the filesystem, dialogs, docx conversion, or window control goes
-// through this typed surface.
+// needs the filesystem, dialogs, or window control goes through this typed
+// surface.
 contextBridge.exposeInMainWorld('wordAPI', {
   // Window controls (custom title bar)
   window: {
@@ -16,9 +16,9 @@ contextBridge.exposeInMainWorld('wordAPI', {
   },
 
   // Documents
+  // open: csv/txt/html only (mailings recipient lists + Insert "Text from File").
+  // docx open/save go through the PM bytes channels below.
   open: (presetPath) => ipcRenderer.invoke('doc:open', presetPath),
-  save: (payload) => ipcRenderer.invoke('doc:save', payload),
-  saveAs: (payload) => ipcRenderer.invoke('doc:saveAs', payload),
   exportPdf: (payload) => ipcRenderer.invoke('doc:exportPdf', payload),
   print: () => ipcRenderer.invoke('doc:print'),
 

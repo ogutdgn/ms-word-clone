@@ -4,14 +4,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
-
-  // D6 (spec §6.C): doc-touching shortcuts of UNFLIPPED areas block+toast in PM
-  // mode, exactly like their ribbon commands. App-level shortcuts pass through.
-  const pmBlockedOr = (area, fn) => () => {
-    if (WC.PM && WC.PM.active && !WC.PM.isFlipped(area)) { WC.PM.notifyBlocked('Keyboard shortcut'); return; }
-    fn();
-  };
 
   function buildTitleBar() {
     const tb = document.getElementById('titlebar');
@@ -24,34 +16,32 @@
     qat.appendChild(autosave);
     qat.appendChild(el('span', { class: 'qat-sep' }));
     qat.appendChild(qbtn('save', 'Save (Ctrl+S)', () => WC.Files.save()));
-    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM.cmd('undo') : E().exec('undo')));
-    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM.cmd('redo') : E().exec('redo')));
+    qat.appendChild(qbtn('undo', 'Undo (Ctrl+Z)', () => { if (WC.PM.ready) WC.PM.cmd('undo'); }));
+    qat.appendChild(qbtn('redo', 'Redo (Ctrl+Y)', () => { if (WC.PM.ready) WC.PM.cmd('redo'); }));
     qat.appendChild(qbtn('chevron_down', 'Customize Quick Access Toolbar', () => WC.toast('Customize Quick Access Toolbar is a UI placeholder.')));
     tb.appendChild(qat);
 
     // centered title
     tb.appendChild(el('div', { class: 'title-center', text: 'Document1 - Word' }));
 
-    // D8.8 chrome mode pill (PM-only — legacy titlebar DOM stays byte-identical):
-    // Editing | Reviewing | Viewing; Reviewing rides the SAME trackChanges dispatch
-    // as the ribbon (lock-respecting), state-sync keeps the label honest (T1).
-    if (WC.PM && WC.PM.active) {
-      const pill = el('div', { class: 'mode-pill', id: 'wc-mode-pill', title: 'Editing mode' });
-      pill.appendChild(el('span', { class: 'mode-pill-label', text: 'Editing' }));
-      pill.appendChild(el('span', { class: 'mode-pill-caret', html: WC.icon('chevron_down', 8) }));
-      pill.addEventListener('click', () => {
-        const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null;
-        if (!pm) return;
-        WC.flyout(pill, (fly) => {
-          const cur = pill.querySelector('.mode-pill-label').textContent;
-          const item = (label, fn) => fly.appendChild(WC.flyItem((cur === label ? '✓ ' : '   ') + label, { onClick: fn }));
-          item('Editing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
-          item('Reviewing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (!pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
-          item('Viewing', () => { try { pm.getEditor().setEditable(false, false); } catch (e) { /* engine unavailable */ } });
-        });
+    // D8.8 chrome mode pill: Editing | Reviewing | Viewing; Reviewing rides the SAME
+    // trackChanges dispatch as the ribbon (lock-respecting), state-sync keeps the
+    // label honest (T1).
+    const pill = el('div', { class: 'mode-pill', id: 'wc-mode-pill', title: 'Editing mode' });
+    pill.appendChild(el('span', { class: 'mode-pill-label', text: 'Editing' }));
+    pill.appendChild(el('span', { class: 'mode-pill-caret', html: WC.icon('chevron_down', 8) }));
+    pill.addEventListener('click', () => {
+      const pm = WC.PM.ready ? WC.PM : null;
+      if (!pm) return;
+      WC.flyout(pill, (fly) => {
+        const cur = pill.querySelector('.mode-pill-label').textContent;
+        const item = (label, fn) => fly.appendChild(WC.flyItem((cur === label ? '✓ ' : '   ') + label, { onClick: fn }));
+        item('Editing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
+        item('Reviewing', () => { try { pm.getEditor().setEditable(true, false); } catch (e) { /* engine unavailable */ } if (!pm.reviewState().tracking) WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }); });
+        item('Viewing', () => { try { pm.getEditor().setEditable(false, false); } catch (e) { /* engine unavailable */ } });
       });
-      tb.appendChild(pill);
-    }
+    });
+    tb.appendChild(pill);
 
     // window controls
     const right = el('div', { class: 'titlebar-right' });
@@ -87,52 +77,51 @@
       }
       if (!mod) return;
       const shift = e.shiftKey;
+      const applyStyleChord = (name) => () => { if (WC.PM.ready && !WC.PM.applyStyleByName(name)) WC.toast('Style “' + name + '” is not available in this document.'); };
       const map = () => {
-        if (k === 'z' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('undo') : E().undo(); };
-        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('redo') : E().redo(); };
+        if (k === 'z' && !shift) return () => { if (WC.PM.ready) WC.PM.cmd('undo'); };
+        if ((k === 'z' && shift) || (k === 'y' && !shift)) return () => { if (WC.PM.ready) WC.PM.cmd('redo'); };
         if (k === 's' && !shift) return () => WC.Files.save();
         if ((k === 's' && shift) || e.key === 'F12') return () => WC.Files.saveAs();
-        if (k === 'enter' && !shift) return pmBlockedOr('insert-basics', () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' }));
+        if (k === 'enter' && !shift) return () => WC.Commands.run({ cmd: 'pageBreak', label: 'Page Break' });
         if (k === 'o') return () => WC.Files.open();
         if (k === 'n' && !shift) return () => WC.Files.newDoc(); // !shift: don't shadow Ctrl+Shift+N (Apply Normal, below)
         if (k === 'p') return () => WC.Files.print();
-        if (k === 'f') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false));
-        if (k === 'h') return pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true));
-        if (k === 'k') return pmBlockedOr('insert-basics', () => WC.Dialogs.insertLink());
-        if (k === '=' && !shift) return () => E().zoomIn();
-        if (k === '-') return () => E().zoomOut();
-        if (k === '0') return () => E().zoomReset();
-        if (k === 'l' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'left') : E().exec('justifyLeft'); };
-        if (k === 'e' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'center') : E().exec('justifyCenter'); };
-        // slice 8: review chords (Word: Ctrl+Shift+E = Track Changes, Ctrl+Alt+M =
-        // New Comment, Ctrl+Alt+Space = Read Aloud) — D6-guarded like their ribbon
-        // commands until the review flip.
-        if (k === 'e' && shift) return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' }));
-        if (e.altKey && k === 'm') return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'newComment', label: 'New Comment' }));
-        if (e.altKey && k === ' ') return pmBlockedOr('review', () => WC.Commands.run({ cmd: 'readAloud', label: 'Read Aloud' }));
-        if (k === 'r' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'right') : E().exec('justifyRight'); };
-        if (k === 'j' && !shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('setTextAlign', 'justify') : E().exec('justifyFull'); };
-        if (k === 'l' && shift) return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; pm ? pm.cmd('toggleBulletList') : E().exec('insertUnorderedList'); };
-        if (k === 'd' && !shift) return pmBlockedOr('character', () => WC.Dialogs.font());
-        if (shift && (k === '.' || k === '>')) return pmBlockedOr('character', () => WC.Commands && incFont(1));
-        if (shift && (k === ',' || k === '<')) return pmBlockedOr('character', () => incFont(-1));
-        if (k === ']') return pmBlockedOr('character', () => incFont(1));
-        if (k === '[') return pmBlockedOr('character', () => incFont(-1));
+        if (k === 'f') return () => WC.Dialogs.findPane(false);
+        if (k === 'h') return () => WC.Dialogs.findPane(true);
+        if (k === 'k') return () => WC.Dialogs.insertLink();
+        if (k === '=' && !shift) return () => WC.PM.zoomIn();
+        if (k === '-') return () => WC.PM.zoomOut();
+        if (k === '0') return () => WC.PM.zoomReset();
+        if (k === 'l' && !shift) return () => { if (WC.PM.ready) WC.PM.cmd('setTextAlign', 'left'); };
+        if (k === 'e' && !shift) return () => { if (WC.PM.ready) WC.PM.cmd('setTextAlign', 'center'); };
+        // review chords (Word: Ctrl+Shift+E = Track Changes, Ctrl+Alt+M = New Comment,
+        // Ctrl+Alt+Space = Read Aloud).
+        if (k === 'e' && shift) return () => WC.Commands.run({ cmd: 'trackChanges', label: 'Track Changes' });
+        if (e.altKey && k === 'm') return () => WC.Commands.run({ cmd: 'newComment', label: 'New Comment' });
+        if (e.altKey && k === ' ') return () => WC.Commands.run({ cmd: 'readAloud', label: 'Read Aloud' });
+        if (k === 'r' && !shift) return () => { if (WC.PM.ready) WC.PM.cmd('setTextAlign', 'right'); };
+        if (k === 'j' && !shift) return () => { if (WC.PM.ready) WC.PM.cmd('setTextAlign', 'justify'); };
+        if (k === 'l' && shift) return () => { if (WC.PM.ready) WC.PM.cmd('toggleBulletList'); };
+        if (k === 'd' && !shift) return () => WC.Dialogs.font();
+        if (shift && (k === '.' || k === '>')) return () => incFont(1);
+        if (shift && (k === ',' || k === '<')) return () => incFont(-1);
+        if (k === ']') return () => incFont(1);
+        if (k === '[') return () => incFont(-1);
         // Styles chords route through applyStyleByName so a catalog-missing style
         // toasts exactly like the gallery/pane paths (foreign-doc edge; final-review).
-        if (shift && k === 'n') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Normal'); if (!pm.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); };
-        if (e.altKey && k === '1') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 1'); if (!pm.applyStyleByName('Heading 1')) WC.toast('Style “Heading 1” is not available in this document.'); };
-        if (e.altKey && k === '2') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 2'); if (!pm.applyStyleByName('Heading 2')) WC.toast('Style “Heading 2” is not available in this document.'); };
-        if (e.altKey && k === '3') return () => { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; if (!pm) return WC.applyNamedStyle('Heading 3'); if (!pm.applyStyleByName('Heading 3')) WC.toast('Style “Heading 3” is not available in this document.'); };
-        // slice 4: copy/paste formatting chords (Word: Cmd+Shift+C / Cmd+Shift+V —
-        // oracle B5). PM-only — legacy returns null so the chord keeps its default.
-        if (shift && k === 'c') { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; return pm ? () => pm.armFormatPainter(false) : null; }
-        if (shift && k === 'v') { const pm = WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null; return pm ? () => pm.cmd('applyStoredFormat') : null; }
+        if (shift && k === 'n') return applyStyleChord('Normal');
+        if (e.altKey && k === '1') return applyStyleChord('Heading 1');
+        if (e.altKey && k === '2') return applyStyleChord('Heading 2');
+        if (e.altKey && k === '3') return applyStyleChord('Heading 3');
+        // copy/paste formatting chords (Word: Cmd+Shift+C / Cmd+Shift+V — oracle B5).
+        if (shift && k === 'c') return WC.PM.ready ? () => WC.PM.armFormatPainter(false) : null;
+        if (shift && k === 'v') return WC.PM.ready ? () => WC.PM.cmd('applyStoredFormat') : null;
         return null;
       };
       // PM keymaps own the history keys when focus is in the view — stand down
       // (the fork handles Mod-Z/Y itself; firing our handler too would double-undo).
-      if (WC.PM && WC.PM.active && window.WC.view && window.WC.view.dom.contains(document.activeElement)
+      if (window.WC.view && window.WC.view.dom.contains(document.activeElement)
           && mod && ['z', 'y'].includes(k)) return;
       const action = map();
       if (action) { e.preventDefault(); action(); }
@@ -152,8 +141,8 @@
       const m = {
         'file.new': () => WC.Files.newDoc(), 'file.open': () => WC.Files.open(), 'file.save': () => WC.Files.save(),
         'file.saveAs': () => WC.Files.saveAs(), 'file.print': () => WC.Files.print(),
-        'edit.find': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(false)), 'edit.replace': pmBlockedOr('find-replace', () => WC.Dialogs.findPane(true)),
-        'view.zoomIn': () => E().zoomIn(), 'view.zoomOut': () => E().zoomOut(), 'view.zoomReset': () => E().zoomReset(),
+        'edit.find': () => WC.Dialogs.findPane(false), 'edit.replace': () => WC.Dialogs.findPane(true),
+        'view.zoomIn': () => WC.PM.zoomIn(), 'view.zoomOut': () => WC.PM.zoomOut(), 'view.zoomReset': () => WC.PM.zoomReset(),
       };
       if (m[action]) m[action]();
     });
@@ -184,20 +173,14 @@
   function boot() {
     buildTitleBar();
     buildRuler();
-    WC.Editor.init();
     WC.StatusBar.init();
     WC.Ribbon.init();
     WC.Backstage.init();
     WC.Files.init();
-    if (WC.Layout && WC.Layout.initSelection) WC.Layout.initSelection();
-    // slice-8 flip (K8 belt): the legacy tracked-changes beforeinput interceptor
-    // binds only under --legacy — in PM mode the fork engine owns tracking.
-    if (!(WC.PM && WC.PM.active) && WC.Review && WC.Review.init) WC.Review.init();
     bindKeys();
     bindMisc();
-    if (!(WC.PM && WC.PM.active)) WC.Editor.focus(); // PM mode: bridge focuses the PM view post-mount
-    // initial state sync
-    WC.Editor.emit();
+    // WC.Editor retired (slice 11): PM is the only editor — the bridge focuses the
+    // PM view post-mount and the fork engine drives state sync.
     console.log('WORD_CLONE_READY tabs=' + WC.RIBBON.length);
   }
 

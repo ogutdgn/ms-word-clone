@@ -3,7 +3,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
   const StatusBar = {
     node: null, pageEl: null, wordEl: null, zlevel: null, zslider: null,
@@ -29,17 +28,17 @@
         b.addEventListener('click', () => {
           if (v === 'read') { WC.Commands.run({ cmd: 'readMode', label: 'Read Mode' }); return; }
           if (WC.closeReadMode) WC.closeReadMode();
-          E().setView(v); this.setActiveView(v);
+          WC.PM.setView(v); this.setActiveView(v);
         });
         this.viewBtns[v] = b; right.appendChild(b);
       });
       right.appendChild(el('span', { class: 'sb-sep' }));
 
       const zoom = el('div', { class: 'zoom-control' });
-      const minus = el('span', { class: 'zbtn', text: '−', onclick: () => E().zoomOut() });
+      const minus = el('span', { class: 'zbtn', text: '−', onclick: () => WC.PM.zoomOut() });
       this.zslider = el('input', { type: 'range', min: '10', max: '500', value: '100' });
-      this.zslider.addEventListener('input', () => E().setZoom(parseInt(this.zslider.value, 10) / 100));
-      const plus = el('span', { class: 'zbtn', text: '+', onclick: () => E().zoomIn() });
+      this.zslider.addEventListener('input', () => WC.PM.setZoom(parseInt(this.zslider.value, 10) / 100));
+      const plus = el('span', { class: 'zbtn', text: '+', onclick: () => WC.PM.zoomIn() });
       this.zlevel = el('span', { class: 'zlevel', text: '100%', onclick: () => WC.Dialogs.zoom() });
       zoom.appendChild(minus); zoom.appendChild(this.zslider); zoom.appendChild(plus); zoom.appendChild(this.zlevel);
       right.appendChild(zoom);
@@ -58,22 +57,17 @@
 
     update() {
       if (!this.node) return;
-      if (WC.PM && WC.PM.active && WC.PM.ready) {
-        // Continuous flow until Phase 7 — report honestly (spec §7.8).
-        this.pageEl.textContent = 'Page 1 of 1';
-        const c = WC.PM.counts();
-        this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
-        return;
-      }
-      const count = E().pageCount();
-      const cur = E().currentPage();
-      this.pageEl.textContent = `Page ${cur} of ${count}`;
-      const c = E().counts();
+      // WC.Editor retired (slice 11): the PM bridge owns counts. The pre-mount
+      // counts() stub returns zeros (the correct boot display) before PM.ready.
+      if (!(WC.PM && WC.PM.active)) return;
+      // Continuous flow until Phase 7 — report honestly (spec §7.8).
+      this.pageEl.textContent = 'Page 1 of 1';
+      const c = WC.PM.counts();
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
     updateZoom() {
       if (!this.zlevel) return;
-      const pct = Math.round(E().zoom * 100);
+      const pct = Math.round(((window.WC.PM && window.WC.PM.zoom) || 1) * 100);
       this.zlevel.textContent = pct + '%';
       this.zslider.value = String(pct);
     },

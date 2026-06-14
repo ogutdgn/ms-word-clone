@@ -88,26 +88,10 @@
   // ---------- slice 0a: infrastructure ----------
   await t('[0a] PM mode active + body flipped', () =>
     !!PM() && PM().active === true && document.body.classList.contains('pm-active'));
-  await t('[0a] legacy #editor hidden but laid out', () => {
-    const ed = document.getElementById('editor'); const cs = getComputedStyle(ed);
-    return cs.visibility === 'hidden' && cs.position === 'absolute' && ed.offsetHeight > 0;
-  });
   await t('[0a] #pm-editor is the visible page', () => {
     const pe = document.getElementById('pm-editor');
     return !!pe && getComputedStyle(pe).visibility !== 'hidden' && pe.offsetWidth > 600;
   });
-  await t('[0a] D6 guard: legacy exec is blocked, returns false, mutates nothing', () => {
-    const ed = document.getElementById('editor'); const before = ed.innerHTML;
-    const ok = window.WC.Editor.exec('bold');
-    return ok === false && ed.innerHTML === before;
-  });
-  await t('[0a] D6 guard: legacy setHTML/applyBlockStyle blocked', () => {
-    const ed = document.getElementById('editor'); const before = ed.innerHTML;
-    window.WC.Editor.setHTML('<p>should not land</p>');
-    window.WC.Editor.applyBlockStyle('marginLeft', '48px');
-    return ed.innerHTML === before;
-  });
-  await t('[0a] D6 guard: legacy undo blocked', () => window.WC.Editor.undo() === false);
   await t('[0a] dirty flag tracks PM edits', async () => {
     const d0 = PM().isDirty();
     v().dispatch(v().state.tr.insertText('x', 1));
@@ -157,7 +141,7 @@
     return rs.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: r.left + rs.clientWidth + 4, clientY: r.top + 4 })) === true;
   });
   await t('[0a] invariants: telemetry off, WC intact', () =>
-    (window.__NET_LOG || []).length === 0 && !!window.WC.Editor && !!window.WC.Ribbon);
+    (window.__NET_LOG || []).length === 0 && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     // Repointed slice 10: startMailMerge flips this slice → run-block probe moves to
     // `margins` (AREA layout-page, Phase-7-gated, stays blocked through slice 11).
@@ -3940,7 +3924,7 @@
     if (/«FirstName»/.test(html)) return 'merged html kept the «FirstName» placeholder';
     return /Alice/.test(html) || 'merged html does not contain the record value Alice';
   });
-  await t('[10mm] D6 flip: mail-merge is FLIPPED', () => PM().isFlipped('mail-merge') === true || 'mail-merge not in FLIPPED');
+  await t('[10mm] D6: mail-merge is on the PM engine (not deferred)', () => PM().isBlocked('startMailMerge') === false || 'startMailMerge is D6-blocked (should be on PM engine)');
   await t('[10mm] merge resolver matches preview (_val: «Last_Name» field over a LastName column)', () => {
     // Regression (task-5 review): PM preview resolves via _val (squashed-name match);
     // the Finish&Merge resolver must too, else «Last_Name» over a LastName column
@@ -3973,7 +3957,7 @@
   });
 
   // ===== [10th] themes / Design tab (slice 10 PR2) — doc-replacing tests LAST =====
-  await t('[10th] D6 flip: themes is FLIPPED', () => PM().isFlipped('themes') === true || 'themes not in FLIPPED');
+  await t('[10th] D6: themes is on the PM engine (not deferred)', () => PM().isBlocked('themes') === false || 'themes is D6-blocked (should be on PM engine)');
 
   await t('[10th] EXPORT: deApplyTheme redefines Heading1 with literal w:rFonts ascii + w:color val in styles.xml', async () => {
     setDocs(['Heading One', 'body text']);
@@ -4125,7 +4109,7 @@
   });
 
   // ===== [10ex] insert-exotica (slice 10 PR3) — doc-replacing tests LAST =====
-  await t('[10ex] D6 flip: insert-exotica is FLIPPED', () => PM().isFlipped('insert-exotica') === true || 'insert-exotica not in FLIPPED');
+  await t('[10ex] D6: insert-exotica is on the PM engine (not deferred)', () => PM().isBlocked('coverPage') === false || 'coverPage is D6-blocked (should be on PM engine)');
 
   await t('[10ex] EXPORT: xeDropCap → <w:framePr w:dropCap> in document.xml', async () => {
     setDocs(['Dropped capital paragraph here', 'body']); caretAfter('Dropped');
@@ -4243,7 +4227,7 @@
   });
 
   // ===== [10dr] draw / Draw tab (slice 10 PR4) — doc-replacing tests LAST =====
-  await t('[10dr] D6 flip: draw is FLIPPED', () => PM().isFlipped('draw') === true || 'draw not in FLIPPED');
+  await t('[10dr] D6: draw is on the PM engine (not deferred)', () => PM().isBlocked('drawing') === false || 'drawing is D6-blocked (should be on PM engine)');
 
   await t('[10dr] EXPORT: dInsertInk → <a:custGeom>/<a:pathLst> freeform in document.xml', async () => {
     setDoc('canvas'); caretAfter('canvas');
@@ -4325,6 +4309,21 @@
     const xml2 = await exportDocumentXml(); // fallback: at least the custom geometry still round-trips to OOXML
     return /<a:custGeom\b/.test(xml2) || 'ink lost on round-trip (no renderable custGeom + none on re-export)';
   });
+
+  // [11] Legacy retirement — single-world invariants + conflict-file/feature survival guards.
+  await t('[11] PM is the only world', () => window.WC.PM && window.WC.PM.active === true && window.WC.PM.ready === true);
+  await t('[11] body is pm-active', () => document.body.classList.contains('pm-active'));
+  await t('[11] legacy WC.Editor is retired', () => typeof window.WC.Editor === 'undefined');
+  await t('[11] Design themes table survives', () => Array.isArray(window.WC.Design.THEMES) && window.WC.Design.THEMES.length > 0);
+  await t('[11] Design color/font/spacing/styleset tables survive', () => Array.isArray(window.WC.Design.COLOR_SCHEMES) && window.WC.Design.COLOR_SCHEMES.length > 0 && Array.isArray(window.WC.Design.FONT_PAIRS) && !!window.WC.Design.SPACING && !!window.WC.Design.STYLE_SETS);
+  await t('[11] setThemeColors survives (bridge/design.ts dep)', () => typeof window.WC.setThemeColors === 'function');
+  await t('[11] Draw pen registry survives', () => Array.isArray(window.WC.Draw.PENS) && window.WC.Draw.PENS.length > 0 && Array.isArray(window.WC.Draw.customPens));
+  await t('[11] Ref shared-state slots survive', () => typeof window.WC.Ref.citationStyle === 'string' && Array.isArray(window.WC.Ref.sources));
+  await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
+  await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
+  await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('margins') === true);
+  await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);

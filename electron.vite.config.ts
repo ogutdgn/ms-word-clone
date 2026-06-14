@@ -1,24 +1,5 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import { resolve } from 'node:path'
-import { copyFileSync } from 'node:fs'
-
-// electron-vite leaves main.js's relative `require('./docx-utils')` EXTERNAL (it does not
-// bundle a CJS relative require), so docx-utils.js must sit next to out/main/index.js at
-// runtime. Copy it after EVERY main build — fires in BOTH `electron-vite dev` and
-// `electron-vite build` (a `cp` in the npm `build` script does NOT run under dev, which is
-// why `npm run dev` crashed with "Cannot find module './docx-utils'"). Cross-platform
-// (node fs, not the Unix `cp`).
-function copyDocxUtilsPlugin() {
-  return {
-    name: 'copy-docx-utils',
-    closeBundle() {
-      copyFileSync(
-        resolve(__dirname, 'src/main/docx-utils.js'),
-        resolve(__dirname, 'out/main/docx-utils.js'),
-      )
-    },
-  }
-}
 
 // A strict CSP <meta> + a relaxed header intersect (most-restrictive wins), so we
 // swap the meta IN DEV only. The prod build keeps the strict meta verbatim — unsafe
@@ -105,9 +86,8 @@ const aliases = [
 
 export default defineConfig({
   main: {
-    // externalizeDepsPlugin: keep node deps (html-to-docx, mammoth, …) external.
-    // copyDocxUtilsPlugin: place docx-utils.js next to out/main/index.js (dev + build).
-    plugins: [externalizeDepsPlugin(), copyDocxUtilsPlugin()],
+    // externalizeDepsPlugin: keep node deps external (don't bundle into the main chunk).
+    plugins: [externalizeDepsPlugin()],
     build: { rollupOptions: { input: { index: resolve(__dirname, 'src/main/main.js') } } },
   },
   preload: {

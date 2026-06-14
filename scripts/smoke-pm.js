@@ -9,7 +9,7 @@
   for (let i = 0; i < 100 && !window.__WC_READY; i++) await sleep(50); // sentinel gate
 
   t('view mounted (sentinel)', () => window.__WC_READY === true);
-  t('legacy world intact', () => !!window.WC && !!window.WC.Editor);
+  t('WC core present (single-world)', () => !!window.WC && !!window.WC.PM && !!window.WC.Commands);
   t('new view present', () => !!window.WC.view && typeof window.WC.view.dispatch === 'function');
   t('view is editable', () => window.WC.view.dom.isContentEditable === true);
   t('imported doc rendered', () => window.WC.view.state.doc.content.size > 4);

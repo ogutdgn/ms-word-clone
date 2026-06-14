@@ -4,10 +4,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
-  // Phase 2 (slice 10): PM bridge accessor — null under --legacy or pre-mount, so
-  // the verbatim legacy ELSE branch runs (keeps test:legacy byte-identical).
-  const PMA = () => (WC.PM && WC.PM.active && WC.PM.ready ? WC.PM : null);
 
   const DEFAULT_FIELDS = ['Title', 'FirstName', 'LastName', 'CompanyName', 'Address1', 'City', 'State', 'ZIP', 'Email'];
 
@@ -17,7 +13,6 @@
     mergeType: 'letters',
     previewOn: false,
     current: 0,
-    template: null,
     _hl: false,
 
     startMailMerge(type) { this.mergeType = type; WC.toast('Mail merge type: ' + type); },
@@ -67,7 +62,7 @@
     insertMergeFieldMenu(node) {
       WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fields')); if (!this.fields.length) fly.appendChild(WC.flyItem('(no fields — select recipients first)', {})); this.fields.forEach((f) => fly.appendChild(WC.flyItem(f, { onClick: () => this.insertField(f, '«' + f + '»') }))); });
     },
-    insertField(field, label, data) { const pm = PMA(); if (pm) { if (field === '__AddressBlock__') { pm.mmAddressBlock(); return; } if (field === '__GreetingLine__') { pm.mmGreetingLine(); return; } pm.mmInsertField(field); return; } let attrs = ''; if (data) Object.keys(data).forEach((k) => { if (data[k] != null) attrs += ' data-' + k + '="' + WC.escapeHtml(String(data[k])) + '"'; }); E().focus(); E().restoreRange(); E().insertNodeHTML('<span class="wc-mergefield" data-field="' + WC.escapeHtml(field) + '"' + attrs + '>' + WC.escapeHtml(label || ('«' + field + '»')) + '</span>&#8203;'); },
+    insertField(field) { if (field === '__AddressBlock__') { WC.PM.mmAddressBlock(); return; } if (field === '__GreetingLine__') { WC.PM.mmGreetingLine(); return; } WC.PM.mmInsertField(field); },
     addressBlock() {
       const fmt = el('select', {}, ['Mr. Joshua Randall Jr.', 'Joshua Randall', 'Joshua', 'Mr. Randall'].map((o) => el('option', { text: o })));
       const company = el('input', { type: 'checkbox', checked: 'checked' });
@@ -88,7 +83,7 @@
         el('div', { style: { marginTop: '8px', fontWeight: '600' }, text: 'Preview' }), preview, nav,
       ]);
       WC.dialog({ title: 'Insert Address Block', width: '460px', body, footer: [
-        { label: 'OK', primary: true, onClick: () => { const pm = PMA(); pm ? pm.mmAddressBlock() : this.insertField('__AddressBlock__', '«AddressBlock»'); } },
+        { label: 'OK', primary: true, onClick: () => { WC.PM.mmAddressBlock(); } },
         { label: 'Cancel' },
       ] });
     },
@@ -110,11 +105,11 @@
         el('div', { style: { marginTop: '8px', fontWeight: '600' }, text: 'Preview' }), preview,
       ]);
       WC.dialog({ title: 'Insert Greeting Line', width: '480px', body, footer: [
-        { label: 'OK', primary: true, onClick: () => { const pm = PMA(); pm ? pm.mmGreetingLine() : this.insertField('__GreetingLine__', '«GreetingLine»', { greet: greet.value, punct: punct.value }); } },
+        { label: 'OK', primary: true, onClick: () => { WC.PM.mmGreetingLine(); } },
         { label: 'Cancel' },
       ] });
     },
-    highlightMergeFields() { const pm = PMA(); if (pm) { this._hl = !this._hl; pm.mmHighlight(this._hl); return; } E().node.classList.toggle('show-mergefields'); },
+    highlightMergeFields() { this._hl = !this._hl; WC.PM.mmHighlight(this._hl); },
 
     // Resolve a Word standard field name (e.g. "First Name") to the recipient's
     // actual column: Match Fields map first, then exact name, then squashed-name
@@ -144,11 +139,6 @@
       const raw = this._val(rec || {}, field);
       return (raw != null && raw !== '') ? WC.escapeHtml(raw) : '';
     },
-    fill(rec) {
-      const div = document.createElement('div'); div.innerHTML = this.template;
-      div.querySelectorAll('.wc-mergefield').forEach((m) => { m.outerHTML = this.composite(m.dataset.field, rec || {}, { greet: m.dataset.greet, punct: m.dataset.punct }); });
-      return div.innerHTML;
-    },
     // Build a field-name → value map for a recipient (PM preview, non-destructive).
     // Keys = each merge-field NAME; values resolved via _val so Match-Fields applies.
     _previewMap(rec) {
@@ -158,28 +148,16 @@
     },
     previewResults(on) {
       if (typeof on !== 'boolean') on = !this.previewOn;
-      const pm = PMA();
-      if (pm) {
-        if (on) {
-          if (!this.recipients.length) { WC.toast('No recipients to preview.'); return; }
-          this.previewOn = true; this.current = 0;
-          pm.mmPreview(this._previewMap(this.recipients[0]));
-        } else { this.previewOn = false; pm.mmPreview(null); }
-        const btn = WC.Ribbon.controlIndex.previewResults && WC.Ribbon.controlIndex.previewResults.node;
-        if (btn) btn.classList.toggle('toggled', this.previewOn);
-        WC.toast('Preview ' + (this.previewOn ? 'on (record 1 of ' + this.recipients.length + ')' : 'off'));
-        return;
-      }
       if (on) {
         if (!this.recipients.length) { WC.toast('No recipients to preview.'); return; }
-        this.template = E().getHTML(); this.previewOn = true; this.current = 0;
-        E().setHTML(this.fill(this.recipients[0]));
-      } else { this.previewOn = false; if (this.template != null) E().setHTML(this.template); this.template = null; }
+        this.previewOn = true; this.current = 0;
+        WC.PM.mmPreview(this._previewMap(this.recipients[0]));
+      } else { this.previewOn = false; WC.PM.mmPreview(null); }
       const btn = WC.Ribbon.controlIndex.previewResults && WC.Ribbon.controlIndex.previewResults.node;
       if (btn) btn.classList.toggle('toggled', this.previewOn);
       WC.toast('Preview ' + (this.previewOn ? 'on (record 1 of ' + this.recipients.length + ')' : 'off'));
     },
-    go(n) { if (!this.previewOn) { this.previewResults(true); return; } this.current = Math.max(0, Math.min(this.recipients.length - 1, n)); const pm = PMA(); if (pm) { pm.mmPreview(this._previewMap(this.recipients[this.current])); if (WC.StatusBar) WC.StatusBar.update(); return; } E().setHTML(this.fill(this.recipients[this.current])); if (WC.StatusBar) WC.StatusBar.update(); },
+    go(n) { if (!this.previewOn) { this.previewResults(true); return; } this.current = Math.max(0, Math.min(this.recipients.length - 1, n)); WC.PM.mmPreview(this._previewMap(this.recipients[this.current])); if (WC.StatusBar) WC.StatusBar.update(); },
     first() { this.go(0); }, last() { this.go(this.recipients.length - 1); }, next() { this.go(this.current + 1); }, prev() { this.go(this.current - 1); },
     findRecipient() {
       const input = el('input', { type: 'text', class: 'grow', placeholder: 'Find text in recipient fields' });
@@ -188,39 +166,26 @@
         { label: 'Close' },
       ] });
     },
-    checkErrors() { const pm = PMA(); if (pm) { const used = []; const tmp = document.createElement('div'); tmp.innerHTML = pm.getHTML() || ''; tmp.querySelectorAll('span.annotation[data-field-type="MERGEFIELD"]').forEach((m) => { const n = (m.getAttribute('data-default-display-label') || m.getAttribute('data-display-label') || '').replace(/^«|»$/g, ''); if (n) used.push(n); }); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); return; } const tmpl = this.previewOn ? this.template : E().getHTML(); const used = (tmpl.match(/data-field="([^"]+)"/g) || []).map((m) => m.slice(12, -1)).filter((f) => !f.startsWith('__')); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); },
+    checkErrors() { const used = []; const tmp = document.createElement('div'); tmp.innerHTML = WC.PM.getHTML() || ''; tmp.querySelectorAll('span.annotation[data-field-type="MERGEFIELD"]').forEach((m) => { const n = (m.getAttribute('data-default-display-label') || m.getAttribute('data-display-label') || '').replace(/^«|»$/g, ''); if (n) used.push(n); }); const missing = used.filter((f) => !this.fields.includes(f)); WC.toast(missing.length ? 'Unmatched fields: ' + missing.join(', ') : (this.recipients.length ? 'No errors. ' + this.recipients.length + ' recipients ready.' : 'No recipients selected.')); },
 
     finishMerge(mode) {
-      if (mode === 'edit') {
-        const pm = PMA();
-        if (pm) {
-          if (!this.recipients.length) { WC.toast('No recipients. Select recipients first.'); return; }
-          const n = this.recipients.length;
-          // Restore the «name» template before reading it (K-5): finish-merge reads
-          // PM.getHTML() and substitutes per record, so a live preview must be off first.
-          if (this.previewOn) { pm.mmPreview(null); this.previewOn = false; }
-          const merged = pm.mmBuildMerge(this.recipients, (field, rec) => this._mergeResolve(field, rec));
-          return Promise.resolve(pm.mmFinishToNewDoc(merged)).then((ok) => { if (ok) WC.toast('Merged to a new document: ' + n + ' records.'); return ok; });
-        }
-      }
-      const tmpl = this.previewOn ? this.template : E().getHTML();
       if (!this.recipients.length) { WC.toast('No recipients. Select recipients first.'); return; }
       if (mode === 'print') { WC.toast('Merged ' + this.recipients.length + ' records — sending to Print.'); WC.Files.print(); return; }
       if (mode === 'email') { WC.toast('Sending email requires a mail backend — not implemented.', 'See docs/NOT_IMPLEMENTED.md'); return; }
-      // Edit Individual Documents: one filled copy per recipient, page-break between,
-      // opened in a NEW document so the merge template is not overwritten in place.
-      const old = this.template; this.template = tmpl;
-      const merged = this.recipients.map((r) => this.fill(r)).join('<div class="manual-break" contenteditable="false" style="break-after:page;page-break-after:always"></div>');
-      this.template = old; this.previewOn = false;
+      // Edit Individual Documents: substitute per record into a new document.
       const n = this.recipients.length;
-      return WC.Files.newDocWith(merged, 'Letters').then((ok) => { if (ok) WC.toast('Merged to a new document: ' + n + ' records.'); return ok; });
+      // Restore the «name» template before reading it (K-5): finish-merge reads
+      // PM.getHTML() and substitutes per record, so a live preview must be off first.
+      if (this.previewOn) { WC.PM.mmPreview(null); this.previewOn = false; }
+      const merged = WC.PM.mmBuildMerge(this.recipients, (field, rec) => this._mergeResolve(field, rec));
+      return Promise.resolve(WC.PM.mmFinishToNewDoc(merged)).then((ok) => { if (ok) WC.toast('Merged to a new document: ' + n + ' records.'); return ok; });
     },
 
     envelopes() {
       const deliver = el('textarea', { class: 'grow', rows: '4', placeholder: 'Delivery address' });
       const ret = el('textarea', { class: 'grow', rows: '3', placeholder: 'Return address' });
       WC.dialog({ title: 'Envelopes and Labels — Envelopes', width: '480px', body: el('div', {}, [el('div', { text: 'Delivery address:' }), deliver, el('div', { style: { marginTop: '8px' }, text: 'Return address:' }), ret]), footer: [
-        { label: 'Add to Document', primary: true, onClick: async () => { const env = '<div class="wc-envelope"><p style="font-size:9pt">' + WC.escapeHtml(ret.value).replace(/\n/g, '<br>') + '</p><div style="margin:140px 0 0 320px"><p>' + WC.escapeHtml(deliver.value).replace(/\n/g, '<br>') + '</p></div></div><div class="manual-break" style="break-after:page;page-break-after:always;border-top:1px dashed #b9b9b9"></div>'; const pm = PMA(); if (pm) { const ok = await pm.openHtml(env + (pm.getHTML() || '')); if (ok) WC.toast('Envelope added as the first page (existing content preserved).'); return; } E().node.insertAdjacentHTML('afterbegin', env); E().dirty = true; E().repaginate(); WC.toast('Envelope added as the first page (existing content preserved).'); } },
+        { label: 'Add to Document', primary: true, onClick: async () => { const env = '<div class="wc-envelope"><p style="font-size:9pt">' + WC.escapeHtml(ret.value).replace(/\n/g, '<br>') + '</p><div style="margin:140px 0 0 320px"><p>' + WC.escapeHtml(deliver.value).replace(/\n/g, '<br>') + '</p></div></div><div class="manual-break" style="break-after:page;page-break-after:always;border-top:1px dashed #b9b9b9"></div>'; const ok = await WC.PM.openHtml(env + (WC.PM.getHTML() || '')); if (ok) WC.toast('Envelope added as the first page (existing content preserved).'); } },
         { label: 'Print', onClick: () => WC.Files.print() },
         { label: 'Cancel' },
       ] });
@@ -231,8 +196,8 @@
       const fullPage = el('input', { type: 'checkbox', checked: 'checked' });
       const buildHTML = () => { const m = product.value.match(/(\d+)×(\d+)/); const cols = +m[1], rows = +m[2]; let html = '<table class="wc-labels no-border" style="width:100%">'; for (let r = 0; r < rows; r++) { html += '<tr>'; for (let c = 0; c < cols; c++) html += '<td style="height:48px;font-size:9pt;border:1px dashed #ccc;padding:4px">' + WC.escapeHtml(text.value).replace(/\n/g, '<br>') + '</td>'; html += '</tr>'; } html += '</table>'; return { html, cols, rows }; };
       WC.dialog({ title: 'Envelopes and Labels — Labels', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Product:' }), product]), el('div', { text: 'Address:' }), text, el('div', { class: 'row', style: { marginTop: '6px' } }, [el('label', {}, [fullPage, el('span', { text: ' Full page of the same label' })])])]), footer: [
-        { label: 'New Document', primary: true, onClick: async () => { const { html, cols, rows } = buildHTML(); const pm = PMA(); const ok = pm ? await pm.openHtml(html) : await WC.Files.newDocWith(html, 'Labels'); if (ok) WC.toast('Labels sheet created in a new document (' + cols + '×' + rows + ').'); } },
-        { label: 'Print', onClick: async () => { const { html } = buildHTML(); const pm = PMA(); if (pm) { WC.toast('Label-sheet printing lands with page layout (Phase 7) — use New Document to place the labels.'); return; } const snap = E().getHTML(); E().node.insertAdjacentHTML('beforeend', html); E().repaginate(); try { await WC.Files.print(); } finally { E().setHTML(snap); } } },
+        { label: 'New Document', primary: true, onClick: async () => { const { html, cols, rows } = buildHTML(); const ok = await WC.PM.openHtml(html); if (ok) WC.toast('Labels sheet created in a new document (' + cols + '×' + rows + ').'); } },
+        { label: 'Print', onClick: () => { WC.toast('Label-sheet printing lands with page layout (Phase 7) — use New Document to place the labels.'); } },
         { label: 'Cancel' },
       ] });
     },
@@ -256,23 +221,9 @@
     updateLabels() {
       // Propagate the first label cell's merge fields to every other cell, with a
       // «Next Record» field at the start of each subsequent cell (Word behavior).
-      // Only ever touch a real labels table — never fall back to the first table,
-      // which would clobber an ordinary user table.
-      const pm = PMA();
-      if (pm) {
-        // PM-safe: the full PM-table «Next Record» propagation is pagination-gated
-        // (ledger A). Never touch the legacy editor in PM mode — guide the user instead.
-        WC.toast('Update Labels lands with the label-sheet page layout (Phase 7). Create a label sheet via Mailings → Labels → New Document, then insert «Next Record» from Rules.');
-        return;
-      }
-      const table = E().node.querySelector('table.wc-labels');
-      if (!table) { WC.toast('No label sheet found. Create one first (Mailings → Labels → New Document).'); return; }
-      const cells = Array.from(table.querySelectorAll('td'));
-      if (cells.length < 2) { WC.toast('Need a label grid to update.'); return; }
-      const first = cells[0].innerHTML;
-      cells.forEach((td, i) => { td.innerHTML = (i === 0 ? '' : '<span class="wc-mergefield" data-field="__NextRecord__">«Next Record»</span> ') + first; });
-      E().dirty = true; E().repaginate();
-      WC.toast('Updated all ' + cells.length + ' labels from the first.');
+      // PM-safe: the full PM-table «Next Record» propagation is pagination-gated
+      // (ledger A) — guide the user instead.
+      WC.toast('Update Labels lands with the label-sheet page layout (Phase 7). Create a label sheet via Mailings → Labels → New Document, then insert «Next Record» from Rules.');
     },
   };
   function blank(fields) { const o = {}; fields.forEach((f) => o[f] = ''); return o; }

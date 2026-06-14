@@ -1,7 +1,8 @@
 # Target Tech Stack — CUA RL environment
 
 > The **target** stack after the migration (see [`../decisions/`](../decisions/)). The
-> *current* app's stack is documented in the legacy [`../TECH_STACK.md`](../TECH_STACK.md).
+> migration is now **EXECUTED** — slice 11 retired the legacy world, so this target is the
+> shipped stack; [`../TECH_STACK.md`](../TECH_STACK.md) documents it as built.
 > "Locked" = decided in an ADR; "Candidate" = recommended in OPEN_DECISIONS, not yet locked.
 
 ## Locked
@@ -27,10 +28,12 @@
 | Determinism | `seedrandom`, `@sinonjs/fake-timers`, bundled fonts, `force-device-scale-factor=1`, version pins | OPEN H2 |
 | Agent transport | MCP-sidecar + thin RPC/CDP for the pixel hot-loop | OPEN D1 |
 
-## Retired on migration
-- **DOM-as-model** (`#editor` contenteditable + `document.execCommand`) → ProseMirror model.
-- **mammoth** + **html-to-docx** (lossy HTML round-trip) → forked SuperDoc converter.
-- **No-bundler ordered `<script>` tags** + global `window.WC` → electron-vite + ESM/TS modules.
+## Retired (EXECUTED in slice 11)
+- **DOM-as-model** (`#editor` contenteditable + `document.execCommand`) → ProseMirror model. ✅ removed.
+- **mammoth** + **html-to-docx** (lossy HTML round-trip) → forked SuperDoc `super-converter`. ✅ removed.
+- **No-bundler ordered `<script>` tags** for the editor core → electron-vite + ESM/TS modules. ✅ done.
+  *(The shared `WC` chrome still uses classic `<script>` tags; its WC→TS/ESM migration is the one
+  remaining piece of this line item — deferred to a future slice.)*
 
 ## Reference-only (read, do NOT depend on)
 Cloned under `opensource-solutions/` (gitignored): `prosemirror-*`, `tiptap`, `SuperDoc`

@@ -77,6 +77,19 @@ translator services · Editor (cloud grammar) · Researcher. Loop obligation: no
 | **draw inkToShape/inkToMath = honest toasts** — shape/equation recognition of ink has no real-Word ML construct here; `arcTo` in custGeom is dropped by the importer's parser (the stroke smoother only emits moveTo/quadBezTo, so no loss); highlighter = a fat translucent `a:ln` freeform stroke (honest degrade vs Word's true highlighter fill — the alpha DOES survive Word's resave) | recorded decision (D10dr.5); slice 10 PR4 | slice 10 PR4 |
 | **draw live pointer-capture drawing not headless-tested** — the persist→render and Word-import→render paths are validated programmatically (Task-4 probe + oracle Leg B), but live pointerdown/move/up capture + the page-position mapping (R3) can only be confirmed by a manual `npm start` draw (the geometry is ported from the proven legacy WC.Draw). The bridge pen-state mirror to the ribbon tile-highlight (a cosmetic PM-mode highlight) is a minor follow-up | recorded note; slice 10 PR4 | slice 10 PR4 |
 
+## C (slice 11 — legacy retirement, 2026-06)
+
+Appended when the legacy world was retired (slice 11). These record the single-world
+state of areas that previously leaned on the legacy engine.
+
+| Item | Decision / evidence | Recorded |
+|---|---|---|
+| **`window.WC` chrome → TS/ESM module migration is DEFERRED** — the shared chrome (`commands.js`, `ribbon.js`, `dialogs.js`, `util.js`, `app.js`, `files.js`, `backstage.js`, `statusbar.js`, `*-tools.js` value tables, `home-features.js`, `table-tools-pm.js`, `icons*.js`, gen'd `ribbon-data.js`) stays as classic `<script>` tags on `window.WC`; only the editor core + bridge are TS/ESM. A future slice may migrate the chrome. | recorded decision (slice 11, decision 4); the editor core migration is what forced the bundler, the chrome migration is independent | slice 11 |
+| **Shapes / Excel-Spreadsheet / Draw-Table inserts now show an honest toast** — there is no PM construct for them; they were silently-broken in PM since slice 10 (the legacy `E()`-mutating path was the only impl). Each now degrades to an honest "available in a future update" toast (no false success, no `E()` leak). Real PM constructs are a future follow-up. | recorded decision (slice 11) | slice 11 |
+| **The 4 Phase-7 DEFERRED areas remain honestly `isBlocked`** — layout-page, layout-arrange, header-footer, text-effects. Their `commands.js` handler bodies are gated Phase-7 stubs (dead bodies that still reference the deleted `WC.HeaderFooter`/`WC.Layout`/`E()`, never reached because `isBlocked`/`notifyBlocked` short-circuits first). They show a Word-like deferral toast and await Phase 7 (pagination + live child editors). `isBlocked`/`notifyBlocked` stay as the permanent Phase-7 gate (the D6 `FLIPPED`/`isFlipped` flip-tracking was retired in slice 11). | recorded decision (slice 11; Phase-7 class A) | slice 11 |
+| **Office Clipboard pane opens but auto-capture is best-effort in PM** — the pane (`WC.Clipboard`) opens and manual paste works, but the auto-capture of cut/copy history was `editor.js`-wired in legacy; in PM it is best-effort. Full PM auto-capture is a follow-up. | recorded deviation (slice 11) | slice 11 |
+| **Dictate / sensitivity-labels → honest toasts** — Dictate (Web Speech) and sensitivity labels show honest toasts in PM (the legacy `WC.Dictate`/sensitivity-bar wiring was retired with `editor.js`). Cloud-runtime class for sensitivity; Dictate is a possible future PM follow-up. | recorded deviation (slice 11; cloud/runtime class B for sensitivity) | slice 11 |
+
 ## Process notes
 
 - Slices 1–7 were oracle-validated vs **Word for Mac 16.77.1**; from slice 8 the

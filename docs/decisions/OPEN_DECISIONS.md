@@ -120,7 +120,9 @@ of this spike (run via a standalone Node project) — still to do for the real m
   render in our view behind the existing ribbon → flip editing core → logger → verifier →
   hard constructs (sections/headers/footers/fields/track-changes/comments) → pagination (last) →
   `.docx` round-trip tests → (optional) React chrome. Gate every cut-over on the 228+9 suite.
-  **Status: open (draft in `../research/opensource-deepdive/04-migration-and-feature-preservation.md`).**
-  Phase 2 in progress per `docs/superpowers/specs/2026-06-05-phase2-editing-core-design.md` —
-  slice 0a (flip + bridge + D6) landed 2026-06-05; hard-constructs wiring (track changes/comments/
-  fields) moved INTO Phase 2 slices 8–9, ahead of the logger.
+  **Status: EXECUTED through legacy retirement (slice 11, 2026-06).** The strangler-fig cut-over
+  is complete: Phase 1 scaffold → Phase 2 wired every ribbon area onto the PM engine (slices 0a–10)
+  → **slice 11 retired the legacy world** (the `--legacy` flag, the `contenteditable` editor, the
+  leaf legacy engines, and the `mammoth`/`html-to-docx` converter are gone; gates collapsed from six
+  to three). Remaining sequencing items still open: pagination (Phase 7), the logger, and the
+  verifier. The `WC` chrome → TS/ESM migration is deferred to a future slice.

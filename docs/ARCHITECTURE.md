@@ -1,11 +1,21 @@
 # Architecture
 
-A faithful Microsoft Word desktop clone built on **Electron 31**. The renderer
-is **vanilla JavaScript with no bundler** — modules are plain classic `<script>`
-tags loaded in dependency order, sharing a single global `WC` namespace. The
-main process owns all privileged work (filesystem, dialogs, `.docx`
-conversion, window control) and exposes a narrow, typed API to the renderer
-through a `contextBridge` preload.
+A faithful Microsoft Word desktop clone built on **Electron 31**, with the
+renderer built by **electron-vite + TypeScript**. The document is a single
+**owned ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`)
+mounted at `#pm-editor` and driven through the `WC.PM` bridge
+(`src/renderer/bridge/*.ts`). The shared chrome around it (ribbon, dialogs,
+backstage, statusbar) is still **vanilla JavaScript** — classic `<script>` tags
+loaded in dependency order onto a global `WC` namespace (its WC→TS/ESM migration
+is deferred). The main process owns all privileged work (filesystem, dialogs,
+text/PDF IO, window control) and exposes a narrow, typed API to the renderer
+through a `contextBridge` preload; `.docx` is converted renderer-side by the fork.
+
+> **Single world (slice 11):** the legacy `contenteditable` editor, the `--legacy`
+> boot flag, and the `mammoth`/`html-to-docx` converter were removed. The PM engine
+> is the only editor and the fork's `super-converter` is the only `.docx` path. Some
+> sections below still describe shared chrome (`ribbon.js`, `commands.js`, `dialogs.js`,
+> `app.js`) that legitimately lives on the `WC` namespace.
 
 ---
 
@@ -22,9 +32,10 @@ A privileged Node.js process. It:
 - Registers all `ipcMain.handle(...)` channels (window controls, recent files,
   open/save/saveAs, PDF export, print, image pick, screenshot, external links).
 - Performs the heavy lifting that the renderer is forbidden from doing: reading
-  and writing files (`fs/promises`), showing native `dialog`s, and converting
-  documents with lazily-`require`d libraries — **`mammoth`** for `.docx → HTML`
-  on open, **`html-to-docx`** for `HTML → .docx` on save.
+  and writing files (`fs/promises`) and showing native `dialog`s. `.docx` open/save
+  pass **raw bytes** across the bridge (`doc:openBytes` / `doc:saveBytes`); the
+  OOXML↔model conversion happens renderer-side in the vendored fork's
+  `super-converter`, not in the main process.
 - Installs **no application menu** (`Menu.setApplicationMenu(null)`): Word uses
   the ribbon, and the renderer is the single source of truth for keyboard
   shortcuts. `buildHiddenMenu()` exists but is intentionally not installed.
@@ -39,10 +50,12 @@ Two environment-specific accommodations live here:
 
 ### Renderer process — `src/renderer/`
 
-The Chromium UI. `index.html` defines the DOM skeleton and loads every module.
-The renderer never touches Node directly; its only privileged channel is
-`window.wordAPI` (see §4). All editing, ribbon, dialogs, pagination, and
-document model logic live here as `WC.*` modules.
+The Chromium UI. `index.html` defines the DOM skeleton, loads the shared-chrome
+classic scripts first, then the ESM entry `./main.ts` last (which constructs the
+vendored ProseMirror Editor and mounts `#pm-editor`). The renderer never touches
+Node directly; its only privileged channel is `window.wordAPI` (see §4). The
+document model is the PM core + `WC.PM` bridge; the ribbon, dialogs, backstage,
+and statusbar live as shared `WC.*` chrome modules.
 
 ### `BrowserWindow.webPreferences` — security posture
 
@@ -80,65 +93,51 @@ Additional hardening in `main.js`:
 
 ## 2. Renderer load order & the `WC` namespace
 
-`index.html` loads classic scripts **in strict dependency order**. There is no
-module system — each file does `window.WC = window.WC || {}` and attaches its
-public object to it (e.g. `WC.Editor`, `WC.Commands`, `WC.Ribbon`). Order
-matters because later modules reference `WC.*` objects defined earlier.
+`index.html` loads the shared-chrome classic scripts **in strict dependency order**
+onto a global `WC` namespace (each file does `window.WC = window.WC || {}`), then
+loads the ESM entry `./main.ts` **last**. The classic scripts build the static
+chrome; `main.ts` constructs the ProseMirror Editor and installs the `WC.PM` bridge.
 
 ```
+js/00-netlog.js               net recorder (loads first; observes load-time requests)
 vendor/purify.min.js          DOMPurify (sanitizer)
 js/icons-fluent.js            raw Fluent SVG icon data (auto-generated)
 js/icons.js                   WC.icon / WC.rawIcon — icons keyed by cmd name
 js/util.js                    WC.el, WC.debounce, WC.flyout, WC.dialog,
                               WC.toast, WC.colorPalette, WC.escapeHtml …
 js/ribbon-data.js             WC.RIBBON — declarative tab/group/control tree
-js/editor.js                  WC.Editor — the document surface (see §5)
-js/formatting.js              WC.formatBlock + named styles (Normal, Heading 1…)
 js/statusbar.js               WC.StatusBar — page/word count, view, zoom
-js/home-features.js           WC.Clipboard (Office clipboard) + WC.Dictate
-js/insert-features.js         WC.Insert — cover pages, shapes, icons, SmartArt
-js/table-tools.js             WC.Table — table editing + context menu
-js/header-footer.js           WC.HeaderFooter — header/footer regions, fields
-js/draw-tools.js              WC.Draw — freehand SVG ink layer
-js/design-tools.js            WC.Design — themes, colors, fonts, watermark
-js/layout-tools.js            WC.Layout — line numbers, hyphenation, arrange
-js/references-tools.js        WC.Ref — TOC, footnotes, citations, index
-js/mailings-tools.js          WC.Mail — mail-merge engine
-js/review-tools.js            WC.Review — Track Changes engine
+js/home-features.js           WC.Clipboard (Office clipboard pane)
+js/insert-features.js         WC.Insert — insert helpers / value tables
+js/table-tools-pm.js          PM-mode Table Tools (contextual Table tabs)
+js/draw-tools.js              WC.Draw — draw value/state tables
+js/design-tools.js            WC.Design — themes/colors/fonts value tables
+js/references-tools.js        WC.Ref — references value/state tables
+js/mailings-tools.js          WC.Mail — mail-merge dialogs/state
+js/review-tools.js            WC.Review — review value/state tables
 js/dialogs.js                 WC.Dialogs — modal dialogs + task panes
-js/comments.js                WC.Comments — modern comments
 js/commands.js                WC.Commands — command dispatcher + handlers (§6)
 js/ribbon.js                  WC.Ribbon — renders WC.RIBBON, wires controls (§3)
-js/files.js                   WC.Files — document lifecycle + IO via wordAPI
+js/files.js                   WC.Files — document lifecycle + IO via WC.PM/wordAPI
 js/backstage.js               WC.Backstage — full-screen File menu
 js/app.js                     bootstrap: builds title bar, binds keys, boot()
+main.ts (ESM)                 constructs the vendored Editor, mounts #pm-editor,
+                              installs WC.PM (commands/io/state-sync/focus)
 ```
 
 `commands.js` must load before `ribbon.js` (the ribbon wires controls to
-`WC.Commands`), and both load after the feature modules (`WC.Insert`,
-`WC.Design`, `WC.Review`, …) that their handlers delegate to.
+`WC.Commands`), and the feature value/state modules load before the dispatcher.
+The leaf legacy editing engines (`editor.js`, `formatting.js`, `comments.js`,
+`table-tools.js`, `layout-tools.js`, `header-footer.js`) were removed in slice 11;
+their behavior now lives in the PM core + `bridge/*.ts`.
 
-### Boot sequence — `app.js`
+### Boot sequence
 
-`app.js` runs last and calls `boot()` (on `DOMContentLoaded` or immediately):
-
-```js
-buildTitleBar();          // QAT + window controls, wired to wordAPI.window.*
-buildRuler();
-WC.Editor.init();         // grab #editor, enable styleWithCSS, attach listeners
-WC.StatusBar.init();
-WC.Ribbon.init();         // render tabstrip + ribbon body from WC.RIBBON
-WC.Backstage.init();
-WC.Files.init();
-WC.Layout.initSelection(); WC.Review.init();
-bindKeys();               // Ctrl+S/O/N/P, alignment, Ctrl+Enter page break …
-bindMisc();               // dirty-title sync; forward main's menu:action events
-WC.Editor.focus(); WC.Editor.emit();
-```
-
-Keyboard shortcuts live entirely in the renderer (`bindKeys()` in `app.js`).
-Most route through `WC.Commands.run({ cmd })`, `WC.Editor.exec(...)`, or
-`WC.Files.*`.
+The classic `app.js` `boot()` builds the title bar/ruler and initializes the chrome
+(`WC.StatusBar.init()`, `WC.Ribbon.init()`, `WC.Backstage.init()`, `WC.Files.init()`,
+`bindKeys()`); the ESM `main.ts` then constructs the Editor, mounts `#pm-editor`, and
+exposes `WC.PM` + `window.__WC_READY`. Keyboard shortcuts (`bindKeys()` in `app.js`)
+route through `WC.Commands.run({ cmd })` or `WC.Files.*`, which drive the `WC.PM` bridge.
 
 ---
 
@@ -161,9 +160,9 @@ holds no document logic.
   - group **launcher** (dialog-box-launcher) → `WC.Commands.launcher(group.id, …)`
 - `controlIndex` maps each `cmd` to its DOM node, so handlers can toggle/recolor
   controls (e.g. `setColorBar`, `setComboValue`).
-- **Live state sync:** `WC.Editor.onStateChange(st => this.syncToggles(st))`
-  flips the `toggled` class on bold/italic/align/list buttons based on
-  `queryCommandState`, via `TOGGLE_MAP`.
+- **Live state sync:** the `WC.PM` bridge pushes editor state on each transaction
+  (`WC.PM.onStateChange`), and `syncToggles(st)` flips the `toggled` class on
+  bold/italic/align/list buttons from that state, via `TOGGLE_MAP`.
 - **Contextual tabs:** `showContextualTab()` / `hideContextualTab()` inject and
   remove runtime tabs (e.g. Header & Footer), mirroring Word.
 
@@ -183,9 +182,8 @@ publishes a single typed object as `window.wordAPI`; each method is a thin
 | `window.close()`                 | `window:close`           | close window |
 | `window.isMaximized()`           | `window:isMaximized`     | query state |
 | `window.onStateChange(cb)`       | `window:state` (on)      | maximize-state push |
-| `open(presetPath)`               | `doc:open`               | open dialog + `mammoth`/text parse → HTML |
-| `save(payload)`                  | `doc:save`               | write to known path |
-| `saveAs(payload)`                | `doc:saveAs`             | save dialog + `html-to-docx` |
+| `openBytes(presetPath)`          | `doc:openBytes`          | open dialog → raw `.docx` bytes (converted by the fork renderer-side) |
+| `saveBytes(payload)` / `saveTextFile` | `doc:saveBytes` / `doc:saveTextFile` | write `.docx` bytes / html/txt to a path |
 | `exportPdf(payload)`             | `doc:exportPdf`          | `webContents.printToPDF` |
 | `print()`                        | `doc:print`              | `webContents.print` |
 | `recent.list()` / `recent.clear()` | `recent:list` / `recent:clear` | recent-files JSON |
@@ -194,51 +192,43 @@ publishes a single typed object as `window.wordAPI`; each method is a thin
 | `openExternal(url)`              | `shell:openExternal`     | open `http(s)` in OS browser |
 | `onMenuAction(cb)`               | `menu:action` (on)       | forwarded menu accelerators |
 
-`WC.Files` (`files.js`) and `app.js` are the main renderer-side consumers of
-this bridge. Returned payloads are plain `{ ok, html, path, name, format }`
-objects; HTML produced by `mammoth` is fed into `WC.Editor.setHTML(...)`.
+`WC.Files` (`files.js`) and the `WC.PM` bridge (`bridge/io.ts`) are the main
+renderer-side consumers of this bridge. `.docx` bytes are fed into the fork
+converter (`WC.PM.openDocx(bytes)` / `WC.PM.exportDocxBytes()`); html/txt/csv
+import and html/txt save are handled renderer-side too.
 
 ---
 
-## 5. The editor model — `editor.js`
+## 5. The editor model — the PM core + `WC.PM` bridge
 
-The document is a **single `contenteditable` element**, `#editor`, inside
-`#pages` inside `#canvas`/`#workarea`. There is one continuous editable surface;
-"pages" are a visual illusion produced by `repaginate()` (gap spacers), not
-separate DOM containers.
+The document is a **ProseMirror editor** mounted at `#pm-editor` (inside `#pages`
+inside `#canvas`/`#workarea`). The engine is an owned, vendored fork of SuperDoc's
+`super-editor` core (`src/renderer/core/superdoc-fork/`): the schema, the
+`super-converter`, and the editing extensions — with the Vue UI and `DomPainter`
+dropped and telemetry stripped. `src/renderer/main.ts` constructs it and exposes
+`window.WC.view`.
 
-```html
-<div id="editor" contenteditable="true" spellcheck="true"><p><br></p></div>
-```
+The renderer-side controller is the **`WC.PM` bridge** (`src/renderer/bridge/*.ts`).
+It is the only document-write path — every ribbon command becomes a ProseMirror
+transaction:
 
-`WC.Editor` is the model + controller for that surface:
+- **Commands:** `bridge/commands.ts` + the per-area modules (`insert.ts`, `table.ts`,
+  `search.ts`, `review.ts`, `references.ts`, `design.ts`, `mail.ts`, `draw.ts`,
+  `insert-exotica.ts`, …) apply marks/nodes and run the fork's commands. Many wire
+  the fork's SuperDoc **Document API** (`editor.doc.*`) so constructs (fields,
+  footnotes, comments, citations) export to `.docx`.
+- **State sync:** `state-sync.ts` derives ribbon-facing state on each transaction and
+  fires `WC.PM.onStateChange(st)` (drives `syncToggles`, the contextual Table tabs,
+  combo values, etc.).
+- **IO seam:** `bridge/io.ts` runs the fork converter — `WC.PM.openDocx(bytes)` /
+  `WC.PM.exportDocxBytes()` for `.docx`, plus html/txt/csv import and html/txt save.
+- **View & zoom:** `WC.PM.setView(...)` / `WC.PM.setZoom(...)` own view-mode and zoom
+  (moved off the retired `WC.Editor`).
+- **Focus & overlays:** `focus.ts`, the ink overlay (`ink-overlay.ts`), and the
+  comments/track chrome (`comments-ui.ts`, `track-chrome.ts`) layer UI over the view.
 
-- **execCommand + `styleWithCSS`:** `init()` calls
-  `document.execCommand('styleWithCSS', false, true)` and
-  `defaultParagraphSeparator → 'p'`, so formatting is emitted as inline CSS and
-  Enter creates `<p>` blocks (matching Word's paragraph model). `exec(cmd, val)`
-  is the focus-preserving wrapper around `document.execCommand` used by most
-  Home-tab handlers.
-- **Custom command layer over execCommand:** where `execCommand` is
-  insufficient, the editor provides its own primitives:
-  `applyInlineStyle` / `applyInlineStyles` (wrap selection in a styled `<span>`,
-  e.g. text-stroke outlines), `applyBlockStyle` (per-block CSS),
-  `insertNodeHTML` (DOM insertion that preserves `class`/`data-*`), and a full
-  **multilevel-list engine** (`demoteListItem`, `promoteListItem`,
-  `setListLevel`, `applyMultilevelPattern`).
-- **Selection state:** `saveRange()` / `restoreRange()` persist the caret across
-  focus loss and ribbon clicks; `queryState()` reports active formatting
-  (bold/italic/align/font/block) for ribbon sync via `onStateChange`/`emit`.
-- **Pagination:** `repaginate()` lays the continuous flow out as discrete page
-  sheets in print view by inserting `.wc-page-gap` spacers at page boundaries,
-  binary-searching the split point inside a straddling paragraph and snapping to
-  word boundaries. Caret position is preserved by absolute character offset
-  across the DOM surgery.
-- **View & zoom:** `setView('print'|'web'|'read'|'outline'|'draft')` toggles
-  workarea classes; `setZoom` CSS-scales `#pages`.
-- **IO seam:** `getHTML()` strips layout artifacts (page-gap spacers, find
-  highlights) before saving; `setHTML(html)` loads a document and re-paginates
-  once images decode, then rebuilds comments/ink.
+The page sheet is continuous-flow today; real model-driven multi-page sheets are
+Phase-7-gated (see [PAGINATION.md](PAGINATION.md)).
 
 ---
 
@@ -260,19 +250,23 @@ run(control, node) {
 }
 ```
 
-Each handler is a one-liner that either drives the editor or delegates to a
-feature module. Examples:
+Each handler is a one-liner that drives the `WC.PM` bridge or opens a dialog.
+Examples:
 
 ```js
-H.bold      = () => E().exec('bold');                  // execCommand
-H.alignLeft = () => E().exec('justifyLeft');
-H.table     = (c, node) => WC.Dialogs.insertTable();   // dialog
-H.themes    = (c, node) => galleryMenu(node, …);       // delegate to WC.Design
-H.trackChanges = () => WC.Review.setTrackChanges();    // delegate to WC.Review
+H.bold      = () => WC.PM.toggleMark('bold');          // PM transaction
+H.alignLeft = () => WC.PM.setAlign('left');
+H.table     = (c, node) => WC.Dialogs.insertTable();   // dialog → WC.PM.insertTable
+H.themes    = (c, node) => galleryMenu(node, …);       // theme via WC.PM bridge
+H.trackChanges = () => WC.PM.setTrackChanges();        // PM Track Changes
 ```
 
-(`E` is `() => WC.Editor`.) Unknown / out-of-scope commands surface a uniform
-"not implemented" message — see `docs/NOT_IMPLEMENTED.md`.
+The PM-only dispatch collapsed the old `pm ? PM : legacy` branches — there is no
+legacy `E()` fallback. The four Phase-7 deferred areas (layout-page, layout-arrange,
+header-footer, text-effects) are gated by `isBlocked`/`notifyBlocked` and show a
+Word-like deferral toast; their handler bodies are dead stubs awaiting Phase 7.
+Unknown / out-of-scope commands surface a uniform "not implemented" message — see
+`docs/NOT_IMPLEMENTED.md`.
 
 ### `Commands.dropdown(control, node)` — split arrows & dropdowns
 
@@ -291,7 +285,7 @@ if (cmd === 'table')      return WC.Insert.tableMenu(node);   // delegated
 ```
 
 Many entries delegate straight to a feature module's own menu builder
-(`WC.Insert.shapesMenu`, `WC.HeaderFooter.headerMenu`, etc.).
+(`WC.Insert.shapesMenu`, the references/design/mail menu builders, etc.).
 
 ### Other dispatch entry points on `WC.Commands`
 
@@ -301,7 +295,7 @@ Many entries delegate straight to a feature module's own menu builder
 - `launcher(groupId, control, node)` — dialog-box-launcher icons, keyed by
   **group id** (avoids `cmd` collisions, e.g. the Font launcher vs. the font
   combo).
-- `applyStyle(name)` → `WC.applyNamedStyle` (Styles gallery).
+- `applyStyle(name)` → `WC.PM.applyNamedStyle(name)` (Styles gallery commit).
 
 ---
 
@@ -311,8 +305,8 @@ Many entries delegate straight to a feature module's own menu builder
                               MAIN PROCESS  (src/main/main.js — Node, privileged)
                               ┌───────────────────────────────────────────────┐
                               │  ipcMain.handle(...)                           │
-                              │    doc:open  → mammoth   (.docx → HTML)        │
-                              │    doc:save  → html-to-docx (HTML → .docx)     │
+                              │    doc:openBytes  → raw .docx bytes            │
+                              │    doc:saveBytes / doc:saveTextFile → write    │
                               │    doc:exportPdf → printToPDF                  │
                               │    window:* / fs:readImage / insert:screenshot │
                               │    Menu.setApplicationMenu(null)               │
@@ -325,33 +319,31 @@ Many entries delegate straight to a feature module's own menu builder
                               │  contextBridge.exposeInMainWorld('wordAPI', {…})│
                               └───────────────▲────────────────────────────────┘
                                               │ window.wordAPI.*
-                              RENDERER (src/renderer/* — vanilla JS, global WC)
+                              RENDERER (src/renderer/* — WC chrome + PM core/bridge)
    user clicks a ribbon control                       │
             │                                          │
             ▼                                          │
    ribbon.js  renderControl()                          │
    main-face click ──► WC.Commands.run(control, node)  │
    split arrow  ────► WC.Commands.dropdown(control)    │
-            │                                          │
-            ▼                                          ▼
-   commands.js                                  files.js  (WC.Files)
-   ┌─────────────────────────────┐   load/save ── window.wordAPI.open/save ──► (main)
-   │ H[cmd]? ── yes ─► handler    │                       │
-   │   │  no                      │                       ▼ setHTML / getHTML
-   │   ▼                          │              editor.js  (WC.Editor)
-   │ split/dropdown ─► dropdown() │ ──drives──►   #editor contenteditable
-   │   │                          │              execCommand + styleWithCSS
-   │   ▼                          │              applyInline/Block, lists,
-   │ *Menu builder (WC.flyout)    │              repaginate(), queryState()
+            │                                          ▼
+            ▼                                  files.js + bridge/io.ts
+   commands.js (PM-only)             load/save ── wordAPI.openBytes/saveBytes ──► (main)
+   ┌─────────────────────────────┐                       │
+   │ H[cmd]? ── yes ─► handler    │              fork super-converter
+   │   │  no                      │              (bytes ↔ PM model)
+   │   ▼                          │                       │
+   │ split/dropdown ─► dropdown() │ ──drives──►   WC.PM bridge (bridge/*.ts)
+   │   │                          │              dispatch ProseMirror transactions
+   │ *Menu builder (WC.flyout)    │              into the vendored Editor (#pm-editor)
    │   │  no match                │                       │
-   │   ▼                          │             onStateChange / emit
+   │   ▼                          │             state-sync.ts → onStateChange(st)
    │ WC.notImplemented(label)     │                       │
    └─────────────────────────────┘                       ▼
-            │ delegates                          ribbon.js syncToggles(st)
+            │                                    ribbon.js syncToggles(st)
             ▼                                    (bold/italic/align highlight)
-   feature modules: WC.Insert, WC.Design, WC.Review,
-   WC.Ref, WC.Mail, WC.Layout, WC.Table, WC.HeaderFooter,
-   WC.Draw, WC.Comments, WC.Dialogs …  (all operate on WC.Editor)
+   PM core: schema + super-converter + extensions
+   (src/renderer/core/superdoc-fork/) — the only document model
 ```
 
 ---
@@ -363,23 +355,21 @@ Many entries delegate straight to a feature module's own menu builder
 | `util.js` | `WC.el`, `WC.debounce`, `WC.flyout`, `WC.dialog`, `WC.toast`, `WC.colorPalette`, `WC.notImplemented`, `WC.escapeHtml` … | DOM helpers, flyouts, color palettes, toasts, screentips, modal dialog shell |
 | `icons-fluent.js` / `icons.js` | `WC.icon`, `WC.rawIcon` | SVG icon set keyed by command name (Fluent data is auto-generated) |
 | `ribbon-data.js` | `WC.RIBBON`, `WC.FONTS`, `WC.SIZES` | declarative tab/group/control tree (auto-generated from research data) |
-| `editor.js` | `WC.Editor` | the `#editor` contenteditable surface, selection state, custom command layer, pagination, zoom, view modes, IO HTML |
-| `formatting.js` | `WC.Styles`, `WC.formatBlock`, `WC.applyNamedStyle` | block formatting + Word named styles (Normal, Heading 1…) |
+| `core/superdoc-fork/` | (PM core) | the vendored ProseMirror engine — schema + `super-converter` + editing extensions; the only document model |
+| `main.ts` | `window.WC.view`, `WC.PM` | constructs the Editor, mounts `#pm-editor`, installs the bridge |
+| `bridge/*.ts` | `WC.PM` | the bridge: ribbon commands → PM transactions (commands/io/state-sync/focus + per-area modules), zoom, view, named styles, the fork Document API |
 | `statusbar.js` | `WC.StatusBar` | bottom bar: page/word/char count, view buttons, zoom slider |
-| `home-features.js` | `WC.Clipboard`, `WC.Dictate` | Office Clipboard history + speech-to-text dictation |
-| `insert-features.js` | `WC.Insert` | cover pages, shapes, icons, SmartArt, charts, screenshots, bookmarks |
-| `table-tools.js` | `WC.Table` | table editing, insert/delete rows & columns, cell context menu |
-| `header-footer.js` | `WC.HeaderFooter` | header/footer editing regions + page-number/date fields |
-| `draw-tools.js` | `WC.Draw` | freehand SVG ink layer, pens, eraser, replay |
-| `design-tools.js` | `WC.Design` | themes, color schemes, font pairings, paragraph spacing, watermark, page borders |
-| `layout-tools.js` | `WC.Layout` | line numbers, hyphenation, object arrange (wrap/position/align/rotate) |
-| `references-tools.js` | `WC.Ref` | table of contents, footnotes/endnotes, captions, citations, index |
-| `mailings-tools.js` | `WC.Mail` | mail-merge engine (recipients, fields, preview, finish) |
-| `review-tools.js` | `WC.Review` | Track Changes engine, display modes, accept/reject, accessibility |
+| `home-features.js` | `WC.Clipboard` | Office Clipboard pane |
+| `insert-features.js` | `WC.Insert` | insert helpers / value tables (menus delegate to `WC.PM`) |
+| `table-tools-pm.js` | (PM table tools) | the contextual Table Design/Layout tabs, wired to `WC.PM` |
+| `draw-tools.js` | `WC.Draw` | draw value/state tables (ink via `WC.PM`/the ink overlay) |
+| `design-tools.js` | `WC.Design` | themes/colors/fonts/paragraph-spacing value tables |
+| `references-tools.js` | `WC.Ref` | references value/state tables |
+| `mailings-tools.js` | `WC.Mail` | mail-merge dialogs/state |
+| `review-tools.js` | `WC.Review` | review value/state tables |
 | `dialogs.js` | `WC.Dialogs` | modal dialogs + task panes (Insert Table, Link, Symbol, Find/Replace, Font, Paragraph…) |
-| `comments.js` | `WC.Comments` | modern threaded comments anchored to selections |
-| `commands.js` | `WC.Commands` | the command dispatcher + the `H` handler table (§6) |
+| `commands.js` | `WC.Commands` | the command dispatcher + the `H` handler table (PM-only, §6) |
 | `ribbon.js` | `WC.Ribbon` | renders `WC.RIBBON`, wires controls to the dispatcher, syncs toggle state, contextual tabs |
-| `files.js` | `WC.Files` | document lifecycle + IO through `window.wordAPI`, dirty/title tracking |
+| `files.js` | `WC.Files` | document lifecycle + IO through `WC.PM`/`window.wordAPI`, dirty/title tracking |
 | `backstage.js` | `WC.Backstage`, `WC.BACKSTAGE` | full-screen File menu (New, Open, Print, Save, Export…) |
 | `app.js` | — (bootstrap) | builds title bar + ruler, binds keyboard shortcuts, `boot()` init order |

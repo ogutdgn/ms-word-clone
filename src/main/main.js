@@ -4,12 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu, desktopCapturer, scree
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
-const docxUtils = require('./docx-utils');
 const { is } = require('@electron-toolkit/utils');
-
-// Lazy-required heavy libs (loaded on first use to keep startup fast)
-let mammoth = null;
-let htmlToDocx = null;
 
 const isDev = process.argv.includes('--dev') || process.argv.includes('--enable-logging');
 
@@ -113,16 +108,11 @@ function createWindow() {
   mainWindow.webContents.session.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'media' || perm === 'audioCapture' || perm === 'microphone'));
   mainWindow.webContents.session.setPermissionCheckHandler(() => true);
 
-  // Phase 2 (spec §4.2): `electron . --legacy` boots the classic pre-PM app.
-  // The renderer reads ?legacy=1 synchronously, so the page flip never flashes.
-  const legacyBoot = process.argv.includes('--legacy');
+  // PM is the only boot mode (slice 11: --legacy retired).
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL + (legacyBoot ? '?legacy=1' : ''));
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, '..', 'renderer', 'index.html'),
-      legacyBoot ? { query: { legacy: '1' } } : undefined,
-    );
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {
@@ -254,25 +244,10 @@ ipcMain.handle('recent:clear', async () => {
 async function openPath(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.docx') {
-    if (!mammoth) mammoth = require('mammoth');
-    const styleMap = [
-      "p[style-name='Title'] => h1.doc-title:fresh",
-      "p[style-name='Subtitle'] => p.doc-subtitle:fresh",
-      "p[style-name='Heading 1'] => h1:fresh",
-      "p[style-name='Heading 2'] => h2:fresh",
-      "p[style-name='Heading 3'] => h3:fresh",
-      "p[style-name='Quote'] => blockquote:fresh",
-      "r[style-name='Strong'] => strong",
-    ];
-    const result = await mammoth.convertToHtml(
-      { path: filePath },
-      { styleMap, includeDefaultStyleMap: true, convertImage: mammoth.images.imgElement(async (image) => {
-        const buf = await image.read('base64');
-        return { src: `data:${image.contentType};base64,${buf}` };
-      }) }
-    );
-    await pushRecentFile(filePath);
-    return { ok: true, html: result.value, messages: result.messages, path: filePath, name: path.basename(filePath), format: 'docx' };
+    // The legacy mammoth importer is gone (slice 11). Real .docx opens go through the
+    // PM engine's byte channel (doc:openBytes → fork super-converter). This text path
+    // only serves the csv/txt/html data-source readers below.
+    return { ok: false, error: 'Open .docx via the PM document path (doc:openBytes), not this text reader.' };
   }
   if (ext === '.html' || ext === '.htm') {
     const html = await fsp.readFile(filePath, 'utf8');
@@ -325,90 +300,6 @@ ipcMain.handle('doc:open', async (_evt, presetPath) => {
       filePath = res.filePaths[0];
     }
     return await openPath(filePath);
-  } catch (e) {
-    return { ok: false, error: String(e && e.message ? e.message : e) };
-  }
-});
-
-// ---------------------------------------------------------------------------
-// IPC: save document
-// ---------------------------------------------------------------------------
-async function writeDocx(filePath, html, options, header, footer, comments) {
-  if (!htmlToDocx) htmlToDocx = require('html-to-docx');
-  const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${docxUtils.flattenNestedTables(html)}</body></html>`;
-  const hasHeader = !!(header && header.trim());
-  const hasFooter = !!(footer && footer.trim());
-  const docxOpts = Object.assign({
-    table: { row: { cantSplit: true } },
-    footer: hasFooter,
-    header: hasHeader,
-    pageNumber: false,
-    font: 'Aptos',
-    fontSize: 24, // half-points => 12pt (matches real Word default)
-    // ALL margin keys must be integers — html-to-docx stringifies missing keys
-    // as "undefined", which makes real Word reject the file (w:header="undefined").
-    margins: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720, gutter: 0 },
-  }, options || {});
-  // header/footer go to real Word header/footer parts — never demoted to body text.
-  const headerHtml = hasHeader ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${header}</body></html>` : null;
-  const footerHtml = hasFooter ? `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${footer}</body></html>` : null;
-  let buffer = await htmlToDocx(fullHtml, headerHtml, docxOpts, footerHtml);
-  if (comments && comments.length) {
-    try { buffer = await docxUtils.injectComments(require('jszip'), buffer, comments); }
-    catch (e) { if (isDev) console.error('comment injection failed (saving without native comments):', e); }
-  }
-  await fsp.writeFile(filePath, buffer);
-}
-
-// html-to-docx silently drops a <table> nested inside a <td> (deleting the cell's
-// text too). Flatten any inner table to <br>-joined cell text so nothing is lost.
-async function saveToPath(filePath, html, format, header, footer, comments) {
-  const ext = (format || path.extname(filePath).replace('.', '')).toLowerCase();
-  if (ext === 'docx') {
-    await writeDocx(filePath, html, null, header, footer, comments);
-  } else if (ext === 'html' || ext === 'htm') {
-    const full = `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${path.basename(filePath)}</title></head>\n<body>${html}</body></html>`;
-    await fsp.writeFile(filePath, full, 'utf8');
-  } else if (ext === 'txt' || ext === 'text' || ext === 'md' || ext === 'rtf') {
-    // openPath() labels .txt/.md/.rtf as format 'text'; accept that (and the bare
-    // extensions) so a file opened from plain text can be saved without throwing.
-    const text = html.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n').replace(/<br\s*\/?>(?=)/gi, '\n').replace(/<[^>]+>/g, '');
-    await fsp.writeFile(filePath, decodeEntities(text), 'utf8');
-  } else {
-    throw new Error('Unsupported save format: ' + ext);
-  }
-  await pushRecentFile(filePath);
-}
-
-function decodeEntities(s) {
-  return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-}
-
-ipcMain.handle('doc:save', async (_evt, { filePath, html, format, header, footer, comments }) => {
-  try {
-    if (!filePath) return { ok: false, error: 'No path' };
-    await saveToPath(filePath, html, format, header, footer, comments);
-    return { ok: true, path: filePath, name: path.basename(filePath) };
-  } catch (e) {
-    return { ok: false, error: String(e && e.message ? e.message : e) };
-  }
-});
-
-ipcMain.handle('doc:saveAs', async (_evt, { html, suggestedName, header, footer, comments }) => {
-  try {
-    const res = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save As',
-      defaultPath: suggestedName || 'Document1.docx',
-      filters: [
-        { name: 'Word Document', extensions: ['docx'] },
-        { name: 'Web Page', extensions: ['html'] },
-        { name: 'Plain Text', extensions: ['txt'] },
-      ],
-    });
-    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
-    const ext = path.extname(res.filePath).replace('.', '').toLowerCase() || 'docx';
-    await saveToPath(res.filePath, html, ext, header, footer, comments);
-    return { ok: true, path: res.filePath, name: path.basename(res.filePath), format: ext };
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }

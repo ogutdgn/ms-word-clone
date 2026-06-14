@@ -3,7 +3,6 @@
   window.WC = window.WC || {};
   const WC = window.WC;
   const el = WC.el;
-  const E = () => WC.Editor;
 
   const Backstage = {
     root: null, railEl: null, contentEl: null, active: 'home',
@@ -92,7 +91,7 @@
       this.content.appendChild(el('h1', { text: 'Open' }));
       const browse = el('div', { class: 'bs-action' }, [
         el('span', { class: 'bic', html: WC.icon('blankPage', 28) }),
-        el('div', { class: 'btxt' }, [el('div', { class: 'bt', text: 'Browse' }), el('div', { class: 'bd', text: (WC.PM && WC.PM.active) ? 'Open a .docx, .html, .txt or .csv file from this PC' : 'Open a .docx, .html, .txt or .rtf file from this PC' })]),
+        el('div', { class: 'btxt' }, [el('div', { class: 'bt', text: 'Browse' }), el('div', { class: 'bd', text: 'Open a .docx, .html, .txt or .csv file from this PC' })]),
       ]);
       browse.addEventListener('click', () => WC.Files.open());
       this.content.appendChild(browse);
@@ -104,7 +103,8 @@
       this.content.appendChild(el('h1', { text: 'Info' }));
       const f = WC.Files;
       const props = el('div', { class: 'info-props' });
-      const rows = [['Name', f.name], ['Location', f.path || 'Not saved yet'], ['Format', (f.format || 'docx').toUpperCase()], ['Words', E().counts().words], ['Pages', E().pageCount()]];
+      const c = WC.PM.counts();
+      const rows = [['Name', f.name], ['Location', f.path || 'Not saved yet'], ['Format', (f.format || 'docx').toUpperCase()], ['Words', c.words], ['Pages', c.pages]];
       rows.forEach(([k, v]) => props.appendChild(el('div', { class: 'row' }, [el('span', { class: 'k', text: k }), el('span', { text: String(v) })])));
       this.content.appendChild(props);
       this.content.appendChild(el('div', { style: { marginTop: '18px', color: '#888', maxWidth: '560px', fontSize: '12px' }, text: 'Protect Document, Inspect Document, and Version History are part of Word but are not implemented in this clone (see docs/NOT_IMPLEMENTED.md).' }));
@@ -129,7 +129,7 @@
 
       const preview = el('div', { class: 'print-preview' });
       const sheet = el('div', { class: 'sheet' });
-      sheet.innerHTML = E().getHTML();
+      sheet.innerHTML = WC.PM.getHTML();
       preview.appendChild(sheet);
       wrap.appendChild(settings); wrap.appendChild(preview);
       this.content.appendChild(wrap);
@@ -164,7 +164,7 @@
     pane_options() {
       this.content.appendChild(el('h1', { text: 'Word Options' }));
       const list = el('div', { class: 'info-props' });
-      [['Theme', 'Colorful (M365 light)'], ['Default font', 'Calibri 11'], ['Page size', 'Letter'], ['Margins', 'Normal (1")'], ['Editor engine', 'contenteditable + custom command layer'], ['File round-trip', 'mammoth (import) / html-to-docx (export)']].forEach(([k, v]) =>
+      [['Theme', 'Colorful (M365 light)'], ['Default font', 'Calibri 11'], ['Page size', 'Letter'], ['Margins', 'Normal (1")'], ['Editor engine', 'ProseMirror'], ['File round-trip', 'SuperDoc fork super-converter']].forEach(([k, v]) =>
         list.appendChild(el('div', { class: 'row' }, [el('span', { class: 'k', style: { width: '160px' }, text: k }), el('span', { text: v })])));
       this.content.appendChild(list);
       this.content.appendChild(el('div', { style: { marginTop: '16px', color: '#888', fontSize: '12px', maxWidth: '560px' }, text: 'The full multi-tab Word Options dialog (Proofing, AutoCorrect, Advanced, Customize Ribbon, etc.) is not implemented.' }));
@@ -188,8 +188,8 @@
 
     async useTemplate(t) {
       if (!(await WC.Files.confirmDiscard())) return;
-      E().setHTML(t.content);
-      WC.Files.path = null; WC.Files.name = t.name; E().dirty = false; WC.Files.updateTitle();
+      if (!(await WC.PM.openHtml(t.content))) { WC.toast('Could not create document from template'); return; }
+      WC.Files.path = null; WC.Files.name = t.name; WC.Files.format = 'docx'; WC.Files.setClean(); WC.Files.updateTitle();
       this.close();
     },
 

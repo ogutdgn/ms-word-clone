@@ -1,0 +1,18 @@
+{
+  "slice": "11 — legacy retirement",
+  "task": "Task 5 — remove the legacy docx converter (html-to-docx/mammoth/docx-utils)",
+  "date": "2026-06-14",
+  "reference": "Word for Windows 16.0 (COM oracle, PID-safe)",
+  "question": "Is the PM fork super-converter still the faithful .docx path AFTER the legacy converter stack is deleted?",
+  "leg_A_pm_export_to_word": {
+    "verdict": "PASS",
+    "tool": "scripts/oracle/word-oracle-win.ps1 roundtrip",
+    "input": "C:/tmp/wc-rt-s3-table.docx (a fresh PM-converter export from the post-Task-5 build — GridTable4-Accent1 table fixture round-tripped through editor.exportDocx)",
+    "output": "C:/tmp/wc-slice11-resaved.docx",
+    "result": "ROUNDTRIP_OK (EXIT=0) — Word opened the PM-exported docx WITHOUT a repair prompt and resaved it cleanly",
+    "pid_safe": "only the freshly spawned WINWORD instance was driven + quit; the user's Word window was never touched"
+  },
+  "gate_corroboration": "test:roundtrip 27/0 (the PM converter exercised end-to-end on 4 real-Word fixtures) — unchanged by Task 5, which removed only the orthogonal legacy converter (the fork has zero references to html-to-docx/mammoth/docx-utils).",
+  "deps_note": "jszip KEPT (shared with the fork zipper/encryption). lodash promoted to an explicit dependency (it was a live fork importer previously satisfied only transitively via html-to-docx); resolves to the same version, no converter-output change.",
+  "conclusion": "Legacy docx converter removal is faithful: the SuperDoc-fork super-converter is the sole, Word-faithful .docx path. commit 21e46f6."
+}

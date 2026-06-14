@@ -7,6 +7,60 @@
 
 ---
 
+## 2026-06-14 — Slice 11 (legacy retirement) DONE: dual-world scaffolding retired — the PM engine is the ONLY editor (Phase 2 editing core COMPLETE)
+
+- **Branch:** `feature/phase-2-slice-11-legacy-retirement` (off `main` @ `18bd70b`); **PR pending** into `main`.
+- **Phase:** **Phase 2 — slice 11 DONE → Phase 2 editing core COMPLETE (all slices 0a–11) → Phase 3 (Logger) next.**
+  The strangler-fig migration finishes by removing the legacy host it grew around.
+- **State summary:** the dual-world scaffolding that ran since slice 0a is GONE — PM (ProseMirror/SuperDoc-fork)
+  is the single editor. **Net −4229 lines / 54 files.** REMOVED: the `--legacy` boot flag + `?legacy=1`
+  forwarding + `bridge/mode.ts`; the legacy contenteditable `WC.Editor` (`editor.js`) + the `#editor` DOM; the
+  leaf legacy engines `formatting.js`/`comments.js`/`table-tools.js`/`layout-tools.js`/`header-footer.js` + the
+  `review-tools.js` Track-Changes engine; the legacy docx converter (`html-to-docx`/`mammoth`/`src/main/docx-utils.js`
+  + the `copyDocxUtilsPlugin` vite step + the `doc:save`/`doc:saveAs` IPC + `wordAPI.save`/`saveAs`); the 3 frozen
+  legacy gates (`test:legacy`/`test:smoke:legacy`/`test:docx`) + `scripts/test-suite.js`/`test_docx.js`/
+  `export_ref.js`/`analyze_import.js`. COLLAPSED every dual-world `pm ? PM : legacy` branch to PM-only across
+  commands.js/dialogs.js/app.js/files.js/ribbon.js/backstage.js/mailings-tools.js/insert-features.js + the
+  conflict-keep files. **Migrated onto the `WC.PM` bridge** (the legacy editor secretly still owned these in PM):
+  zoom + view-mode (`setZoom`/`zoomIn`/`zoomOut`/`setView`, driving the `#pages` scale() transform the PM overlays
+  depend on), the styles catalog (`WC.Styles`→`WC.PM.allStyleNames`), the Office-Clipboard paste
+  (`WC.Clipboard.paste`→`pm.pasteHTMLString`), and the equation built-ins (→`pm.insertEquation`). **D6:** retired the
+  vestigial flip-tracking (`FLIPPED`/`isFlipped`); KEPT `isBlocked`/`notifyBlocked` rewritten against a static
+  `DEFERRED` set ({layout-page, layout-arrange, header-footer, text-effects}) as the **permanent Phase-7 deferral
+  gate**. KEPT (shared chrome, still classic `<script>` tags — the `window.WC`→TS/ESM migration is a DEFERRED future
+  slice): ribbon/commands/dialogs/util/icons/app/files/backstage/statusbar/00-netlog/table-tools-pm + the value/state
+  tables in design/draw/references/review/home-features. `jszip` kept; `lodash` promoted to an explicit dep (was
+  transitive via html-to-docx).
+- **Process discoveries (caught by the gates + leak audit, NOT the up-front critique):** 3 hidden conflicts —
+  `WC.Styles` (style catalog read by dialogs.js), the `WC.Editor` zoom/view ownership (deleting it aborted boot via
+  `StatusBar`→`E().zoom`), and the `lodash` transitive dep — plus **4 reachable `E()` leaks** (the equation dropdown
+  built-ins; the shapes / Excel-Spreadsheet / Draw-Table inserts) — all fixed (PM verb or honest toast). Final leak
+  audit: **zero reachable `E()`** (remaining E() only in `isBlocked`-gated deferred-area handlers — intentional
+  Phase-7 residue).
+- **Done this session (per-commit):** `8f882fe` plan · `481b50c` `[11]` guards · `4959334` flag/boot · `dfb0d9a`
+  leaf engines + WC.Styles reroute · `d01c3bf` WC.Editor delete + zoom/view migration · `21e46f6` converter removal ·
+  `7e4ea76` converter oracle · `e22c5a8` commands.js collapse · `17939a0` conflict-file prune · `735e144`+`87854d1`
+  dialogs/ribbon/backstage/mailings/app/files/preload collapse · `2f07560` D6 reframe · `c1e76d2`
+  insert-features/statusbar dead-arm collapse · `ccf790c` commands.js E() leak sweep · `1080d4f` single-world docs ·
+  `a065ae8` review-followup cleanup. Executed subagent-driven (fresh agent/task; coordinator review + leak audit +
+  gates after each; ultracode 7-mapper pre-verification + 3-critic plan critique + 2-reviewer whole-branch review).
+- **Gates (now THREE):** PM **326/326** (idle — flakes only under heavy concurrent load, a recorded deferral),
+  smoke **9/9**, roundtrip **27/0**. test:legacy/test:smoke:legacy/test:docx retired; test-suite.js archived in git
+  tag `legacy-suite-257-archive`.
+- **Oracle vs Word for Windows 16.0:** converter-removal **Leg A PASS** — `word-oracle-win.ps1 roundtrip` on a fresh
+  PM-exported docx → ROUNDTRIP_OK (no repair). The fork super-converter is the sole faithful .docx path.
+  `docs/superpowers/plans/notes/2026-06-14-slice11-converter-oracle.json`.
+- **Whole-branch review:** 2 adversarial reviewers (feature-preservation + leak/correctness), each ran the gates →
+  both **Ready to merge: Yes**, zero Critical/Important; only cosmetic minors (dead-line + stale `--legacy` comments
+  folded in `a065ae8`).
+- **Deferrals recorded (deferrals.md):** `window.WC`→TS/ESM migration (future slice); shapes / Excel-Spreadsheet /
+  Draw-Table / Dictate / sensitivity → honest toasts (were silently-broken-in-PM since slice 10); the 4 Phase-7
+  deferred areas stay honestly `isBlocked` (their commands.js handler bodies are dead Phase-7 stubs awaiting Phase 7);
+  Office-Clipboard pane opens but auto-capture is best-effort in PM.
+- **Next:** PR into `main` → **user approval** → merge (merge-commit) → delete branch → refresh the graph
+  (/graphify). Then **Phase 3 (Logger)**.
+- **Blockers/notes:** none. The user's Word window untouched (PID-safe oracle).
+
 ## 2026-06-13 — Slice 10 PR 4 (draw) DONE: Draw-tab ink FLIPPED to REAL exportable freeform shapes (oracle Leg A+B PASS)
 
 - **Branch:** `feature/phase-2-slice-10-draw` (off `main` after the insert-exotica merge); **PR pending** into `main`.

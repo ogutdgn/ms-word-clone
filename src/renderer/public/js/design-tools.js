@@ -1,10 +1,11 @@
-/* design-tools.js — Design tab: themes, colors, fonts, paragraph spacing,
-   style sets, watermark, page color, page borders. Theme = CSS variables. */
+/* design-tools.js — Design tab DATA TABLES (themes, colors, fonts, paragraph
+   spacing, style sets) + WC.setThemeColors. The legacy apply/snapshot/watermark
+   engine was retired in slice 11 (PM uses WC.PM.deApplyTheme/deApplyColors/…);
+   only the value tables + setThemeColors remain, read by commands.js + the
+   bridge (bridge/design.ts). */
 (function () {
   window.WC = window.WC || {};
   const WC = window.WC;
-  const el = WC.el;
-  const E = () => WC.Editor;
   const root = () => document.documentElement;
 
   // Themes — accent palettes/fonts/Text2 colors web-verified from Office theme
@@ -59,95 +60,8 @@
   ];
   const STYLE_SETS = ['Default', 'Basic (Simple)', 'Basic (Elegant)', 'Lines (Distinctive)', 'Shaded', 'Casual', 'Centered', 'Word 2010', 'Word 2013'];
 
-  const Design = {
-    THEMES, COLOR_SCHEMES, FONT_PAIRS, SPACING, STYLE_SETS,
-    // Capture/restore the document's look so the ribbon galleries can live-preview
-    // a choice on hover (like Word) and revert when the pointer leaves.
-    snapshot() {
-      const r = root().style; const ed = E().node;
-      return {
-        headingFont: r.getPropertyValue('--doc-heading-font'),
-        bodyFont: r.getPropertyValue('--doc-font'),
-        headingColor: r.getPropertyValue('--heading-color'),
-        wordBlue: r.getPropertyValue('--word-blue'),
-        accents: WC._themeAccents ? WC._themeAccents.slice() : null,
-        edClass: ed.className,
-        paraStyles: Array.from(ed.querySelectorAll('p, li')).map((p) => p.getAttribute('style') || ''),
-      };
-    },
-    restore(s) {
-      if (!s) return;
-      const r = root().style;
-      const set = (k, v) => { if (v) r.setProperty(k, v); else r.removeProperty(k); };
-      set('--doc-heading-font', s.headingFont); set('--doc-font', s.bodyFont);
-      set('--heading-color', s.headingColor);
-      // Always restore the accent state, INCLUDING the "no accents captured" case.
-      // If we skip it when s.accents is null, a previewed accent leaves --word-blue
-      // and WC._themeAccents stuck, which then poisons the next snapshot.
-      if (WC.setThemeColors) {
-        if (s.accents) WC.setThemeColors(s.accents);
-        else { WC._themeAccents = null; set('--word-blue', s.wordBlue); }
-      } else { set('--word-blue', s.wordBlue); }
-      E().node.className = s.edClass;
-      if (s.paraStyles) { const ps = E().node.querySelectorAll('p, li'); ps.forEach((p, i) => { const v = s.paraStyles[i]; if (v == null) return; if (v) p.setAttribute('style', v); else p.removeAttribute('style'); }); }
-    },
-    applyTheme(t, silent) {
-      root().style.setProperty('--doc-heading-font', t.heading);
-      root().style.setProperty('--doc-font', t.body);
-      root().style.setProperty('--heading-color', t.color);
-      if (WC.setThemeColors) WC.setThemeColors(t.accents);
-      if (silent) return;
-      WC.Ribbon.setComboValue && WC.Ribbon.setComboValue('font', first(t.body));
-      E().dirty = true; WC.toast('Theme “' + t.name + '” applied.');
-    },
-    applyColorScheme(s, silent) { if (WC.setThemeColors) WC.setThemeColors(s.accents); if (silent) return; E().dirty = true; WC.toast('Colors: ' + s.name); },
-    applyFontPairing(p, silent) {
-      root().style.setProperty('--doc-heading-font', p.heading);
-      root().style.setProperty('--doc-font', p.body);
-      if (silent) return;
-      WC.Ribbon.setComboValue && WC.Ribbon.setComboValue('font', first(p.body));
-      E().dirty = true; WC.toast('Fonts: ' + p.name);
-    },
-    applyParagraphSpacing(s, silent) {
-      const paras = E().node.querySelectorAll('p, li');
-      paras.forEach((p) => { p.style.marginTop = s.before + 'pt'; p.style.marginBottom = s.after + 'pt'; p.style.lineHeight = String(s.line); });
-      if (silent) return;
-      E().dirty = true; E().repaginate(); E().updateStatus(); WC.toast('Paragraph Spacing: ' + s.name);
-    },
-    applyStyleSet(name, silent) {
-      E().node.className = E().node.className.replace(/\bstyleset-[\w-]+\b/g, '').trim();
-      const cls = 'styleset-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      if (name !== 'Default') E().node.classList.add(cls);
-      if (silent) return;
-      E().dirty = true; WC.toast('Style Set: ' + name);
-    },
-    pageColor(color) { E().node.style.backgroundColor = color || ''; document.querySelectorAll('.page').forEach((p) => p.style.background = color || ''); E().dirty = true; },
-    pageBorders(opts) {
-      opts = opts || {};
-      let box = E().node.querySelector('.wc-page-border');
-      if (opts.remove) { if (box) box.remove(); E().dirty = true; return; }
-      if (!box) { box = el('div', { class: 'wc-page-border', contenteditable: 'false' }); E().node.appendChild(box); }
-      box.style.borderStyle = opts.style || 'solid';
-      box.style.borderWidth = (opts.width || 1) + 'px';
-      box.style.borderColor = opts.color || '#000000';
-      E().dirty = true;
-    },
-    watermark(text, opts) {
-      opts = opts || {};
-      this.removeWatermark();
-      if (!text) return;
-      const color = (opts.color || '#C8C8C8').replace('#', '%23');
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='816' height='1056'><text x='408' y='560' font-family='Calibri,Arial' font-size='80' fill='${color}' fill-opacity='0.5' text-anchor='middle' transform='rotate(${opts.diagonal === false ? 0 : -45} 408 560)'>${escapeXml(text)}</text></svg>`;
-      E().node.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-      E().node.style.backgroundRepeat = 'repeat-y';
-      E().node.style.backgroundPosition = 'center top';
-      E().dirty = true; WC.toast('Watermark: ' + text);
-    },
-    removeWatermark() { E().node.style.backgroundImage = ''; },
-    setAsDefault() { WC.toast('Current theme/spacing set as the default for new documents (session).'); },
-  };
-  function escapeXml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function first(chain) { return String(chain).split(',')[0].replace(/['"]/g, '').trim(); }
+  // Value tables only — read by commands.js (Design gallery menus) and the bridge.
+  const Design = { THEMES, COLOR_SCHEMES, FONT_PAIRS, SPACING, STYLE_SETS };
 
   // Re-map the color picker's theme row to a new accent set.
   WC.setThemeColors = function (accents) {

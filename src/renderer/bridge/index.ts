@@ -1,8 +1,8 @@
 // WC.PM — the bridge between the vanilla-JS Word chrome and the vendored
 // ProseMirror engine (spec §4/§5). Grafted onto the existing WC namespace;
 // NEVER reassign window.WC or window.WC.Editor (main.ts invariant).
-import { legacyBoot } from './mode'
 import { installCommands } from './commands'
+import { STYLE_NAME_TO_ID } from './style-names'
 import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
@@ -41,10 +41,12 @@ let replacing = false
 // would let Ctrl+S write a blank over the old file (spec §5.3 data loss).
 let lastImportBlanked = false
 
-// ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the flipped-area set. ----
+// ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the Phase-7 deferred set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
-// Keys = the §9.1 area names. Each slice's flip edits FLIPPED in source (auditable).
-const FLIPPED = new Set<string>(['character', 'history', 'paragraph', 'lists', 'styles', 'clipboard', 'editing-misc', 'find-replace', 'insert-basics', 'review', 'references', 'mail-merge', 'themes', 'insert-exotica', 'draw']) // slices 1-6 + 8-10
+// Single-world (slice 11+): all areas are permanently on the PM engine. The only
+// meaningful distinction is the Phase-7 DEFERRED areas (layout/header/text-effects)
+// whose engine support is pending pagination — isBlocked honestly blocks those.
+const DEFERRED = new Set<string>(['text-effects', 'layout-page', 'layout-arrange', 'header-footer']) // Phase-7-deferred areas (not yet on the PM engine)
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -74,7 +76,7 @@ const AREA: Record<string, string> = {
   blankPage: 'insert-basics', symbol: 'insert-basics', equation: 'insert-basics',
   horizontalLine: 'insert-basics', pictures: 'insert-basics',
   // Table Tools (Table Layout + Table Design contextual tabs, slice 6 Task 10) — mapped
-  // to insert-basics (FLIPPED) so the dispatch audit stays honest and they un-block.
+  // to insert-basics so the dispatch audit stays honest and they are not deferred.
   tblInsertAbove: 'insert-basics', tblInsertBelow: 'insert-basics', tblInsertLeft: 'insert-basics',
   tblInsertRight: 'insert-basics', tblDeleteRow: 'insert-basics', tblDeleteColumn: 'insert-basics',
   tblDeleteTable: 'insert-basics', tblMerge: 'insert-basics', tblSplitCell: 'insert-basics',
@@ -139,8 +141,7 @@ const AREA: Record<string, string> = {
   docInfo: 'header-footer', differentFirstPage: 'header-footer', differentOddEven: 'header-footer',
   showDocText: 'header-footer', dateAndTime: 'header-footer', linkToPrevious: 'header-footer',
 }
-function isFlipped(area: string) { return FLIPPED.has(area) }
-function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && !FLIPPED.has(a) }
+function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
 // SAFETY: validate + PARSE before any teardown — a corrupt file must leave the
@@ -255,7 +256,7 @@ function notifyBlocked(what: string) {
   if (now - lastToast < 1500) return // throttle: leaf-closure paths can fire bursts
   lastToast = now
   const w = window as any
-  w.WC?.toast?.("This action isn't on the new engine yet", what + ' — run with --legacy for the classic editor')
+  w.WC?.toast?.("This action isn't available on the new engine yet", what)
 }
 
 // Synchronous, pre-mount (spec §4.2): the D6 guards consult WC.PM.active before
@@ -264,12 +265,11 @@ export function preinstallBridge() {
   const w = window as any
   w.WC = w.WC || {}
   w.WC.PM = {
-    active: !legacyBoot,
+    active: true,
     ready: false,
     notifyBlocked,
     isBlocked,   // D6 §7.1a — consulted by the WC.Commands dispatch heads (Task 4B)
-    isFlipped,
-    AREA, FLIPPED, // exposed for tests/audit
+    AREA, DEFERRED, // exposed for tests/audit
     cmd: () => false,
     chain: () => false,
     getState: () => null,
@@ -374,8 +374,35 @@ export function preinstallBridge() {
     dInsertInk: () => false, dInsertCanvas: () => false, dSetDrawing: () => false, dIsDrawing: () => false,
     dSetEraser: () => false, dSetSelect: () => false, dSetLasso: () => false, dSetPen: () => false,
     dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
+    // slice 11: WC.Styles (formatting.js) is retired — expose the canonical PM style list here.
+    allStyleNames: (): string[] => Object.keys(STYLE_NAME_TO_ID),
+    // slice 11: zoom + view ownership migrated off the retired WC.Editor. The
+    // #pages host carries the scale() transform; the content node is #pm-editor.
+    // Lives in the preinstall stub (DOM-driven) so it works pre- and post-mount.
+    zoom: 1,
+    view: 'print',
+    pageH: 1056,
+    setZoom(z: number) {
+      const ww = window as any
+      const pages = document.getElementById('pages'); if (!pages) return
+      const zoom = Math.max(0.1, Math.min(5, z))
+      ww.WC.PM.zoom = zoom
+      pages.style.transform = `scale(${zoom})`
+      const content = document.getElementById('pm-editor') || pages
+      pages.style.marginBottom = (zoom < 1 ? 0 : ((content as HTMLElement).scrollHeight * (zoom - 1))) + 'px'
+      if (ww.WC?.StatusBar?.updateZoom) ww.WC.StatusBar.updateZoom()
+    },
+    zoomIn() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom + 0.1) * 10) / 10) },
+    zoomOut() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom - 0.1) * 10) / 10) },
+    zoomReset() { (window as any).WC.PM.setZoom(1) },
+    setView(v: string) {
+      ;(window as any).WC.PM.view = v
+      const wa = document.getElementById('workarea'); if (!wa) return
+      wa.classList.remove('view-print', 'view-web', 'view-read', 'view-outline', 'view-draft')
+      wa.classList.add('view-' + v)
+    },
   }
-  if (!legacyBoot) document.body.classList.add('pm-active')
+  document.body.classList.add('pm-active')
 }
 
 // Re-entrant by design: replaceEditor (slice 0b) re-runs this on Open/New —
@@ -384,7 +411,6 @@ export function installBridge(editor: AnyEditor) {
   const w = window as any
   current = editor
   const PM = w.WC.PM
-  if (legacyBoot) { PM.ready = true; return PM } // §4.3-3: passive under --legacy — zero listeners
   if (!painterEscInstalled) {
     painterEscInstalled = true
     // slice 4: Esc cancels an armed format painter (Word). Capture-phase so the PM
@@ -572,16 +598,13 @@ export function installBridge(editor: AnyEditor) {
     }
   }
   installStateSync(editor)
-  // slice 8 task 4: comments cards/composer/pane chrome. AFTER the legacyBoot
-  // early-return above, so the UI module never runs (and its DOM never exists)
-  // under --legacy (D8.3 PM-only constraint).
+  // slice 8 task 4: comments cards/composer/pane chrome (D8.3 PM-only constraint).
   installCommentsUI(editor)
   // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
-  // Revisions pane). Same PM-only-by-construction placement as comments-ui.
+  // Revisions pane).
   installTrackChrome(editor)
   // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
-  // page sheet). Same PM-only-by-construction placement — its DOM never exists under
-  // --legacy (this runs AFTER the legacyBoot early-return above).
+  // page sheet).
   installNotesArea(editor)
   installFocusGuards()
   PM.ready = true
@@ -622,11 +645,9 @@ function lcsOps(a: string[], b: string[]): Array<{ type: 'eq' | 'del' | 'ins'; t
 
 // Mount failure (spec §7.2): un-flip BEFORE toasting — never a blank page.
 export function failBridge(err: unknown) {
+  console.error('[wc] PM bridge mount failed', err)
   const w = window as any
   document.body.classList.remove('pm-active')
   if (w.WC?.PM) w.WC.PM.active = false
-  w.WC?.toast?.('New engine failed to start — using the classic editor', String((err as any)?.message || err))
-  // May run pre-DOMContentLoaded (sync mount failure): WC.Editor.node is null
-  // until init() — never let the fallback itself throw and kill __WC_READY.
-  try { if (w.WC?.Editor?.node) w.WC.Editor.focus() } catch { /* fallback must never throw */ }
+  try { w.WC?.toast?.('Editor failed to load — please restart the app.') } catch { /* toast must never throw */ }
 }

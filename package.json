@@ -11,11 +11,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite dev",
-    "test:legacy": "electron . --legacy --probe-out=/tmp/wc-legacy.json --shot-evalfile=scripts/test-suite.js --shot-delay=800",
     "test:pm": "electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js",
     "test:smoke": "electron . --probe-out=/tmp/wc-smoke.json --shot-evalfile=scripts/smoke-pm.js",
-    "test:smoke:legacy": "electron . --legacy --probe-out=/tmp/wc-smoke-legacy.json --shot-evalfile=scripts/smoke-pm.js",
-    "test:docx": "node scripts/test_docx.js",
     "test:roundtrip": "node scripts/test-roundtrip-pm.js"
   },
   "dependencies": {
@@ -23,9 +20,8 @@
     "color2k": "^2.0.3",
     "dompurify": "^3.4.7",
     "he": "^1.2.0",
-    "html-to-docx": "^1.8.0",
     "jszip": "^3.10.1",
-    "mammoth": "^1.8.0",
+    "lodash": "^4.17.21",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-dropcursor": "^1.8.2",
     "prosemirror-gapcursor": "^1.4.1",
