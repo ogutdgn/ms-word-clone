@@ -276,6 +276,10 @@
 .styles-more { display: flex; flex-direction: column; margin-left: 2px; }
 .styles-more button { width: 18px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--btn-border); border-radius: 2px; font-size: 8px; }
 .styles-more button:hover { background: var(--btn-hover); }
+/* Expanded Quick Styles gallery (the "More" flyout) — Word's full grid + commands. */
+.flyout.styles-flyout { padding: 6px; min-width: 0; }
+.styles-flyout .styles-grid-expanded { display: grid; grid-template-columns: repeat(4, 86px); gap: 3px; margin-bottom: 2px; }
+.styles-flyout .style-cell { width: 86px; height: 34px; }
 
 /* Ribbon display options + collapse chevron at far right of ribbon body */
 .ribbon-collapse {

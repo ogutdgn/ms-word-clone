@@ -282,30 +282,57 @@
     renderStylesGallery(c) {
       const wrap = el('div', { class: 'styles-gallery' });
       const grid = el('div', { class: 'styles-grid' });
-      const styles = (c.items || []).filter((s) => !/^(Create a Style|Clear Formatting|Apply Styles)/i.test(s));
+      // Word's Quick Styles order, filtered to the LIVE catalog (WC.PM.allStyleNames)
+      // so a cell never renders a style that can't apply — decoupled from ribbon-data.
+      const ORDER = ['Normal', 'No Spacing', 'Heading 1', 'Heading 2', 'Heading 3', 'Title', 'Subtitle', 'Subtle Emphasis', 'Emphasis', 'Intense Emphasis', 'Strong', 'Quote', 'Intense Quote', 'Subtle Reference', 'Intense Reference', 'Book Title', 'List Paragraph'];
+      const catalog = (WC.PM && WC.PM.allStyleNames) ? WC.PM.allStyleNames() : null;
+      const styles = catalog ? ORDER.filter((s) => catalog.indexOf(s) >= 0)
+        : (c.items || []).filter((s) => !/^(Create a Style|Clear Formatting|Apply Styles)/i.test(s));
       const preview = {
-        'Normal': 'font:11pt Aptos,Calibri', 'No Spacing': 'font:11pt Aptos,Calibri', 'Heading 1': 'color:#0E2841;font:13pt Aptos,Calibri',
-        'Heading 2': 'color:#0E2841;font:12pt Aptos,Calibri', 'Title': 'font:15pt Aptos,Calibri', 'Subtitle': 'color:#595959',
-        'Strong': 'font-weight:bold', 'Emphasis': 'font-style:italic', 'Quote': 'font-style:italic;color:#595959',
+        'Normal': 'font:11pt Aptos,Calibri', 'No Spacing': 'font:11pt Aptos,Calibri',
+        'Heading 1': 'color:#0E2841;font:13pt Aptos,Calibri', 'Heading 2': 'color:#0E2841;font:12pt Aptos,Calibri',
+        'Heading 3': 'color:#0E2841;font:11.5pt Aptos,Calibri', 'Title': 'font:18pt Aptos,Calibri',
+        'Subtitle': 'color:#595959;font-style:italic',
+        'Strong': 'font-weight:bold', 'Emphasis': 'font-style:italic', 'Subtle Emphasis': 'font-style:italic;color:#595959',
+        'Intense Emphasis': 'font-style:italic;font-weight:bold;color:#0E2841',
+        'Quote': 'font-style:italic;color:#595959', 'Intense Quote': 'font-style:italic;font-weight:bold;color:#0E2841',
+        'Subtle Reference': 'text-transform:uppercase;letter-spacing:.4px;color:#595959',
+        'Intense Reference': 'text-transform:uppercase;letter-spacing:.4px;font-weight:bold;color:#0E2841',
+        'Book Title': 'font-weight:bold;font-style:italic', 'List Paragraph': 'font:11pt Aptos,Calibri',
       };
-      styles.forEach((s) => {
-        const cell = el('div', { class: 'style-cell', title: s, dataset: { style: s } });
-        cell.setAttribute('style', (preview[s] || '') + ';');
-        cell.appendChild(el('span', { text: s.replace(/^Heading /, 'Heading ') }));
-        cell.addEventListener('mousedown', (e) => e.preventDefault());
-        // Live preview: apply the style to the current selection on hover, revert on leave.
-        cell.addEventListener('mouseenter', () => stylePreviewEnter(s));
-        cell.addEventListener('mouseleave', () => stylePreviewLeave());
-        cell.addEventListener('click', () => { stylePreviewCommit(); WC.Commands.applyStyle(s); });
-        grid.appendChild(cell);
-      });
+      const cell = (s) => {
+        const node = el('div', { class: 'style-cell', title: s, dataset: { style: s } });
+        node.setAttribute('style', (preview[s] || '') + ';');
+        node.appendChild(el('span', { text: s }));
+        node.addEventListener('mousedown', (e) => e.preventDefault());
+        // Live preview is a no-op in PM (click-only, locked 2026-06-11); kept for opt-in.
+        node.addEventListener('mouseenter', () => stylePreviewEnter(s));
+        node.addEventListener('mouseleave', () => stylePreviewLeave());
+        node.addEventListener('click', () => { stylePreviewCommit(); WC.Commands.applyStyle(s); if (WC.closeFlyouts) WC.closeFlyouts(); });
+        return node;
+      };
+      styles.forEach((s) => grid.appendChild(cell(s)));
       wrap.appendChild(grid);
       const more = el('div', { class: 'styles-more' });
-      const up = el('button', { html: '▲' }); const down = el('button', { html: '▼' });
-      const all = el('button', { html: WC.icon('chevron_down', 8), title: 'More styles' });
+      const up = el('button', { html: '▲', title: 'Row up' }); const down = el('button', { html: '▼', title: 'Row down' });
+      const all = el('button', { html: WC.icon('chevron_down', 8), title: 'More' });
       up.addEventListener('click', () => { grid.scrollLeft -= 70; });
       down.addEventListener('click', () => { grid.scrollLeft += 70; });
-      all.addEventListener('click', () => WC.Dialogs.stylesPane());
+      // Word's "More" opens the EXPANDED Quick Styles gallery (the full grid + the
+      // gallery commands) — NOT the Styles task pane (that's the dialog-launcher chevron).
+      all.addEventListener('click', () => {
+        WC.flyout(all, (fly) => {
+          fly.classList.add('styles-flyout');
+          const fg = el('div', { class: 'styles-grid-expanded' });
+          const active = (WC.PM && WC.PM.getState) ? (WC.PM.getState().block || '') : '';
+          styles.forEach((s) => { const ec = cell(s); if (s === active) ec.classList.add('active'); fg.appendChild(ec); });
+          fly.appendChild(fg);
+          fly.appendChild(WC.flySep());
+          fly.appendChild(WC.flyItem('Create a Style…', { icon: 'stylesGallery', onClick: () => WC.notImplemented('Create a Style (custom style authoring)') }));
+          fly.appendChild(WC.flyItem('Clear Formatting', { icon: 'clearAllFormatting', onClick: () => WC.Commands.run({ cmd: 'clearAllFormatting' }) }));
+          fly.appendChild(WC.flyItem('Apply Styles…', { icon: 'styles', onClick: () => WC.Dialogs.applyStyles() }));
+        }, { align: 'right' });
+      });
       more.appendChild(up); more.appendChild(down); more.appendChild(all);
       wrap.appendChild(more);
       return wrap;

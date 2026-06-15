@@ -68,14 +68,31 @@ evaluator + per-control rule registry), generalized from `bridge/state-sync.ts`.
 | **Ribbon** | Responsive ribbon — Stage B (full group→flyout collapse, per-tab reduction order) | 🕗 Deferred (next slice) | heaviest; needs breakpoint calibration across 212 controls |
 | Font | Font-dialog launcher cmd collision cleanup | 🕗 Deferred | works today via group-id keying; bundle into a ribbon-data cleanup |
 | Font | Dark theme | ⛔ Out of scope | clone is light-theme; the dark screenshot was the user's real Word as a reference |
-| Paragraph | _tbd_ | | |
-| Paragraph | _tbd_ | | |
-| Styles | _tbd_ | | |
 | Editing | _tbd_ | | |
 | Adobe Acrobat | (whole section) | ⛔ Out of scope | third-party plugin (proposed — confirm at kickoff) |
 | Voice / Dictate | (whole section) | ⛔ Out of scope | cloud speech (deferrals.md §B) (proposed) |
 | Editor | (whole section) | ⛔ Out of scope | cloud grammar (deferrals.md §B) (proposed) |
 | Add-ins | (whole section) | ⛔ Out of scope | Office.js marketplace (proposed) |
+
+**Styles** — scope locked 2026-06-15 (section kickoff; verified vs real Word via computer use + a
+catalog probe). Not layout-coupled. The gallery already applies styles, highlights the active style
+(caret-driven), and the Styles Pane + Apply Styles dialogs exist; the kickoff hardens contents/order +
+the "More" behavior to match real Word.
+
+| Section | Feature | Status | Note |
+|---|---|---|---|
+| Styles | Quick Styles gallery: contents + Word order | ✅ In scope | gallery list **decoupled from ribbon-data** → canonical Word order filtered by the live catalog (`WC.PM.allStyleNames()`) so a cell never renders a non-applicable style |
+| Styles | Add **Intense Reference** to the catalog + gallery | ✅ In scope | the base fixture's `styles.xml` defines `IntenseReference` (probe-verified); wired in `STYLE_NAME_TO_ID` |
+| Styles | Gallery cell click applies (selection → linked char style; caret → paragraph) | ✅ In scope (works) | slice-3 behavior; click-only (no hover preview, locked 2026-06-11) |
+| Styles | Active-style highlight tracks the caret | ✅ In scope (works) | `state-sync.ts` toggles `.style-cell.active` from `st.block` |
+| Styles | **"More" expander → expanded gallery grid** (not the pane) | ✅ In scope | THE behavioral gap: real Word's More opens the full quick-style grid + Clear Formatting / Create a Style / Apply Styles…; the clone jumped to the pane |
+| Styles | Expanded gallery commands: Clear Formatting, Apply Styles…, Create a Style | ✅ In scope | Clear Formatting + Apply Styles… functional; **Create a Style** = honest stub (custom-style authoring deferred) |
+| Styles | Preview fidelity (cells render in their style) | ✅ In scope | extend the preview-CSS map to emphasis/quote/reference styles |
+| Styles | Styles Pane (dialog launcher) + Apply Styles (Ctrl+Shift+S) | ✅ In scope (works) | task pane lists `allStyleNames()`; verify |
+| Styles | **Subtle Reference / Book Title** quick styles | 🕗 Deferred | not in the base fixture's `styles.xml` (probe-verified); needs a fixture regen to apply/render — low-usage, deferred |
+| Styles | New Style / Manage Styles / Style Inspector (custom-style authoring) | ⛔ Out of scope | class-B; custom paragraph/char style creation is a large subsystem (honest stub toasts) |
+| Styles | Save Selection as a New Quick Style | ⛔ Out of scope | depends on custom-style authoring |
+| Styles | "AaBbCcDdEe" Mac-style cell sample | ⛔ Out of scope | clone uses Windows-parity name-in-style cells (CLAUDE.md parity reference = Word for Windows 16.0) |
 
 ## Insert
 _TBD._

@@ -19,6 +19,9 @@ export const STYLE_NAME_TO_ID: Record<string, string> = {
   'Emphasis': 'Emphasis',
   'Subtle Emphasis': 'SubtleEmphasis',
   'Intense Emphasis': 'IntenseEmphasis',
+  // Intense Reference is defined in the base fixture's styles.xml (probe-verified);
+  // Subtle Reference / Book Title are NOT (would need a fixture regen — deferred).
+  'Intense Reference': 'IntenseReference',
 }
 export const STYLE_ID_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.entries(STYLE_NAME_TO_ID).map(([name, id]) => [id, name]),

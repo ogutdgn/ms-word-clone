@@ -877,6 +877,31 @@
     PM().cmd('undo'); await sleep(50);
     return applied && paraAttrs('commit').paragraphProperties?.styleId == null;
   });
+  await t('[home] Quick Styles gallery uses Word order + live catalog (Intense Reference in; Subtle Reference / Book Title out)', () => {
+    const cells = Array.from(document.querySelectorAll('.styles-gallery .styles-grid .style-cell')).map((c) => c.dataset.style);
+    const expected = ['Normal', 'No Spacing', 'Heading 1', 'Heading 2', 'Heading 3', 'Title', 'Subtitle', 'Subtle Emphasis', 'Emphasis', 'Intense Emphasis', 'Strong', 'Quote', 'Intense Quote', 'Intense Reference', 'List Paragraph'];
+    const orderOk = cells.join('|') === expected.join('|');
+    const noUnsupported = cells.indexOf('Subtle Reference') < 0 && cells.indexOf('Book Title') < 0;
+    return orderOk && noUnsupported;
+  });
+  await t('[home] Intense Reference applies as a character style (run mark, paragraph styleId untouched)', async () => {
+    setDoc('irefcell probe'); selectText('irefcell probe');
+    cellFor('Intense Reference').click(); await sleep(60);
+    const m = markNames('irefcell');
+    const hasIRef = m.some((x) => /IntenseReference/.test(x));
+    const paraUnstyled = paraAttrs('irefcell').paragraphProperties?.styleId == null;
+    return hasIRef && paraUnstyled;
+  });
+  await t('[home] Styles "More" opens the expanded gallery flyout (not the pane) with gallery commands', () => {
+    const moreBtn = document.querySelector('.styles-gallery .styles-more button:last-child');
+    moreBtn.click();
+    const fly = document.querySelector('.flyout.styles-flyout');
+    const cells = fly ? fly.querySelectorAll('.style-cell').length : 0;
+    const cmds = fly ? Array.from(fly.querySelectorAll('.fly-item .fi-label')).map((l) => l.textContent) : [];
+    const ok = !!fly && cells >= 15 && cmds.indexOf('Clear Formatting') >= 0 && cmds.indexOf('Apply Styles…') >= 0 && cmds.indexOf('Create a Style…') >= 0;
+    window.WC.closeFlyouts();
+    return ok;
+  });
   await t('[fix] no selection: clicking a style restyles ONLY the caret paragraph', async () => {
     // User spec: caret in a paragraph, no selection → click restyles that
     // paragraph (the "current line"), never the whole document.
