@@ -7,6 +7,21 @@
 
 ---
 
+## 2026-06-15 (Phase 3 — Home/Paragraph section + Text Effects rebuild started)
+
+- **Branch:** `fix/ribbon-home`. **Phase:** Phase 3 Home tab — Paragraph section DONE; Font "Text Effects" rebuild IN PROGRESS.
+- **Paragraph section DONE** (`19a3f4e`; kickoff via `paragraph-section-understand` workflow → scope locked):
+  - **Two-row arrangement** (`renderParagraphGroupBody`, mirrors Font): row1 lists/indents/sort/show-hide, row2 alignment/spacing/shading/borders. Shared `.para-grid` CSS.
+  - **Mixed-selection alignment** (user-locked in scope): `toQueryState` now intersects justification across all selected paragraphs → presses NONE when mixed (Word parity); collapsed/uniform presses the one match.
+  - **Decrease-Indent enablement**: greys at zero indent unless in a list (`st.inList` + rule).
+  - **Show/Hide ¶ latch**: moved into the state machine (`st.formattingMarks` from the #pm-editor class; `H.showHide` flips the class + nudges sync; rule owns the latch).
+  - **Sort**: dropped the un-Word "select multiple paragraphs" toast (silent no-op on <2 paras).
+  - Alignment + list latches KEPT on the legacy TOGGLE_MAP path (avoid two writers of 'toggled'). All 14 Paragraph controls already worked; not layout-coupled. +4 tests.
+  - **Deferred (Phase-4 / next slice):** per-glyph formatting marks (only ¶ renders) + Paragraph dialog "Line & Page Breaks" tab (both layout-coupled → deferrals.md A.1); dropdown menu completeness.
+- **Broken Font button IDENTIFIED = "Text Effects & Typography"** (`textEffectsAndTypography`): every flyout action called the retired `E()=WC.Editor.applyInlineStyles` → live TypeError crash. **User locked: fix it FULLY (MS-Word-faithful + docx-exportable).** Research workflow (`text-effects-research`) running to map fork w14/OpenType support before building.
+- **Gates:** PM **348/349** (1 = Windows-only `[10mm]` fixture skip), smoke **9/9**, roundtrip **27/0**.
+- **Next:** build Text Effects (w14 outline/glow/shadow/reflection + OpenType ligatures/number-styles/stylistic-sets) per the research plan, with oracle docx round-trip; then Home tab PR.
+
 ## 2026-06-15 (Phase 3 — Home/Font eyeball bug fixes) — 3 user-found Font bugs fixed
 
 - **Branch:** `fix/ribbon-home` (continues). **Phase:** Phase 3 Home tab — Font section eyeball loop.
