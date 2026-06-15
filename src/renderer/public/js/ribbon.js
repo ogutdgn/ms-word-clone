@@ -284,9 +284,51 @@
       return wrap;
     },
 
+    // Shared in-ribbon gallery carousel (Word's Quick Styles / Themes chrome):
+    //   ‹ prev ›   …visible tiles in a clipped, horizontally-paged viewport…   › next
+    //   plus a centered ▾ "More" chevron that opens the full expanded grid.
+    // Pages by the viewport's visible width (snapped to whole tiles), and DISABLES
+    // the prev arrow on the first page / the next arrow on the last page (Word parity).
+    makeGalleryCarousel(cellEls, opts) {
+      opts = opts || {};
+      const wrap = el('div', { class: 'rgallery' + (opts.className ? ' ' + opts.className : '') });
+      const prev = el('button', { class: 'rgallery-nav prev', html: '‹', title: 'Previous row' });
+      const next = el('button', { class: 'rgallery-nav next', html: '›', title: 'Next row' });
+      const viewport = el('div', { class: 'rgallery-viewport' });
+      const track = el('div', { class: 'rgallery-track' });
+      cellEls.forEach((c) => track.appendChild(c));
+      viewport.appendChild(track);
+      const more = el('button', { class: 'rgallery-more', html: WC.icon('chevron_down', 8), title: 'More' });
+      [prev, viewport, next, more].forEach((n) => wrap.appendChild(n));
+      const tileStep = () => {
+        const f = track.firstElementChild;
+        if (!f) return 60;
+        const cs = getComputedStyle(track);
+        const gap = parseFloat(cs.columnGap || cs.gap || '0') || 0;
+        return f.getBoundingClientRect().width + gap;
+      };
+      const pageDelta = () => {
+        const step = tileStep();
+        return Math.max(step, Math.floor(viewport.clientWidth / step) * step);
+      };
+      const update = () => {
+        const max = viewport.scrollWidth - viewport.clientWidth;
+        prev.disabled = viewport.scrollLeft <= 1;
+        next.disabled = viewport.scrollLeft >= max - 1 || max <= 0;
+      };
+      prev.addEventListener('mousedown', (e) => e.preventDefault());
+      next.addEventListener('mousedown', (e) => e.preventDefault());
+      prev.addEventListener('click', () => { viewport.scrollBy({ left: -pageDelta(), behavior: 'smooth' }); });
+      next.addEventListener('click', () => { viewport.scrollBy({ left: pageDelta(), behavior: 'smooth' }); });
+      viewport.addEventListener('scroll', update);
+      more.addEventListener('mousedown', (e) => e.preventDefault());
+      more.addEventListener('click', () => opts.onMore && opts.onMore(more));
+      requestAnimationFrame(update);
+      if (window.ResizeObserver) { try { new ResizeObserver(update).observe(viewport); } catch (_) {} }
+      return wrap;
+    },
+
     renderStylesGallery(c) {
-      const wrap = el('div', { class: 'styles-gallery' });
-      const grid = el('div', { class: 'styles-grid' });
       // Word's Quick Styles order, filtered to the LIVE catalog (WC.PM.allStyleNames)
       // so a cell never renders a style that can't apply — decoupled from ribbon-data.
       const ORDER = ['Normal', 'No Spacing', 'Heading 1', 'Heading 2', 'Heading 3', 'Title', 'Subtitle', 'Subtle Emphasis', 'Emphasis', 'Intense Emphasis', 'Strong', 'Quote', 'Intense Quote', 'Subtle Reference', 'Intense Reference', 'Book Title', 'List Paragraph'];
@@ -307,8 +349,10 @@
       };
       const cell = (s) => {
         const node = el('div', { class: 'style-cell', title: s, dataset: { style: s } });
-        node.setAttribute('style', (preview[s] || '') + ';');
-        node.appendChild(el('span', { text: s }));
+        const pv = el('span', { class: 'sc-preview', text: 'AaBbCcDdEe' });
+        pv.setAttribute('style', (preview[s] || '') + ';');
+        node.appendChild(pv);
+        node.appendChild(el('span', { class: 'sc-name', text: s }));
         node.addEventListener('mousedown', (e) => e.preventDefault());
         // Live preview is a no-op in PM (click-only, locked 2026-06-11); kept for opt-in.
         node.addEventListener('mouseenter', () => stylePreviewEnter(s));
@@ -316,17 +360,8 @@
         node.addEventListener('click', () => { stylePreviewCommit(); WC.Commands.applyStyle(s); if (WC.closeFlyouts) WC.closeFlyouts(); });
         return node;
       };
-      styles.forEach((s) => grid.appendChild(cell(s)));
-      wrap.appendChild(grid);
-      const more = el('div', { class: 'styles-more' });
-      const up = el('button', { html: '▲', title: 'Row up' }); const down = el('button', { html: '▼', title: 'Row down' });
-      const all = el('button', { html: WC.icon('chevron_down', 8), title: 'More' });
-      up.addEventListener('click', () => { grid.scrollLeft -= 70; });
-      down.addEventListener('click', () => { grid.scrollLeft += 70; });
-      // Word's "More" opens the EXPANDED Quick Styles gallery (the full grid + the
-      // gallery commands) — NOT the Styles task pane (that's the dialog-launcher chevron).
-      all.addEventListener('click', () => {
-        WC.flyout(all, (fly) => {
+      const openMore = (anchor) => {
+        WC.flyout(anchor, (fly) => {
           fly.classList.add('styles-flyout');
           const fg = el('div', { class: 'styles-grid-expanded' });
           const active = (WC.PM && WC.PM.getState) ? (WC.PM.getState().block || '') : '';
@@ -337,10 +372,8 @@
           fly.appendChild(WC.flyItem('Clear Formatting', { icon: 'clearAllFormatting', onClick: () => WC.Commands.run({ cmd: 'clearAllFormatting' }) }));
           fly.appendChild(WC.flyItem('Apply Styles…', { icon: 'styles', onClick: () => WC.Dialogs.applyStyles() }));
         }, { align: 'right' });
-      });
-      more.appendChild(up); more.appendChild(down); more.appendChild(all);
-      wrap.appendChild(more);
-      return wrap;
+      };
+      return this.makeGalleryCarousel(styles.map(cell), { className: 'styles-gallery', onMore: openMore });
     },
 
     renderSpinner(c) {

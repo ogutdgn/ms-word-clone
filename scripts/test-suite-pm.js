@@ -941,7 +941,7 @@
     return applied && paraAttrs('commit').paragraphProperties?.styleId == null;
   });
   await t('[home] Quick Styles gallery uses Word order + live catalog (Intense Reference in; Subtle Reference / Book Title out)', () => {
-    const cells = Array.from(document.querySelectorAll('.styles-gallery .styles-grid .style-cell')).map((c) => c.dataset.style);
+    const cells = Array.from(document.querySelectorAll('.styles-gallery .rgallery-track .style-cell')).map((c) => c.dataset.style);
     const expected = ['Normal', 'No Spacing', 'Heading 1', 'Heading 2', 'Heading 3', 'Title', 'Subtitle', 'Subtle Emphasis', 'Emphasis', 'Intense Emphasis', 'Strong', 'Quote', 'Intense Quote', 'Intense Reference', 'List Paragraph'];
     const orderOk = cells.join('|') === expected.join('|');
     const noUnsupported = cells.indexOf('Subtle Reference') < 0 && cells.indexOf('Book Title') < 0;
@@ -955,8 +955,25 @@
     const paraUnstyled = paraAttrs('irefcell').paragraphProperties?.styleId == null;
     return hasIRef && paraUnstyled;
   });
+  await t('[home] Quick Styles carousel: ‹/› page the viewport, arrows disable at first/last page', async () => {
+    const gal = document.querySelector('.styles-gallery.rgallery');
+    const prev = gal && gal.querySelector('.rgallery-nav.prev');
+    const next = gal && gal.querySelector('.rgallery-nav.next');
+    const vp = gal && gal.querySelector('.rgallery-viewport');
+    if (!gal || !prev || !next || !vp) return 'carousel parts missing';
+    vp.scrollLeft = 0; vp.dispatchEvent(new Event('scroll')); await sleep(30);
+    if (vp.scrollWidth <= vp.clientWidth + 1) return 'viewport not overflowing (cannot test paging)';
+    const prevOffAtStart = prev.disabled === true;
+    const nextOnAtStart = next.disabled === false;
+    vp.scrollLeft = vp.scrollWidth; vp.dispatchEvent(new Event('scroll')); await sleep(30);
+    const nextOffAtEnd = next.disabled === true;
+    const prevOnAtEnd = prev.disabled === false;
+    vp.scrollLeft = 0; vp.dispatchEvent(new Event('scroll'));
+    return (prevOffAtStart && nextOnAtStart && nextOffAtEnd && prevOnAtEnd)
+      || ('prev@0=' + prevOffAtStart + ' next@0=' + nextOnAtStart + ' next@end=' + nextOffAtEnd + ' prev@end=' + prevOnAtEnd);
+  });
   await t('[home] Styles "More" opens the expanded gallery flyout (not the pane) with gallery commands', () => {
-    const moreBtn = document.querySelector('.styles-gallery .styles-more button:last-child');
+    const moreBtn = document.querySelector('.styles-gallery .rgallery-more');
     moreBtn.click();
     const fly = document.querySelector('.flyout.styles-flyout');
     const cells = fly ? fly.querySelectorAll('.style-cell').length : 0;
