@@ -46,8 +46,46 @@
       this.renderTabStrip();
       this.renderBody();
       this.activate(WC.RIBBON[0].id);
+      this.installResponsive();
       // WC.Editor retired (slice 11): in PM mode the bridge's state-sync drives
       // syncToggles via the fork engine; there is no legacy onStateChange to bind.
+    },
+
+    // Phase 3 responsive ribbon (Stage A): when the active tab's groups overflow
+    // the window width, progressively condense them (tighten spacing → hide large
+    // labels → shrink large buttons to small icons) instead of clipping behind a
+    // horizontal scrollbar. Cross-cutting — works for every tab.
+    installResponsive() {
+      const relayout = () => this.relayoutRibbon();
+      if (typeof ResizeObserver === 'function') {
+        // Observe #ribbon (full window width). Our condense-class changes alter
+        // CHILD sizes, not #ribbon's own box, so they never re-fire the observer
+        // (no measure→mutate→refire feedback loop). rAF-coalesced.
+        let scheduled = false;
+        const ro = new ResizeObserver(() => {
+          if (scheduled) return;
+          scheduled = true;
+          requestAnimationFrame(() => { scheduled = false; relayout(); });
+        });
+        ro.observe(this.body);
+      } else {
+        window.addEventListener('resize', relayout);
+      }
+      relayout();
+    },
+
+    relayoutRibbon() {
+      const panel = this.body && this.body.querySelector('.ribbon-panel.active');
+      if (!panel) return;
+      const scroll = panel.querySelector('.ribbon-scroll');
+      if (!scroll) return;
+      const LEVELS = ['condense-1', 'condense-2', 'condense-3'];
+      LEVELS.forEach((c) => panel.classList.remove(c));
+      // Escalate until the groups fit (or levels run out). Reading scrollWidth
+      // after each add forces a reflow so the next comparison is fresh.
+      for (let i = 0; i < LEVELS.length && scroll.scrollWidth > scroll.clientWidth + 1; i++) {
+        panel.classList.add(LEVELS[i]);
+      }
     },
 
     renderTabStrip() {
@@ -310,6 +348,7 @@
       this.tabstrip.querySelectorAll('.ribbon-tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tabId));
       this.body.querySelectorAll('.ribbon-panel').forEach((p) => p.classList.toggle('active', p.dataset.tab === tabId));
       this.body.classList.remove('collapsed');
+      this.relayoutRibbon(); // different tabs have different widths — recheck the fit
     },
 
     // Inject a contextual ribbon tab at runtime (Header & Footer = one tab;

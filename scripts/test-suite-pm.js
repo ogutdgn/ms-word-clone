@@ -1089,6 +1089,25 @@
     const marks = markNames('KEPTITALIC');
     return r === true && marks.some((m) => m.startsWith('italic'));
   });
+  await t('[ribbon] responsive: condenses when narrow, not when very wide', async () => {
+    const ribbon = document.getElementById('ribbon');
+    const panel = ribbon.querySelector('.ribbon-panel.active');
+    if (!panel) return 'no active panel';
+    const LEVELS = ['condense-1', 'condense-2', 'condense-3'];
+    const anyCondensed = () => LEVELS.some((c) => panel.classList.contains(c));
+    const prev = ribbon.style.width;
+    ribbon.style.width = '3000px';            // wide enough for everything to fit
+    window.WC.Ribbon.relayoutRibbon();
+    const wideCondensed = anyCondensed();
+    ribbon.style.width = '320px';             // force a narrow window
+    window.WC.Ribbon.relayoutRibbon();
+    const narrowCondensed = anyCondensed();
+    ribbon.style.width = prev || '';          // restore
+    window.WC.Ribbon.relayoutRibbon();
+    if (wideCondensed) return 'condensed even at 3000px (should fit)';
+    if (!narrowCondensed) return 'did not condense at 320px';
+    return true;
+  });
   await t('[home] Font group renders the Word two-row arrangement', () => {
     const grp = document.querySelector('.ribbon-group[data-group="font"]');
     if (!grp) return 'font group not found';

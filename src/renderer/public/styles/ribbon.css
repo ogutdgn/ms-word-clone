@@ -85,8 +85,29 @@
 #ribbon.collapsed { height: 0; min-height: 0; overflow: hidden; border-bottom: none; }
 .ribbon-panel { display: none; height: 100%; padding: 4px 0 0; overflow: hidden; }
 .ribbon-panel.active { display: flex; align-items: stretch; }
-.ribbon-scroll { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; width: 100%; }
+.ribbon-scroll { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; width: 100%; padding-right: 30px; }
 .ribbon-scroll::-webkit-scrollbar { height: 8px; }
+
+/* ---- Responsive condensing (Stage A, applied by WC.Ribbon.relayoutRibbon) ---- */
+/* Level 1: tighten spacing + slim the font-name combo (no shape change). */
+.ribbon-panel.condense-1 .ribbon-group { padding-left: 3px; padding-right: 3px; }
+.ribbon-panel.condense-1 .ribbon-group-body { gap: 0; }
+.ribbon-panel.condense-1 .rcombo.font-name { width: 110px; }
+.ribbon-panel.condense-1 .rcombo.font-name input { width: 86px; }
+/* Level 2: drop large-button labels (icon stays large). */
+.ribbon-panel.condense-2 .rbtn.large .lbl,
+.ribbon-panel.condense-2 .rsplit.large .arrow .lbl { display: none; }
+.ribbon-panel.condense-2 .rbtn.large,
+.ribbon-panel.condense-2 .rsplit.large { max-width: 52px; min-width: 34px; }
+/* Level 3: shrink large buttons to small icon buttons (Word's large→small). */
+.ribbon-panel.condense-3 .rbtn.large,
+.ribbon-panel.condense-3 .rsplit.large { flex-direction: row; height: 22px; min-width: 22px; max-width: none; padding: 0 4px; }
+.ribbon-panel.condense-3 .rbtn.large .ic,
+.ribbon-panel.condense-3 .rsplit.large .main .ic { width: 16px; height: 16px; }
+.ribbon-panel.condense-3 .rbtn.large .ic svg,
+.ribbon-panel.condense-3 .rsplit.large .main .ic svg { width: 16px; height: 16px; }
+.ribbon-panel.condense-3 .rsplit.large .main { flex-direction: row; padding: 0 4px; border-radius: 3px 0 0 3px; }
+.ribbon-panel.condense-3 .rsplit.large .arrow { height: 22px; border-radius: 0 3px 3px 0; }
 
 /* ---- Group ---- */
 .ribbon-group {
