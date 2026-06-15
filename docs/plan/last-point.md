@@ -7,7 +7,43 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — Phase 4a PAGINATION CORE COMPLETE + oracle-validated; PR ready; 4b (image resize) next)
+## 2026-06-15 (RESUME HERE — Phase 4a MERGED to main (3 review rounds); 4b (image resize) next)
+
+> **Branch:** `main` (Phase 4a merged via PR #36, merge commit `1c00252`; the
+> `build/phase-4a-pagination` branch is deleted). **Phase:** 4 (layout engine); 4a (pagination
+> core) **DONE + merged**; sub-phase **4b (image resize) is NEXT** — branch off `main`.
+>
+> **State:** the pagination engine (`src/renderer/pagination/pagination.ts`) ships in main: auto
+> multi-page sheets, page margins, live "Page X of Y", manual page breaks + MID-document blank pages,
+> and line-level intra-paragraph splitting — all oracle-validated vs Word for Windows 16.0. Gates on
+> main: **PM 404/404, smoke 9/9, roundtrip 27/0.**
+>
+> **Review hardening (the bulk of this session):** ran `/code-review max` on the 4a diff (15 confirmed
+> findings) → fixed the high-value ones (imported run-level `<w:br w:type=page>` detection, table
+> mid-cell-seam mangling + nested-cell mis-attribution, asymmetric-margin band bleed, status-bar
+> blank-page count, Linux opaque-headless-window). A focused **re-review of the fix commit** caught
+> that the fixes over-reached: `pageBreakSource` (section breaks) was page-broken on the wrong side /
+> for continuous sections → **reverted + deferred to 4f**. A **third review** found the trailing
+> (doc-final) page-break feature had grown a disproportionate edge tail → **reverted + deferred**.
+> Net: the COMMON cases are correct + validated; section breaks, trailing breaks, and mid-paragraph
+> breaks are documented deferrals (deferrals.md §A.1b). Tables are skipped at any nesting depth.
+> Lesson: re-review your own review-fixes — both re-reviews caught real new bugs.
+>
+> **NEXT — sub-phase 4b (image resize)** (LAYOUT_ENGINE.md §4 / acceptance #2, deferrals.md §A.1
+> "Image RESIZE"): branch `build/phase-4b-image-resize` off `main`. Build an image NodeView with 8
+> live resize handles whose drag writes `w:extent` (EMU) back to the model + aspect-lock on corner
+> drag — replacing the DECORATIVE handles from commit `2dca2e4` (the `.ProseMirror-selectednode`
+> handles in editor.css). Read the fork's image extension (`extensions/image/`) + `bridge/insert.ts`
+> insertImage; propose the design vs the real code first; validate the exported EMU vs the oracle
+> (read-props / docx-inspect); ship tests; keep all 3 gates green. Then 4c floating → 4d tables →
+> 4e headers/footers → 4f page-bg/columns/sections.
+>
+> **Blockers/notes:** none. `npm install` on a fresh checkout (nspell). Oracle = sandbox-disabled,
+> foreground, PID-safe. The COM-oracle `read-layout` verb is the pagination ground truth.
+
+---
+
+## 2026-06-15 (Phase 4a PAGINATION CORE COMPLETE + oracle-validated; PR opened)
 
 > **Branch:** `build/phase-4a-pagination` (off `main` @ `4a404ce`). **Phase:** 4 (layout engine),
 > sub-phase **4a (pagination core) — COMPLETE.** All four pagination scenarios match real Word exactly

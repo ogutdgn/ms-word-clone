@@ -29,13 +29,14 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a COMPLETE (`build/phase-4a-pagination`, PR ready)
-> **4a DONE + oracle-validated vs real Word (all scenarios match exactly).** The owned engine
-> `src/renderer/pagination/pagination.ts` delivers: multi-page sheets (auto), page margins, live page count,
-> manual page breaks, blank pages, and line-level intra-paragraph splitting. Plus the COM-oracle `read-layout`
-> verb and the Windows headless-rAF fix. **NEXT:** PR `build/phase-4a-pagination` → `main`, then **sub-phase
-> 4b (image resize)** on a fresh branch (LAYOUT_ENGINE.md §4) → 4c floating → 4d tables → 4e headers/footers
-> → 4f page-background/columns. Gates: PM 402 / smoke 9 / roundtrip 27.
+## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a MERGED; 4b (image resize) NEXT
+> **4a DONE + MERGED to `main`** (PR #36, merge `1c00252`), oracle-validated vs real Word, and hardened
+> through **three `/code-review` rounds** (engine = `src/renderer/pagination/pagination.ts`: auto multi-page,
+> margins, page count, manual breaks + mid-doc blank pages, line-split; section/trailing/mid-paragraph breaks
+> deferred — deferrals.md §A.1b). Gates on main: PM 404 / smoke 9 / roundtrip 27. **NEXT:** **sub-phase 4b
+> (image resize)** — branch `build/phase-4b-image-resize` off `main`; image NodeView + 8 live handles writing
+> `w:extent` (EMU) + aspect-lock (LAYOUT_ENGINE.md §4). Then 4c floating → 4d tables → 4e headers/footers →
+> 4f page-bg/columns/sections.
 >
 > **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
 > ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
@@ -342,7 +343,14 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **Line-level intra-paragraph split** (`90039b2`): a paragraph taller than the page splits at the line
   (line boxes + widow/orphan + mid-paragraph nudge seam); convergence deadband stops sub-line jitter.
   Oracle: ~65-line paragraph → 2 pages = Word's 2.
-- [x] **4a COMPLETE** — all pagination scenarios oracle-match Word. PR `build/phase-4a-pagination` → `main` ready.
+- [x] **4a COMPLETE** — all pagination scenarios oracle-match Word. PR #36 opened.
+- [x] **Review hardening (3 rounds of `/code-review`)**: `cf7a682` fixed the max-review findings (imported
+  run-level breaks, table mid-cell-seam, asymmetric margins, status-bar blank-page count, Linux headless
+  window); `88764fa` reverted a `pageBreakSource` over-reach (wrong side / continuous sections) caught by a
+  re-review; `8ae47a1` reverted the trailing-break feature (disproportionate edge tail) caught by a 3rd
+  review + guarded tables at any nesting depth. Section/trailing/mid-paragraph breaks deferred (§A.1b).
+- [x] **4a MERGED to `main`** (PR #36, merge `1c00252`; branch deleted). Gates on main: PM 404 / smoke 9 / roundtrip 27.
+- [ ] **4b — image resize** (NEXT, `build/phase-4b-image-resize` off main).
 - [ ] **4b — image resize** (NEXT, new branch off main after 4a merges).
 - Gates after each: PM 402/402, smoke 9/9, roundtrip 27/0. Oracle note:
   `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`.
