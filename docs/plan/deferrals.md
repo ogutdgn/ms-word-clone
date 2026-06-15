@@ -12,6 +12,10 @@
 > *(Moved from `docs/loop/` 2026-06-11 when the short-lived loop process was retired —
 > the ledger itself is process-independent and stays live.)*
 
+> **2026-06-15 — §A is now the active Phase-4 feed.** Per the user pivot ("build the layout
+> engine first, then fix bugs"), the consolidated spec + acceptance checklist + sub-phase build
+> order lives in **[../LAYOUT_ENGINE.md](../LAYOUT_ENGINE.md)**; the rows below are its input.
+
 ## A — Phase-4 / layout-engine-gated (was Phase 7; spec §9.3)
 
 - Page-setup *visual* geometry: margins, orientation, size, columns (model attrs may land earlier).
@@ -48,6 +52,9 @@
 | Insert → Header & Footer | **Header / Footer / Page Number** | Need the on-page header/footer region + page geometry. `isBlocked` today → honest deferral toast (no crash). | 2026-06-15 |
 | Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
 | Insert → Pages | **Page Break vertical geometry** | Inserts a real break node; rendering an actual page boundary needs the multi-page layout engine. | 2026-06-15 |
+| Insert → Picture / object selection | **Image RESIZE** (drag handles) | The selection frame + handles render (`2dca2e4`) but are **decorative**. Live resize needs an image **NodeView** whose handle-drag writes `w:extent` (EMU) back to the model. LAYOUT_ENGINE.md §2.2 / sub-phase 4b. | 2026-06-15 |
+| Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE + text-wrap** (floating) | Insert is **inline only**; drag-to-reposition + inline⇄floating + wrap (square/tight/through/top&bottom/behind/in-front) need the frames overlay + `w:anchor`/`posH`/`posV`. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
+| Insert / Table Tools → Table | **Column/row RESIZE, table RELOCATE, row-split across pages** | Tables render but the grid is fixed: dragging column/row borders (`w:gridCol`/`w:trHeight`), moving a table, and splitting a tall table's rows across a page boundary all need the table layout pass. LAYOUT_ENGINE.md §2 #4–6 / sub-phase 4d. | 2026-06-15 |
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 

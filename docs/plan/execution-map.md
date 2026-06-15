@@ -29,7 +29,19 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 3 — Editing-core hardening + scope finalization (ribbon tab-by-tab) → Phase 4 (Pagination / layout engine) next
+## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE (Phase 3 ribbon-hardening PAUSED; pivot 2026-06-15)
+> **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
+> ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
+> a whole class of features/bugs — image **resize/relocate**, table **resize/relocate/row-split**, floating
+> objects, headers/footers, page-border render, columns, multi-page — are **fundamentally layout-gated**.
+> Piecemeal fixes leak, so Phase 4 is now **active**. **START at [../LAYOUT_ENGINE.md](../LAYOUT_ENGINE.md)**
+> (spec + acceptance checklist + sub-phases 4a→4f); its checklist is fed by [deferrals.md](deferrals.md) §A.1.
+> First sub-phase = **4a pagination core** (model-driven multi-page sheets), oracle-validated lines/page;
+> PAGINATION.md is the prior art. **Branch off `main`** (PR `fix/ribbon-home` first) — never work on `main`.
+> Logger/Verifier/MCP remain at Phases 5/6/7.
+>
+> <details><summary>Phase-3 ribbon-hardening playbook (PAUSED — kept for when we return to per-tab polish)</summary>
+>
 > **Phase 3 = the ribbon-hardening pass** (re-sequenced 2026-06-14; goal = a fully working env BEFORE
 > logger/verifier/MCP). Go **tab by tab, section by section.** Logger/Verifier/MCP slip to Phases 5/6/7;
 > the **pagination / layout engine is pulled up to Phase 4.**
@@ -56,6 +68,8 @@
 >   branch. Split a big tab (Home) into section-group PRs only if review gets unwieldy. Every section ends gates-green.
 > - **Tests cover logic + state, NOT clicks/visual/arrangement** — those are eyeballed vs live Word.
 >
+> </details>
+
 > ---
 > **Phase 2 (editing core) is COMPLETE — slice history below (most recent first):**
 >

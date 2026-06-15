@@ -35,6 +35,25 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
   the layout-coupled bugs flagged during the Phase-3 ribbon-hardening pass; validated against the Word oracle.
 - **Decisions are append-only ADRs.** To change a locked decision, add a superseding ADR.
 
+> **Pivot — 2026-06-15 (user decision): build the layout engine BEFORE further bug-fixing.**
+> Phase-3 hardening proved that a whole class of features/bugs are **fundamentally blocked on
+> the layout engine** — not just pagination, but image **resize/relocate**, table
+> **resize/relocate/row-split**, floating objects, headers/footers, page-border render, columns.
+> Piecemeal fixes leak. So **Phase 4 (layout engine) is now the active next phase**; the gated
+> bugs are fixed *after* it lands. Full spec + acceptance checklist + sub-phase build order:
+> **[../LAYOUT_ENGINE.md](../LAYOUT_ENGINE.md)** (its checklist is fed by `deferrals.md` §A).
+
+## Cross-platform / running on Windows
+**Windows is the native target — not a problem, arguably better.** The parity oracle is **Word
+for Windows 16.0** and the **COM oracle** (`scripts/oracle/word-oracle-win.ps1`, PowerShell)
+is the intended, reliable ground truth (the macOS AppleScript oracle was a flaky stopgap).
+Office fonts (Calibri/Cambria/Corbel/Aptos) are **installed natively on Windows** → higher
+render fidelity than on macOS. Electron + electron-vite + the gates (`electron .` probes +
+`node` round-trip) are cross-platform. The few `/tmp/...` paths in scripts are a macOS-session
+artifact; on Windows they resolve to `C:\tmp\...` and the probe harness now **creates that dir
+automatically** (`src/main/main.js`), so `npm run build && npm run test:pm|smoke|roundtrip`
+work unchanged. (Author/oracle helper scripts already use `C:/tmp/` — the project's heritage.)
+
 ## Branching model
 - **Never do code work on `main`.** Always **create + checkout a feature branch first**
   (verify with `git branch --show-current` before editing).
@@ -57,8 +76,8 @@ CSS** and **our existing `WC.RIBBON` UI**. Instrument with our **logger** (taps
 | **0** | Research + architecture decisions (ADR-0001…0005) + de-risk spike | ✅ done |
 | **1** | Scaffold: electron-vite + TS; vendor the SuperDoc fork (strip Vue/painter/telemetry); mount the model in our own `EditorView` (closes Q1 last mile) | ✅ done (engine owned, gates green; branch pushed) |
 | **2** | Editing core behind the existing ribbon (strangler-fig): commands → PM transactions | ✅ **done (all slices 0a–11).** PM core is the only editor; character/paragraph/lists/styles/clipboard+editing-misc/find-replace/insert-basics+full-Table-Tools/file-io/review/references/mail-merge/themes/insert-exotica/draw flipped & oracle-validated; **slice 11 retired the dual-world scaffolding** (legacy editor/converter/`--legacy` flag/3 legacy gates removed; −4229 lines; gates PM 326 · smoke 9 · roundtrip 27). Editing core COMPLETE → Phase 3 (ribbon hardening) next. |
-| **3** | **Editing-core hardening + scope finalization** (branch-per-tab) — ribbon **tab-by-tab** bug-fix pass (research → compare-vs-live-clone → fix), the ribbon **state machine** (enablement + latch), `docs/SCOPE.md` (in/out scope), and **flagging layout-coupled bugs as the Phase-4 spec** (`deferrals.md` §A.1) | ◀ **current** |
-| **4** | **Pagination / layout engine** (branch; pulled up from old "last") — model-driven PM plugin + overlay: multi-page + floating-object positioning + text-wrap; built to **clear the Phase-3 layout flags**; validate vs the Word oracle | |
+| **3** | **Editing-core hardening + scope finalization** (branch-per-tab) — ribbon **tab-by-tab** bug-fix pass (research → compare-vs-live-clone → fix), the ribbon **state machine** (enablement + latch), `docs/SCOPE.md` (in/out scope), and **flagging layout-coupled bugs as the Phase-4 spec** (`deferrals.md` §A.1) | ✅ **enough done — PAUSED.** Home/Insert/Design/Editor hardened; remaining bugs are layout-gated → deferred to Phase 4. (`fix/ribbon-home`) |
+| **4** | **Pagination / layout engine** (branch) — model-driven PM plugin + overlay + object NodeViews: multi-page sheets, image/table **resize + relocate**, floating-object **position + text-wrap**, headers/footers, page-border render, columns; **writes geometry back to the model** (EMU/twips) so it round-trips + is verifiable; validate vs the Word oracle. **Spec + acceptance checklist + sub-phases 4a–4f: [../LAYOUT_ENGINE.md](../LAYOUT_ENGINE.md).** | ◀ **NEXT / ACTIVE** |
 | **5** | **Logger** (branch) — `dispatchTransaction` tap + raw capture + outcome serialize + firewall | |
 | **6** | **Verifier** (branch) — headless predicates + reward + QA harness + oracle gold | |
 | **7** | **MCP server** (branch) — tools/resources, transports, episodes; + pixel RPC | |

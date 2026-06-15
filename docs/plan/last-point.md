@@ -7,7 +7,40 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — carousel/borders/picture/design /loop: 4 items DONE, verified vs real Word)
+## 2026-06-15 (RESUME HERE — PIVOT: build the LAYOUT ENGINE next, then fix the gated bugs)
+
+> **User decision:** most remaining features/bugs can't be finished until the layout engine
+> exists — not just pagination, but image **resize/relocate**, table **resize/relocate/row-split**,
+> floating objects, headers/footers, page-border render, columns. So we **build the layout engine
+> first (Phase 4)**, then the gated bugs become fixable. The user is moving to a **fresh session on
+> a Windows PC**.
+>
+> **START HERE (fresh session):**
+> 1. Read **[../LAYOUT_ENGINE.md](../LAYOUT_ENGINE.md)** — the consolidated Phase-4 spec: what the
+>    engine is, the acceptance checklist (§2), the proposed architecture (§3), and the sub-phase
+>    build order **4a→4f** (§4). Its checklist is fed by `deferrals.md` §A.1.
+> 2. Read **[plan.md](plan.md)** (roadmap: Phase 3 PAUSED, Phase 4 ACTIVE) and its new
+>    **"Cross-platform / running on Windows"** section.
+> 3. **Branch first** off `main` (or merge `fix/ribbon-home` first — see below): e.g.
+>    `build/phase-4a-pagination`. Never work on `main`.
+> 4. Sub-phase 4a = **pagination core** (model-driven multi-page sheets, line-level boundary,
+>    page-break/blank-page geometry), oracle-validated lines/page. PAGINATION.md is the prior art.
+>
+> **Windows: NOT a problem — arguably better.** Parity oracle = **Word for Windows 16.0 COM**
+> (`scripts/oracle/word-oracle-win.ps1`) — the intended ground truth (the macOS AppleScript oracle
+> was a flaky stopgap). Office fonts (Calibri/Cambria/Aptos) are native on Windows → better
+> fidelity. Gates are cross-platform; the probe harness now auto-creates its output dir
+> (`src/main/main.js`), so `/tmp/...` → `C:\tmp\...` works. (`d1b591a`-era state; one commit pending
+> for the harness mkdir + these docs.)
+>
+> **Pre-pivot housekeeping:** `fix/ribbon-home` carries ~22 commits (Home/Insert/Design/Editor
+> hardening + the editor bug fixes). **Suggested: PR `fix/ribbon-home` → `main` before starting
+> Phase 4**, so Phase 4 branches off a clean integrated base. All gates green on it: PM 387/388
+> (1 known win-only `[10mm]` skip), smoke 9/9, roundtrip 27/0.
+
+---
+
+## 2026-06-15 (carousel/borders/picture/design /loop: 4 items DONE, verified vs real Word)
 
 > Continuation /loop on `fix/ribbon-home`. User gave 4 concrete asks + screenshots; all done, each its
 > own commit, all three gates green after each (PM 384/385 = 1 known win-only `[10mm]` skip; smoke 9/9;

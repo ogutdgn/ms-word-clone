@@ -14,6 +14,12 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 > - **Start each session at [docs/plan/](docs/plan/):** `last-point.md` (where we are),
 >   `execution-map.md` (what to do now), `plan.md` (the roadmap + dev process). Keep these
 >   current with the **`plan-tracking`** skill (`.claude/skills/plan-tracking/`) at session end.
+> - **NEXT/ACTIVE phase (pivot 2026-06-15): the LAYOUT ENGINE (Phase 4).** Most remaining
+>   features/bugs (image/table **resize+relocate**, floating objects, multi-page, headers/footers,
+>   page borders, columns) are layout-gated — build the engine first, then fix them. Spec +
+>   acceptance checklist + sub-phases: **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)**.
+>   **Windows is the native target** (Word-for-Windows COM oracle, native Office fonts) — see
+>   `plan.md` → "Cross-platform / running on Windows".
 > - **Locked decisions:** [docs/decisions/](docs/decisions/) (ADR-0001…0005 + `OPEN_DECISIONS.md`).
 >   **Target architecture/tech-stack:** [docs/architecture/](docs/architecture/).
 >   **Research (incl. the green de-risk spike):** [docs/research/](docs/research/).
@@ -51,6 +57,7 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 
 | Task | Read |
 |------|------|
+| **Build the layout engine (Phase 4 — NEXT)** | **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)** (+ `docs/plan/deferrals.md` §A feed) |
 | Big picture, module map, dispatch | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Libraries / versions / the build (electron-vite + TS) | [docs/TECH_STACK.md](docs/TECH_STACK.md) |
 | Add/change a ribbon control | [docs/RIBBON.md](docs/RIBBON.md) |
