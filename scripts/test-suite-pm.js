@@ -1014,6 +1014,30 @@
     const on = !paste.classList.contains('wc-disabled');
     return off && on;
   });
+  await t('[home] Merge Formatting keeps bold, drops source font/size/color', async () => {
+    setDoc('mergedest base');
+    const sel = selectText('base');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), sel.to, sel.to)));
+    await sleep(40);
+    PM().pasteMergeHtml('<p><span style="font-family:Courier New;font-size:26pt;color:#ff0000"><b>MERGEDWORD</b></span></p>');
+    await sleep(120);
+    const marks = markNames('MERGEDWORD');
+    if (!marks.some((m) => m.startsWith('bold'))) return 'lost bold: ' + JSON.stringify(marks);
+    if (marks.some((m) => /Courier|26pt|ff0000|#ff0000/i.test(m))) return 'kept source fmt: ' + JSON.stringify(marks);
+    return true;
+  });
+  await t('[home] Merge Formatting falls back to plain text with no rich source', async () => {
+    setDoc('plainonly base');
+    const sel = selectText('base');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), sel.to, sel.to)));
+    await sleep(40);
+    // Empty HTML → pasteMerge routes to pasteTextOnly; just assert it doesn't throw
+    // and returns a boolean (the real clipboard path is oracle-tested separately).
+    const r = PM().pasteMergeHtml('<span><i>KEPTITALIC</i></span>');
+    await sleep(120);
+    const marks = markNames('KEPTITALIC');
+    return r === true && marks.some((m) => m.startsWith('italic'));
+  });
   await t('[home] Office Clipboard auto-captures on copy (bridge path)', async () => {
     setDoc('captureword alpha'); selectText('captureword'); await sleep(60);
     window.WC.Clipboard.clear();

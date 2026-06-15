@@ -298,6 +298,8 @@ export function preinstallBridge() {
     pasteTextOnly: async () => false,
     pasteHTML: async () => false,
     pastePicture: async () => false,
+    pasteMerge: async () => false,
+    pasteMergeHtml: () => false,
     clipboardFlavors: async () => null,
     refreshClipboardState: async () => false,
     selectAll: () => false,

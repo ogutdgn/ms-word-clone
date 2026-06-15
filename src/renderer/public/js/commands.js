@@ -1686,7 +1686,7 @@
         const item = (label, enabled, onClick) =>
           fly.appendChild(WC.flyItem(label, enabled ? { onClick } : { disabled: true }));
         item('Keep Source Formatting', fl.hasHtml || fl.hasText, () => pm.pasteDefault());
-        item('Merge Formatting', false, () => {}); // recorded deferral — destination-formatting rules engine
+        item('Merge Formatting', fl.hasHtml || fl.hasText, () => pm.pasteMerge());
         item('Picture', fl.hasImage, () => pm.pastePicture());
         item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
         fly.appendChild(WC.flySep());

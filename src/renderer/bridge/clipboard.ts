@@ -13,6 +13,30 @@ type AnyEditor = any
 let _clipboardHasContent = false
 export const clipboardHasContent = (): boolean => _clipboardHasContent
 
+// Merge Formatting (Word's middle paste option): keep the source's "meaningful"
+// run formatting (bold/italic/underline/strike/links/lists/sub-superscript) but
+// adopt the DESTINATION paragraph's font, size, and color so the pasted text
+// blends in. Implemented as an HTML pre-pass that strips the inheriting
+// properties — the stripped runs then fall through to the destination style,
+// while the emphasis tags (<b>/<i>/<u>/<a>/<ul>…) survive untouched. Pure and
+// exported so it is unit-testable without touching the OS clipboard.
+const MERGE_STRIP_PROPS = [
+  'font-family', 'font-size', 'color', 'background', 'background-color',
+  'line-height', 'mso-ansi-font-size', 'mso-bidi-font-size',
+  'mso-ascii-font-family', 'mso-hansi-font-family', 'mso-bidi-font-family',
+]
+export function mergeFormattingHtml(html: string): string {
+  try {
+    const docp = new DOMParser().parseFromString(html, 'text/html')
+    docp.querySelectorAll<HTMLElement>('*').forEach((el) => {
+      if (el.style) MERGE_STRIP_PROPS.forEach((p) => el.style.removeProperty(p))
+      el.removeAttribute('face'); el.removeAttribute('size'); el.removeAttribute('color')
+      if (el.getAttribute('style') === '') el.removeAttribute('style') // drop now-empty style=""
+    })
+    return docp.body.innerHTML
+  } catch { return html }
+}
+
 // view.pasteText/pasteHTML synthesize a bare `new ClipboardEvent('paste')` whose
 // clipboardData is null — but the fork's InputRule handlePaste reads
 // event.clipboardData.getData(...) and would throw. Hand it a real ClipboardEvent
@@ -85,6 +109,17 @@ export function installClipboard(editor: AnyEditor) {
   async function clipboardFlavors(): Promise<{ hasText: boolean; hasHtml: boolean; hasImage: boolean; formats: string[] } | null> {
     return (await api()?.flavors()) ?? null
   }
+  // Direct (clipboard-free) merge paste — testable and reused by pasteMerge.
+  function pasteMergeHtml(html: string): boolean {
+    focusView()
+    const merged = mergeFormattingHtml(html)
+    return !!editor.view.pasteHTML(merged, pasteEvent({ 'text/html': merged, 'text/plain': '' }))
+  }
+  async function pasteMerge(): Promise<boolean> {
+    const html = await api()?.readHTML()
+    if (!html) return pasteTextOnly() // no rich source → plain text already "merges"
+    return pasteMergeHtml(html)
+  }
 
-  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState }
+  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState, pasteMerge, pasteMergeHtml }
 }
