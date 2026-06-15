@@ -8,6 +8,21 @@ const { is } = require('@electron-toolkit/utils');
 
 const isDev = process.argv.includes('--dev') || process.argv.includes('--enable-logging');
 
+// Headless probe runs (test:pm / test:smoke / test:roundtrip) drive the
+// renderer via executeJavaScript and immediately quit — they never need a
+// visible window. Launching Electron normally activates the app and steals
+// the macOS foreground, interrupting whatever the user is doing. In headless
+// mode we keep the window hidden AND (on macOS) switch to the dock-less
+// "accessory" activation policy so the test run is invisible and never grabs
+// focus. Gated on a probe with no PNG capture (--shot needs a painted window).
+const isHeadless =
+  (process.argv.some((a) => a.startsWith('--probe-out=')) &&
+    !process.argv.some((a) => a.startsWith('--shot='))) ||
+  process.argv.includes('--headless');
+if (isHeadless && process.platform === 'darwin' && app.setActivationPolicy) {
+  app.setActivationPolicy('accessory');
+}
+
 let mainWindow = null;
 
 // Frameless Electron 31 on Linux/Wayland (incl. WSLg) has no client-side
@@ -119,7 +134,7 @@ function createWindow() {
     const winArg = process.argv.find((a) => a.startsWith('--win='));
     if (winArg) { const [w, h] = winArg.split('=')[1].split('x').map(Number); if (w && h) mainWindow.setSize(w, h); }
     if (process.argv.includes('--start-maximized')) toggleFauxMaximize();
-    mainWindow.show();
+    if (!isHeadless) mainWindow.show();
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
     maybeScreenshot();
   });
