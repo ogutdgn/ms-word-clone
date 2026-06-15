@@ -1117,7 +1117,7 @@
     if (combos.length !== 2) return 'row1 should have 2 combos, got ' + combos.length;
     const r2 = rows[1];
     const has = (cmd) => !!r2.querySelector('[data-cmd="' + cmd + '"]');
-    return has('bold') && has('italic') && has('underline') && has('fontColor') || 'row2 missing formatting buttons';
+    return (has('bold') && has('italic') && has('underline') && has('fontColor')) || 'row2 missing formatting buttons';
   });
   await t('[home] font combos show the effective value on an empty doc (not blank)', async () => {
     setDoc('');

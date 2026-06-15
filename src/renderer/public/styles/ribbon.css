@@ -85,8 +85,12 @@
 #ribbon.collapsed { height: 0; min-height: 0; overflow: hidden; border-bottom: none; }
 .ribbon-panel { display: none; height: 100%; padding: 4px 0 0; overflow: hidden; }
 .ribbon-panel.active { display: flex; align-items: stretch; }
-.ribbon-scroll { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; width: 100%; padding-right: 30px; }
+.ribbon-scroll { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; width: 100%; }
 .ribbon-scroll::-webkit-scrollbar { height: 8px; }
+/* Reserve a gutter for the absolutely-positioned collapse chevron via a margin on
+   the LAST group (a flex-item margin IS counted in scrollWidth, so the overflow
+   fit-test stays accurate — unlike container padding-right). */
+.ribbon-scroll > .ribbon-group:last-child { margin-right: 30px; }
 
 /* ---- Responsive condensing (Stage A, applied by WC.Ribbon.relayoutRibbon) ---- */
 /* Level 1: tighten spacing + slim the font-name combo (no shape change). */
@@ -250,6 +254,11 @@
 /* color split-button: shows a color bar under the glyph */
 .rbtn .color-bar { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 18px; height: 3px; background: #c00000; border-radius: 1px; }
 .rsplit .color-bar { width: 18px; height: 3px; border-radius: 1px; margin-top: 1px; }
+/* Small split color buttons (Highlight / Font Color in the Font row): anchor the
+   color bar UNDER the glyph like Word, not beside it (the static bar was laying
+   out as a flex sibling, inflating width + detaching the dropdown arrow). */
+.rsplit.small .main { position: relative; }
+.rsplit.small .color-bar { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 14px; margin: 0; }
 
 /* Styles gallery */
 .styles-gallery { display: flex; align-items: center; height: 66px; gap: 0; }

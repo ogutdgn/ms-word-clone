@@ -57,14 +57,14 @@ function effectiveFont(editor: AnyEditor): { name: string; size: string } {
       const cs = getComputedStyle(el)
       name = String(cs.fontFamily || '').split(',')[0].replace(/['"]/g, '').trim()
       const px = parseFloat(String(cs.fontSize || ''))
-      if (isFinite(px) && px > 0) size = String(Math.round((px * 72) / 96)) // CSS px → pt
+      if (isFinite(px) && px > 0) size = String(Math.round((px * 72) / 96 * 2) / 2) // CSS px → pt, keep half-points (10.5)
     }
   } catch { /* no live view */ }
   if (!name || !size) {
     try {
       const d = (editor as any).converter?.getDocumentDefaultStyles?.() || {}
       if (!name) name = d.typeface || (d.fontFamilyCss ? String(d.fontFamilyCss).split(',')[0].replace(/['"]/g, '').trim() : '')
-      if (!size && d.fontSizePt != null) size = String(Math.round(d.fontSizePt))
+      if (!size && d.fontSizePt != null) size = String(d.fontSizePt) // exact (preserves a .5 default like 10.5)
     } catch { /* no converter */ }
   }
   return { name, size }
@@ -146,32 +146,19 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     // oracle probe pending, Task 13.3). Unknown/foreign styleIds → '' (no highlight).
     st.block = resolved?.styleId ? (STYLE_ID_TO_NAME[resolved.styleId] ?? '') : 'Normal'
   }
-  // Phase 3 font combos (Word parity): the name/size combos must show the
-  // EFFECTIVE value for a collapsed cursor or a uniform selection (never blank —
-  // the reported bug), and blank ONLY for a selection that spans mixed values.
-  // The entries loop above set st.fontName/fontSize from the caret/first run's
-  // explicit marks; refine here.
-  {
-    const sel = editor.state.selection
-    let famMixed = false
-    let sizeMixed = false
-    if (!sel.empty) {
-      const fams = new Set<string>()
-      const sizes = new Set<string>()
-      try {
-        editor.state.doc.nodesBetween(sel.from, sel.to, (node: any) => {
-          if (!node.isText) return
-          const ts = node.marks.find((m: any) => m.type?.name === 'textStyle')
-          fams.add(ts?.attrs?.fontFamily ? String(ts.attrs.fontFamily).split(',')[0].replace(/['"]/g, '').trim() : '')
-          sizes.add(ts?.attrs?.fontSize ? String(ts.attrs.fontSize).replace(/pt$/, '').trim() : '')
-        })
-      } catch { /* selection the iterator can't read */ }
-      famMixed = fams.size > 1
-      sizeMixed = sizes.size > 1
-    }
-    const eff = (!st.fontName || !st.fontSize) ? effectiveFont(editor) : null
-    st.fontName = famMixed ? '' : (st.fontName || eff?.name || '')
-    st.fontSize = sizeMixed ? '' : (st.fontSize || eff?.size || '')
+  // Phase 3 font combos (Word parity). getActiveFormatting (above) already
+  // resolves the run-property cascade and intersects it across the selection, so
+  // st.fontName/fontSize hold the uniform RESOLVED value or '' on a genuinely
+  // MIXED selection — trust that (don't re-derive it from raw marks; an earlier
+  // raw-mark scan duplicated the engine and over-blanked uniform selections that
+  // mix explicit + style-derived runs — review-caught). Only fall back to the
+  // effective rendered/default font for a COLLAPSED cursor that resolved to
+  // nothing (empty doc / empty paragraph / after Clear Formatting) — Word never
+  // blanks a collapsed cursor; a mixed SELECTION stays blank.
+  if (editor.state.selection.empty && (!st.fontName || !st.fontSize)) {
+    const eff = effectiveFont(editor)
+    if (!st.fontName) st.fontName = eff.name
+    if (!st.fontSize) st.fontSize = eff.size
   }
   st.computedFontFamily = st.fontName
   const sizeNum = parseFloat(st.fontSize)
