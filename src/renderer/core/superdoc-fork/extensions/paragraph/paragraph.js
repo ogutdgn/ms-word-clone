@@ -15,6 +15,7 @@ import { createNumberingPlugin } from './numberingPlugin.js';
 import { createLeadingCaretPlugin } from './leadingCaretPlugin.js';
 import { createDropcapPlugin } from './dropcapPlugin.js';
 import { createListBoundaryNavigationPlugin } from './listBoundaryNavigationPlugin.js';
+import { createBorderCarryPlugin } from './borderCarryPlugin.js';
 import { shouldSkipNodeView } from '../../utils/headless-helpers.js';
 import { parseAttrs } from './helpers/parseAttrs.js';
 
@@ -418,6 +419,7 @@ export const Paragraph = OxmlNode.create({
       listInputFallbackPlugin,
       createLeadingCaretPlugin(),
       createListBoundaryNavigationPlugin(),
+      createBorderCarryPlugin(),
     ];
   },
 });

@@ -260,9 +260,10 @@ export function encodeMarksFromRPr(runProperties, docx) {
  * @param {Object} paragraphProperties - Paragraph properties after resolution.
  * @param {boolean} hasPreviousParagraph - Whether there is a preceding paragraph.
  * @param {Object | null} nextParagraphProps - Resolved properties of the next paragraph.
+ * @param {Object | null} previousParagraphProps - Resolved properties of the previous paragraph.
  * @returns {Object} CSS properties keyed by CSS property name.
  */
-export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, nextParagraphProps) {
+export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, nextParagraphProps, previousParagraphProps) {
   if (!paragraphProperties || typeof paragraphProperties !== 'object') {
     return {};
   }
@@ -332,32 +333,45 @@ export function encodeCSSFromPPr(paragraphProperties, hasPreviousParagraph, next
   }
 
   if (borders && typeof borders === 'object') {
-    const sideOrder = ['top', 'right', 'bottom', 'left'];
     const valToCss = {
       single: 'solid',
       dashed: 'dashed',
       dotted: 'dotted',
       double: 'double',
     };
-
-    sideOrder.forEach((side) => {
-      const b = borders[side];
-      if (!b) return;
-      if (['nil', 'none', undefined, null].includes(b.val)) {
-        css[`border-${side}`] = 'none';
-        return;
-      }
-
+    const lineCss = (b) => {
+      if (!b || ['nil', 'none', undefined, null].includes(b.val)) return null;
       const width = b.size != null ? `${eighthPointsToPixels(b.size)}px` : '1px';
       const cssStyle = valToCss[b.val] || 'solid';
       const color = !b.color || b.color === 'auto' ? '#000000' : `#${b.color}`;
+      return `${width} ${cssStyle} ${color}`;
+    };
 
-      css[`border-${side}`] = `${width} ${cssStyle} ${color}`;
+    // Word merges CONSECUTIVE paragraphs that share an identical border spec into a
+    // single block: the left/right edges run continuously down the run, the TOP edge
+    // draws only above the first member, the BOTTOM only below the last, and the
+    // "between" rule (Inside Horizontal) draws between members. In continuous flow
+    // each paragraph is a stacked block, so a "between" line is just the upper block's
+    // bottom border. We approximate "same run" as a structurally-identical border spec.
+    const sameRun = (a, b) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+    const mergePrev = sameRun(borders, previousParagraphProps?.borders);
+    const mergeNext = sameRun(borders, nextParagraphProps?.borders);
 
-      if (b.space != null && side === 'bottom') {
-        css[`padding-bottom`] = `${eighthPointsToPixels(b.space)}px`;
-      }
-    });
+    css['border-left'] = lineCss(borders.left) || 'none';
+    css['border-right'] = lineCss(borders.right) || 'none';
+
+    // TOP: only the first member of a run paints it.
+    css['border-top'] = (!mergePrev && lineCss(borders.top)) || 'none';
+
+    // BOTTOM: interior members paint the BETWEEN (Inside Horizontal) rule; the last
+    // member of a run paints the real bottom border.
+    const bottomLine = mergeNext ? lineCss(borders.between) : lineCss(borders.bottom);
+    css['border-bottom'] = bottomLine || 'none';
+
+    // The bottom-edge "space" offset only applies where the bottom border is drawn.
+    if (!mergeNext && borders.bottom && borders.bottom.space != null && lineCss(borders.bottom)) {
+      css['padding-bottom'] = `${eighthPointsToPixels(borders.bottom.space)}px`;
+    }
   }
 
   // Paragraph shading (w:shd → shd-translator key 'shading': { val, color, fill, ... }).

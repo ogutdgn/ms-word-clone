@@ -1659,8 +1659,9 @@
   }
   // Word's default paragraph border edge: single, 0.5pt (size is EIGHTH-points: 4),
   // auto color, 1pt offset. Inside-H maps to OOXML w:between (faithful model + export);
-  // its render BETWEEN paragraphs needs the layout engine (Phase-4 flag). Inside-V has
-  // no paragraph OOXML equivalent (table/column concept) → flagged, no model write.
+  // it RENDERS as the shared rule between consecutive same-bordered paragraphs (the
+  // upper block's bottom edge — see encodeCSSFromPPr's run-merge). Inside-V has no
+  // paragraph OOXML equivalent (table/column concept) → flagged, no model write.
   function borderDef() { return { val: 'single', size: 4, color: 'auto', space: 1 }; }
   function applyBorder(edge) {
     if (['top', 'bottom', 'left', 'right'].indexOf(edge) >= 0) lastBorderEdge = edge;
@@ -1678,8 +1679,8 @@
       ['top', 'bottom', 'left', 'right'].forEach((k) => { cur[k] = borderDef(); });
       delete cur.between;
     } else if (edge === 'inside' || edge === 'insideH') {
+      // Inside Borders / Inside Horizontal on stacked paragraphs == the "between" rule.
       if (present('between')) delete cur.between; else cur.between = borderDef();
-      if (edge === 'inside') WC.toast('Inside Horizontal borders between paragraphs render with the layout engine (Phase 4); Inside Vertical needs a table.');
     } else {
       // single outer edge: toggle (Word removes an edge that is already present)
       if (present(edge)) delete cur[edge]; else cur[edge] = borderDef();

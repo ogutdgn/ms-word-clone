@@ -561,6 +561,48 @@
     window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Inside Vertical Border$/); await sleep(40);
     return before === JSON.stringify(paraAttrs('insv').paragraphProperties?.borders || null);
   });
+  await t('[home] Bottom Border carries on Enter + merges — the rule moves to the run’s new last paragraph', async () => {
+    setDocs(['mergeAA', 'mergeBB', 'mergeCC']);
+    let p = null, s = -1; doc().descendants((n, pos) => { if (n.type.name === 'paragraph') { s++; if (s === 1) p = pos + 1; } return p == null; });
+    window.WC.editor.commands.setTextSelection({ from: p, to: p });
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Bottom Border$/); await sleep(60);
+    const bbHas = getComputedStyle(paraEl('mergeBB')).borderBottomStyle === 'solid';
+    let pe = null; s = -1; doc().descendants((n, pos) => { if (n.type.name === 'paragraph') { s++; if (s === 1) pe = pos + 1 + n.content.size; } return true; });
+    window.WC.editor.commands.setTextSelection({ from: pe, to: pe });
+    window.WC.editor.commands.splitBlock(); await sleep(40);
+    window.WC.editor.commands.insertContent('mergeDD'); await sleep(140);
+    const ddCarried = !!(paraAttrs('mergeDD').paragraphProperties?.borders?.bottom);
+    const bbSuppressed = getComputedStyle(paraEl('mergeBB')).borderBottomStyle === 'none';
+    const ddDrawn = getComputedStyle(paraEl('mergeDD')).borderBottomStyle === 'solid';
+    return (bbHas && ddCarried && bbSuppressed && ddDrawn)
+      || ('bbHas=' + bbHas + ' ddCarried=' + ddCarried + ' bbSuppressed=' + bbSuppressed + ' ddDrawn=' + ddDrawn);
+  });
+  await t('[home] All Borders on stacked paragraphs renders an outer box + merged inside-horizontal rules', async () => {
+    setDocs(['boxAA', 'boxBB', 'boxCC']);
+    window.WC.editor.commands.selectAll();
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^All Borders$/); await sleep(140);
+    const cs = (needle) => getComputedStyle(paraEl(needle));
+    const topOnFirst = cs('boxAA').borderTopStyle === 'solid';
+    const noTopMid = cs('boxBB').borderTopStyle === 'none' && cs('boxCC').borderTopStyle === 'none';
+    const betweenRules = cs('boxAA').borderBottomStyle === 'solid' && cs('boxBB').borderBottomStyle === 'solid';
+    const bottomOnLast = cs('boxCC').borderBottomStyle === 'solid';
+    const sidesAll = ['boxAA', 'boxBB', 'boxCC'].every((n) => cs(n).borderLeftStyle === 'solid' && cs(n).borderRightStyle === 'solid');
+    return (topOnFirst && noTopMid && betweenRules && bottomOnLast && sidesAll)
+      || JSON.stringify({ topOnFirst, noTopMid, betweenRules, bottomOnLast, sidesAll });
+  });
+  await t('[home] Inside Horizontal on stacked paragraphs draws rules BETWEEN only (no outer edges)', async () => {
+    setDocs(['ihAA', 'ihBB', 'ihCC']);
+    window.WC.editor.commands.selectAll();
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Inside Horizontal Border$/); await sleep(140);
+    const cs = (needle) => getComputedStyle(paraEl(needle));
+    const noTopFirst = cs('ihAA').borderTopStyle === 'none';
+    const ruleAfterA = cs('ihAA').borderBottomStyle === 'solid';
+    const ruleAfterB = cs('ihBB').borderBottomStyle === 'solid';
+    const noBottomLast = cs('ihCC').borderBottomStyle === 'none';
+    const noSides = ['ihAA', 'ihBB', 'ihCC'].every((n) => cs(n).borderLeftStyle === 'none' && cs(n).borderRightStyle === 'none');
+    return (noTopFirst && ruleAfterA && ruleAfterB && noBottomLast && noSides)
+      || JSON.stringify({ noTopFirst, ruleAfterA, ruleAfterB, noBottomLast, noSides });
+  });
   await t('[home] flyItem checkable reserves a check column; ✓ only when checked', () => {
     const a = window.WC.flyItem('X', { checkable: true, checked: true });
     const b = window.WC.flyItem('Y', { checkable: true, checked: false });

@@ -190,10 +190,22 @@ export class ParagraphNodeView {
       paragraphProperties,
       this.surroundingContext.hasPreviousParagraph,
       this.surroundingContext.nextParagraphProps,
+      this.surroundingContext.previousParagraphProps,
     );
     Object.entries(style).forEach(([k, v]) => {
       this.dom.style[k] = v;
     });
+
+    const forceUpdateNeighbor = (node) => {
+      const view = node ? nodeViewMap.get(node) : null;
+      if (!view) return;
+      try {
+        view.getPos();
+      } catch {
+        return;
+      }
+      view.update(view.node, view.decorations, view.innerDecorations, true);
+    };
 
     // Check if spacing-related props changed and if so, trigger update on previous paragraph so it can adjust its bottom spacing
     if (
@@ -201,23 +213,15 @@ export class ParagraphNodeView {
       paragraphProperties.styleId !== oldParagraphProperties?.styleId ||
       paragraphProperties.contextualSpacing !== oldParagraphProperties?.contextualSpacing
     ) {
-      const previousNodeView = this.surroundingContext.previousParagraph
-        ? nodeViewMap.get(this.surroundingContext.previousParagraph)
-        : null;
-      if (previousNodeView) {
-        // Check if the previous node view is still valid
-        try {
-          previousNodeView.getPos();
-        } catch {
-          return;
-        }
-        previousNodeView.update(
-          previousNodeView.node,
-          previousNodeView.decorations,
-          previousNodeView.innerDecorations,
-          true,
-        );
-      }
+      forceUpdateNeighbor(this.surroundingContext.previousParagraph);
+    }
+
+    // Border merging is neighbor-dependent (the upper block paints the "between"
+    // rule, the run's first/last members own the top/bottom edges). When this
+    // paragraph's borders change, both neighbors must recompute their merge state.
+    if (JSON.stringify(paragraphProperties.borders) !== JSON.stringify(oldParagraphProperties?.borders)) {
+      forceUpdateNeighbor(this.surroundingContext.previousParagraph);
+      forceUpdateNeighbor(this.surroundingContext.nextParagraph);
     }
   }
 
@@ -230,6 +234,7 @@ export class ParagraphNodeView {
     const index = $pos.index();
     let hasPreviousParagraph = false;
     let previousParagraph = null;
+    let previousParagraphProps = null;
     let nextParagraphProps = null;
     if (index > 0) {
       const previousNode = parent.child(index - 1);
@@ -237,12 +242,15 @@ export class ParagraphNodeView {
         previousNode.type.name === 'paragraph' && !getResolvedParagraphProperties(previousNode)?.framePr?.dropCap;
       if (hasPreviousParagraph) {
         previousParagraph = previousNode;
+        previousParagraphProps = getResolvedParagraphProperties(previousNode);
       }
     }
+    let nextParagraph = null;
     if (parent) {
       if (index < parent.childCount - 1) {
         const nextNode = parent.child(index + 1);
         if (nextNode.type.name === 'paragraph') {
+          nextParagraph = nextNode;
           nextParagraphProps = getResolvedParagraphProperties(nextNode);
         }
       }
@@ -251,6 +259,8 @@ export class ParagraphNodeView {
     this.surroundingContext = {
       hasPreviousParagraph,
       previousParagraph,
+      previousParagraphProps,
+      nextParagraph,
       nextParagraphProps,
     };
   }

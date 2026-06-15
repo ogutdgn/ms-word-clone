@@ -358,7 +358,7 @@ describe('ParagraphNodeView', () => {
       },
     });
 
-    expect(encodeCSSFromPPr).toHaveBeenCalledWith(resolvedProps, false, null);
+    expect(encodeCSSFromPPr).toHaveBeenCalledWith(resolvedProps, false, null, null);
     expect(nodeView.dom.getAttribute('data-num-id')).toBe('5');
     expect(nodeView.dom.getAttribute('data-level')).toBe('2');
     expect(nodeView.dom.classList.contains('sd-editor-dropcap')).toBe(true);
