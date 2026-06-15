@@ -430,6 +430,44 @@ body.pm-active #pm-editor {
   background: var(--page);
   box-shadow: 0 1px 4px var(--page-shadow);
 }
+
+/* Phase 4a: kill the browser-default <p> margin (1em ≈ 16px). The fork resets
+   ol/ul/li margins (prosemirror.css) but NOT <p>, and those resets are scoped to
+   `.sd-editor-scoped` — a class our bare mount doesn't carry — so every paragraph
+   inherited ~16px of phantom top+bottom spacing the document never specified. That
+   made the clone render ~25 paragraphs/page where real Word fits ~44 (oracle:
+   read-layout), so pagination could never match Word. Real paragraph spacing is
+   applied INLINE by ParagraphNodeView (encodeCSSFromPPr, resolved from the
+   paragraph + its style), and inline styles override this reset — so spacing that
+   IS in the document still renders; only the phantom default is removed. */
+body.pm-active #pm-editor .ProseMirror p { margin-top: 0; margin-bottom: 0; }
+
+/* ===== Phase 4a: pagination spacers (src/renderer/pagination/pagination.ts) =====
+   Widget decorations painted INSIDE .ProseMirror at page boundaries. The body is
+   transparent so the white #pm-editor shows through as the page margins; the
+   .pm-gap-band paints the gray inter-sheet gap and the two sheet-edge shadows, so
+   one continuous white box reads as discrete sheets (a faithful port of the
+   retired engine's .wc-page-gap / .wc-gap-band — see docs/PAGINATION.md §5). The
+   full-bleed width + negative margins are set inline (driven by the model's L/R
+   margin). Non-editable + non-selectable: pure layout, never document content. */
+body.pm-active #pm-editor .pm-page-spacer {
+  display: block;
+  position: relative;
+  background: transparent;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.pm-active #pm-editor .pm-page-spacer .pm-gap-band {
+  position: absolute;
+  left: 0; right: 0;
+  background: var(--canvas);
+  box-shadow: 0 -6px 7px -4px rgba(0, 0, 0, 0.18), 0 6px 7px -4px rgba(0, 0, 0, 0.18);
+  z-index: 2;
+}
+/* Continuous views never paint sheets (the plugin also clears the seams there). */
+#workarea.view-web .pm-page-spacer, #workarea.view-draft .pm-page-spacer,
+#workarea.view-outline .pm-page-spacer, #workarea.view-read .pm-page-spacer { display: none; }
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
 
 /* Selected inline object (a picture or a video thumbnail): show a Word-like

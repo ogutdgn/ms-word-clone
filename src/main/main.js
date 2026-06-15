@@ -110,6 +110,16 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: true,
+      // A never-shown window (headless probe runs: test:pm/smoke/roundtrip on
+      // Windows) is treated as occluded by Chromium, which SUSPENDS
+      // requestAnimationFrame + throttles timers. The ribbon state-sync tick
+      // (bridge/state-sync.ts) coalesces into rAF, so without this the chrome
+      // (toggles/combos/latches) never updates in headless tests and the
+      // pagination measurer (also rAF-driven) would never run. Disabling
+      // background throttling keeps rAF/timers live in the hidden window. Safe
+      // for the real app (a desktop editor that stays responsive when
+      // backgrounded, like Word).
+      backgroundThrottling: false,
     },
   });
 
@@ -134,7 +144,24 @@ function createWindow() {
     const winArg = process.argv.find((a) => a.startsWith('--win='));
     if (winArg) { const [w, h] = winArg.split('=')[1].split('x').map(Number); if (w && h) mainWindow.setSize(w, h); }
     if (process.argv.includes('--start-maximized')) toggleFauxMaximize();
-    if (!isHeadless) mainWindow.show();
+    if (!isHeadless) {
+      mainWindow.show();
+    } else if (process.platform === 'win32') {
+      // Headless probe runs (test:pm/smoke/roundtrip) must still PAINT so that
+      // requestAnimationFrame runs at full speed. On Windows a never-shown
+      // window is treated as occluded and Chromium throttles rAF to ~2fps,
+      // starving the rAF-coalesced ribbon state-sync (bridge/state-sync.ts) and
+      // the pagination measurer — so chrome assertions miss their ~150ms wait
+      // windows (probe-confirmed: bold toggle lights at 1150ms, not 150ms).
+      // Show it fully transparent + inactive: rAF runs at 60fps, the window
+      // never steals focus, and nothing is visible to the user.
+      // WIN32 ONLY: setOpacity is a documented no-op on Linux (Electron docs), so
+      // showInactive there would pop an OPAQUE window during headless/CI runs.
+      // macOS uses the dock-less accessory policy above; Linux keeps the never-shown
+      // path (xvfb/CI hide it anyway).
+      mainWindow.setOpacity(0);
+      mainWindow.showInactive();
+    }
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
     maybeScreenshot();
   });

@@ -51,10 +51,52 @@
 | Home → Paragraph → Borders | **Diagonal Down/Up border** (table cells) | Greyed outside tables (Word parity). In a cell, rendering the diagonal line needs the table layout pass. | 2026-06-15 |
 | Insert → Header & Footer | **Header / Footer / Page Number** | Need the on-page header/footer region + page geometry. `isBlocked` today → honest deferral toast (no crash). | 2026-06-15 |
 | Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
-| Insert → Pages | **Page Break vertical geometry** | Inserts a real break node; rendering an actual page boundary needs the multi-page layout engine. | 2026-06-15 |
+| ~~Insert → Pages~~ | ~~**Page Break vertical geometry**~~ | **RESOLVED 2026-06-15 (Phase 4a)**: the pagination engine (`src/renderer/pagination/pagination.ts`) renders manual page breaks (`hardBreak[pageBreakType='page']`) and blank pages (two consecutive breaks) as real page boundaries, plus auto multi-page flow + line-level intra-paragraph splitting. Oracle-validated vs Word for Windows 16.0 (`word-oracle-win.ps1 read-layout`): break paragraph + page count match exactly. | ~~2026-06-15~~ |
 | Insert → Picture / object selection | **Image RESIZE** (drag handles) | The selection frame + handles render (`2dca2e4`) but are **decorative**. Live resize needs an image **NodeView** whose handle-drag writes `w:extent` (EMU) back to the model. LAYOUT_ENGINE.md §2.2 / sub-phase 4b. | 2026-06-15 |
 | Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE + text-wrap** (floating) | Insert is **inline only**; drag-to-reposition + inline⇄floating + wrap (square/tight/through/top&bottom/behind/in-front) need the frames overlay + `w:anchor`/`posH`/`posV`. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
 | Insert / Table Tools → Table | **Column/row RESIZE, table RELOCATE, row-split across pages** | Tables render but the grid is fixed: dragging column/row borders (`w:gridCol`/`w:trHeight`), moving a table, and splitting a tall table's rows across a page boundary all need the table layout pass. LAYOUT_ENGINE.md §2 #4–6 / sub-phase 4d. | 2026-06-15 |
+
+#### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
+
+> The 4a pagination engine matches Word for the common cases (oracle-validated). These edges
+> are deliberately deferred. (High-value review findings FIXED: imported run-level
+> `<w:br w:type="page">` breaks, the MID-document blank page + its status-bar weighting, the table
+> mid-cell-seam mangling + nested-cell mis-attribution (tables are skipped at any nesting depth),
+> asymmetric-margin band bleed, and the Linux opaque-headless-window regression. Two re-reviews of the
+> fix commits then caught over-reaches that were REVERTED: `pageBreakSource` page-broke on the wrong
+> side / for continuous sections, and the TRAILING-break feature grew an edge-case tail disproportionate
+> to its value — both deferred below.)
+
+- **Section breaks (`w:sectPr` → `pageBreakSource`) are NOT paginated.** A `w:sectPr` lives on a
+  section's LAST paragraph (the break renders AFTER it) and is section-type-dependent (continuous vs
+  next/even/odd-page), so it is left to the section-geometry sub-phase (4f). The COMMON imported manual
+  page break is a run-level `<w:br w:type="page">` (→ `hardBreak[lineBreakType='page']`), which IS
+  paginated. Until 4f, a section break imports as continuous flow.
+- **Trailing (doc-final) page break is NOT paginated.** A `Ctrl+Enter` at the very end of the document
+  (no content after it) does not add Word's trailing blank sheet; the page count is unchanged. The
+  feature was implemented then reverted — it grew a long edge tail (non-text content after the break,
+  caret-at-break-position page counting, deadband/signature staleness) for a minor case. A MID-document
+  page break / blank page (content after) IS paginated + oracle-validated. Revisit when the forced seam
+  is placed AT the break position (the same fix that handles mid-paragraph breaks).
+- **Page break inside a content-control / bibliography / index container.** The scan descends into all
+  top-level blocks except tables, so a break in such a container IS detected, but (like mid-paragraph)
+  it moves the next top-level block, not the container's internal remainder. Niche.
+- **Mid-paragraph manual break.** A `Ctrl+Enter` placed in the MIDDLE of a paragraph (text both
+  before and after) currently moves only the NEXT block to a new page; the after-the-break remainder
+  of that same paragraph stays on the current page. Word splits the paragraph at the break. Fix =
+  place the forced seam AT the break's position (like a line split). Common-case breaks (end of a
+  paragraph / between paragraphs) are correct + oracle-validated.
+- **A single block taller than one page that can't be line-split** (an image > 1 page, or a <4-line
+  block taller than the content area) overflows the sheet without a seam and the page count is
+  best-effort. True image/object pagination is sub-phase 4b/4d territory.
+- **Pre-first-measure page count.** `counts().pages` / the status bar can show a one-frame "of 1"
+  for a multi-page doc immediately on boot/Open, before the first rAF pagination measure publishes;
+  it self-corrects on the next tick.
+- **No automated oracle gate in `test:pm`.** The `[4a]` tests assert self-consistent geometry
+  (page count, seam positions, band counts); the absolute lines-per-page parity vs Word is validated
+  via the `word-oracle-win.ps1 read-layout` verb as a manual/PowerShell step (it needs a live Word),
+  recorded in `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`. A future
+  CI-friendly oracle harness could automate it.
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 

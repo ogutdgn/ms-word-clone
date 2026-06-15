@@ -79,7 +79,7 @@ $b = if ($argv.Count -gt 2) { $argv[2] } else { $null }
 $c = if ($argv.Count -gt 3) { $argv[3] } else { $null }
 
 function Usage-Exit {
-  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
+  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | read-layout <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
   exit 2
 }
 
@@ -320,6 +320,34 @@ function Read-StyleProps([string]$docxPath) {
   return $out
 }
 
+# read-layout — Word's PAGINATION ground truth for the Phase-4 layout engine.
+# Forces a repaginate, then reports the page count, line count, and the paragraph
+# index that STARTS each page (the break points), plus each paragraph's start page.
+# Compare these to the clone's WC.PM.__pagination (pageCount + per-seam block) to
+# verify the model-driven engine matches real Word's lines/page.
+function Read-Layout([string]$docxPath) {
+  $doc = Open-Doc $docxPath $true
+  try { $doc.Repaginate() } catch {}
+  $pages = 0; try { $pages = [int]$doc.ComputeStatistics(2) } catch {}   # wdStatisticPages
+  $lines = 0; try { $lines = [int]$doc.ComputeStatistics(1) } catch {}   # wdStatisticLines
+  $n = $doc.Paragraphs.Count
+  $perPara = @()
+  $breaks = @()
+  $prevPage = 0
+  for ($i = 1; $i -le $n; $i++) {
+    $r = $doc.Paragraphs.Item($i).Range.Duplicate
+    $r.Collapse(1)                                    # wdCollapseStart — page of the paragraph's START
+    $pg = 0
+    try { $pg = [int]$r.Information(3) } catch {}      # wdActiveEndPageNumber
+    $perPara += [pscustomobject][ordered]@{ index = $i; page = $pg; text = Strip-ParaMark ($doc.Paragraphs.Item($i).Range.Text) }
+    if ($pg -gt $prevPage) {
+      if ($prevPage -gt 0) { $breaks += $i }          # this paragraph opens a new page
+      $prevPage = $pg
+    }
+  }
+  return [pscustomobject][ordered]@{ pages = $pages; lines = $lines; paragraphs = $n; breakParas = @($breaks); perPara = $perPara }
+}
+
 # Resolve a (possibly relative) path against the PowerShell $PWD — NOT the .NET
 # process CWD, which can differ in hosted sessions ([IO.Path]::GetFullPath alone
 # would key off the process CWD while Test-Path/Resolve-Path key off $PWD).
@@ -368,6 +396,9 @@ try {
   } elseif ($cmd -eq 'read-style-props' -and $a) {
     Start-WordInstance
     Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-style-props'; paragraphs = @(Read-StyleProps $a) })
+  } elseif ($cmd -eq 'read-layout' -and $a) {
+    Start-WordInstance
+    Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-layout'; layout = (Read-Layout $a) })
   } elseif ($cmd -eq 'roundtrip' -and $a -and $b) {
     Start-WordInstance
     Invoke-Roundtrip $a $b

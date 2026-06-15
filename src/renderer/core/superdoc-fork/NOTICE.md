@@ -388,6 +388,14 @@ The following upstream packages are included in this directory tree:
     per-run Ligatures/Stylistic Sets in Chromium).
   The visual quartet renders in-app today; its net-new `w14:textOutline/glow/
   shadow/reflection` export translators are the follow-up.
+- **Default line height calibrated to Word (Phase 4a pagination, 2026-06-15):**
+  `core/renderers/ProseMirrorRenderer.ts` `DEFAULT_LINE_HEIGHT` 1.2 → 1.225.
+  Oracle-derived (`word-oracle-win.ps1 read-layout`): real Word fits ~44 Aptos-12
+  single lines per Letter page (~19.6px/line = 1.225x of 16px); upstream's 1.2
+  (19.2px) fit 45, so the model-driven pagination engine (src/renderer/pagination/)
+  drifted a page behind Word on long docs. `line-height: normal` can't be used
+  (Chromium's Aptos metrics give 18px, ≠ Word). Paragraphs with explicit w:spacing
+  line rules still override this default (set inline by ParagraphNodeView).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

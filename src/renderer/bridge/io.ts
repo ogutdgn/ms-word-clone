@@ -44,7 +44,9 @@ export function installIo(editor: AnyEditor) {
     // PM engine does not inject ZWS — no strip needed (cf. legacy editor.js counts)
     const paras = dom ? dom.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote').length : 0
     const lines = (text.match(/\n/g) || []).length + 1
-    const pages = 1 // continuous flow until Phase 7 (spec §7.8)
+    // Phase 4a: the pagination engine (src/renderer/pagination/) publishes the live
+    // page count on WC.PM.__pagination. Fall back to 1 before the first measure.
+    const pages = (w.WC?.PM?.__pagination?.pageCount as number) || 1
     const sel = editor.state.selection
     const selWords = sel.empty
       ? 0

@@ -29,7 +29,14 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE (Phase 3 ribbon-hardening PAUSED; pivot 2026-06-15)
+## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a COMPLETE (`build/phase-4a-pagination`, PR ready)
+> **4a DONE + oracle-validated vs real Word (all scenarios match exactly).** The owned engine
+> `src/renderer/pagination/pagination.ts` delivers: multi-page sheets (auto), page margins, live page count,
+> manual page breaks, blank pages, and line-level intra-paragraph splitting. Plus the COM-oracle `read-layout`
+> verb and the Windows headless-rAF fix. **NEXT:** PR `build/phase-4a-pagination` → `main`, then **sub-phase
+> 4b (image resize)** on a fresh branch (LAYOUT_ENGINE.md §4) → 4c floating → 4d tables → 4e headers/footers
+> → 4f page-background/columns. Gates: PM 402 / smoke 9 / roundtrip 27.
+>
 > **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
 > ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
 > a whole class of features/bugs — image **resize/relocate**, table **resize/relocate/row-split**, floating
@@ -316,6 +323,29 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-15 (Phase 4a — pagination core, `build/phase-4a-pagination`)
+- [x] **Windows headless-rAF fix** (`0f144b9`, `fix(main)`): paint the headless probe window
+  transparent+inactive on non-darwin so rAF runs at 60fps (a never-shown window throttles it to ~2fps,
+  starving the rAF-coalesced state-sync → ~18 spurious chrome-test failures). Gates green on Windows.
+- [x] **Pagination core** (`c11d689`, `feat(pagination)`): owned `Pagination` extension + measure-and-nudge
+  PM plugin (`src/renderer/pagination/pagination.ts`) — model-driven multi-page sheets, page margins, seams
+  as widget decorations; wired via `getStarterExtensions().concat`. +7 `[4a]` tests.
+- [x] **Oracle `read-layout` verb** (`ae7ffb4`, `test(oracle)`): Word page count + per-paragraph start-page
+  + break paragraphs — the pagination ground truth.
+- [x] **Word-fidelity** (`47d5d23`, `fix(pagination)`): reset browser-default `<p>` margin + `DEFAULT_LINE_HEIGHT`
+  1.2→1.225 (NOTICE'd). Oracle-validated: clone now paginates the fixture EXACTLY like Word (2 pages, break
+  at para 45). +2 tests.
+- [x] **Status bar page count** (`31fb1af`, `feat(pagination)`): live "Page X of Y" from the engine. +1 test.
+- [x] **Manual page-break / blank-page geometry** (`9490d4e`): hardBreak[pageBreakType='page'] forces a
+  page boundary; blank page (two breaks) skips a sheet (2 gap bands). Oracle: break para + page count = Word.
+- [x] **Line-level intra-paragraph split** (`90039b2`): a paragraph taller than the page splits at the line
+  (line boxes + widow/orphan + mid-paragraph nudge seam); convergence deadband stops sub-line jitter.
+  Oracle: ~65-line paragraph → 2 pages = Word's 2.
+- [x] **4a COMPLETE** — all pagination scenarios oracle-match Word. PR `build/phase-4a-pagination` → `main` ready.
+- [ ] **4b — image resize** (NEXT, new branch off main after 4a merges).
+- Gates after each: PM 402/402, smoke 9/9, roundtrip 27/0. Oracle note:
+  `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`.
 
 ### 2026-06-14 (Phase 3 execution — Home tab: Clipboard section + state-machine spine)
 - [x] **Headless test runs** (`81f48b8`, `chore(main)`): probe-mode `electron .` runs hidden on macOS

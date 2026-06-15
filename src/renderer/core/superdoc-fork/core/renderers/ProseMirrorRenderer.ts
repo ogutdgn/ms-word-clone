@@ -97,9 +97,14 @@ const RESIZE_DEBOUNCE_MS = 150;
 
 /**
  * Default line height multiplier for text content.
- * This value provides consistent vertical spacing and improves readability.
+ * Calibrated to Word's Aptos-12 single-line metrics via the COM oracle
+ * (scripts/oracle/word-oracle-win.ps1 read-layout): real Word fits ~44 of these
+ * lines per Letter page, i.e. ~19.6px/line = 1.225x of 16px. Upstream's 1.2
+ * (19.2px) over-fit by one line per page, so multi-page pagination drifted a page
+ * behind Word on long documents. (Chromium's `line-height: normal` for Aptos is
+ * 18px — its font metrics differ from Word's — so an explicit ratio is required.)
  */
-const DEFAULT_LINE_HEIGHT = 1.2;
+const DEFAULT_LINE_HEIGHT = 1.225;
 const HEADER_FOOTER_LINE_HEIGHT = 1;
 
 /**

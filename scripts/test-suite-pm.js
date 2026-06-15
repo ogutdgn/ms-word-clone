@@ -5012,6 +5012,252 @@
   await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('margins') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
+  // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------
+  // The engine is rAF-driven; allow generous settle time (the headless probe window
+  // paints transparent+inactive so rAF runs at full speed — see src/main/main.js).
+  const seamEls = () =>
+    Array.from(document.querySelectorAll('#pm-editor .ProseMirror > .pm-page-spacer')).filter((s) => s.querySelector('.pm-gap-band'));
+  const allSpacerEls = () => Array.from(document.querySelectorAll('#pm-editor .ProseMirror > .pm-page-spacer'));
+  const fillParas = (n) => {
+    const arr = [];
+    for (let i = 1; i <= n; i++) arr.push('Paragraph line number ' + i + ' — the quick brown fox jumps over the lazy dog.');
+    setDocs(arr);
+  };
+
+  await t('[4a] pagination exposes page geometry from the document model', async () => {
+    setDoc('pagination geometry probe');
+    await sleep(400);
+    const pg = PM().__pagination;
+    if (!pg || !pg.geometry) return 'no __pagination/geometry exposed';
+    const g = pg.geometry;
+    return (Math.round(g.pageH) === 1056 && Math.round(g.marginTop) === 96 && Math.round(g.contentH) === 864) ||
+      'geometry off: ' + JSON.stringify({ pageH: g.pageH, mt: g.marginTop, ch: g.contentH });
+  });
+
+  await t('[4a] editor line-height calibrated to Word (Aptos-12 -> 1.225)', () => {
+    // Locks DEFAULT_LINE_HEIGHT (ProseMirrorRenderer.ts): oracle read-layout showed
+    // real Word fits ~44 Aptos-12 lines/Letter page (~19.6px = 1.225x16). Upstream
+    // 1.2 (19.2px) drifted pagination a page behind Word on long docs.
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const lh = pm && pm.style.lineHeight;
+    return lh === '1.225' || 'inline line-height = ' + lh + ' (expected 1.225)';
+  });
+
+  await t('[4a] no phantom browser-default paragraph top-margin leaks', async () => {
+    // The browser-default <p> margin (~16px top AND bottom) is reset; legitimate
+    // spacing still comes inline from the model (e.g. a style's space-after lands
+    // on margin-bottom). The browser default would put 16px on BOTH sides, so a 0
+    // top margin proves the default no longer leaks. (oracle-confirmed: removing
+    // the phantom margin made the clone's lines/page match Word.)
+    setDoc('margin probe paragraph');
+    await sleep(300);
+    const p = document.querySelector('#pm-editor .ProseMirror p');
+    if (!p) return 'no paragraph';
+    return getComputedStyle(p).marginTop === '0px' || 'p margin-top = ' + getComputedStyle(p).marginTop + ' (browser default leaked)';
+  });
+
+  await t('[4a] short doc = single page, no page seams', async () => {
+    setDoc('one short line');
+    await sleep(400);
+    const pg = PM().__pagination;
+    if (!pg) return 'no __pagination';
+    return (pg.pageCount === 1 && pg.breaks.length === 0 && seamEls().length === 0) ||
+      'pageCount=' + pg.pageCount + ' breaks=' + pg.breaks.length + ' seams=' + seamEls().length;
+  });
+
+  await t('[4a] overflowing content paginates into multiple pages with rendered seams', async () => {
+    fillParas(70);
+    await sleep(600);
+    const pg = PM().__pagination;
+    if (!pg) return 'no __pagination';
+    if (pg.pageCount < 2) return 'pageCount=' + pg.pageCount + ' (expected >=2)';
+    if (pg.breaks.length !== pg.pageCount - 1) return 'breaks=' + pg.breaks.length + ' != pageCount-1=' + (pg.pageCount - 1);
+    if (seamEls().length !== pg.breaks.length) return 'rendered seams=' + seamEls().length + ' != breaks=' + pg.breaks.length;
+    return true;
+  });
+
+  await t('[4a] counts().pages + status bar reflect the live page count', async () => {
+    fillParas(70);
+    // poll until counts.pages catches up to the engine
+    const PMx = PM();
+    let pages = 0, pc = 0;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = (PMx.__pagination || {}).pageCount || 1; pages = PMx.counts().pages; if (pages === pc && pc >= 2) break; }
+    if (pages !== pc) return 'counts.pages=' + pages + ' != engine pageCount=' + pc;
+    if (pc < 2) return 'expected multi-page, got ' + pc;
+    const status = document.querySelector('#statusbar .sb-item');
+    const txt = status ? status.textContent : '';
+    return /^Page \d+ of \d+$/.test(txt) && txt.endsWith('of ' + pc) || 'status="' + txt + '" pageCount=' + pc;
+  });
+
+  await t('[4a] page margins are realized (top-margin + tail spacers present)', async () => {
+    // After fillParas(70): a top-margin spacer (no band) + N seams (band) + a tail (no band).
+    const spacers = allSpacerEls();
+    const bandless = spacers.filter((s) => !s.querySelector('.pm-gap-band'));
+    return bandless.length >= 2 || 'bandless spacers (top+tail) = ' + bandless.length + ' of ' + spacers.length;
+  });
+
+  await t('[4a] each seam positions the next page content at the page content-top', async () => {
+    // The core geometry invariant: the first content block after page-seam k must
+    // start at visual y = k*pitch + marginTop (the content-top of page k+1). This
+    // verifies every page boundary directly and is robust to the last-page tail.
+    fillParas(70);
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    // poll to convergence (box height stable)
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 25 && stable < 3; i++) { await sleep(120); const h = pm.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const z = PM().zoom || 1;
+    const boxTop = pm.getBoundingClientRect().top;
+    const g = PM().__pagination.geometry, GAP = 14, pitch = g.pageH + GAP;
+    const kids = Array.from(pm.children);
+    let k = 0; const errs = [];
+    for (let i = 0; i < kids.length; i++) {
+      const el = kids[i];
+      if (!(el.classList.contains('pm-page-spacer') && el.querySelector('.pm-gap-band'))) continue;
+      k++;
+      let j = i + 1; while (j < kids.length && kids[j].classList.contains('pm-page-spacer')) j++;
+      if (j >= kids.length) continue;
+      const top = (kids[j].getBoundingClientRect().top - boxTop) / z;
+      const target = k * pitch + g.marginTop;
+      if (Math.abs(top - target) > 6) errs.push('seam' + k + ' top=' + Math.round(top) + ' target=' + Math.round(target));
+    }
+    if (k === 0) return 'no seams found';
+    return errs.length === 0 ? true : errs.join('; ');
+  });
+
+  await t('[4a] a pagination decoration tick does NOT dirty the document', async () => {
+    PM().setClean();
+    fillParas(60); // forces a re-paginate (many decoration ticks)
+    await sleep(600);
+    // The content edit above DOES dirty (a real user edit). Re-clean, then force
+    // a pure pagination re-tick via a zoom change (no doc edit) and confirm clean.
+    PM().setClean();
+    const before = PM().isDirty();
+    PM().setZoom(1.1); // re-layout → pagination re-measures + dispatches a decoration-only tick
+    await sleep(400);
+    PM().setZoom(1);
+    await sleep(300);
+    const after = PM().isDirty();
+    return (before === false && after === false) || 'dirty before=' + before + ' after=' + after;
+  });
+
+  await t('[4a] continuous (Web) view renders no page seams', async () => {
+    fillParas(70);
+    await sleep(500);
+    const seamsPrint = seamEls().length;
+    PM().setView('web');
+    await sleep(400);
+    const seamsWeb = seamEls().length;
+    PM().setView('print');
+    await sleep(400);
+    const seamsBack = seamEls().length;
+    return (seamsPrint > 0 && seamsWeb === 0 && seamsBack > 0) ||
+      'print=' + seamsPrint + ' web=' + seamsWeb + ' back=' + seamsBack;
+  });
+
+  // ---- Phase 4a: manual page breaks (hardBreak[pageBreakType='page']) ----
+  const caretToEndOf = (needle) => {
+    selectText(needle);
+    const s = v().state.selection;
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), s.to, s.to)));
+  };
+  const firstParaAfterSeam = (needle) => {
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    let sawSeam = false;
+    for (const el of Array.from(pm.children)) {
+      if (el.classList.contains('pm-page-spacer')) { if (el.querySelector('.pm-gap-band')) sawSeam = true; }
+      else if (sawSeam && el.tagName === 'P' && el.textContent.includes(needle)) return true;
+    }
+    return false;
+  };
+
+  await t('[4a] manual page break forces the next content onto a new page', async () => {
+    setDocs(['Mpb alpha line', 'Mpb bravo line', 'Mpb charlie line']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('bravo');
+    PM().insertPageBreak();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    if (pc <= before) return 'pageCount did not increase (' + before + ' -> ' + pc + ')';
+    return firstParaAfterSeam('charlie') || 'charlie not on the new page after the seam';
+  });
+
+  await t('[4a] blank page (two breaks) skips a sheet with two gap bands', async () => {
+    setDocs(['Bp alpha line', 'Bp bravo line', 'Bp charlie line']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('bravo');
+    PM().insertBlankPage();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
+    if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const seam = Array.from(pm.querySelectorAll(':scope > .pm-page-spacer')).find((s) => s.querySelector('.pm-gap-band'));
+    const bands = seam ? seam.querySelectorAll('.pm-gap-band').length : 0;
+    return bands === 2 || 'expected 2 gap bands on the blank-page seam, got ' + bands;
+  });
+
+  await t('[4a] manual page break exports as <w:br w:type="page">', async () => {
+    setDocs(['Exp alpha line', 'Exp bravo line']);
+    await sleep(200);
+    caretToEndOf('alpha');
+    PM().insertPageBreak();
+    await sleep(200);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
+  });
+
+  await t('[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)', async () => {
+    window.WC.editor.commands.selectAll();
+    const words = [];
+    for (let i = 1; i <= 600; i++) words.push('word' + i);
+    window.WC.editor.commands.insertContent('<p>' + words.join(' ') + '</p>');
+    const box = document.getElementById('pm-editor');
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const pg = PM().__pagination;
+    if (pg.pageCount < 2) return 'expected multi-page, got ' + pg.pageCount;
+    if (pg.breaks.length < 1) return 'no line-split seam placed (breaks=' + pg.breaks.length + ')';
+    // the seam must be INSIDE the single paragraph (a line split, not a whole-block move)
+    const seamInPara = document.querySelector('#pm-editor .ProseMirror > p .pm-page-spacer');
+    if (!seamInPara) return 'seam not inside the paragraph (line-split expected)';
+    // box is (within the convergence deadband) an exact number of sheets
+    const g = pg.geometry, GAP = 14;
+    const expected = pg.pageCount * g.pageH + (pg.pageCount - 1) * GAP;
+    return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
+  });
+
+  await t('[4a] status bar weights the caret page by a blank-page seam (skip=2)', async () => {
+    setDocs(['Sbp alpha', 'Sbp bravo', 'Sbp gamma']);
+    await sleep(300);
+    caretToEndOf('bravo');
+    PM().insertBlankPage();
+    let pc = 1;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 3) break; }
+    if (pc < 3) return 'blank page pageCount=' + pc + ' (expected 3)';
+    const skips = (PM().__pagination.breaks || []).map((b) => b.skip);
+    if (!skips.includes(2)) return 'no skip=2 seam exposed: ' + JSON.stringify(skips);
+    caretToEndOf('gamma'); // caret on the 3rd sheet (sheet 2 is the blank page)
+    await sleep(300);
+    const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
+    return txt === 'Page 3 of 3' || 'status="' + txt + '" (expected "Page 3 of 3")';
+  });
+
+  await t('[4a] a straddling table is moved wholesale, never line-split mid-cell', async () => {
+    window.WC.editor.commands.selectAll();
+    const fillers = Array.from({ length: 40 }, (_, i) => '<p>Tbl filler ' + (i + 1) + '.</p>').join('');
+    const rows = Array.from({ length: 14 }, (_, r) => '<tr><td>Row ' + (r + 1) + ' A</td><td>Row ' + (r + 1) + ' B</td></tr>').join('');
+    window.WC.editor.commands.insertContent(fillers + '<table>' + rows + '</table><p>tbl after</p>');
+    const box = document.getElementById('pm-editor');
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    if (pm.querySelectorAll('table').length < 1) return 'no table rendered';
+    if (PM().__pagination.pageCount < 2) return 'expected multi-page with the table';
+    const inside = pm.querySelectorAll('table .pm-page-spacer').length;
+    return inside === 0 || 'a page-spacer was injected inside a table (' + inside + ') — table mangled';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()

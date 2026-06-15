@@ -7,7 +7,99 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — PIVOT: build the LAYOUT ENGINE next, then fix the gated bugs)
+## 2026-06-15 (RESUME HERE — Phase 4a PAGINATION CORE COMPLETE + oracle-validated; PR ready; 4b (image resize) next)
+
+> **Branch:** `build/phase-4a-pagination` (off `main` @ `4a404ce`). **Phase:** 4 (layout engine),
+> sub-phase **4a (pagination core) — COMPLETE.** All four pagination scenarios match real Word exactly
+> (COM oracle `read-layout`).
+>
+> **State summary:** the owned engine `src/renderer/pagination/pagination.ts` now delivers the full 4a
+> scope: real multi-page sheets (auto overflow, page-relative baseline), page margins, live "Page X of Y",
+> **manual page breaks** (`hardBreak[pageBreakType='page']`), **blank pages** (two consecutive breaks →
+> a skipped sheet + 2 gap bands), and **line-level intra-paragraph splitting** (Range.getClientRects line
+> boxes + widow/orphan ≥2 lines each side + a mid-paragraph nudge seam). A convergence **deadband**
+> (`layoutsClose`) absorbs sub-line getClientRects/posAtCoords jitter so the engine settles (no busy-loop).
+> `measureBlocks` subtracts intra-block seam heights for a stable natural height.
+>
+> **Oracle validation (all EXACT vs Word for Windows 16.0):**
+> - 70 single-line paras → 2 pages, break at para 45 (= Word 45).
+> - 20 multi-line (3-line) paras → 2 pages, break at para 15 (= Word 15; widow/orphan moves whole).
+> - manual break after para 2 of 4 → 2 pages, para 3 on page 2 (= Word); exports `<w:br w:type="page"/>`.
+> - blank page → 3 pages (content / blank / content), box exactly 3 sheets, 2 gap bands.
+> - one ~65-line paragraph → 2 pages with a mid-paragraph line split (= Word's 2 pages).
+>
+> **Done this session (commits on the branch, newest last):** `9490d4e` manual breaks + blank pages ·
+> `90039b2` line-level intra-paragraph splitting. (Earlier this branch: headless-rAF fix, pagination core,
+> oracle `read-layout` verb, Word-fidelity margin+line-height, status-bar page count, the 2026-06-15
+> core checkpoint.) **Gates:** PM **402/402**, smoke **9/9**, roundtrip **27/0**. deferrals.md §A.1
+> Page-Break row marked RESOLVED.
+>
+> **NEXT:** open/merge the 4a PR (`build/phase-4a-pagination` → `main`), then **sub-phase 4b — image
+> resize** (LAYOUT_ENGINE.md §4 / acceptance #2): an image NodeView with 8 live resize handles writing
+> `w:extent` (EMU) back to the model + aspect-lock on corner drag (replaces the decorative handles from
+> `2dca2e4`). Branch `build/phase-4b-image-resize` off `main` after 4a merges. Then 4c (floating
+> anchor/position/wrap) → 4d (tables) → 4e (headers/footers) → 4f (page background/columns).
+>
+> **Blockers/notes:** none. `npm install` needed on a fresh checkout (nspell). Oracle = sandbox-disabled,
+> foreground, PID-safe. The user's Word window is untouched. A live computer-use side-by-side eyeball vs
+> Word is recommended as a final confirmation (geometry already oracle-validated numerically).
+
+---
+
+## 2026-06-15 (Phase 4a PAGINATION CORE built + oracle-validated; manual breaks + line-split next)
+
+> **Branch:** `build/phase-4a-pagination` (off `main` @ `4a404ce`). **Phase:** 4 (layout engine),
+> sub-phase **4a (pagination core) — core DONE, oracle-validated vs real Word; 4a not yet complete**
+> (manual page-break/blank-page geometry + line-level intra-paragraph split remain).
+>
+> **State summary:** the single continuous `#pm-editor` sheet is now real **multi-page sheets**, driven
+> by an **owned, model-driven engine** `src/renderer/pagination/pagination.ts` — a `Pagination`
+> Extension + PM plugin (concatenated into `getStarterExtensions()` in `bridge/create-editor.ts`, so it
+> rides the normal pipeline and survives Open/New). A rAF-debounced PluginView **measures** top-level
+> block geometry and renders page seams + page margins as **widget decorations** (never model nodes →
+> exports clean, caret never moves). Geometry comes from the MODEL (`editor.getPageStyles()`). Seam
+> heights use a **measure-and-nudge** solver (margin-collapse-proof; box = exactly N sheets, proven to
+> the pixel). Page margins (top/bottom) are realized (the fork left them unrendered). Live **"Page X of Y"**
+> in the status bar (`io.ts counts().pages` + `statusbar.js`).
+>
+> **Oracle validation (THE key result):** new `read-layout` verb in `word-oracle-win.ps1` (page count +
+> per-paragraph start-page + break paragraphs). On a 70-para Aptos-12 fixture exported by the clone,
+> the clone's pagination now **matches real Word EXACTLY**: 2 pages, page break at paragraph 45
+> (= Word's 45). Two fidelity fixes got there: (1) reset the browser-default 16px `<p>` margin
+> (`editor.css`) — the fork resets ol/ul/li but not `p`, and only under `.sd-editor-scoped` which the
+> bare mount lacks, so every paragraph carried phantom spacing (~25 lines/page vs Word's ~44); real
+> spacing still comes inline from the model; (2) `DEFAULT_LINE_HEIGHT` 1.2→**1.225** (fork, NOTICE'd) —
+> Word's Aptos-12 line metric (~19.6px), upstream's 19.2px over-fit by one line/page. Evidence:
+> `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`.
+>
+> **Windows enablement (foundation):** headless probe runs were spuriously failing ~18 ribbon-chrome
+> tests on this fresh Windows checkout — a never-shown BrowserWindow throttles rAF to ~2fps, starving
+> the rAF-coalesced state-sync. Fixed by painting the headless window **transparent + inactive** on
+> non-darwin (`src/main/main.js`) so rAF runs at 60fps without stealing focus. This unblocked the whole
+> loop (gates now reliably green on Windows).
+>
+> **Done this session (commits on the branch, newest last):** `0f144b9` headless-rAF fix · `c11d689`
+> pagination core + 7 `[4a]` tests · `ae7ffb4` oracle `read-layout` verb · `47d5d23` Word-fidelity
+> (margin + line-height) + 2 tests · `31fb1af` status-bar page count + 1 test. **Gates:** PM **398/398**,
+> smoke **9/9**, roundtrip **27/0** (all headless on Windows).
+>
+> **NEXT (continue 4a):**
+> 1. **Manual page breaks** — render `hardBreak[pageBreakType='page']` (confirmed: a `hardBreak` inline
+>    atom; DOM `span[linebreaktype="page"]`) as a forced page boundary. Plan: detect forced positions,
+>    extend the solver with a **page-relative natural baseline** (`pageStartNat`) so auto-overflow stays
+>    correct after a forced break, and place a seam via the same nudge. Single break first; **blank page**
+>    (two consecutive hardBreaks) = a multi-band seam skipping a page (generalize `makeSpacer` to a
+>    band-offsets array: bottom band at `h - GAP - marginTop`, each earlier band one `pitch` up).
+> 2. **Line-level intra-paragraph split** — a paragraph taller than a page splits at the line
+>    (PAGINATION.md §7 binary search on rendered line bottoms); today only block-boundary breaks exist.
+> 3. Re-validate each vs the oracle (`read-layout`) + computer-use side-by-side; keep all 3 gates green.
+>
+> **Blockers/notes:** none. The user's Word window is untouched (PID-safe oracle, fresh instance).
+> `npm install` is required on a fresh checkout (the pull added `nspell`). Probe fixtures live in `C:/tmp`.
+
+---
+
+## 2026-06-15 (PIVOT: build the LAYOUT ENGINE next, then fix the gated bugs)
 
 > **User decision:** most remaining features/bugs can't be finished until the layout engine
 > exists — not just pagination, but image **resize/relocate**, table **resize/relocate/row-split**,
