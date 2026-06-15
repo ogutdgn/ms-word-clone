@@ -319,9 +319,26 @@ hold the single-PM-copy + telemetry-off invariants.
   emphasis); Paste-menu "Merge Formatting" enabled. +2 tests.
 - [x] **Set Default Paste** (`f32b58c`): `D.setDefaultPaste` modal + `localStorage` mode honored by
   `pasteDefault`/`defaultPasteMode`. +1 test.
-- [x] **Gates green (headless):** PM **334/335** (1 = Windows-only `[10mm]` fixture skip), smoke **9/9**, roundtrip **27/0**.
-- [ ] **Next:** live-Word visual eyeball of Clipboard enablement + dialogs (user-triggered — grabs the screen);
-  then Home **section 2 = Font** (kickoff → scope-lock → register Font state rules into the spine).
+- [x] **2 user-found Clipboard fixes** (real-Word compare): Keep Text Only no longer auto-linkifies a pasted URL
+  (`f7fb8ad`, NOTICE'd fork guard); context-aware Paste Options + Merge→**Match Formatting** label (`d282074`).
+- [x] **Clipboard gates:** PM **336/337**, smoke 9/9, roundtrip 27/0. Scope + checkpoint docs (`ff1a589`).
+
+### 2026-06-14 (Phase 3 execution — Home tab: Font section + responsive ribbon)
+- [x] **Font kickoff (HUMAN GATE):** `font-section-understand` workflow (5 mappers + synthesis) root-caused the
+  3 user asks → scope locked in `docs/SCOPE.md`: **Stage A responsiveness (all tabs), two-row arrangement,
+  empty-combo fix** IN; Stage B (group→flyout collapse) DEFERRED; dark theme OUT.
+- [x] **Empty font/size combo bug** (`57be59f`): `effectiveFont()` fallback (computed-style, Heading-aware →
+  doc-default) so combos never blank on an empty doc; mixed selection blanks; activeElement guard. +4 tests.
+- [x] **Font two-row arrangement** (`2b3bab7`): `renderFontGroupBody` Word two-row layout. +1 structural test.
+- [x] **Responsive ribbon Stage A** (`b63817c`): `installResponsive`/`relayoutRibbon` ResizeObserver condensing
+  for all 10 tabs (tighten → drop large labels → shrink large→small); de-clip chevron. +1 test.
+- [x] **Adversarial review** (`font-section-review` workflow, 3 lenses + verify): 1 confirmed-important fix
+  (drop the redundant raw-mark mixed scan; trust the engine's resolved intersection) + polish (half-points,
+  chevron gutter via margin, small-split color bars under glyph) → `bc19f90`. Dismissed 2 false alarms
+  (the "trim out-of-scope Home groups" finding fabricated its evidence + is Stage B).
+- [x] **Gates green:** PM **341/342** (1 = Windows-only `[10mm]` fixture skip), smoke **9/9**, roundtrip **27/0**.
+- [ ] **Next:** visual eyeball (Font arrangement + responsive condensing + Clipboard chrome — user-triggered);
+  then Home **section 3 = Paragraph** (kickoff → scope-lock → register its state rules).
 
 ### 2026-06-14 (Phase 3 planning — roadmap re-sequence + bug-fix methodology)
 - [x] **Strategic re-scope (user decision):** primary goal = a **fully working editing env first**.

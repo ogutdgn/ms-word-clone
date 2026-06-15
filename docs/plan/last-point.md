@@ -46,10 +46,30 @@
     KEY DECISION (user): Word's exact paste-option labels vary by OS/build, so the locked behavior is the
     **enablement state machine**, not the label set. (Researched: Mac "Match Formatting" = Win "Use
     Destination Styles"; list/table/Excel/chart sources show different button sets — a future enhancement.)
-- **Gates:** PM **336/337** (the 1 fail = `[10mm]` Leg-B reads a Windows-authored fixture absent on this Mac —
-  self-skips "fixture not readable", NOT a regression; +10 new `[home]` tests), smoke **9/9**, roundtrip **27/0**.
-- **Next:** (1) optional broader live-Word eyeball (Format Painter, dialogs — user-triggered); (2) Home
-  **section 2 = Font** (kickoff → scope-lock → register Font state rules into the spine). Optionally re-author
+- **Home section 2 = Font — DONE** (kickoff via the `font-section-understand` workflow; scope locked in
+  `docs/SCOPE.md`; built; adversarially reviewed via the `font-section-review` workflow):
+  - **Empty font/size combo BUG fixed** (`57be59f` + review refinement `bc19f90`): the combos now always show
+    the EFFECTIVE value for a collapsed cursor (new `effectiveFont()` — computed-style, Heading-aware →
+    `converter.getDocumentDefaultStyles()` fallback) and blank only on a genuinely mixed selection. Review
+    caught that the first cut re-derived mixedness from raw marks (over-blanked uniform style-driven
+    selections); the fix TRUSTS the engine's existing resolved intersection (`getActiveFormatting`) and only
+    falls back to `effectiveFont` for a collapsed cursor — also drops a redundant per-tick walk. + activeElement
+    guard on the combo push; half-point sizes preserved.
+  - **Font two-row arrangement** (`2b3bab7`): `renderFontGroupBody` renders Word's two rows (name/size/grow/
+    shrink/case/clear · B/I/U/strike/sub/super/effects/highlight/color). Small split color bars (Highlight/Font
+    Color) now anchor UNDER the glyph (`bc19f90`).
+  - **Responsive ribbon Stage A** (`b63817c`, cross-cutting all 10 tabs): `installResponsive`/`relayoutRibbon`
+    — a ResizeObserver on `#ribbon` (loop-safe) condenses the active tab (tighten → drop large labels → shrink
+    large→small) until it fits, instead of clipping. Chevron gutter reserved via last-group margin (`bc19f90`).
+    **Stage B (full group→flyout collapse, per-tab reduction order) is DEFERRED to a follow-up slice.**
+  - **Note (real, informational):** the Home tab has 5 single-control groups (Voice/Sensitivity/Editor/Add-ins/
+    Reuse Files) that ARE real Word Home groups (kept; only their cloud *features* are out of scope per SCOPE.md)
+    but add width, so condensing engages at normal widths. Trimming/collapsing them = Stage B / a separate
+    product call (review-confirmed this is NOT a defect in this diff).
+- **Gates:** PM **341/342** (the 1 fail = `[10mm]` Leg-B reads a Windows-authored fixture absent on this Mac —
+  self-skips "fixture not readable", NOT a regression; +14 new `[home]`/`[ribbon]` tests), smoke **9/9**, roundtrip **27/0**.
+- **Next:** (1) **visual eyeball** of the Font arrangement + responsive condensing + Clipboard chrome (user-triggered —
+  needs the screen); (2) Home **section 3 = Paragraph** (kickoff → scope-lock → register its state rules). Optionally re-author
   the `[10mm]` fixture via the Mac oracle for a fully-green `test:pm`.
 - **Blockers/notes:** none. `fix/ribbon-home` carries 10 commits; PR the whole Home tab when its sections are done.
   Clipboard section: all locked builds done + 2 user-found issues fixed.
