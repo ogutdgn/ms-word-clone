@@ -44,6 +44,8 @@ import { translator as numFormTranslator } from '../w14-numForm/numForm-translat
 import { translator as numSpacingTranslator } from '../w14-numSpacing/numSpacing-translator.js';
 import { translator as stylisticSetsTranslator } from '../w14-stylisticSets/stylisticSets-translator.js';
 import { translator as cntxtAltsTranslator } from '../w14-cntxtAlts/cntxtAlts-translator.js';
+import { translator as textOutlineTranslator } from '../w14-textOutline/textOutline-translator.js';
+import { translator as glowTranslator } from '../w14-glow/glow-translator.js';
 import {
   trackInsertRunPropertyTranslator,
   trackDeleteRunPropertyTranslator,
@@ -95,6 +97,8 @@ export const propertyTranslators = [
   numSpacingTranslator,
   stylisticSetsTranslator,
   cntxtAltsTranslator,
+  textOutlineTranslator,
+  glowTranslator,
   trackInsertRunPropertyTranslator,
   trackDeleteRunPropertyTranslator,
   webHiddenTranslator,

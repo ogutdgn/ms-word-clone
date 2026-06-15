@@ -49,6 +49,25 @@
 | Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
 | Insert → Pages | **Page Break vertical geometry** | Inserts a real break node; rendering an actual page boundary needs the multi-page layout engine. | 2026-06-15 |
 
+### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
+
+> **Stage 2a DONE (2026-06-15):** `w14:textOutline` + `w14:glow` now EXPORT and round-trip.
+> Units: `w14:w`/`w14:rad` = pt × 12700 EMU (probe-verified: 2pt→25400, 6pt→63500); stroke/glow
+> color via a `w14:srgbClr` child. New fork translators `w14-textOutline/` + `w14-glow/`
+> (NOTICE'd), registered in `rpr-translator.js`; bridged both ways in `super-converter/styles.js`
+> (`decodeRPrFromMarks` + `encodeMarksFromRPr`). Gated by `[effects]` in `test:pm`.
+> - **Oracle status:** the macOS Word oracle timed out this session (`AppleEvent -1712`, the
+>   documented Word-for-Mac AppleScript session fragility — not a docx defect). The structure
+>   mirrors the **already-oracle-validated** typography trio's w14-under-`w:rPr` pattern, so Word
+>   acceptance is high-confidence; a confirming oracle open + visual check is the recommended next step.
+> - **Stage 2b PENDING — `w14:shadow` + `w14:reflection`:** deferred BECAUSE their units need
+>   oracle-derived values, not because of any blocker. shadow = `{dx,dy,blur,color,preset}` →
+>   `w14:shadow` needs cartesian→polar conversion (`dist`=hypot in EMU, `dir`=atan2 in 60000ths-degree,
+>   plus `sx/sy/kx/ky`); reflection = a preset string → the full `w14:reflection` attribute set
+>   (`stA/stPos/endA/endPos` in 1000ths-%, `dist/dir/fadeDir`) needs Word's exact preset values.
+>   Build them the same way (translator dir + `decodeRPrFromMarks`/`encodeMarksFromRPr` branches +
+>   registration) once the oracle is reachable to validate the polar/preset numbers.
+
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 
 Office.js add-ins · 3D models · online pictures/video playback · co-authoring ·

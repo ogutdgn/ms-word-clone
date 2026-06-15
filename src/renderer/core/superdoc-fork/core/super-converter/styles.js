@@ -239,6 +239,10 @@ export function encodeMarksFromRPr(runProperties, docx) {
   if (fvl) textStyleAttrs.fontVariantLigatures = fvl;
   const ffs = composeFontFeatureSettings(runProperties.stylisticSets);
   if (ffs) textStyleAttrs.fontFeatureSettings = ffs;
+  // Text Effects quartet (stage 2): the w14 translators decoded the OOXML back into the
+  // visual-effect objects; pass them through to the textStyle mark so they round-trip.
+  if (runProperties.textOutline) textStyleAttrs.textOutline = runProperties.textOutline;
+  if (runProperties.textGlow) textStyleAttrs.textGlow = runProperties.textGlow;
 
   if (Object.keys(textStyleAttrs).length) {
     marks.push({ type: 'textStyle', attrs: textStyleAttrs });
@@ -749,6 +753,18 @@ export function decodeRPrFromMarks(marks) {
             case 'fontFeatureSettings': {
               const sets = splitFontFeatureSettings(value);
               if (sets.length) runProperties.stylisticSets = sets;
+              break;
+            }
+            // Text Effects QUARTET (stage 2): pass the visual-effect objects straight
+            // through to run properties; the w14 translators (textOutline/glow) emit the
+            // OOXML with EMU/alpha unit conversions. Shadow + reflection are stage-2b
+            // (their polar/preset units need oracle-derived values — deferrals A.1).
+            case 'textOutline': {
+              if (value && typeof value === 'object') runProperties.textOutline = value;
+              break;
+            }
+            case 'textGlow': {
+              if (value && typeof value === 'object') runProperties.textGlow = value;
               break;
             }
           }

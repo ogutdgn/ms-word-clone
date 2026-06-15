@@ -653,6 +653,16 @@
     pane.remove();
     return spellingCount >= 2 && label === 'believe' && fixed;
   });
+  await t('[effects] textOutline + glow export to w14 with correct EMU units (stage 2)', async () => {
+    setDoc('OutlineGlow effect text'); selectText('OutlineGlow effect text');
+    window.WC.PM.cmd('setMark', 'textStyle', { textOutline: { widthPt: 2, color: '#FF0000', fill: 'transparent' }, textGlow: { radiusPt: 5, color: '#00FF00' } });
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const outlineEmu = (xml.match(/<w14:textOutline[^>]*w14:w="(\d+)"/) || [])[1]; // 2pt × 12700
+    const glowEmu = (xml.match(/<w14:glow[^>]*w14:rad="(\d+)"/) || [])[1]; // 5pt × 12700
+    const outlineColor = /<w14:textOutline[\s\S]*?<w14:srgbClr w14:val="FF0000"/.test(xml);
+    const glowColor = /<w14:glow[\s\S]*?<w14:srgbClr w14:val="00FF00"/.test(xml);
+    return outlineEmu === '25400' && glowEmu === '63500' && outlineColor && glowColor;
+  });
   await t('[insert] small stacked Insert buttons keep text labels; Home Font buttons stay icon-only', () => {
     const ci = window.WC.Ribbon.controlIndex;
     const labeled = (cmd) => { const n = ci[cmd] && ci[cmd].node; const lbl = n && n.querySelector('.lbl'); return !!n && !n.classList.contains('icononly') && !!lbl && /\S/.test(lbl.textContent); };
