@@ -25,19 +25,24 @@
    dialog**: tabs Borders / Page Border / Shading; Setting None/Box/Shadow/3-D/Custom; Style/Color/Width;
    clickable Preview edges; Apply to (Paragraph/Text); Options; Horizontal Line. (inside-borders between paras
    + page borders likely need layout — FLAG/defer those; per-paragraph edges work today.) Verify via computer use.
-3. **Editor section — make it REAL** (cmd `editor`, currently a stub pane). User wants actual Spelling + Grammar
+3. **Styles section (Home tab) — section kickoff + harden.** Clipboard/Font/Paragraph are done; Styles is the
+   next Home section. Quick Styles gallery (Normal, No Spacing, Heading 1/2, Title, Subtitle, …), the gallery
+   scroll/More, Apply Styles, the Styles pane (cmd `stylesGallery`/`stylesPane`). Kickoff = research → propose
+   in/out scope → lock in SCOPE.md → register its state rules (active-style highlight already syncs) → fix gaps.
+   Verify gallery contents + behaviours vs real Word via computer use.
+4. **Editor section — make it REAL** (cmd `editor`, currently a stub pane). User wants actual Spelling + Grammar
    checking — investigate integrating a grammar/spell library (e.g. an offline dictionary + a grammar engine).
    Screenshot shows: Editor Score, Corrections (Spelling N / Grammar N), Refinements, Similarity, Insights.
    Spell-check is feasible offline; grammar is harder — note what's feasible vs cloud-only.
-4. **Insert tab ribbon — labels invisible on small screens** (user sees only icons). Even when narrow, controls
+5. **Insert tab ribbon — labels invisible on small screens** (user sees only icons). Even when narrow, controls
    should be viewable/labeled like Word. Likely the Stage-A responsive condense over-hides labels OR the Insert
    groups overflow. Make Insert UI-accurate to Word (buttons + arrangement); then per-feature: FLAG the
    layout-engine-dependent ones (most Insert features — headers/footers/page-geometry/floating objects), make
    the rest work. Compare via computer use.
-5. **STILL PENDING from Text Effects: stage 2** — the 4 net-new `w14:textOutline/glow/shadow/reflection` export
+6. **STILL PENDING from Text Effects: stage 2** — the 4 net-new `w14:textOutline/glow/shadow/reflection` export
    translators (EMU/60000ths-deg/1000ths-% units) + bridge + RUN_PROPERTIES keys + per-effect **oracle**
    round-trip vs real Word. Quartet renders today but doesn't save to docx yet.
-6. After Home fully done → **Insert tab** (item 4), then the Home-tab PR.
+7. After Home fully done → **Insert tab** (item 4), then the Home-tab PR.
 
 ## 2026-06-15 (Phase 3 — Text Effects & Typography rebuilt: button un-broken, trio docx-faithful)
 
