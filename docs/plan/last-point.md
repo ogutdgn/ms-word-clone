@@ -33,6 +33,11 @@
    COLOR_SCHEMES 8→18, FONT_PAIRS reworked; Themes menu gains Reset/Browse/Save; Colors/Fonts gain
    Customize…; **Page Color now opens the colour picker** (was hardcoded white).
 
+5. `fix(insert)` `904ab85` — image **fallback size** when natural dims are unknown (undecodable data-URL
+   / a 0×0 viewBox-only SVG) → column-fit default, not the bridge's 100×100. Surfaced by an **adversarial
+   review workflow** over the whole /loop diff (3 review dims × skeptical verify): it confirmed ONLY this
+   one edge case; the border-merge plugin, both carousels, and the Design rebuild all held up.
+
 **Still open / next:** other Insert stubs (Shapes, SmartArt, Chart, Text Box, Equation, 3D, Screenshot,
 Signature, Object) remain — large/layout-gated, see deferrals §A.3. Text Effects stage 2b (shadow +
 reflection) still pending (deferrals §A.2). Suggested wrap-up: PR `fix/ribbon-home` → `main`.
