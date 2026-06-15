@@ -608,6 +608,21 @@
     window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^View Gridlines$/); await sleep(20);
     return g1 === !g0 && pe.classList.contains('show-grid') === g0;
   });
+  await t('[home] Borders dialog seeds an explicit nil edge as OFF (review #3)', async () => {
+    setDoc('nilseed probe'); selectText('nilseed');
+    // an imported docx can carry an explicit nil/none edge — Word treats it as no border
+    window.WC.PM.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': { bottom: { val: 'nil', size: 4, color: 'auto', space: 1 } } });
+    window.WC.Dialogs.bordersAndShading();
+    const bottomOn = document.querySelector('.dialog .bs-edge.e-bottom').classList.contains('on');
+    document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
+    window.WC.PM.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
+    return bottomOn === false;
+  });
+  await t('[home] document_border glyph resolves, not the _generic fallback (review #2)', () => {
+    const html = window.WC.icon('document_border', 16);
+    // the real glyph = a page rect + a dashed inner border; _generic has no dasharray
+    return html.indexOf('stroke-dasharray="1.5 1.5"') >= 0 && html.indexOf('M8 12h8') < 0;
+  });
   await t('[2] sort dialog OK reorders paragraphs ascending (one undo step)', async () => {
     setDocs(['banana', 'cherry', 'apple']);
     window.WC.editor.commands.selectAll();

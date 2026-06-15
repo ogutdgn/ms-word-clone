@@ -1062,11 +1062,14 @@
   // whole Page Border tab + Shadow/3-D depth are layout-gated (Phase 4, deferrals A.1).
   D.bordersAndShading = function (initialTab) {
     const pm = WC.PM;
+    if (pm.ready) pm.captureSelection(); // the dialog steals focus; restore before applying
     const para = (pm.getEditor().getAttributes('paragraph') || {}).paragraphProperties || {};
     const cur0 = para.borders || {};
-    const seed = cur0.bottom || cur0.top || cur0.left || cur0.right || cur0.between || null;
+    // a "live" edge is present AND not an explicit nil/none (matches the dropdown's has())
+    const live = (e) => !!e && e.val !== 'none' && e.val !== 'nil';
+    const seed = [cur0.bottom, cur0.top, cur0.left, cur0.right, cur0.between].find(live) || null;
     // working border state
-    const edges = { top: !!cur0.top, bottom: !!cur0.bottom, left: !!cur0.left, right: !!cur0.right, between: !!cur0.between };
+    const edges = { top: live(cur0.top), bottom: live(cur0.bottom), left: live(cur0.left), right: live(cur0.right), between: live(cur0.between) };
     let style = (seed && seed.val) || 'single';
     let width = (seed && seed.size) || 4;            // eighth-points
     let color = seed && seed.color && seed.color !== 'auto' ? '#' + String(seed.color).replace(/^#/, '') : 'auto';
@@ -1226,19 +1229,24 @@
     WC.dialog({ title: 'Borders and Shading', width: '620px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
         const flags = [];
-        if (bordersTouched) {
-          const b = buildBorders();
-          if (Object.keys(b).length) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': b });
-          else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
-          if (applyTo === 'text') flags.push('Apply to: Text (run-level borders) is deferred — applied to the paragraph.');
-          if (setting === 'shadow' || setting === '3d') flags.push('Shadow / 3-D border depth renders with the layout engine (Phase 4).');
-          if (edges.between) flags.push('Inside Horizontal border renders between paragraphs with the layout engine (Phase 4).');
-        }
-        if (shadingTouched) {
-          if (shadeFill) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });
-          else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
-        }
-        if (pageTouched) { pm.dePageBorders({ style: pgStyle.value === 'single' ? 'solid' : pgStyle.value, color: pgColor, width: Math.max(1, Math.round((parseInt(pgWidth.value, 10) / 8))) }); flags.push('Page border saved to the document; on-page render arrives with the layout engine (Phase 4).'); }
+        // restore the captured selection (the dialog blurred the editor) before writing
+        pm.withSelection(() => {
+          if (bordersTouched) {
+            const b = buildBorders();
+            if (Object.keys(b).length) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': b });
+            else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
+            if (applyTo === 'text') flags.push('Apply to: Text (run-level borders) is deferred — applied to the paragraph.');
+            if (setting === 'shadow' || setting === '3d') flags.push('Shadow / 3-D border depth renders with the layout engine (Phase 4).');
+            if (edges.between) flags.push('Inside Horizontal border renders between paragraphs with the layout engine (Phase 4).');
+          }
+          if (shadingTouched) {
+            if (shadeFill) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });
+            else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+          }
+        });
+        // page borders are section-level (no text selection needed). dePageBorders treats
+        // width as POINTS (round(pt*8)); pass eighth-points/8 so sub-1pt widths survive export.
+        if (pageTouched) { pm.dePageBorders({ style: pgStyle.value === 'single' ? 'solid' : pgStyle.value, color: pgColor, width: parseInt(pgWidth.value, 10) / 8 }); flags.push('Page border saved to the document; on-page render arrives with the layout engine (Phase 4).'); }
         if (flags.length) WC.toast(flags[0], flags.length > 1 ? flags.slice(1).join(' ') : undefined);
       } },
       { label: 'Cancel' },

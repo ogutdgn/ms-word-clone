@@ -57,6 +57,7 @@
     borderHorizLine: '<path d="M3 9h5M3 13h5M3 17h3" stroke="currentColor" opacity=".55"/><path d="M11 13h10" stroke="currentColor" stroke-width="1.8"/><path d="M3 5h12" stroke="currentColor" opacity=".55"/>',
     drawTable: '<rect x="4" y="6" width="16" height="13" fill="none" stroke="currentColor" stroke-dasharray="2 2" opacity=".6"/><path d="M14 4 19 9 11 17l-5 1 1-5z" fill="none" stroke="currentColor"/>',
     viewGridlines: '<rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor"/><path d="M4 10h16M4 15h16M9 4v16M14 4v16" stroke="currentColor" stroke-dasharray="2 2" opacity=".7"/>',
+    document_border: '<rect x="5" y="3" width="14" height="18" rx="1" fill="none" stroke="currentColor"/><rect x="8" y="6.5" width="8" height="11" fill="none" stroke="currentColor" stroke-dasharray="1.5 1.5" opacity=".75"/>',
     // Styles / Editing
     find: '<circle cx="11" cy="11" r="6" fill="none" stroke="currentColor"/><path d="M16 16l4 4" stroke="currentColor"/>',
     replace: '<path d="M4 7h9M10 4 13 7l-3 3" fill="none" stroke="currentColor"/><path d="M20 17h-9M14 14l-3 3 3 3" fill="none" stroke="currentColor"/>',
