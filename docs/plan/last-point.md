@@ -7,6 +7,30 @@
 
 ---
 
+## 2026-06-15 (Phase 3 — Text Effects & Typography rebuilt: button un-broken, trio docx-faithful)
+
+- **Branch:** `fix/ribbon-home`. **Phase:** Phase 3 Home tab — Text Effects rebuild (stage 1 DONE; quartet export = stage 2).
+- **The broken Font button ("Text Effects & Typography") is FIXED on the PM engine** (`5dd55bd`; research via
+  `text-effects-research` workflow → user locked "fix fully, all 7, docx-exportable; build it all"):
+  - **Crash gone + un-blocked:** all ~12 dead `E()=WC.Editor.applyInlineStyles` call sites re-routed to
+    `WC.PM.cmd('setMark','textStyle',{…})`; `textEffectsAndTypography` re-mapped area `text-effects`→`character`
+    and `text-effects` removed from the `DEFERRED`/`isBlocked` set (it was gated AND crashing).
+  - **One shared mechanism:** 7 new `textStyle` attrs (text-style.js) — trio `fontVariantNumeric` /
+    `fontVariantLigatures` / `fontFeatureSettings`, quartet `textOutline` / `textGlow` / `textShadowW14` /
+    `textReflection`; render via CSS (glow+shadow share one text-shadow compositor); bridged in `styles.js`.
+  - **Typography trio = FULLY docx round-tripping** (their `w14:numForm/numSpacing/ligatures/cntxtAlts/
+    stylisticSets` translators already existed): render + export + re-import all validated by probe + tests.
+    "Standard and Contextual" maps to `ligatures=standard`+`cntxtAlts` (the `standardContextual` enum is dropped
+    by the exporter). Removed the editor-wide `font-feature-settings:'liga' 0` (blocked per-run typography render).
+  - **Visual quartet (Outline/Glow/Shadow/Reflection) RENDERS in-app** (CSS: -webkit-text-stroke / text-shadow /
+    -webkit-box-reflect) but **does NOT export to docx yet** — its 4 net-new `w14:textOutline/glow/shadow/
+    reflection` translators (with EMU/60000ths-degree/1000ths-% unit conversions) are **stage 2**, deliberately
+    deferred so the units get **oracle-validated vs real Word** rather than rushed (a units bug silently corrupts
+    docx). On a feature branch; interim = quartet renders but save drops it.
+- **Gates:** PM **353/354** (1 = Windows-only `[10mm]` fixture skip; +6 Text Effects tests), smoke **9/9**, roundtrip **27/0**.
+- **Next (stage 2):** build the 4 quartet `w14` export translators + bridge + RUN_PROPERTIES keys + per-effect
+  oracle round-trip vs real Word (macOS AppleScript oracle); then the Home-tab PR.
+
 ## 2026-06-15 (Phase 3 — Home/Paragraph section + Text Effects rebuild started)
 
 - **Branch:** `fix/ribbon-home`. **Phase:** Phase 3 Home tab — Paragraph section DONE; Font "Text Effects" rebuild IN PROGRESS.
