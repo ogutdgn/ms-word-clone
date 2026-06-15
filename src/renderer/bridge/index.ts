@@ -399,6 +399,7 @@ export function preinstallBridge() {
       const content = document.getElementById('pm-editor') || pages
       pages.style.marginBottom = (zoom < 1 ? 0 : ((content as HTMLElement).scrollHeight * (zoom - 1))) + 'px'
       if (ww.WC?.StatusBar?.updateZoom) ww.WC.StatusBar.updateZoom()
+      ww.WC.PM.__repaginate?.() // re-measure (Phase 4a): zoom re-layouts without a transaction
     },
     zoomIn() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom + 0.1) * 10) / 10) },
     zoomOut() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom - 0.1) * 10) / 10) },
@@ -408,6 +409,7 @@ export function preinstallBridge() {
       const wa = document.getElementById('workarea'); if (!wa) return
       wa.classList.remove('view-print', 'view-web', 'view-read', 'view-outline', 'view-draft')
       wa.classList.add('view-' + v)
+      ;(window as any).WC.PM.__repaginate?.() // re-measure (Phase 4a): continuous views drop the page seams
     },
   }
   document.body.classList.add('pm-active')

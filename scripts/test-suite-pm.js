@@ -5012,6 +5012,113 @@
   await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('margins') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
+  // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------
+  // The engine is rAF-driven; allow generous settle time (the headless probe window
+  // paints transparent+inactive so rAF runs at full speed — see src/main/main.js).
+  const seamEls = () =>
+    Array.from(document.querySelectorAll('#pm-editor .ProseMirror > .pm-page-spacer')).filter((s) => s.querySelector('.pm-gap-band'));
+  const allSpacerEls = () => Array.from(document.querySelectorAll('#pm-editor .ProseMirror > .pm-page-spacer'));
+  const fillParas = (n) => {
+    const arr = [];
+    for (let i = 1; i <= n; i++) arr.push('Paragraph line number ' + i + ' — the quick brown fox jumps over the lazy dog.');
+    setDocs(arr);
+  };
+
+  await t('[4a] pagination exposes page geometry from the document model', async () => {
+    setDoc('pagination geometry probe');
+    await sleep(400);
+    const pg = PM().__pagination;
+    if (!pg || !pg.geometry) return 'no __pagination/geometry exposed';
+    const g = pg.geometry;
+    return (Math.round(g.pageH) === 1056 && Math.round(g.marginTop) === 96 && Math.round(g.contentH) === 864) ||
+      'geometry off: ' + JSON.stringify({ pageH: g.pageH, mt: g.marginTop, ch: g.contentH });
+  });
+
+  await t('[4a] short doc = single page, no page seams', async () => {
+    setDoc('one short line');
+    await sleep(400);
+    const pg = PM().__pagination;
+    if (!pg) return 'no __pagination';
+    return (pg.pageCount === 1 && pg.breaks.length === 0 && seamEls().length === 0) ||
+      'pageCount=' + pg.pageCount + ' breaks=' + pg.breaks.length + ' seams=' + seamEls().length;
+  });
+
+  await t('[4a] overflowing content paginates into multiple pages with rendered seams', async () => {
+    fillParas(70);
+    await sleep(600);
+    const pg = PM().__pagination;
+    if (!pg) return 'no __pagination';
+    if (pg.pageCount < 2) return 'pageCount=' + pg.pageCount + ' (expected >=2)';
+    if (pg.breaks.length !== pg.pageCount - 1) return 'breaks=' + pg.breaks.length + ' != pageCount-1=' + (pg.pageCount - 1);
+    if (seamEls().length !== pg.breaks.length) return 'rendered seams=' + seamEls().length + ' != breaks=' + pg.breaks.length;
+    return true;
+  });
+
+  await t('[4a] page margins are realized (top-margin + tail spacers present)', async () => {
+    // After fillParas(70): a top-margin spacer (no band) + N seams (band) + a tail (no band).
+    const spacers = allSpacerEls();
+    const bandless = spacers.filter((s) => !s.querySelector('.pm-gap-band'));
+    return bandless.length >= 2 || 'bandless spacers (top+tail) = ' + bandless.length + ' of ' + spacers.length;
+  });
+
+  await t('[4a] each seam positions the next page content at the page content-top', async () => {
+    // The core geometry invariant: the first content block after page-seam k must
+    // start at visual y = k*pitch + marginTop (the content-top of page k+1). This
+    // verifies every page boundary directly and is robust to the last-page tail.
+    fillParas(70);
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    // poll to convergence (box height stable)
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 25 && stable < 3; i++) { await sleep(120); const h = pm.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const z = PM().zoom || 1;
+    const boxTop = pm.getBoundingClientRect().top;
+    const g = PM().__pagination.geometry, GAP = 14, pitch = g.pageH + GAP;
+    const kids = Array.from(pm.children);
+    let k = 0; const errs = [];
+    for (let i = 0; i < kids.length; i++) {
+      const el = kids[i];
+      if (!(el.classList.contains('pm-page-spacer') && el.querySelector('.pm-gap-band'))) continue;
+      k++;
+      let j = i + 1; while (j < kids.length && kids[j].classList.contains('pm-page-spacer')) j++;
+      if (j >= kids.length) continue;
+      const top = (kids[j].getBoundingClientRect().top - boxTop) / z;
+      const target = k * pitch + g.marginTop;
+      if (Math.abs(top - target) > 6) errs.push('seam' + k + ' top=' + Math.round(top) + ' target=' + Math.round(target));
+    }
+    if (k === 0) return 'no seams found';
+    return errs.length === 0 ? true : errs.join('; ');
+  });
+
+  await t('[4a] a pagination decoration tick does NOT dirty the document', async () => {
+    PM().setClean();
+    fillParas(60); // forces a re-paginate (many decoration ticks)
+    await sleep(600);
+    // The content edit above DOES dirty (a real user edit). Re-clean, then force
+    // a pure pagination re-tick via a zoom change (no doc edit) and confirm clean.
+    PM().setClean();
+    const before = PM().isDirty();
+    PM().setZoom(1.1); // re-layout → pagination re-measures + dispatches a decoration-only tick
+    await sleep(400);
+    PM().setZoom(1);
+    await sleep(300);
+    const after = PM().isDirty();
+    return (before === false && after === false) || 'dirty before=' + before + ' after=' + after;
+  });
+
+  await t('[4a] continuous (Web) view renders no page seams', async () => {
+    fillParas(70);
+    await sleep(500);
+    const seamsPrint = seamEls().length;
+    PM().setView('web');
+    await sleep(400);
+    const seamsWeb = seamEls().length;
+    PM().setView('print');
+    await sleep(400);
+    const seamsBack = seamEls().length;
+    return (seamsPrint > 0 && seamsWeb === 0 && seamsBack > 0) ||
+      'print=' + seamsPrint + ' web=' + seamsWeb + ' back=' + seamsBack;
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
