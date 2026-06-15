@@ -653,6 +653,14 @@
     pane.remove();
     return spellingCount >= 2 && label === 'believe' && fixed;
   });
+  await t('[insert] small stacked Insert buttons keep text labels; Home Font buttons stay icon-only', () => {
+    const ci = window.WC.Ribbon.controlIndex;
+    const labeled = (cmd) => { const n = ci[cmd] && ci[cmd].node; const lbl = n && n.querySelector('.lbl'); return !!n && !n.classList.contains('icononly') && !!lbl && /\S/.test(lbl.textContent); };
+    const insertOk = labeled('coverPage') && labeled('blankPage') && labeled('link') && labeled('bookmark') && labeled('header') && labeled('textBox');
+    const boldNode = ci['bold'] && ci['bold'].node;
+    const boldIconOnly = !!boldNode && boldNode.classList.contains('icononly');
+    return insertOk && boldIconOnly;
+  });
   await t('[2] sort dialog OK reorders paragraphs ascending (one undo step)', async () => {
     setDocs(['banana', 'cherry', 'apple']);
     window.WC.editor.commands.selectAll();

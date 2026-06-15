@@ -98,7 +98,16 @@ the "More" behavior to match real Word.
 | Styles | "AaBbCcDdEe" Mac-style cell sample | ⛔ Out of scope | clone uses Windows-parity name-in-style cells (CLAUDE.md parity reference = Word for Windows 16.0) |
 
 ## Insert
-_TBD._
+
+**Insert** — UI arrangement locked 2026-06-15 (verified vs real Word via computer use). The slice-10
+feature wiring stands; this pass fixes the ribbon arrangement + label visibility.
+
+| Section | Feature | Status | Note |
+|---|---|---|---|
+| Ribbon | Small stacked buttons keep their **labels** (Word arrangement) | ✅ In scope | THE reported bug (only icons on a narrow screen). `LARGE` set trimmed to the genuinely-large Insert buttons; the rest render as small labeled buttons stacked 3-per-column (`renderControl` `labeled` opt). Condense only ever hides LARGE-button labels, so the many small labels stay visible |
+| Pages / Tables / Illustrations / Links / Text / Symbols | feature behaviour | ✅ In scope (slice 10) | Cover Page, Blank Page, Page Break, Table, Pictures, Shapes, Icons, 3D Models, SmartArt, Chart, Screenshot, Link, Bookmark, Cross-reference, Text Box, WordArt, Drop Cap, Date & Time, Quick Parts, Object, Equation, Symbol — real inserts / honest toasts |
+| Header & Footer | Header / Footer / Page Number | 🕗 Deferred (Phase 4) | layout-engine-gated (`isBlocked`); honest deferral toast — deferrals.md §A.1 |
+| Illustrations / Text | Floating-object position + text-wrap | 🕗 Deferred (Phase 4) | insertion + export are real (slice-10 anchors); off-flow positioning needs the layout engine |
 
 ## Draw
 _TBD._

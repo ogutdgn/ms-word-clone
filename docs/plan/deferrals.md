@@ -45,6 +45,9 @@
 | Home → Paragraph → Borders → Borders and Shading | **Shadow / 3-D border depth** (Setting buttons) | Approximated to a flat Box today; the offset/bevel depth needs the layout engine. OK shows a Phase-4 toast. | 2026-06-15 |
 | Home → Paragraph → Borders → Borders and Shading | **Apply to: Text** (run-level `w:bdr`) | Run-level character borders are not on the fork command surface; the dialog applies to the paragraph and flags. | 2026-06-15 |
 | Home → Paragraph → Borders | **Diagonal Down/Up border** (table cells) | Greyed outside tables (Word parity). In a cell, rendering the diagonal line needs the table layout pass. | 2026-06-15 |
+| Insert → Header & Footer | **Header / Footer / Page Number** | Need the on-page header/footer region + page geometry. `isBlocked` today → honest deferral toast (no crash). | 2026-06-15 |
+| Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
+| Insert → Pages | **Page Break vertical geometry** | Inserts a real break node; rendering an actual page boundary needs the multi-page layout engine. | 2026-06-15 |
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 

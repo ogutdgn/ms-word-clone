@@ -16,15 +16,17 @@
   function stylePreviewCommit() { if (WC.PM && WC.PM.ready) WC.PM.stylePreviewCommitRestore(); }
 
   // Commands rendered as large buttons (the prominent button in each group).
+  // Insert-tab note: real Word renders most Insert controls as SMALL buttons stacked
+  // 3-per-column WITH labels (Pages, Illustrations beyond Pictures, Links, Header &
+  // Footer, Text, Add-ins, Media). Keeping only the genuinely-large ones here keeps the
+  // tab compact so labels stay visible (condense only ever hides LARGE-button labels).
   const LARGE = new Set([
-    'paste', 'table', 'pictures', 'onlinePictures', 'shapes', 'icons', 'smartArt', 'chart', 'screenshot',
-    'coverPage', 'blankPage', 'header', 'footer', 'pageNumber', 'textBox', 'wordArt', 'dropCap', 'object', 'equation', 'symbol',
+    'paste', 'table', 'pictures', 'equation', 'symbol', 'comment',
     'tableOfContents', 'insertFootnote', 'insertCitation', 'bibliography', 'insertCaption', 'insertTableOfFigures', 'markEntry', 'insertIndex',
     'startMailMerge', 'selectRecipients', 'insertMergeField', 'finishMerge', 'greetingLine', 'addressBlock',
     'spellingGrammar', 'thesaurus', 'newComment', 'trackChanges', 'readAloud', 'translate', 'compare', 'protect',
     'readMode', 'printLayout', 'webLayout', 'zoom', 'onePage', 'multiplePages', 'pageWidth', 'switchWindows',
     'margins', 'orientation', 'size', 'columns', 'breaks', 'watermark', 'pageColor', 'pageBorders',
-    'getAddIns', 'wikipedia', 'onlineVideo', 'link', 'comment', 'crossReference', 'bookmark', 'quickParts', 'signatureLine', 'dateAndTime',
     'themes', 'help', 'feedback', 'showTraining', 'contactSupport', 'colors', 'fonts', 'paragraphSpacing', 'effects', 'setAsDefault',
     'navigationPane', 'immersiveReader', 'focus', 'draft', 'outline', 'macros',
   ]);
@@ -170,13 +172,16 @@
         // large controls
         const larges = rest.filter((c) => LARGE.has(c.cmd) || group.controls.length <= 2);
         const smalls = rest.filter((c) => !(LARGE.has(c.cmd) || group.controls.length <= 2));
+        // Insert (and other content-tab) small buttons keep their labels beside the icon,
+        // stacked 3-per-column, like real Word — not icon-only (that's a Home Font/Paragraph look).
+        const labeled = tab.id === 'insert';
         larges.forEach((c) => body.appendChild(this.renderControl(c, 'large')));
         // pack small controls 3 per column
         for (let i = 0; i < smalls.length; i += 3) {
           const stack = el('div', { class: 'ctrl-stack' });
           smalls.slice(i, i + 3).forEach((c) => {
             const row = el('div', { class: 'ctrl-row' });
-            row.appendChild(this.renderControl(c, 'small'));
+            row.appendChild(this.renderControl(c, 'small', { labeled }));
             stack.appendChild(row);
           });
           body.appendChild(stack);
@@ -352,8 +357,11 @@
       return wrap;
     },
 
-    renderControl(c, size) {
+    renderControl(c, size, opts) {
       if (c.type === 'spinner') return this.renderSpinner(c);
+      // opts.labeled = a SMALL button that keeps its text label beside the icon (Word's
+      // stacked small buttons on Insert/Layout/etc.); without it small buttons are icon-only.
+      const labeled = !!(opts && opts.labeled) && size === 'small';
       const isSplit = c.type === 'split';
       const isDrop = c.type === 'dropdown';
       const isColor = /color|highlight|shading/i.test(c.cmd) && (c.type === 'split' || /color/i.test(c.label));
@@ -361,10 +369,10 @@
 
       let node;
       if (isSplit) {
-        node = el('div', { class: 'rsplit ' + size, dataset: { cmd: c.cmd } });
+        node = el('div', { class: 'rsplit ' + size + (labeled ? ' labeled' : ''), dataset: { cmd: c.cmd } });
         const main = el('div', { class: 'main' });
         main.appendChild(el('span', { class: 'ic', html: iconHtml }));
-        if (size === 'large') main.appendChild(el('span', { class: 'lbl', text: c.label }));
+        if (size === 'large' || labeled) main.appendChild(el('span', { class: 'lbl', text: c.label }));
         if (isColor) main.appendChild(el('span', { class: 'color-bar', dataset: { colorbar: c.cmd } }));
         const arrow = el('div', { class: 'arrow' }, [size === 'large' ? null : null, el('span', { html: WC.icon('chevron_down', 8) })]);
         node.appendChild(main); node.appendChild(arrow);
@@ -373,9 +381,9 @@
         main.addEventListener('click', () => WC.Commands.run(c, node));
         arrow.addEventListener('click', () => WC.Commands.dropdown(c, node));
       } else {
-        node = el('div', { class: 'rbtn ' + size, dataset: { cmd: c.cmd } });
+        node = el('div', { class: 'rbtn ' + size + (labeled ? ' labeled' : ''), dataset: { cmd: c.cmd } });
         node.appendChild(el('span', { class: 'ic', html: iconHtml }));
-        if (size === 'large') node.appendChild(el('span', { class: 'lbl', text: c.label }));
+        if (size === 'large' || labeled) node.appendChild(el('span', { class: 'lbl', text: c.label }));
         else if (!this.isIconOnly(c)) node.appendChild(el('span', { class: 'lbl', text: c.label }));
         if (isDrop) node.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8) }));
         if (isColor) node.appendChild(el('span', { class: 'color-bar', dataset: { colorbar: c.cmd } }));
@@ -383,7 +391,7 @@
         node.addEventListener('click', () => { if (isDrop) WC.Commands.dropdown(c, node); else WC.Commands.run(c, node); });
         if (c.cmd === 'formatPainter') node.addEventListener('dblclick', () => { WC.closeFlyouts(); WC.Commands.run({ cmd: 'formatPainterLock' }, node); });
       }
-      if (size === 'small') node.classList.add('icononly');
+      if (size === 'small' && !labeled) node.classList.add('icononly');
       this.controlIndex[c.cmd] = this.controlIndex[c.cmd] || { node, control: c };
       if (TOGGLE_MAP[c.cmd]) this.toggleNodes.push({ node, cmd: c.cmd });
       WC.attachTip(node, c.label, c.tooltip, c.shortcut);

@@ -192,10 +192,14 @@
 .rbtn.small .lbl { font-size: 12px; white-space: nowrap; }
 .rbtn.small .caret { font-size: 8px; color: #666; margin-left: 2px; }
 .rbtn.icononly .lbl { display: none; }
+/* Labeled small buttons (Word's stacked Insert/Layout buttons): icon + text, left-aligned. */
+.rbtn.small.labeled, .rsplit.small.labeled { justify-content: flex-start; }
+.rbtn.small.labeled .lbl, .rsplit.small.labeled .main .lbl { white-space: nowrap; color: #201f1e; }
 
 /* 3-row stack container for small controls */
 .ctrl-stack { display: flex; flex-direction: column; justify-content: center; gap: 1px; height: 66px; }
 .ctrl-row { display: flex; align-items: center; gap: 1px; }
+.ctrl-stack .ctrl-row { justify-content: flex-start; }
 
 /* Home Font + Paragraph groups: explicit two-row layout (Word arrangement) */
 .font-grid, .para-grid { display: flex; flex-direction: column; justify-content: center; gap: 3px; height: 66px; }
