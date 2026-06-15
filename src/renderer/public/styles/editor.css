@@ -432,6 +432,35 @@ body.pm-active #pm-editor {
 }
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
 
+/* Selected inline object (a picture or a video thumbnail): show a Word-like
+   selection frame + corner handles. ProseMirror flags the node with
+   .ProseMirror-selectednode; without any styling the image looked unselectable,
+   so users couldn't tell it was picked and thought it couldn't be moved/deleted. */
+body.pm-active #pm-editor .ProseMirror-selectednode,
+body.pm-active #pm-editor .ProseMirror-selectednode img {
+  outline: 2px solid var(--word-blue, #2b579a);
+  outline-offset: 1px;
+  border-radius: 1px;
+}
+body.pm-active #pm-editor .ProseMirror-selectednode {
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(43, 87, 154, 0.25);
+}
+/* Four corner handles drawn off the selection's corners (decorative; resize is a
+   future slice — the frame alone makes selection obvious so delete/move work). */
+body.pm-active #pm-editor .ProseMirror-selectednode::before,
+body.pm-active #pm-editor .ProseMirror-selectednode::after {
+  content: '';
+  position: absolute;
+  width: 7px; height: 7px;
+  background: #fff;
+  border: 1px solid var(--word-blue, #2b579a);
+  border-radius: 1px;
+  pointer-events: none;
+}
+body.pm-active #pm-editor .ProseMirror-selectednode::before { top: -5px; left: -5px; }
+body.pm-active #pm-editor .ProseMirror-selectednode::after { bottom: -5px; right: -5px; }
+
 /* Strikethrough on sub/superscript runs (Word parity).
    The strike mark serializes as the OUTER <s>; the vertAlign mark serializes
    as an INNER <span style="vertical-align: sub|super; font-size: 65%">. The

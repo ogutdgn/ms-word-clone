@@ -1879,6 +1879,31 @@
     return (res && res.width >= 150 && res.height >= 100 && res.natural == null)
       || ('res=' + JSON.stringify(res));
   });
+  await t('[fix] a node-selected image shows a visible selection frame (.ProseMirror-selectednode is styled)', async () => {
+    setDoc('imgsel: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 80), 'sel.png');
+    await sleep(120);
+    const ed = window.WC.editor;
+    let imgPos = null; ed.state.doc.descendants((n, p) => { if (n.type.name === 'image' && imgPos == null) imgPos = p; });
+    if (imgPos == null) return 'no image node';
+    v().dispatch(v().state.tr.setSelection(window.__PM_NodeSelection.create(doc(), imgPos)));
+    await sleep(60);
+    const sel = document.querySelector('#pm-editor .ProseMirror-selectednode');
+    if (!sel) return 'no .ProseMirror-selectednode element after selecting the image';
+    const cs = getComputedStyle(sel);
+    return (cs.outlineStyle === 'solid' && parseFloat(cs.outlineWidth) >= 1)
+      || ('outline=' + cs.outlineStyle + ' ' + cs.outlineWidth);
+  });
+  await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
+    setDoc('vid: ');
+    window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');
+    await sleep(160);
+    let img = null; window.WC.editor.state.doc.descendants((n) => { if (n.type.name === 'image' && !img) img = n; });
+    if (!img) return 'no image node inserted';
+    const isSvg = /^data:image\/svg\+xml/.test(img.attrs.src || '');
+    const hasUrl = /youtube\.com\/watch\?v=abc123/.test(img.attrs.alt || '');
+    return (isSvg && hasUrl) || ('src=' + (img.attrs.src || '').slice(0, 28) + ' alt=' + img.attrs.alt);
+  });
   await t('[6] insertBookmark wraps the selection in PAIRED start+end (same id)', async () => {
     setDoc('mark this range'); selectText('this range'); await sleep(60);
     PM().insertBookmark({ name: 'spot1' }); await sleep(120);

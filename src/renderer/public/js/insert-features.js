@@ -313,10 +313,38 @@
   };
   Insert.onlineVideoDialog = function () {
     const url = el('input', { type: 'text', class: 'grow', placeholder: 'Paste a video URL (YouTube, Vimeo…)' });
-    WC.dialog({ title: 'Insert Online Video', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'URL:', style: { width: '50px' } }), url]), el('div', { style: { fontSize: '12px', color: '#666', marginTop: '6px' }, text: 'A clickable video thumbnail is inserted (embedded playback is restricted by the app sandbox).' })]), footer: [
-      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; WC.PM.xeOnlineVideo(u); } },
+    WC.dialog({ title: 'Insert Online Video', width: '460px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'URL:', style: { width: '50px' } }), url]), el('div', { style: { fontSize: '12px', color: '#666', marginTop: '6px' }, text: 'A video thumbnail (poster) is inserted; embedded playback is restricted by the app sandbox.' })]), footer: [
+      { label: 'Insert', primary: true, onClick: () => { const u = WC.safeUrl(url.value.trim()); if (u === '#') return; Insert.insertVideoThumbnail(u); } },
       { label: 'Cancel' },
     ] });
+  };
+  // Insert a real, visible video poster: a self-contained SVG data-URL (the CSP is
+  // img-src 'self' data: blob:, so remote provider thumbnails are blocked) with a
+  // play button + host + URL. It goes in as a normal image node, so it's
+  // selectable / movable / deletable like any picture. Embedded playback stays
+  // sandbox-restricted; the link is preserved in the image description.
+  Insert.insertVideoThumbnail = function (videoUrl) {
+    const u = String(videoUrl || '');
+    let host = 'Online Video';
+    try { host = new URL(u).hostname.replace(/^www\./, ''); } catch (_) { /* keep default */ }
+    const disp = u.length > 54 ? u.slice(0, 51) + '…' : u;
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270" viewBox="0 0 480 270">' +
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0d0d0d"/></linearGradient></defs>' +
+      '<rect width="480" height="270" fill="url(#g)"/>' +
+      '<circle cx="240" cy="116" r="42" fill="#ff0000" opacity="0.92"/>' +
+      '<path d="M226 94 L226 138 L264 116 Z" fill="#ffffff"/>' +
+      '<text x="240" y="206" fill="#ffffff" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="bold" text-anchor="middle">' + esc(host) + '</text>' +
+      '<text x="240" y="232" fill="#c8c8c8" font-family="Arial,Helvetica,sans-serif" font-size="12" text-anchor="middle">' + esc(disp) + '</text>' +
+      '</svg>';
+    const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    if (WC.Commands && WC.Commands.insertPictureFromDataUrl) {
+      WC.Commands.insertPictureFromDataUrl(dataUrl, 'Online video: ' + u);
+    } else {
+      WC.PM.insertImage({ src: dataUrl, alt: 'Online video: ' + u, width: 480, height: 270 });
+    }
+    if (WC.toast) WC.toast('Inserted a video thumbnail', 'Embedded playback is restricted by the app sandbox; the video URL is kept as the image description.');
   };
   Insert.screenshot = async function () {
     if (!window.wordAPI.screenshot) { WC.toast('Screenshot capture is not available in this build.'); return; }

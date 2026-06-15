@@ -2,7 +2,7 @@
 // Phase 2: the PM core is the ACTIVE editor by default (spec D1); --legacy boots
 // the classic app. The WC.PM bridge (src/renderer/bridge/) is the only code that
 // talks to the engine.
-import { TextSelection } from '@/pm'
+import { TextSelection, NodeSelection } from '@/pm'
 import { fixtureArrayBuffer, negationArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
 import { createPmEditor } from '@/bridge/create-editor'
@@ -14,6 +14,7 @@ import './core/superdoc-fork/assets/styles/elements/prosemirror.css'
 
 const w = window as any
 w.__PM_TextSelection = TextSelection
+w.__PM_NodeSelection = NodeSelection
 // Debug global for the PM suite: the Word-authored negation-run fixture (spec §7.5).
 // The suite runs from the BUILT app and has no stable absolute repo path — inlining
 // the fixture (gen-fixture) keeps the test hermetic.
