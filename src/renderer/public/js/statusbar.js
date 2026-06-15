@@ -60,9 +60,13 @@
       // WC.Editor retired (slice 11): the PM bridge owns counts. The pre-mount
       // counts() stub returns zeros (the correct boot display) before PM.ready.
       if (!(WC.PM && WC.PM.active)) return;
-      // Continuous flow until Phase 7 — report honestly (spec §7.8).
-      this.pageEl.textContent = 'Page 1 of 1';
       const c = WC.PM.counts();
+      // Phase 4a: real "Page X of Y" from the pagination engine — total page count
+      // + the caret's page (number of seams above the caret + 1).
+      const pg = WC.PM.__pagination || { pageCount: c.pages || 1, breaks: [] };
+      let cur = 1;
+      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).length + 1; } catch (e) {}
+      this.pageEl.textContent = 'Page ' + Math.min(cur, pg.pageCount || 1) + ' of ' + (pg.pageCount || 1);
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
     updateZoom() {

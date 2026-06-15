@@ -5076,6 +5076,19 @@
     return true;
   });
 
+  await t('[4a] counts().pages + status bar reflect the live page count', async () => {
+    fillParas(70);
+    // poll until counts.pages catches up to the engine
+    const PMx = PM();
+    let pages = 0, pc = 0;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = (PMx.__pagination || {}).pageCount || 1; pages = PMx.counts().pages; if (pages === pc && pc >= 2) break; }
+    if (pages !== pc) return 'counts.pages=' + pages + ' != engine pageCount=' + pc;
+    if (pc < 2) return 'expected multi-page, got ' + pc;
+    const status = document.querySelector('#statusbar .sb-item');
+    const txt = status ? status.textContent : '';
+    return /^Page \d+ of \d+$/.test(txt) && txt.endsWith('of ' + pc) || 'status="' + txt + '" pageCount=' + pc;
+  });
+
   await t('[4a] page margins are realized (top-margin + tail spacers present)', async () => {
     // After fillParas(70): a top-margin spacer (no band) + N seams (band) + a tail (no band).
     const spacers = allSpacerEls();
