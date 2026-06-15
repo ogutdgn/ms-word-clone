@@ -5,6 +5,11 @@
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { calculateResolvedParagraphProperties } from '@extensions/paragraph/resolvedPropertiesCache.js'
 import { STYLE_ID_TO_NAME } from './style-names'
+import { clipboardHasContent } from './clipboard'
+
+// One-time guard for window-level listeners (installStateSync re-runs per editor
+// mount; editor.on listeners die with the editor, window listeners do not).
+let externalListenersInstalled = false
 
 type AnyEditor = any
 
@@ -114,6 +119,15 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
   st.computedFontFamily = st.fontName
   const sizeNum = parseFloat(st.fontSize)
   st.computedFontSizePt = isNaN(sizeNum) ? null : sizeNum
+  // Phase 3 ribbon state machine: control-state facts that enablement/latch rules
+  // (registered via WC.Ribbon.registerStateRule) read. Kept on the same queryState
+  // object so a single evaluator pass (sync → applyStateRules) sees everything.
+  try { st.hasSelection = !editor.state.selection.empty } catch { st.hasSelection = false }
+  try { const can = editor.can?.(); st.canUndo = !!can?.undo?.(); st.canRedo = !!can?.redo?.() }
+  catch { st.canUndo = false; st.canRedo = false }
+  const fpStore = (editor as any).extensionStorage?.formatCommands
+  st.painterArmed = !!(fpStore && (fpStore.storedStyle || fpStore.storedParaProps))
+  st.clipboardHasContent = clipboardHasContent()
   return st
 }
 
@@ -126,6 +140,10 @@ export function installStateSync(editor: AnyEditor) {
     scheduled = false
     const st = toQueryState(editor)
     w.WC?.Ribbon?.syncToggles?.(st)
+    // Phase 3: the declarative ribbon state machine — one evaluator pass over the
+    // registered enablement/latch/value rules (WC.Ribbon.registerStateRule). Each
+    // section registers its own rules; this single call applies them all.
+    w.WC?.Ribbon?.applyStateRules?.(st)
     // Fidelity WIN over legacy: combos now track the caret (real Word does this).
     // Deliberate spec deviation (recorded): setColorBar is NOT caret-driven — the
     // split-button color bars show the LAST-USED color (applyColor writes them),
@@ -149,15 +167,12 @@ export function installStateSync(editor: AnyEditor) {
     document.querySelectorAll('.style-cell').forEach((c: any) => {
       c.classList.toggle('active', !!st.block && c.dataset.style === st.block)
     })
-    // slice 4: format-painter chrome — button latches + the page shows a copy
-    // cursor while armed (fork FormatCommands storage is the state of record;
-    // arm/cancel don't dispatch a transaction, so the bridge wrappers nudge sync).
-    const fpStorage = (editor as any).extensionStorage?.formatCommands
-    const fpArmed = !!(fpStorage && (fpStorage.storedStyle || fpStorage.storedParaProps))
-    const fpBtn = w.WC?.Ribbon?.controlIndex?.formatPainter?.node
-    if (fpBtn) fpBtn.classList.toggle('toggled', fpArmed)
+    // slice 4 / Phase 3: the format-painter BUTTON latch is now a state-machine
+    // rule (formatPainter → latched: st.painterArmed, registered in
+    // home-features.js). The page copy-cursor stays here — it's a document-surface
+    // affordance, not a ribbon-control state.
     const pmPage = document.getElementById('pm-editor')
-    if (pmPage) pmPage.style.cursor = fpArmed ? 'copy' : ''
+    if (pmPage) pmPage.style.cursor = st.painterArmed ? 'copy' : ''
     // slice 8 (A6): Track Changes latch + Display-for-Review combo via the format-painter
     // DIRECT-POKE pattern — PM-only by construction. NEVER the shared TOGGLE_MAP: under
     // --legacy, syncToggles would read !!undefined and clobber the legacy latch
@@ -198,11 +213,11 @@ export function installStateSync(editor: AnyEditor) {
     // No-op until Stage F (table-tools-pm.js) ships syncContextualTabs — must not throw.
     ;(window as any).WC?.TableToolsPM?.syncContextualTabs?.(inTable)
     w.WC?.StatusBar?.update?.()
-    // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty.
-    const can = (w.WC?.editor as any)?.can?.()
+    // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty
+    // (st.canUndo/canRedo computed once in toQueryState).
     document.querySelectorAll('.qat .qat-btn').forEach((b: any) => {
-      if (/^Undo/.test(b.title)) b.style.opacity = can?.undo?.() ? '' : '0.4'
-      if (/^Redo/.test(b.title)) b.style.opacity = can?.redo?.() ? '' : '0.4'
+      if (/^Undo/.test(b.title)) b.style.opacity = st.canUndo ? '' : '0.4'
+      if (/^Redo/.test(b.title)) b.style.opacity = st.canRedo ? '' : '0.4'
     })
   }
   // Coalesce 'transaction' + 'selectionUpdate' (both fire per keystroke) into one
@@ -210,5 +225,18 @@ export function installStateSync(editor: AnyEditor) {
   const schedule = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(sync) } }
   editor.on('transaction', schedule)
   editor.on('selectionUpdate', schedule)
+  // Phase 3: let non-transaction state changes nudge a ribbon re-eval. A clipboard
+  // copy fires no editor transaction, and the OS clipboard can change in another
+  // app — clipboard.ts calls this after cut/copy and on the focus re-probe below.
+  const PM = (window as any).WC?.PM
+  if (PM) PM._scheduleRibbonSync = schedule
+  if (!externalListenersInstalled) {
+    externalListenersInstalled = true
+    // Window regained focus → the OS clipboard may have changed elsewhere; re-probe
+    // so Paste's enablement reflects reality (refreshClipboardState nudges sync).
+    window.addEventListener('focus', () => { (window as any).WC?.PM?.refreshClipboardState?.() })
+  }
+  // Initial probe so Paste reflects a pre-existing clipboard at boot.
+  ;(window as any).WC?.PM?.refreshClipboardState?.()
   schedule()
 }

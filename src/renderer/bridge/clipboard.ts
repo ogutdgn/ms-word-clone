@@ -4,6 +4,15 @@
 // view.pasteHTML / setImage so every insertion is a normal PM transaction.
 type AnyEditor = any
 
+// Phase 3 ribbon state machine: cache of whether the OS clipboard currently
+// holds pasteable content. Drives the Paste button's enablement (Word greys
+// Paste on an empty clipboard). It is EXTERNAL state — the user can copy in
+// another app — so it is refreshed on window focus and after our own clipboard
+// ops, never derived from an editor transaction. state-sync.ts reads the getter
+// in toQueryState; clipboard.ts updates it here.
+let _clipboardHasContent = false
+export const clipboardHasContent = (): boolean => _clipboardHasContent
+
 // view.pasteText/pasteHTML synthesize a bare `new ClipboardEvent('paste')` whose
 // clipboardData is null — but the fork's InputRule handlePaste reads
 // event.clipboardData.getData(...) and would throw. Hand it a real ClipboardEvent
@@ -19,12 +28,26 @@ export function installClipboard(editor: AnyEditor) {
   const api = () => (window as any).wordAPI?.clipboard
 
   const focusView = () => { try { editor.view.focus() } catch { /* view gone */ } }
+  // A copy fires no editor transaction, so the per-transaction ribbon sync would
+  // not re-run — nudge it explicitly so Paste re-enables immediately.
+  const nudgeRibbon = () => { try { (window as any).WC?.PM?._scheduleRibbonSync?.() } catch { /* pre-mount */ } }
+
+  // Re-probe the OS clipboard and re-evaluate the ribbon. Called on window focus
+  // (clipboard may have changed in another app) and once at boot.
+  async function refreshClipboardState(): Promise<boolean> {
+    try {
+      const f = await api()?.flavors()
+      _clipboardHasContent = !!(f && (f.hasText || f.hasHtml || f.hasImage))
+    } catch { /* clipboard unreadable */ }
+    nudgeRibbon()
+    return _clipboardHasContent
+  }
 
   async function cutSelection(): Promise<boolean> {
-    focusView(); await api()?.cut(); return true
+    focusView(); await api()?.cut(); _clipboardHasContent = true; nudgeRibbon(); return true
   }
   async function copySelection(): Promise<boolean> {
-    focusView(); await api()?.copy(); return true
+    focusView(); await api()?.copy(); _clipboardHasContent = true; nudgeRibbon(); return true
   }
   async function pasteDefault(): Promise<boolean> {
     focusView(); await api()?.paste(); return true // fire-and-forget — content lands async
@@ -58,5 +81,5 @@ export function installClipboard(editor: AnyEditor) {
     return (await api()?.flavors()) ?? null
   }
 
-  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors }
+  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState }
 }

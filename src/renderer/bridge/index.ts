@@ -299,6 +299,7 @@ export function preinstallBridge() {
     pasteHTML: async () => false,
     pastePicture: async () => false,
     clipboardFlavors: async () => null,
+    refreshClipboardState: async () => false,
     selectAll: () => false,
     selectSimilarFormatting: () => false,
     armFormatPainter: () => false,

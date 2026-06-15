@@ -369,7 +369,35 @@
       const bar = this.body.querySelector(`[data-colorbar="${cmd}"]`);
       if (bar) bar.style.background = color;
     },
+
+    // ---- Phase 3 ribbon state machine ------------------------------------
+    // A declarative per-control rule registry. Each rule is
+    //   { enabled?(st)->bool, latched?(st)->bool, value?(st)->string }
+    // evaluated every transaction by applyStateRules(st) (called from the
+    // bridge state-sync tick). enabled→`wc-disabled` (greyed + click-blocked
+    // via ribbon.css), latched→`toggled`, value→combo/input text. Sections
+    // register their rules with WC.registerRibbonRule(cmd, rule).
+    stateRules: {},
+    registerStateRule(cmd, rule) {
+      this.stateRules[cmd] = Object.assign(this.stateRules[cmd] || {}, rule);
+    },
+    applyStateRules(st) {
+      for (const cmd in this.stateRules) {
+        const r = this.stateRules[cmd];
+        const ent = this.controlIndex[cmd];
+        if (!ent || !ent.node) continue;
+        if (r.enabled) ent.node.classList.toggle('wc-disabled', !r.enabled(st));
+        if (r.latched) ent.node.classList.toggle('toggled', !!r.latched(st));
+        if (r.value && ent.input && document.activeElement !== ent.input) ent.input.value = r.value(st);
+      }
+    },
   };
 
   WC.Ribbon = Ribbon;
+  // Drain any state rules queued by section scripts that loaded BEFORE this file
+  // (script order: section-features → ribbon.js — see WC.registerRibbonRule in
+  // home-features.js), then route further registrations straight through.
+  (WC._pendingStateRules || []).forEach(([cmd, rule]) => Ribbon.registerStateRule(cmd, rule));
+  WC._pendingStateRules = null;
+  WC.registerRibbonRule = (cmd, rule) => Ribbon.registerStateRule(cmd, rule);
 })();

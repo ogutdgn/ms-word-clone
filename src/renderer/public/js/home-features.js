@@ -7,6 +7,13 @@
 (function () {
   window.WC = window.WC || {};
   const WC = window.WC;
+
+  // Phase 3 ribbon state machine: register enablement/latch rules. ribbon.js
+  // loads AFTER this file, so queue until WC.Ribbon exists — ribbon.js drains
+  // WC._pendingStateRules on load and swaps this for a direct call.
+  WC.registerRibbonRule = WC.registerRibbonRule || function (cmd, rule) {
+    (WC._pendingStateRules = WC._pendingStateRules || []).push([cmd, rule]);
+  };
   // PM bridge accessor — clipboard paste routes through the engine (the legacy
   // WC.Editor was retired). Returns the active+ready PM bridge or null.
   const pm = () => (WC.PM && WC.PM.active && WC.PM.ready) ? WC.PM : null;
@@ -55,4 +62,14 @@
     if (label) WC.toast('Sensitivity set to “' + label + '”.');
     else WC.toast('Sensitivity label removed.');
   };
+
+  // ===================== Clipboard ribbon state rules =====================
+  // Word's Home → Clipboard enablement (validated live): Cut and Copy require a
+  // non-empty selection; Paste requires pasteable clipboard content; Format
+  // Painter shows a pressed latch while armed. Facts come from the bridge
+  // state-sync (toQueryState: hasSelection / clipboardHasContent / painterArmed).
+  WC.registerRibbonRule('cut', { enabled: (st) => !!st.hasSelection });
+  WC.registerRibbonRule('copy', { enabled: (st) => !!st.hasSelection });
+  WC.registerRibbonRule('paste', { enabled: (st) => !!st.clipboardHasContent });
+  WC.registerRibbonRule('formatPainter', { latched: (st) => !!st.painterArmed });
 })();

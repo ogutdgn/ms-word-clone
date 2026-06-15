@@ -978,6 +978,42 @@
     await sleep(150);
     return on && !fpBtn.classList.contains('toggled');
   });
+  // ---------- Phase 3 / Home: ribbon state machine (Clipboard section) ----------
+  await t('[home] state machine: rule registry drained + Clipboard rules registered', () => {
+    const sr = window.WC.Ribbon.stateRules;
+    if (!sr) return 'no stateRules registry';
+    return typeof sr.cut?.enabled === 'function'
+      && typeof sr.copy?.enabled === 'function'
+      && typeof sr.paste?.enabled === 'function'
+      && typeof sr.formatPainter?.latched === 'function';
+  });
+  await t('[home] state machine: Cut/Copy greyed with a collapsed caret (no selection)', async () => {
+    setDoc('alpha beta gamma');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 3, 3)));
+    await sleep(150);
+    const cut = window.WC.Ribbon.controlIndex.cut?.node;
+    const copy = window.WC.Ribbon.controlIndex.copy?.node;
+    if (!cut || !copy) return 'cut/copy not in controlIndex';
+    return cut.classList.contains('wc-disabled') && copy.classList.contains('wc-disabled');
+  });
+  await t('[home] state machine: Cut/Copy enabled with a selection', async () => {
+    selectText('beta'); await sleep(150);
+    const cut = window.WC.Ribbon.controlIndex.cut?.node;
+    const copy = window.WC.Ribbon.controlIndex.copy?.node;
+    if (!cut || !copy) return 'cut/copy not in controlIndex';
+    return !cut.classList.contains('wc-disabled') && !copy.classList.contains('wc-disabled');
+  });
+  await t('[home] state machine: Paste greys on empty clipboard, enables with content', () => {
+    const paste = window.WC.Ribbon.controlIndex.paste?.node;
+    if (!paste) return 'paste not in controlIndex';
+    // Drive the rule directly (real clipboard state is non-deterministic headless);
+    // hasSelection:true keeps Cut/Copy correct so this leaves no side effect.
+    window.WC.Ribbon.applyStateRules({ clipboardHasContent: false, hasSelection: true });
+    const off = paste.classList.contains('wc-disabled');
+    window.WC.Ribbon.applyStateRules({ clipboardHasContent: true, hasSelection: true });
+    const on = !paste.classList.contains('wc-disabled');
+    return off && on;
+  });
   await t('[4] Select All selects the whole document via the menu', async () => {
     setDocs(['selall first para', 'selall second para']);
     const node = document.querySelector('[data-cmd="select"]') || document.body;
