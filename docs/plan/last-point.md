@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-06-14 (Phase 3 execution) — Home tab STARTED: Clipboard section built (ribbon state-machine spine + all locked features); test runs now headless on macOS
+
+- **Branch:** `fix/ribbon-home` (off `main` @ `3400932`); **PR pending** (one branch/PR per tab).
+- **Phase:** **Phase 3 — ribbon tab-by-tab hardening. Tab 1 = Home, section 1 = Clipboard** —
+  functionally DONE (all locked builds + gates); **live-Word visual eyeball still pending** (needs the screen).
+- **Env note (back on the MacBook):** the Windows COM oracle (`word-oracle-win.ps1`) is unavailable here;
+  Phase-3 parity uses the **macOS AppleScript oracle** (`scripts/oracle/word-oracle.js`). Ribbon *enablement*
+  greying isn't oracle-observable (doc-prop only) → it's a computer-use/visual check.
+- **State summary:**
+  - **Headless tests** (`81f48b8`): probe-mode `electron .` runs (test:pm/smoke/roundtrip) now run HIDDEN on
+    macOS — `isHeadless` (a `--probe-out=` with no `--shot=`) sets the `accessory` activation policy + skips
+    `mainWindow.show()`. No more window pop-up / focus-steal mid-work. `npm start` + `--shot=` QA unaffected.
+  - **Clipboard scope LOCKED** (`8a3a930`, `docs/SCOPE.md`): Merge Formatting + Set Default Paste IN;
+    auto-capture wired; **Paste Link OUT** (no OLE backend); state machine built here.
+  - **Ribbon state-machine SPINE** (`7d2eb30`) — the reusable Phase-3 core, built once: a declarative
+    per-control rule registry on `WC.Ribbon` (`stateRules` / `registerStateRule` / `applyStateRules`,
+    rule = `{enabled?,latched?,value?}`; enabled→`wc-disabled`, latched→`toggled`). `toQueryState` carries
+    the facts (hasSelection / canUndo/Redo / painterArmed / clipboardHasContent); the sync tick runs one
+    `applyStateRules(st)` pass. Load-order-safe registration (`WC.registerRibbonRule` queues →
+    ribbon.js drains `WC._pendingStateRules`). Clipboard rules: Cut/Copy enabled on a selection, Paste on
+    clipboard content (external cache refreshed on window focus + after our ops), Format Painter latched
+    (migrated off the slice-8 direct poke). **Later sections just register rules — don't scatter pokes.**
+  - **Office Clipboard auto-capture** (`5c12180`): `capture()` on Cut/Copy (bridge) + a DOM `copy`/`cut`
+    listener (keyboard); dedup makes the overlap safe — the 24-item pane history fills now (was dead in PM).
+  - **Merge Formatting** (`353999c`): `mergeFormattingHtml()` strips inheriting run props (font/size/color +
+    mso-* aliases, `<font>` attrs), keeps emphasis tags → pasted text adopts the destination style; the Paste
+    dropdown "Merge Formatting" item enabled (was a disabled stub).
+  - **Set Default Paste** (`f32b58c`): `D.setDefaultPaste` modal (Keep Source / Merge / Keep Text Only),
+    persisted to `localStorage`; `pasteDefault()` honors it via `defaultPasteMode()`.
+- **Gates:** PM **334/335** (the 1 fail = `[10mm]` Leg-B reads a Windows-authored fixture absent on this Mac —
+  self-skips "fixture not readable", NOT a regression; +8 new `[home]` tests), smoke **9/9**, roundtrip **27/0**.
+- **Next:** (1) **live-Word visual eyeball** of Clipboard enablement + dialogs (user-triggered — grabs the
+  screen); (2) Home **section 2 = Font** (kickoff → scope-lock → register its state rules into the spine).
+  Optionally re-author the `[10mm]` fixture via the Mac oracle for a fully-green `test:pm`.
+- **Blockers/notes:** none. `fix/ribbon-home` carries 6 commits; PR the whole Home tab when its sections are done.
+
 ## 2026-06-14 (planning) — Phase 3 RE-SCOPED: ribbon tab-by-tab hardening pass + ribbon state machine; pagination pulled up to Phase 4
 
 - **Branch:** `main` (planning only — no code branch yet; the first will be `fix/ribbon-home`).

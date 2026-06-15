@@ -303,6 +303,26 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-14 (Phase 3 execution — Home tab: Clipboard section + state-machine spine)
+- [x] **Headless test runs** (`81f48b8`, `chore(main)`): probe-mode `electron .` runs hidden on macOS
+  (accessory activation policy + no `mainWindow.show()`) — no more window pop-up / focus-steal during work.
+- [x] **Clipboard section kickoff (HUMAN GATE):** general research sweep (Explore agent mapped the clone's
+  Clipboard surface) → in/out scope proposed → **user locked** (`8a3a930`, `docs/SCOPE.md`): Merge Formatting +
+  Set Default Paste IN, auto-capture wired, **Paste Link OUT** (no OLE).
+- [x] **Ribbon state-machine SPINE** (`7d2eb30`, `feat(ribbon)`): declarative per-control rule registry on
+  `WC.Ribbon` (`registerStateRule`/`applyStateRules`) + facts in `toQueryState`; one `applyStateRules(st)` pass
+  per transaction; load-order-safe `WC.registerRibbonRule` queue. Clipboard rules: Cut/Copy enabled on a
+  selection, Paste on clipboard content, Format Painter latch (migrated off the slice-8 direct poke). +4 `[home]` tests.
+- [x] **Office Clipboard auto-capture** (`5c12180`): `capture()` on Cut/Copy + DOM `copy`/`cut` listener; the
+  24-item pane history fills now (was dead in PM). +1 test.
+- [x] **Merge Formatting** (`353999c`): `mergeFormattingHtml()` strip-and-paste (adopt destination style, keep
+  emphasis); Paste-menu "Merge Formatting" enabled. +2 tests.
+- [x] **Set Default Paste** (`f32b58c`): `D.setDefaultPaste` modal + `localStorage` mode honored by
+  `pasteDefault`/`defaultPasteMode`. +1 test.
+- [x] **Gates green (headless):** PM **334/335** (1 = Windows-only `[10mm]` fixture skip), smoke **9/9**, roundtrip **27/0**.
+- [ ] **Next:** live-Word visual eyeball of Clipboard enablement + dialogs (user-triggered — grabs the screen);
+  then Home **section 2 = Font** (kickoff → scope-lock → register Font state rules into the spine).
+
 ### 2026-06-14 (Phase 3 planning — roadmap re-sequence + bug-fix methodology)
 - [x] **Strategic re-scope (user decision):** primary goal = a **fully working editing env first**.
   Roadmap re-sequenced — Phase 3 = ribbon **tab-by-tab hardening pass** (bugs + scope + state machine);
@@ -317,8 +337,8 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **Docs written:** `plan.md` roadmap re-sequence (+ "pagination LAST"→Phase 4); this `execution-map`
   CURRENT PHASE rewritten; `last-point.md` entry; new `docs/SCOPE.md`; `deferrals.md` §A→Phase-4 + new §A.1
   (layout-engine requirements); resume-point memory.
-- [ ] **Next:** start **Tab 1 = Home** — cut `fix/ribbon-home`, section kickoff (Clipboard first): general
-  research → propose in/out scope → user locks → run the loop. Set up the state-machine shared spine in this first section.
+- [x] **Done:** started **Tab 1 = Home** — cut `fix/ribbon-home`, Clipboard section kickoff + scope lock +
+  state-machine spine built (see the Phase 3 execution block above).
 
 ### 2026-06-14 (Phase 2 — slice 11: legacy retirement)
 - [x] **Orient + deep pre-verification** (ultracode 7-mapper workflow + synthesis): mapped the exact retirement
