@@ -29,12 +29,13 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a IN PROGRESS (`build/phase-4a-pagination`)
-> **4a status (2026-06-15): pagination CORE built + oracle-validated vs real Word (matches exactly).** Done:
-> owned model-driven engine `src/renderer/pagination/pagination.ts` (multi-page sheets, page margins, page
-> count, status bar), the COM-oracle `read-layout` verb, and the Windows headless-rAF fix. **Remaining for
-> 4a:** manual page-break/blank-page geometry + line-level intra-paragraph split (see last-point.md top entry).
-> Then 4b (image resize) → 4f. Gates: PM 398 / smoke 9 / roundtrip 27.
+## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a COMPLETE (`build/phase-4a-pagination`, PR ready)
+> **4a DONE + oracle-validated vs real Word (all scenarios match exactly).** The owned engine
+> `src/renderer/pagination/pagination.ts` delivers: multi-page sheets (auto), page margins, live page count,
+> manual page breaks, blank pages, and line-level intra-paragraph splitting. Plus the COM-oracle `read-layout`
+> verb and the Windows headless-rAF fix. **NEXT:** PR `build/phase-4a-pagination` → `main`, then **sub-phase
+> 4b (image resize)** on a fresh branch (LAYOUT_ENGINE.md §4) → 4c floating → 4d tables → 4e headers/footers
+> → 4f page-background/columns. Gates: PM 402 / smoke 9 / roundtrip 27.
 >
 > **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
 > ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
@@ -336,9 +337,14 @@ hold the single-PM-copy + telemetry-off invariants.
   1.2→1.225 (NOTICE'd). Oracle-validated: clone now paginates the fixture EXACTLY like Word (2 pages, break
   at para 45). +2 tests.
 - [x] **Status bar page count** (`31fb1af`, `feat(pagination)`): live "Page X of Y" from the engine. +1 test.
-- [ ] **Manual page-break / blank-page geometry** — NEXT (hardBreak[pageBreakType='page'] forces a boundary).
-- [ ] **Line-level intra-paragraph split** (PAGINATION.md §7) — NEXT.
-- Gates after each: PM 398/398, smoke 9/9, roundtrip 27/0. Oracle note:
+- [x] **Manual page-break / blank-page geometry** (`9490d4e`): hardBreak[pageBreakType='page'] forces a
+  page boundary; blank page (two breaks) skips a sheet (2 gap bands). Oracle: break para + page count = Word.
+- [x] **Line-level intra-paragraph split** (`90039b2`): a paragraph taller than the page splits at the line
+  (line boxes + widow/orphan + mid-paragraph nudge seam); convergence deadband stops sub-line jitter.
+  Oracle: ~65-line paragraph → 2 pages = Word's 2.
+- [x] **4a COMPLETE** — all pagination scenarios oracle-match Word. PR `build/phase-4a-pagination` → `main` ready.
+- [ ] **4b — image resize** (NEXT, new branch off main after 4a merges).
+- Gates after each: PM 402/402, smoke 9/9, roundtrip 27/0. Oracle note:
   `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`.
 
 ### 2026-06-14 (Phase 3 execution — Home tab: Clipboard section + state-machine spine)
