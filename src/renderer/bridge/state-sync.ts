@@ -40,6 +40,36 @@ export function headParagraph(editor: AnyEditor): { node: any; pos: number } | n
   return null
 }
 
+// The EFFECTIVE font name + size (pt) at the caret, for when no inline marks
+// supply them (empty doc / empty paragraph / after Clear Formatting). Word never
+// blanks a collapsed cursor — it shows the resolved style/default. We read the
+// computed style of the caret's rendered node (style-aware AND Heading-aware: a
+// Heading paragraph computes its heading font), falling back to the document
+// default styles, so the combos always reflect what the user would actually type.
+function effectiveFont(editor: AnyEditor): { name: string; size: string } {
+  let name = ''
+  let size = ''
+  try {
+    const view = editor.view
+    const at = view.domAtPos(editor.state.selection.from)
+    const el: any = at?.node?.nodeType === 3 ? at.node.parentElement : at?.node
+    if (el && typeof getComputedStyle === 'function') {
+      const cs = getComputedStyle(el)
+      name = String(cs.fontFamily || '').split(',')[0].replace(/['"]/g, '').trim()
+      const px = parseFloat(String(cs.fontSize || ''))
+      if (isFinite(px) && px > 0) size = String(Math.round((px * 72) / 96)) // CSS px → pt
+    }
+  } catch { /* no live view */ }
+  if (!name || !size) {
+    try {
+      const d = (editor as any).converter?.getDocumentDefaultStyles?.() || {}
+      if (!name) name = d.typeface || (d.fontFamilyCss ? String(d.fontFamilyCss).split(',')[0].replace(/['"]/g, '').trim() : '')
+      if (!size && d.fontSizePt != null) size = String(Math.round(d.fontSizePt))
+    } catch { /* no converter */ }
+  }
+  return { name, size }
+}
+
 export function toQueryState(editor: AnyEditor): Record<string, any> {
   const st: Record<string, any> = {
     bold: false, italic: false, underline: false, strikethrough: false,
@@ -116,6 +146,33 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     // oracle probe pending, Task 13.3). Unknown/foreign styleIds → '' (no highlight).
     st.block = resolved?.styleId ? (STYLE_ID_TO_NAME[resolved.styleId] ?? '') : 'Normal'
   }
+  // Phase 3 font combos (Word parity): the name/size combos must show the
+  // EFFECTIVE value for a collapsed cursor or a uniform selection (never blank —
+  // the reported bug), and blank ONLY for a selection that spans mixed values.
+  // The entries loop above set st.fontName/fontSize from the caret/first run's
+  // explicit marks; refine here.
+  {
+    const sel = editor.state.selection
+    let famMixed = false
+    let sizeMixed = false
+    if (!sel.empty) {
+      const fams = new Set<string>()
+      const sizes = new Set<string>()
+      try {
+        editor.state.doc.nodesBetween(sel.from, sel.to, (node: any) => {
+          if (!node.isText) return
+          const ts = node.marks.find((m: any) => m.type?.name === 'textStyle')
+          fams.add(ts?.attrs?.fontFamily ? String(ts.attrs.fontFamily).split(',')[0].replace(/['"]/g, '').trim() : '')
+          sizes.add(ts?.attrs?.fontSize ? String(ts.attrs.fontSize).replace(/pt$/, '').trim() : '')
+        })
+      } catch { /* selection the iterator can't read */ }
+      famMixed = fams.size > 1
+      sizeMixed = sizes.size > 1
+    }
+    const eff = (!st.fontName || !st.fontSize) ? effectiveFont(editor) : null
+    st.fontName = famMixed ? '' : (st.fontName || eff?.name || '')
+    st.fontSize = sizeMixed ? '' : (st.fontSize || eff?.size || '')
+  }
   st.computedFontFamily = st.fontName
   const sizeNum = parseFloat(st.fontSize)
   st.computedFontSizePt = isNaN(sizeNum) ? null : sizeNum
@@ -148,8 +205,15 @@ export function installStateSync(editor: AnyEditor) {
     // Deliberate spec deviation (recorded): setColorBar is NOT caret-driven — the
     // split-button color bars show the LAST-USED color (applyColor writes them),
     // matching real Word; syncing them to the caret would be wrong.
-    w.WC?.Ribbon?.setComboValue?.('font', st.fontName || '')
-    w.WC?.Ribbon?.setComboValue?.('fontSize', st.fontSize || '')
+    // Phase 3: guard the push so a sync tick never clobbers a value the user is
+    // typing into the combo (mirrors the spinner pushSpin guard below).
+    const pushCombo = (cmd: string, val: string) => {
+      const ent = w.WC?.Ribbon?.controlIndex?.[cmd]
+      if (ent?.input && document.activeElement === ent.input) return
+      w.WC?.Ribbon?.setComboValue?.(cmd, val)
+    }
+    pushCombo('font', st.fontName || '')
+    pushCombo('fontSize', st.fontSize || '')
     // Caret-tracking Layout spinners (real Word does this; legacy never did).
     // controlIndex entries exist from boot (Ribbon.renderBody renders every tab's
     // panel at init — ribbon.js:97-104); skip the push while the user is typing in

@@ -54,7 +54,21 @@ evaluator + per-control rule registry), generalized from `bridge/state-sync.ts`.
 | Clipboard | Format Painter (1-click / dbl-click sticky / Esc) | ✅ In scope | latch already synced; parity-verify |
 | Clipboard | Office Clipboard pane | ✅ In scope | + **wire auto-capture** on Cut/Copy (history was dead in PM) |
 | Clipboard | Ribbon state machine (spine) | ✅ In scope | built here once; later sections register rules |
-| Font | _tbd_ | | |
+
+**Font** — scope locked 2026-06-14 (section kickoff; informed by the `font-section-understand` workflow). Not layout-coupled.
+
+| Section | Feature | Status | Note |
+|---|---|---|---|
+| Font | Font name + size combos show current/effective value (never blank on empty doc) | ✅ In scope | THE reported bug. Bridge fallback in `toQueryState`: marks → effective computed font (Heading-aware) → `converter.getDocumentDefaultStyles()` |
+| Font | Combos blank only on a genuinely mixed selection | ✅ In scope | Word parity; completes the combo state machine |
+| Font | `activeElement` guard on combo refresh | ✅ In scope | don't clobber a value mid-edit |
+| Font | Two-row group arrangement (Word order) | ✅ In scope | explicit grid: row1 name/size/grow/shrink/case/clear, row2 B/I/U/strike/sub/super/effects/highlight/color |
+| Font | B/I/U/strike/sub/super latch | ✅ In scope (works) | already latched via the sync tick; keep |
+| **Ribbon** | **Responsive ribbon — Stage A** (condense large→small + hide labels + de-clip) | ✅ In scope | **cross-cutting** — built once at `WC.Ribbon` for all 10 tabs (ResizeObserver on `.ribbon-scroll`) |
+| **Ribbon** | Responsive ribbon — Stage B (full group→flyout collapse, per-tab reduction order) | 🕗 Deferred (next slice) | heaviest; needs breakpoint calibration across 212 controls |
+| Font | Font-dialog launcher cmd collision cleanup | 🕗 Deferred | works today via group-id keying; bundle into a ribbon-data cleanup |
+| Font | Dark theme | ⛔ Out of scope | clone is light-theme; the dark screenshot was the user's real Word as a reference |
+| Paragraph | _tbd_ | | |
 | Paragraph | _tbd_ | | |
 | Styles | _tbd_ | | |
 | Editing | _tbd_ | | |

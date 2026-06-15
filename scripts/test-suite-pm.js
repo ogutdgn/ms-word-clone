@@ -1089,6 +1089,40 @@
     const marks = markNames('KEPTITALIC');
     return r === true && marks.some((m) => m.startsWith('italic'));
   });
+  await t('[home] font combos show the effective value on an empty doc (not blank)', async () => {
+    setDoc('');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 1, 1)));
+    await sleep(170);
+    const fontInput = window.WC.Ribbon.controlIndex.font?.input;
+    const sizeInput = window.WC.Ribbon.controlIndex.fontSize?.input;
+    if (!fontInput || !sizeInput) return 'combos not in controlIndex';
+    if (!(fontInput.value.trim().length > 0)) return 'font combo blank';
+    if (!(sizeInput.value.trim().length > 0)) return 'size combo blank';
+    return true;
+  });
+  await t('[home] font name combo blanks on a mixed-font selection', async () => {
+    setDoc('mixfontaaa mixfontbbb');
+    selectText('mixfontaaa'); PM().cmd('setFontFamily', 'Arial'); await sleep(50);
+    selectText('mixfontbbb'); PM().cmd('setFontFamily', 'Georgia'); await sleep(50);
+    let from = null, to = null;
+    doc().descendants((n, p) => {
+      if (!n.isText || !n.text) return;
+      const ia = n.text.indexOf('mixfontaaa'); if (ia >= 0 && from === null) from = p + ia;
+      const ib = n.text.indexOf('mixfontbbb'); if (ib >= 0) to = p + ib + 'mixfontbbb'.length;
+    });
+    if (from === null || to === null) return 'could not locate runs';
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), from, to)));
+    await sleep(170);
+    const fontInput = window.WC.Ribbon.controlIndex.font?.input;
+    return fontInput.value.trim() === '' || ('combo not blank: "' + fontInput.value + '"');
+  });
+  await t('[home] font combo shows the font of a uniform selection', async () => {
+    setDoc('uniformfont text here');
+    selectText('uniformfont'); PM().cmd('setFontFamily', 'Georgia'); await sleep(60);
+    selectText('uniformfont'); await sleep(170);
+    const fontInput = window.WC.Ribbon.controlIndex.font?.input;
+    return /Georgia/.test(fontInput.value) || ('combo: "' + fontInput.value + '"');
+  });
   await t('[home] Keep Text Only does NOT auto-linkify a pasted URL (guarded)', async () => {
     const ed = PM().getEditor();
     const mkEvt = (s) => { const dt = new DataTransfer(); dt.setData('text/plain', s); return new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); };
