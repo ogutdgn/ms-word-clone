@@ -7,7 +7,36 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — new-session backlog: Home polish + Insert tab, as a /loop)
+## 2026-06-15 (RESUME HERE — backlog 1–5 DONE; Text Effects stage 2 in progress)
+
+> Continuation of the /loop below. Branch `fix/ribbon-home`. All three gates green after each commit
+> (PM 373–374 pass / 1 known win-only `[10mm]` skip; smoke 9/9; roundtrip 27/0). Verified against REAL
+> Mac Word via computer use throughout (Borders dropdown+dialog, Styles gallery, Editor pane, Insert tab).
+
+**Done this session (commits on `fix/ribbon-home`, newest last):**
+1. `fix(icons)` — **Show/Hide ¶** now the pilcrow (dropped the `eye_off` Fluent map → hand-authored two-stem ¶).
+2. `feat(home)` — **full Word Borders dropdown** (16 items, per-edge checkmarks, greyed diagonals, Horizontal
+   Line, View Gridlines) **+ Borders and Shading dialog** (Borders/Page Border/Shading tabs, Setting/Style/
+   Color/Width, interactive Preview, Apply to, Options, Horizontal Line). `+ fix(home)` review follow-ups
+   (page-width export, nil-edge seed, dialog focus, `document_border` icon).
+3. `feat(home)` — **Styles section**: gallery decoupled from ribbon-data → canonical Word order filtered by
+   the live catalog; **+ Intense Reference**; the **"More" chevron opens the expanded gallery flyout** (grid +
+   Create a Style / Clear Formatting / Apply Styles), not the pane. SCOPE.md locked.
+4. `feat(editor)` — **real offline proofing** (`src/renderer/proofing/`): nspell + a vendored SCOWL en_US
+   Hunspell dictionary (spelling), mechanical grammar rules, heuristic Clarity/Conciseness. Editor pane
+   rewired (real counts + suggestion cards that fix via PM). Cloud ML pieces stay flagged. `+ nspell` dep.
+5. `feat(insert)` — **small-button labels + Word arrangement**: trimmed the `LARGE` set; `renderControl`
+   `labeled` opt; Insert small buttons stacked 3-per-column WITH labels. Header/Footer/Page Number stay
+   `isBlocked` (layout) — deferrals A.1.
+
+**NEXT (in progress) — backlog #6: Text Effects stage 2.** Build the 4 net-new `w14:textOutline/glow/shadow/
+reflection` export translators (EMU / 60000ths-degree / 1000ths-% unit conversions) + bridge + RUN_PROPERTIES
+keys + per-effect **oracle round-trip vs real Word** (macOS AppleScript oracle). The quartet RENDERS today
+(CSS) but `save` drops it. See the 2026-06-15 Text Effects stage-1 entry below for the exact stage-2 spec.
+
+---
+
+## 2026-06-15 (new-session backlog: Home polish + Insert tab, as a /loop)
 
 > Clean handoff: working tree clean at `ab356f2`, all gates green (PM 353/354, smoke 9/9, roundtrip 27/0).
 > Mode the user set: **continuous /loop, do NOT ask, decide with engineering insight, compare against REAL
