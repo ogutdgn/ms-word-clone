@@ -431,6 +431,17 @@ body.pm-active #pm-editor {
   box-shadow: 0 1px 4px var(--page-shadow);
 }
 
+/* Phase 4a: kill the browser-default <p> margin (1em ≈ 16px). The fork resets
+   ol/ul/li margins (prosemirror.css) but NOT <p>, and those resets are scoped to
+   `.sd-editor-scoped` — a class our bare mount doesn't carry — so every paragraph
+   inherited ~16px of phantom top+bottom spacing the document never specified. That
+   made the clone render ~25 paragraphs/page where real Word fits ~44 (oracle:
+   read-layout), so pagination could never match Word. Real paragraph spacing is
+   applied INLINE by ParagraphNodeView (encodeCSSFromPPr, resolved from the
+   paragraph + its style), and inline styles override this reset — so spacing that
+   IS in the document still renders; only the phantom default is removed. */
+body.pm-active #pm-editor .ProseMirror p { margin-top: 0; margin-bottom: 0; }
+
 /* ===== Phase 4a: pagination spacers (src/renderer/pagination/pagination.ts) =====
    Widget decorations painted INSIDE .ProseMirror at page boundaries. The body is
    transparent so the white #pm-editor shows through as the page margins; the

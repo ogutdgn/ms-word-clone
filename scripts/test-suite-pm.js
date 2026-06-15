@@ -5034,6 +5034,28 @@
       'geometry off: ' + JSON.stringify({ pageH: g.pageH, mt: g.marginTop, ch: g.contentH });
   });
 
+  await t('[4a] editor line-height calibrated to Word (Aptos-12 -> 1.225)', () => {
+    // Locks DEFAULT_LINE_HEIGHT (ProseMirrorRenderer.ts): oracle read-layout showed
+    // real Word fits ~44 Aptos-12 lines/Letter page (~19.6px = 1.225x16). Upstream
+    // 1.2 (19.2px) drifted pagination a page behind Word on long docs.
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const lh = pm && pm.style.lineHeight;
+    return lh === '1.225' || 'inline line-height = ' + lh + ' (expected 1.225)';
+  });
+
+  await t('[4a] no phantom browser-default paragraph top-margin leaks', async () => {
+    // The browser-default <p> margin (~16px top AND bottom) is reset; legitimate
+    // spacing still comes inline from the model (e.g. a style's space-after lands
+    // on margin-bottom). The browser default would put 16px on BOTH sides, so a 0
+    // top margin proves the default no longer leaks. (oracle-confirmed: removing
+    // the phantom margin made the clone's lines/page match Word.)
+    setDoc('margin probe paragraph');
+    await sleep(300);
+    const p = document.querySelector('#pm-editor .ProseMirror p');
+    if (!p) return 'no paragraph';
+    return getComputedStyle(p).marginTop === '0px' || 'p margin-top = ' + getComputedStyle(p).marginTop + ' (browser default leaked)';
+  });
+
   await t('[4a] short doc = single page, no page seams', async () => {
     setDoc('one short line');
     await sleep(400);
