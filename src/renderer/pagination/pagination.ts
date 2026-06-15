@@ -54,8 +54,6 @@ interface Layout {
   topMargin: number
   breaks: Break[]
   tail: number // bottom spacer height (fills last sheet + bottom margin)
-  tailBands: number[] // gap-band offsets in the tail (trailing blank pages from a doc-final page break)
-  trailingBreaks: number[] // positions of doc-final page breaks (exposed so the status bar counts them)
   pageCount: number
   signature: string
 }
@@ -325,17 +323,11 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
     }
     prevPos = b.pos
   }
-  // Trailing forced break(s): a page break in the LAST block with NO text after it has
-  // no following block to push, so it adds a trailing BLANK sheet (Word renders an empty
-  // page for a doc-final Ctrl+Enter). A break with text still after it (mid-last-paragraph)
-  // is NOT trailing — that is the deferred mid-paragraph case, not a blank page.
-  const lastPos = blocks.length ? blocks[blocks.length - 1].pos : -1
-  const docEnd = view?.state?.doc ? view.state.doc.content.size : 0
-  const trailingBreaks = forced.filter(
-    (P) => P > lastPos && view.state.doc.textBetween(P, docEnd).trim().length === 0,
-  )
-  const trailingForced = trailingBreaks.length
-  pagesDone += trailingForced
+  // NOTE: a TRAILING page break (a doc-final Ctrl+Enter with no following block) is
+  // intentionally NOT paginated in 4a — Word would add a blank sheet, but supporting it
+  // grew a long edge-case tail (non-text content after the break, caret-at-break-pos page
+  // counting, deadband/signature staleness) for a minor feature, so it is deferred with
+  // mid-paragraph + section breaks. See deferrals.md §A.1b.
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
   // the first line of each page at the top margin; this also removes the first
@@ -344,22 +336,16 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
   const topMargin = first ? Math.max(0, g.marginTop - first.actualTop + first.precSpacer) : g.marginTop
   // Tail: fill from where the content region ends (last block's MARGIN-box bottom —
   // its bottom margin renders below the border box, before the tail) to the bottom
-  // of the last sheet, so the box is exactly `pageCount` sheets tall. Trailing blank
-  // pages get a gap band at each sheet boundary the tail crosses.
+  // of the last sheet, so the box is exactly `pageCount` sheets tall.
   const last = blocks[blocks.length - 1]
   const contentVisualBottom = last ? last.actualBottom + last.marginBottom : 0
   const desiredBottom = (pageCount - 1) * g.pitch + g.pageH
   const tail = last ? Math.max(g.marginBottom, desiredBottom - contentVisualBottom) : g.pageH
-  const tailBands: number[] = []
-  if (last && trailingForced > 0) {
-    const contentPage = pageCount - trailingForced // 1-based page the last content sits on
-    for (let j = 0; j < trailingForced; j++) tailBands.push((contentPage - 1 + j) * g.pitch + g.pageH - contentVisualBottom)
-  }
   const signature =
     `${g.pageH}|${Math.round(g.marginTop)}|${Math.round(g.marginBottom)}|top${Math.round(topMargin)}|` +
     breaks.map((b) => `${b.pos}:${Math.round(b.height)}:${b.bands.length}`).join(',') +
-    `|tail${Math.round(tail)}:${tailBands.length}|trail${trailingBreaks.join('.')}|n${pageCount}`
-  return { geometry: g, topMargin, breaks, tail, tailBands, trailingBreaks, pageCount, signature }
+    `|tail${Math.round(tail)}|n${pageCount}`
+  return { geometry: g, topMargin, breaks, tail, pageCount, signature }
 }
 
 function buildDecorations(view: any, layout: Layout): DecorationSet {
@@ -390,12 +376,11 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
       }),
     )
   }
-  // Tail: full-height last sheet + bottom margin (+ gap bands for trailing blank pages).
-  const tailBands = layout.tailBands
+  // Tail: full-height last sheet + bottom margin (no bands — the last sheet's bottom).
   decos.push(
-    Decoration.widget(docSize, () => makeSpacer(layout.tail, tailBands, lb, rb), {
+    Decoration.widget(docSize, () => makeSpacer(layout.tail, [], lb, rb), {
       side: 1,
-      key: `pm-tail-${Math.round(layout.tail)}-${tailBands.length}`,
+      key: `pm-tail-${Math.round(layout.tail)}`,
       ignoreSelection: true,
     }),
   )
@@ -412,8 +397,6 @@ function layoutsClose(a: Layout, b: Layout): boolean {
   if (a.pageCount !== b.pageCount) return false
   if (Math.abs(a.topMargin - b.topMargin) > 4) return false
   if (Math.abs(a.tail - b.tail) > TOL) return false
-  if (a.tailBands.length !== b.tailBands.length) return false
-  if (a.trailingBreaks.length !== b.trailingBreaks.length) return false
   if (a.breaks.length !== b.breaks.length) return false
   for (let i = 0; i < a.breaks.length; i++) {
     // A line-split anchor can jitter by a char or two (posAtCoords rounding) while
@@ -478,26 +461,19 @@ class PaginationView {
 
     const g = readGeometry(this.editor)
     const blocks = measureBlocks(view)
-    // Page breaks, scanned at TOP LEVEL ONLY (a break nested inside a table cell or
-    // footnote must paginate within that region, not push the next top-level block;
-    // table row-split is Phase 4d). Covers all three representations:
-    //   - inline hardBreak with pageBreakType='page' (our insertPageBreak / Ctrl+Enter)
-    //   - inline hardBreak with lineBreakType='page' (run-level <w:br w:type=page> import)
-    //   - a paragraph attr pageBreakSource (real Word paragraph/section page break import)
-    //     → that paragraph STARTS a new page (a forced break BEFORE its block).
     // Inline page breaks (absolute positions): our own hardBreak[pageBreakType='page']
     // (Insert → Page Break / Ctrl+Enter) AND the run-level hardBreak[lineBreakType='page']
-    // that the importer produces from a real Word <w:br w:type="page"/>. Paragraph/section
+    // the importer produces from a real Word <w:br w:type="page"/>. Paragraph/section
     // breaks (w:sectPr → a pageBreakSource attr) are NOT handled here — sectPr marks the
     // section's LAST paragraph and is section-type-dependent (continuous vs next-page), so
     // it belongs to the section-geometry sub-phase (4f); see deferrals.md §A.1b.
     const forced: number[] = []
-    view.state.doc.descendants((node: any, pos: number, parent: any) => {
-      // Don't descend into a top-level TABLE: a break nested in a cell paginates within
-      // that region (table row-split is Phase 4d) and must not push the next block. We DO
-      // descend into other top-level blocks (paragraphs nest inline in `run` nodes;
-      // content-control / bibliography containers hold paragraphs that may carry a break).
-      if (parent && parent.type?.name === 'doc' && node.type?.name === 'table') return false
+    view.state.doc.descendants((node: any, pos: number) => {
+      // Never descend into a TABLE at any depth (incl. a table nested in a content-control
+      // container): a break in a cell paginates within that region, not push the next
+      // top-level block; table row-split is Phase 4d. Other containers ARE descended (their
+      // paragraphs may carry a break).
+      if (node.type?.name === 'table') return false
       if (node.type?.name === 'hardBreak' && (node.attrs?.pageBreakType === 'page' || node.attrs?.lineBreakType === 'page')) {
         forced.push(pos)
       }
@@ -527,12 +503,8 @@ class PaginationView {
         ? {
             pageCount: layout.pageCount,
             // `skip` = sheets this seam advances (1 normal, 2 a blank page) — the status
-            // bar weights the caret's page by skip, not by seam count. Trailing
-            // (doc-final) breaks render in the tail (not as seams), but are exposed here
-            // too so the caret on a trailing blank page reports the right page number.
-            breaks: layout.breaks
-              .map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 }))
-              .concat(layout.trailingBreaks.map((pos) => ({ pos, height: 0, skip: 1 }))),
+            // bar weights the caret's page by skip, not by seam count.
+            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 })),
             geometry: layout.geometry,
           }
         : { pageCount: 1, breaks: [], geometry: readGeometry(this.editor) }

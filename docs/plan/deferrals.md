@@ -60,17 +60,24 @@
 
 > The 4a pagination engine matches Word for the common cases (oracle-validated). These edges
 > are deliberately deferred. (High-value review findings FIXED: imported run-level
-> `<w:br w:type="page">` breaks, trailing/blank-page count + its status-bar weighting, the table
-> mid-cell-seam mangling + nested-cell mis-attribution, asymmetric-margin band bleed, and the Linux
-> opaque-headless-window regression. A re-review of the fix commit then caught + reverted an
-> over-reach where `pageBreakSource` was page-broken on the wrong side and for continuous sections —
-> see the section-break bullet below.)
+> `<w:br w:type="page">` breaks, the MID-document blank page + its status-bar weighting, the table
+> mid-cell-seam mangling + nested-cell mis-attribution (tables are skipped at any nesting depth),
+> asymmetric-margin band bleed, and the Linux opaque-headless-window regression. Two re-reviews of the
+> fix commits then caught over-reaches that were REVERTED: `pageBreakSource` page-broke on the wrong
+> side / for continuous sections, and the TRAILING-break feature grew an edge-case tail disproportionate
+> to its value — both deferred below.)
 
 - **Section breaks (`w:sectPr` → `pageBreakSource`) are NOT paginated.** A `w:sectPr` lives on a
   section's LAST paragraph (the break renders AFTER it) and is section-type-dependent (continuous vs
   next/even/odd-page), so it is left to the section-geometry sub-phase (4f). The COMMON imported manual
   page break is a run-level `<w:br w:type="page">` (→ `hardBreak[lineBreakType='page']`), which IS
   paginated. Until 4f, a section break imports as continuous flow.
+- **Trailing (doc-final) page break is NOT paginated.** A `Ctrl+Enter` at the very end of the document
+  (no content after it) does not add Word's trailing blank sheet; the page count is unchanged. The
+  feature was implemented then reverted — it grew a long edge tail (non-text content after the break,
+  caret-at-break-position page counting, deadband/signature staleness) for a minor case. A MID-document
+  page break / blank page (content after) IS paginated + oracle-validated. Revisit when the forced seam
+  is placed AT the break position (the same fix that handles mid-paragraph breaks).
 - **Page break inside a content-control / bibliography / index container.** The scan descends into all
   top-level blocks except tables, so a break in such a container IS detected, but (like mid-paragraph)
   it moves the next top-level block, not the container's internal remainder. Niche.

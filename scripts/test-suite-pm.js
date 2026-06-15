@@ -5227,21 +5227,6 @@
     return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
   });
 
-  await t('[4a] trailing manual page break adds a blank page (+ status bar counts it)', async () => {
-    setDocs(['Trail alpha', 'Trail omega']); // 'omega' is the unique last word of the last block
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('omega'); // caret at the very end of the document
-    PM().insertPageBreak();
-    let pc = before;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
-    if (pc !== before + 1) return 'trailing break: pageCount ' + before + ' -> ' + pc + ' (expected +1)';
-    // caret sits after the trailing break, on the new blank page → status bar must count it
-    await sleep(250);
-    const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
-    return txt === 'Page ' + pc + ' of ' + pc || 'status="' + txt + '" (expected "Page ' + pc + ' of ' + pc + '")';
-  });
-
   await t('[4a] status bar weights the caret page by a blank-page seam (skip=2)', async () => {
     setDocs(['Sbp alpha', 'Sbp bravo', 'Sbp gamma']);
     await sleep(300);
