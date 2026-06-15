@@ -178,8 +178,10 @@ function maybeScreenshot() {
       if (evalFileArg) js = require('fs').readFileSync(evalFileArg.slice('--shot-evalfile='.length), 'utf8');
       let result;
       if (js) { result = await mainWindow.webContents.executeJavaScript(js); await new Promise((r) => setTimeout(r, 600)); }
-      if (probeOut) { await fsp.writeFile(probeOut, typeof result === 'string' ? result : JSON.stringify(result, null, 2)); console.log('PROBE_SAVED ' + probeOut); }
-      if (out) { const img = await mainWindow.webContents.capturePage(); await fsp.writeFile(out, img.toPNG()); console.log('SHOT_SAVED ' + out); }
+      // Cross-platform: ensure the output directory exists. On Windows the gate paths
+      // resolve to e.g. C:\tmp\wc-pm.json, which may not exist yet — create it.
+      if (probeOut) { await fsp.mkdir(require('path').dirname(probeOut), { recursive: true }).catch(() => {}); await fsp.writeFile(probeOut, typeof result === 'string' ? result : JSON.stringify(result, null, 2)); console.log('PROBE_SAVED ' + probeOut); }
+      if (out) { await fsp.mkdir(require('path').dirname(out), { recursive: true }).catch(() => {}); const img = await mainWindow.webContents.capturePage(); await fsp.writeFile(out, img.toPNG()); console.log('SHOT_SAVED ' + out); }
     } catch (e) { console.error('PROBE_FAIL', e); }
     app.quit();
   }, delay);
