@@ -691,6 +691,11 @@ export function handleClipboardPaste({ editor, view }, html, plainText) {
 
   switch (source) {
     case 'plain-text': {
+      // MS-WORD-CLONE FORK EDIT (Phase 3, Home/Clipboard, NOTICE'd): "Keep Text
+      // Only" must paste a URL as plain text, never auto-linkify it (Word). The
+      // bridge's pasteTextOnly sets editor.options.noPasteAutolink around the
+      // paste; returning false here falls through to the default plain-text insert.
+      if (editor.options?.noPasteAutolink) return false;
       const protocols = resolveLinkProtocols(editor);
       const detected = detectPasteUrl(plainText, protocols);
       if (!detected) return false;

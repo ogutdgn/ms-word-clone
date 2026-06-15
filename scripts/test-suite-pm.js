@@ -1055,6 +1055,26 @@
     const marks = markNames('KEPTITALIC');
     return r === true && marks.some((m) => m.startsWith('italic'));
   });
+  await t('[home] Keep Text Only does NOT auto-linkify a pasted URL (guarded)', async () => {
+    const ed = PM().getEditor();
+    const mkEvt = (s) => { const dt = new DataTransfer(); dt.setData('text/plain', s); return new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); };
+    const collapseAfter = (needle) => { const s = selectText(needle); v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), s.to, s.to))); };
+    // WITH the guard (what pasteTextOnly sets) → URL stays plain text, no link mark.
+    setDoc('ktoone base'); collapseAfter('base'); await sleep(40);
+    ed.options.noPasteAutolink = true;
+    try { ed.view.pasteText('https://exampleone.test', mkEvt('https://exampleone.test')); }
+    finally { ed.options.noPasteAutolink = false; }
+    await sleep(80);
+    const guarded = markNames('exampleone.test');
+    if (guarded.some((m) => m.startsWith('link'))) return 'guarded URL still linked: ' + JSON.stringify(guarded);
+    // WITHOUT the guard → the fork auto-links (proves the guard is what suppresses it).
+    setDoc('ktotwo base'); collapseAfter('base'); await sleep(40);
+    ed.view.pasteText('https://exampletwo.test', mkEvt('https://exampletwo.test'));
+    await sleep(80);
+    const unguarded = markNames('exampletwo.test');
+    if (!unguarded.some((m) => m.startsWith('link'))) return 'unguarded URL did not auto-link (test no longer meaningful): ' + JSON.stringify(unguarded);
+    return true;
+  });
   await t('[home] Office Clipboard auto-captures on copy (bridge path)', async () => {
     setDoc('captureword alpha'); selectText('captureword'); await sleep(60);
     window.WC.Clipboard.clear();

@@ -353,6 +353,14 @@ The following upstream packages are included in this directory tree:
   textContent for a flat in-app SVG render (warp renders in Word only).
 - extensions/vector-shape/vector-shape.js — NET-NEW isInk attr + synthesizeInkDrawing + insertInkShape command (slice 10 PR4): inserts a real a:custGeom freeform ink shape (wp:anchor|wp:inline) replayed by translateVectorShape.
 - extensions/vector-shape/VectorShapeView.js — renders an empty zero-size placeholder for isInk nodes (slice 10 PR4): the PM ink overlay owns ink paint.
+- **Plain-text paste autolink is suppressible (Phase 3 Home/Clipboard, 2026-06-14):**
+  `core/InputRule.js` `handlePaste` 'plain-text' branch now early-returns `false` when
+  `editor.options.noPasteAutolink` is set, so a pasted URL is inserted as plain text
+  instead of being turned into a blue underlined link (`handlePlainTextUrlPaste`). The
+  bridge's "Keep Text Only" path (`bridge/clipboard.ts` `pasteTextOnly`) sets the flag
+  for the duration of the synchronous paste — matching Word, where Keep Text Only never
+  auto-linkifies. Default paste (Keep Source) is unaffected (flag unset → autolink still
+  fires, like Word's AutoFormat).
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

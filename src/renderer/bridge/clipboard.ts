@@ -103,7 +103,15 @@ export function installClipboard(editor: AnyEditor) {
     const text = await api()?.readText()
     if (!text) return false
     focusView()
-    return !!editor.view.pasteText(text, pasteEvent({ 'text/plain': text }))
+    // "Keep Text Only" must never auto-linkify a pasted URL (Word) — suppress the
+    // fork's plain-text autolink branch for the duration of this paste. pasteText
+    // runs handlePaste synchronously, so the flag is reset right after.
+    editor.options.noPasteAutolink = true
+    try {
+      return !!editor.view.pasteText(text, pasteEvent({ 'text/plain': text }))
+    } finally {
+      editor.options.noPasteAutolink = false
+    }
   }
   async function pasteHTML(): Promise<boolean> {
     const html = await api()?.readHTML()
