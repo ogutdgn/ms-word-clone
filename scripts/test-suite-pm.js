@@ -525,6 +525,89 @@
     flyClick(/^No Border$/); await sleep(50);
     return all && paraAttrs('border').paragraphProperties?.borders == null;
   });
+  await t('[home] Borders dropdown is the full Word menu (16 items, order, check column, greyed diagonals)', async () => {
+    setDoc('bdrmenu probe'); selectText('bdrmenu');
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body);
+    const labels = Array.from(document.querySelectorAll('.flyout .fly-item')).map((i) => (i.querySelector('.fi-label') || {}).textContent);
+    const expected = ['Bottom Border', 'Top Border', 'Left Border', 'Right Border', 'No Border', 'All Borders', 'Outside Borders', 'Inside Borders', 'Inside Horizontal Border', 'Inside Vertical Border', 'Diagonal Down Border', 'Diagonal Up Border', 'Horizontal Line', 'Draw Table', 'View Gridlines', 'Borders and Shading…'];
+    const orderOk = labels.length === 16 && expected.every((e, i) => labels[i] === e);
+    const checkCol = !!document.querySelector('.flyout .fly-item .fi-check');
+    const disabled = Array.from(document.querySelectorAll('.flyout .fly-item.disabled')).map((i) => (i.querySelector('.fi-label') || {}).textContent);
+    const diagOk = disabled.includes('Diagonal Down Border') && disabled.includes('Diagonal Up Border');
+    window.WC.closeFlyouts();
+    return orderOk && checkCol && diagOk;
+  });
+  await t('[home] Bottom Border toggles ON then OFF via the menu', async () => {
+    setDoc('btoggle probe'); selectText('btoggle');
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Bottom Border$/); await sleep(40);
+    const on = paraAttrs('btoggle').paragraphProperties?.borders?.bottom?.val === 'single';
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Bottom Border$/); await sleep(40);
+    const off = paraAttrs('btoggle').paragraphProperties?.borders == null;
+    return on && off;
+  });
+  await t('[home] All Borders sets w:between (inside-H) and the menu checkmark reflects state', async () => {
+    setDoc('allbtw probe'); selectText('allbtw');
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^All Borders$/); await sleep(40);
+    const hasBetween = !!(paraAttrs('allbtw').paragraphProperties?.borders || {}).between;
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body);
+    const row = Array.from(document.querySelectorAll('.flyout .fly-item')).find((i) => (i.querySelector('.fi-label') || {}).textContent === 'Bottom Border');
+    const checked = /checked/.test(row.className) && (row.querySelector('.fi-check') || {}).textContent === '✓';
+    window.WC.closeFlyouts();
+    return hasBetween && checked;
+  });
+  await t('[home] Inside Vertical Border is layout-flagged (no paragraph model write)', async () => {
+    setDoc('insv probe'); selectText('insv');
+    const before = JSON.stringify(paraAttrs('insv').paragraphProperties?.borders || null);
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Inside Vertical Border$/); await sleep(40);
+    return before === JSON.stringify(paraAttrs('insv').paragraphProperties?.borders || null);
+  });
+  await t('[home] flyItem checkable reserves a check column; ✓ only when checked', () => {
+    const a = window.WC.flyItem('X', { checkable: true, checked: true });
+    const b = window.WC.flyItem('Y', { checkable: true, checked: false });
+    const ac = a.querySelector('.fi-check'), bc = b.querySelector('.fi-check');
+    return !!ac && ac.textContent === '✓' && a.classList.contains('checked') && !!bc && bc.textContent === '' && !b.classList.contains('checked');
+  });
+  await t('[home] Borders and Shading dialog: 3 tabs, ½pt width default, OK applies toggled edges', async () => {
+    setDoc('bsdlg probe'); selectText('bsdlg');
+    window.WC.Dialogs.bordersAndShading();
+    const tabs = Array.from(document.querySelectorAll('.dialog .tabs .t')).map((t) => t.textContent).join(',');
+    const widthDefault = document.querySelector('.dialog select').value; // first select = Width
+    document.querySelector('.dialog .bs-edge.e-top').click();
+    document.querySelector('.dialog .bs-edge.e-right').click();
+    Array.from(document.querySelectorAll('.dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(40);
+    const b = paraAttrs('bsdlg').paragraphProperties?.borders || {};
+    document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
+    return tabs === 'Borders,Page Border,Shading' && widthDefault === '4' && !!b.top && !!b.right && !b.bottom && !b.left;
+  });
+  await t('[home] Borders and Shading dialog: Shading tab applies a fill', async () => {
+    setDoc('bsshade probe'); selectText('bsshade');
+    window.WC.Dialogs.bordersAndShading();
+    Array.from(document.querySelectorAll('.dialog .tabs .t')).find((t) => /Shading/.test(t.textContent)).click();
+    Array.from(document.querySelectorAll('.dialog .bs-tab button')).find((b) => /No Color/.test(b.textContent)).click();
+    const sw = document.querySelector('.flyout .color-swatch[title="#FFC000"]') || document.querySelector('.flyout .color-swatch');
+    const hex = sw.title.replace(/^#/, '').toUpperCase(); sw.click();
+    Array.from(document.querySelectorAll('.dialog .dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(40);
+    const ok = (paraAttrs('bsshade').paragraphProperties?.shading || {}).fill === hex;
+    document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
+    return ok;
+  });
+  await t('[home] Horizontal Line menu item inserts a horizontal-rule block', async () => {
+    setDoc('hrline probe text');
+    const f = selectText('hrline');
+    // Word inserts the line at the cursor — collapse the range so the insert doesn't replace text.
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), f.to, f.to)));
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Horizontal Line$/); await sleep(60);
+    return !!document.querySelector('#pm-editor [data-horizontal-rule]');
+  });
+  await t('[home] View Gridlines menu item toggles the page show-grid class', async () => {
+    const pe = document.getElementById('pm-editor'); const g0 = pe.classList.contains('show-grid');
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^View Gridlines$/); await sleep(20);
+    const g1 = pe.classList.contains('show-grid');
+    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^View Gridlines$/); await sleep(20);
+    return g1 === !g0 && pe.classList.contains('show-grid') === g0;
+  });
   await t('[2] sort dialog OK reorders paragraphs ascending (one undo step)', async () => {
     setDocs(['banana', 'cherry', 'apple']);
     window.WC.editor.commands.selectAll();

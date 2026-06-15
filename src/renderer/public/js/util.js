@@ -78,8 +78,11 @@
 
   WC.flyItem = function (label, opts) {
     opts = opts || {};
-    const item = el('div', { class: 'fly-item' + (opts.disabled ? ' disabled' : '') });
+    const item = el('div', { class: 'fly-item' + (opts.disabled ? ' disabled' : '') + (opts.checked ? ' checked' : '') });
     if (opts.disabled) item.setAttribute('aria-disabled', 'true');
+    // Checkable menus (e.g. the Borders dropdown) reserve a leading check column so
+    // every row aligns; opts.checked fills it with a ✓ (Word's latched-state ticks).
+    if (opts.checkable) item.appendChild(el('span', { class: 'fi-check', text: opts.checked ? '✓' : '' }));
     if (opts.icon !== undefined) item.appendChild(el('span', { class: 'fi-ic', html: WC.icon(opts.icon, 16) }));
     item.appendChild(el('span', { text: label, class: 'fi-label' }));
     if (opts.key) item.appendChild(el('span', { class: 'fi-key', text: opts.key }));

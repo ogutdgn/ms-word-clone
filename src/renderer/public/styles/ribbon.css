@@ -304,6 +304,7 @@
 .flyout .fly-item:hover { background: var(--word-blue-tint); }
 .flyout .fly-item.disabled { opacity: .45; cursor: default; }
 .flyout .fly-item.disabled:hover { background: none; }
+.flyout .fly-item .fi-check { width: 14px; flex: 0 0 14px; text-align: center; color: var(--word-blue, #2b579a); font-size: 12px; font-weight: 700; }
 .flyout .fly-item .fi-ic { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
 .flyout .fly-item .fi-ic svg { width: 16px; height: 16px; }
 .flyout .fly-item .fi-key { margin-left: auto; color: #888; font-size: 11px; padding-left: 24px; }

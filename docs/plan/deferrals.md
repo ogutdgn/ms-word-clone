@@ -39,7 +39,12 @@
 
 | Tab/section | Feature | Required layout capability | Flagged |
 |---|---|---|---|
-| _(filled as the Phase-3 pass surfaces them)_ | | | |
+| Home → Paragraph → Borders | **Inside Horizontal border** between stacked paragraphs | The `w:between` border is set on the model + exports to .docx (faithful), but DRAWING the line between two adjacent same-bordered paragraphs needs the layout engine to group the block. | 2026-06-15 |
+| Home → Paragraph → Borders | **Inside Vertical border** on paragraphs | No paragraph OOXML equivalent (it is a table/multi-column concept). The dropdown item + dialog toggle are present; applying flags a Phase-4 toast and writes no model attr. | 2026-06-15 |
+| Home → Paragraph → Borders → Borders and Shading | **Page Border tab** (on-page render) | The tab writes a real `w:pgBorders` via `dePageBorders` (model + .docx faithful), but drawing a border around the page margins needs the layout engine. The tab carries an inline Phase-4 note. | 2026-06-15 |
+| Home → Paragraph → Borders → Borders and Shading | **Shadow / 3-D border depth** (Setting buttons) | Approximated to a flat Box today; the offset/bevel depth needs the layout engine. OK shows a Phase-4 toast. | 2026-06-15 |
+| Home → Paragraph → Borders → Borders and Shading | **Apply to: Text** (run-level `w:bdr`) | Run-level character borders are not on the fork command surface; the dialog applies to the paragraph and flags. | 2026-06-15 |
+| Home → Paragraph → Borders | **Diagonal Down/Up border** (table cells) | Greyed outside tables (Word parity). In a cell, rendering the diagonal line needs the table layout pass. | 2026-06-15 |
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 

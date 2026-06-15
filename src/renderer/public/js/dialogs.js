@@ -1056,6 +1056,196 @@
     ] });
   };
 
+  // ---- Borders and Shading (Home → Paragraph → Borders ▾ → Borders and Shading…) ----
+  // Faithful 3-tab dialog. Paragraph edge borders + shading are fully functional today;
+  // Inside-Horizontal renders between paragraphs only with the layout engine, and the
+  // whole Page Border tab + Shadow/3-D depth are layout-gated (Phase 4, deferrals A.1).
+  D.bordersAndShading = function (initialTab) {
+    const pm = WC.PM;
+    const para = (pm.getEditor().getAttributes('paragraph') || {}).paragraphProperties || {};
+    const cur0 = para.borders || {};
+    const seed = cur0.bottom || cur0.top || cur0.left || cur0.right || cur0.between || null;
+    // working border state
+    const edges = { top: !!cur0.top, bottom: !!cur0.bottom, left: !!cur0.left, right: !!cur0.right, between: !!cur0.between };
+    let style = (seed && seed.val) || 'single';
+    let width = (seed && seed.size) || 4;            // eighth-points
+    let color = seed && seed.color && seed.color !== 'auto' ? '#' + String(seed.color).replace(/^#/, '') : 'auto';
+    let setting = computeSetting();
+    let applyTo = 'paragraph';
+    let bordersTouched = false, shadingTouched = false, pageTouched = false;
+    // working shading state
+    const sh0 = para.shading;
+    let shadeFill = sh0 && sh0.fill && String(sh0.fill).toLowerCase() !== 'auto' ? '#' + String(sh0.fill).replace(/^#/, '') : null;
+
+    function computeSetting() {
+      const o = edges.top && edges.bottom && edges.left && edges.right;
+      if (!edges.top && !edges.bottom && !edges.left && !edges.right && !edges.between) return 'none';
+      if (o && !edges.between) return 'box';
+      return 'custom';
+    }
+    const STYLES = [['single', 'Solid'], ['dotted', 'Dotted'], ['dashed', 'Dashed'], ['double', 'Double'], ['thick', 'Thick']];
+    const WIDTHS = [['¼ pt', 2], ['½ pt', 4], ['¾ pt', 6], ['1 pt', 8], ['1½ pt', 12], ['2¼ pt', 18], ['3 pt', 24], ['4½ pt', 36], ['6 pt', 48]];
+    function styleCss(v) { return ({ single: 'solid', thick: 'solid', dotted: 'dotted', dashed: 'dashed', double: 'double' })[v] || 'solid'; }
+    function widthPx() { const base = Math.max(1, Math.round((width / 8) * (96 / 72))); return style === 'thick' ? base + 2 : base; }
+    function edgeCss(on) { return on ? `${widthPx()}px ${styleCss(style)} ${color === 'auto' ? '#000' : color}` : 'none'; }
+
+    // ---------- Borders tab ----------
+    const settingBtns = {};
+    function setSetting(s) {
+      setting = s; bordersTouched = true;
+      if (s === 'none') { edges.top = edges.bottom = edges.left = edges.right = edges.between = false; }
+      else if (s === 'box' || s === 'shadow' || s === '3d') { edges.top = edges.bottom = edges.left = edges.right = true; edges.between = false; }
+      // 'custom' leaves edges as-is
+      Object.keys(settingBtns).forEach((k) => settingBtns[k].classList.toggle('active', k === s));
+      renderPreview();
+    }
+    const settingCol = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px', width: '120px' } }, [
+      el('div', { style: { fontWeight: '600', marginBottom: '2px' }, text: 'Setting:' }),
+      ...[['none', 'None', 'borderNoneIc'], ['box', 'Box', 'borderAllIc'], ['shadow', 'Shadow', 'borderOutsideIc'], ['3d', '3-D', 'borderOutsideIc'], ['custom', 'Custom', 'borderInsideIc']].map(([k, label, ic]) => {
+        const b = el('button', { class: 'bs-setting' + (setting === k ? ' active' : ''), onclick: () => setSetting(k) }, [
+          el('span', { class: 'bs-set-ic', html: WC.icon(ic, 18) }), el('span', { text: label }),
+        ]);
+        settingBtns[k] = b; return b;
+      }),
+    ]);
+
+    const styleList = el('div', { class: 'bs-style-list' }, STYLES.map(([v, label]) => {
+      const row = el('div', { class: 'bs-style-row' + (style === v ? ' active' : ''), onclick: () => { style = v; bordersTouched = true; styleList.querySelectorAll('.bs-style-row').forEach((r) => r.classList.remove('active')); row.classList.add('active'); renderPreview(); } }, [
+        el('span', { class: 'bs-style-sample', style: { borderTop: `${v === 'thick' ? 3 : v === 'double' ? 3 : 2}px ${styleCss(v)} #000` } }),
+        el('span', { text: label, style: { fontSize: '12px' } }),
+      ]);
+      return row;
+    }));
+    const colorBtn = el('button', { class: 'btn', style: { minWidth: '110px', textAlign: 'left' } });
+    function paintColorBtn() { colorBtn.innerHTML = ''; colorBtn.appendChild(el('span', { style: { display: 'inline-block', width: '12px', height: '12px', verticalAlign: 'middle', marginRight: '6px', border: '1px solid #888', background: color === 'auto' ? '#000' : color } })); colorBtn.appendChild(document.createTextNode(color === 'auto' ? 'Automatic' : color)); colorBtn.appendChild(document.createTextNode('  ▾')); }
+    colorBtn.addEventListener('click', () => WC.flyout(colorBtn, (f) => f.appendChild(WC.colorPalette((c) => { color = (c === 'inherit' || c == null) ? 'auto' : c; bordersTouched = true; paintColorBtn(); renderPreview(); }, { autoLabel: 'Automatic', automatic: true, autoValue: 'auto' }))));
+    paintColorBtn();
+    const widthSel = el('select', { onchange: () => { width = parseInt(widthSel.value, 10); bordersTouched = true; renderPreview(); } }, WIDTHS.map(([label, v]) => el('option', { value: String(v), text: label })));
+    widthSel.value = String(width);
+
+    // Preview: a sample box with clickable edge toggles (Word's "click the diagram" area).
+    const sampleBox = el('div', { class: 'bs-sample' });
+    const betweenLine = el('div', { class: 'bs-between' });
+    sampleBox.appendChild(el('div', { class: 'bs-sample-text' }, [el('div', {}), el('div', {}), el('div', {})]));
+    sampleBox.appendChild(betweenLine);
+    function edgeToggle(edge, cls) { return el('button', { class: 'bs-edge ' + cls, title: edge[0].toUpperCase() + edge.slice(1) + ' border', onclick: () => { edges[edge] = !edges[edge]; bordersTouched = true; setting = computeSetting(); Object.keys(settingBtns).forEach((k) => settingBtns[k].classList.toggle('active', k === setting)); renderPreview(); } }); }
+    const eT = edgeToggle('top', 'e-top'), eB = edgeToggle('bottom', 'e-bottom'), eL = edgeToggle('left', 'e-left'), eR = edgeToggle('right', 'e-right');
+    const previewGrid = el('div', { class: 'bs-preview-grid' }, [
+      el('div'), eT, el('div'),
+      eL, sampleBox, eR,
+      el('div'), eB, el('div'),
+    ]);
+    function renderPreview() {
+      sampleBox.style.borderTop = edgeCss(edges.top);
+      sampleBox.style.borderBottom = edgeCss(edges.bottom);
+      sampleBox.style.borderLeft = edgeCss(edges.left);
+      sampleBox.style.borderRight = edgeCss(edges.right);
+      betweenLine.style.borderTop = edges.between ? edgeCss(true) : 'none';
+      [['top', eT], ['bottom', eB], ['left', eL], ['right', eR]].forEach(([k, b]) => b.classList.toggle('on', edges[k]));
+    }
+    const applyToSel = el('select', { onchange: () => { applyTo = applyToSel.value; } }, [el('option', { value: 'paragraph', text: 'Paragraph' }), el('option', { value: 'text', text: 'Text' })]);
+    const bordersTab = el('div', { class: 'bs-tab' }, [
+      el('div', { style: { display: 'flex', gap: '18px' } }, [
+        settingCol,
+        el('div', { style: { width: '150px' } }, [
+          el('div', { style: { fontWeight: '600', marginBottom: '2px' }, text: 'Style:' }), styleList,
+          el('div', { class: 'row', style: { marginTop: '8px' } }, [el('label', { text: 'Color:', style: { width: '46px' } }), colorBtn]),
+          el('div', { class: 'row' }, [el('label', { text: 'Width:', style: { width: '46px' } }), widthSel]),
+        ]),
+        el('div', { style: { flex: '1' } }, [
+          el('div', { style: { fontWeight: '600' }, text: 'Preview' }),
+          el('div', { style: { fontSize: '11px', color: '#605E5C', margin: '2px 0 8px' }, text: 'Click on diagram below or use buttons to apply borders' }),
+          previewGrid,
+          el('div', { class: 'row', style: { marginTop: '14px', justifyContent: 'flex-end' } }, [el('label', { text: 'Apply to:' }), applyToSel]),
+        ]),
+      ]),
+    ]);
+
+    // ---------- Shading tab ----------
+    const shadeBtn = el('button', { class: 'btn', style: { minWidth: '130px', textAlign: 'left' } });
+    const shadeSample = el('div', { class: 'bs-sample', style: { margin: '0 auto' } }, [el('div', { class: 'bs-sample-text' }, [el('div', {}), el('div', {}), el('div', {})])]);
+    function paintShade() {
+      shadeBtn.innerHTML = ''; shadeBtn.appendChild(el('span', { style: { display: 'inline-block', width: '12px', height: '12px', verticalAlign: 'middle', marginRight: '6px', border: '1px solid #888', background: shadeFill || '#fff' } })); shadeBtn.appendChild(document.createTextNode(shadeFill || 'No Color')); shadeBtn.appendChild(document.createTextNode('  ▾'));
+      shadeSample.style.background = shadeFill || 'transparent';
+    }
+    shadeBtn.addEventListener('click', () => WC.flyout(shadeBtn, (f) => f.appendChild(WC.colorPalette((c) => { shadeFill = (c == null) ? null : (c === 'inherit' ? '#000000' : c); shadingTouched = true; paintShade(); }, { noColor: true, automatic: false }))));
+    paintShade();
+    const shadeApplyTo = el('select', {}, [el('option', { value: 'paragraph', text: 'Paragraph' }), el('option', { value: 'text', text: 'Text' })]);
+    const shadingTab = el('div', { class: 'bs-tab', style: { display: 'none' } }, [
+      el('div', { style: { display: 'flex', gap: '24px' } }, [
+        el('div', {}, [
+          el('div', { style: { fontWeight: '600', marginBottom: '4px' }, text: 'Fill' }), shadeBtn,
+          el('div', { class: 'row', style: { marginTop: '16px' } }, [el('label', { text: 'Apply to:' }), shadeApplyTo]),
+        ]),
+        el('div', { style: { flex: '1' } }, [el('div', { style: { fontWeight: '600' }, text: 'Preview' }), el('div', { style: { marginTop: '8px' } }, [shadeSample])]),
+      ]),
+    ]);
+
+    // ---------- Page Border tab (layout-gated; model/export real via dePageBorders) ----------
+    const pgStyle = el('select', { onchange: () => { pageTouched = true; } }, ['single', 'double', 'dashed', 'dotted'].map((s) => el('option', { value: s, text: s[0].toUpperCase() + s.slice(1) })));
+    let pgColor = '#000000';
+    const pgColorBtn = el('button', { class: 'btn', text: 'Automatic  ▾' });
+    pgColorBtn.addEventListener('click', () => WC.flyout(pgColorBtn, (f) => f.appendChild(WC.colorPalette((c) => { pgColor = (c === 'inherit' || c == null) ? '#000000' : c; pageTouched = true; pgColorBtn.textContent = pgColor + '  ▾'; }, { autoLabel: 'Automatic', automatic: true }))));
+    const pgWidth = el('select', { onchange: () => { pageTouched = true; } }, WIDTHS.map(([label, v]) => el('option', { value: String(v), text: label })));
+    pgWidth.value = '8';
+    const pageTab = el('div', { class: 'bs-tab', style: { display: 'none' } }, [
+      el('div', { style: { fontSize: '11px', color: '#9a6700', background: '#fff4ce', border: '1px solid #f0d98a', padding: '6px 9px', borderRadius: '3px', marginBottom: '10px' }, text: 'Page borders are saved to the document and export to .docx, but drawing them around the page needs the layout engine (Phase 4).' }),
+      el('div', { class: 'row' }, [el('label', { text: 'Style:', style: { width: '60px' } }), pgStyle]),
+      el('div', { class: 'row' }, [el('label', { text: 'Color:', style: { width: '60px' } }), pgColorBtn]),
+      el('div', { class: 'row' }, [el('label', { text: 'Width:', style: { width: '60px' } }), pgWidth]),
+    ]);
+
+    // ---------- Tabs + footer ----------
+    const panels = { borders: bordersTab, page: pageTab, shading: shadingTab };
+    const tabs = el('div', { class: 'tabs' }, [
+      el('div', { class: 't active', text: 'Borders', onclick: (e) => sw(e.target, 'borders') }),
+      el('div', { class: 't', text: 'Page Border', onclick: (e) => sw(e.target, 'page') }),
+      el('div', { class: 't', text: 'Shading', onclick: (e) => sw(e.target, 'shading') }),
+    ]);
+    function sw(tabEl, key) { tabs.querySelectorAll('.t').forEach((t) => t.classList.remove('active')); tabEl.classList.add('active'); Object.keys(panels).forEach((k) => panels[k].style.display = k === key ? '' : 'none'); }
+    const optionsBtn = el('button', { class: 'btn', text: 'Options…', onclick: () => borderOptions() });
+    const hLineBtn = el('button', { class: 'btn', text: 'Horizontal Line…', onclick: () => { const ed = pm.getEditor(); if (ed.commands.insertHorizontalRule) { ed.commands.insertHorizontalRule(); pm.markDirty && pm.markDirty(); } } });
+    const body = el('div', {}, [tabs, el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } }, [hLineBtn, optionsBtn]), bordersTab, pageTab, shadingTab]);
+    renderPreview();
+
+    let space = (seed && seed.space != null) ? seed.space : 1; // border distance from text (pt), Options dialog
+    function borderOptions() {
+      const fromText = el('input', { type: 'number', value: String(space), min: '0', max: '31', style: { width: '70px' } });
+      WC.dialog({ title: 'Border and Shading Options', width: '340px', body: el('div', {}, [
+        el('div', { style: { fontWeight: '600', marginBottom: '6px' }, text: 'From text' }),
+        el('div', { class: 'row' }, [el('label', { text: 'Distance (pt):', style: { width: '90px' } }), fromText]),
+      ]), footer: [{ label: 'OK', primary: true, onClick: () => { space = parseInt(fromText.value, 10) || 0; bordersTouched = true; } }, { label: 'Cancel' }] });
+    }
+
+    function buildBorders() {
+      const def = () => ({ val: style, size: width, color: color === 'auto' ? 'auto' : color.replace(/^#/, '').toUpperCase(), space: space });
+      const out = {}; ['top', 'bottom', 'left', 'right', 'between'].forEach((k) => { if (edges[k]) out[k] = def(); });
+      return out;
+    }
+
+    WC.dialog({ title: 'Borders and Shading', width: '620px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const flags = [];
+        if (bordersTouched) {
+          const b = buildBorders();
+          if (Object.keys(b).length) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': b });
+          else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
+          if (applyTo === 'text') flags.push('Apply to: Text (run-level borders) is deferred — applied to the paragraph.');
+          if (setting === 'shadow' || setting === '3d') flags.push('Shadow / 3-D border depth renders with the layout engine (Phase 4).');
+          if (edges.between) flags.push('Inside Horizontal border renders between paragraphs with the layout engine (Phase 4).');
+        }
+        if (shadingTouched) {
+          if (shadeFill) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });
+          else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+        }
+        if (pageTouched) { pm.dePageBorders({ style: pgStyle.value === 'single' ? 'solid' : pgStyle.value, color: pgColor, width: Math.max(1, Math.round((parseInt(pgWidth.value, 10) / 8))) }); flags.push('Page border saved to the document; on-page render arrives with the layout engine (Phase 4).'); }
+        if (flags.length) WC.toast(flags[0], flags.length > 1 ? flags.slice(1).join(' ') : undefined);
+      } },
+      { label: 'Cancel' },
+    ] });
+    if (initialTab && panels[initialTab]) { const ix = { borders: 0, page: 1, shading: 2 }[initialTab]; sw(tabs.children[ix], initialTab); }
+  };
+
   // ---- Add Source / Manage Sources ----
   // opts (additive): { prefill, onSubmit }. When `onSubmit` is supplied (the Source
   // Manager → Edit flow, slice-9 FIX 5) it OVERRIDES the default add/insert behavior

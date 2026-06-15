@@ -110,3 +110,25 @@
 .cb-item-menu { position: absolute; top: 4px; right: 4px; opacity: 0; cursor: pointer; }
 .cb-item:hover .cb-item-menu { opacity: 1; }
 .cb-empty { color: #888; text-align: center; padding: 24px 8px; font-size: 13px; }
+
+/* ---- Borders and Shading dialog ---- */
+.dialog .bs-tab { padding-top: 4px; }
+.bs-setting { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid #d2d0ce; background: #fff; cursor: pointer; border-radius: 3px; font-size: 12px; text-align: left; }
+.bs-setting:hover { background: #f3f2f1; }
+.bs-setting.active { border-color: var(--word-blue); background: var(--word-blue-tint); }
+.bs-setting .bs-set-ic { display: inline-flex; }
+.bs-setting .bs-set-ic svg { width: 18px; height: 18px; color: #444; }
+.bs-style-list { border: 1px solid #d2d0ce; height: 116px; overflow-y: auto; background: #fff; }
+.bs-style-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; }
+.bs-style-row:hover { background: #f3f2f1; }
+.bs-style-row.active { background: var(--word-blue-tint); }
+.bs-style-sample { display: inline-block; width: 46px; height: 0; }
+.bs-preview-grid { display: grid; grid-template-columns: 24px 1fr 24px; grid-template-rows: 22px auto 22px; gap: 5px; align-items: center; justify-items: center; width: 210px; }
+.bs-sample { width: 150px; height: 88px; background: #fff; position: relative; box-sizing: border-box; }
+.bs-sample-text { display: flex; flex-direction: column; gap: 9px; padding: 14px 12px; }
+.bs-sample-text > div { height: 3px; background: #c8c6c4; border-radius: 1px; }
+.bs-between { position: absolute; left: 10px; right: 10px; top: 50%; }
+.bs-edge { border: 1px solid #c8c6c4; background: #f3f2f1; cursor: pointer; padding: 0; background-repeat: no-repeat; background-position: center; background-image: linear-gradient(#000, #000); }
+.bs-edge.e-top, .bs-edge.e-bottom { width: 44px; height: 16px; background-size: 80% 2px; }
+.bs-edge.e-left, .bs-edge.e-right { width: 16px; height: 44px; background-size: 2px 80%; }
+.bs-edge.on { background-color: var(--word-blue-tint); border-color: var(--word-blue); background-image: linear-gradient(var(--word-blue), var(--word-blue)); }

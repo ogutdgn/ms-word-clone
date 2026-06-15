@@ -1618,32 +1618,80 @@
     });
   }
 
+  // Read the borders object of the paragraph at the selection head (for menu checkmarks).
+  function currentParaBorders() {
+    const attrs = WC.PM.getEditor().getAttributes('paragraph') || {};
+    return (attrs.paragraphProperties || {}).borders || {};
+  }
+  function gridlinesOn() { return !!document.getElementById('pm-editor')?.classList.contains('show-grid'); }
+
+  // Full Word Borders split-button dropdown: per-edge toggles (with checkmarks),
+  // No/All/Outside/Inside, Inside-H/V, greyed diagonals (table-only), Horizontal Line,
+  // Draw Table, View Gridlines, and the Borders and Shading… dialog.
   function bordersMenu(node) {
-    const edges = [['All Borders', 'all'], ['Outside Borders', 'outside'], ['No Border', 'none'], ['Top Border', 'top'], ['Bottom Border', 'bottom'], ['Left Border', 'left'], ['Right Border', 'right']];
+    const b = currentParaBorders();
+    const has = (k) => !!b[k] && b[k].val !== 'none' && b[k].val !== 'nil';
+    const outer = has('top') && has('bottom') && has('left') && has('right');
+    const inTable = false; // Home paragraph context; diagonal borders only exist in table cells
     WC.flyout(node, (fly) => {
-      edges.forEach(([label, e]) => fly.appendChild(WC.flyItem(label, { onClick: () => applyBorder(e) })));
+      const item = (label, opts) => fly.appendChild(WC.flyItem(label, Object.assign({ checkable: true }, opts)));
+      item('Bottom Border', { icon: 'borderBottom', checked: has('bottom'), onClick: () => applyBorder('bottom') });
+      item('Top Border', { icon: 'borderTop', checked: has('top'), onClick: () => applyBorder('top') });
+      item('Left Border', { icon: 'borderLeft', checked: has('left'), onClick: () => applyBorder('left') });
+      item('Right Border', { icon: 'borderRight', checked: has('right'), onClick: () => applyBorder('right') });
       fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Borders and Shading…', { onClick: () => WC.notImplemented('Borders and Shading dialog') }));
+      item('No Border', { icon: 'borderNoneIc', checked: Object.keys(b).every((k) => !has(k)), onClick: () => applyBorder('none') });
+      item('All Borders', { icon: 'borderAllIc', onClick: () => applyBorder('all') });
+      item('Outside Borders', { icon: 'borderOutsideIc', checked: outer, onClick: () => applyBorder('outside') });
+      item('Inside Borders', { icon: 'borderInsideIc', onClick: () => applyBorder('inside') });
+      fly.appendChild(WC.flySep());
+      item('Inside Horizontal Border', { icon: 'borderInsideH', checked: has('between'), onClick: () => applyBorder('insideH') });
+      item('Inside Vertical Border', { icon: 'borderInsideV', onClick: () => applyBorder('insideV') });
+      item('Diagonal Down Border', { icon: 'borderDiagDown', disabled: !inTable });
+      item('Diagonal Up Border', { icon: 'borderDiagUp', disabled: !inTable });
+      fly.appendChild(WC.flySep());
+      item('Horizontal Line', { icon: 'borderHorizLine', onClick: () => insertHorizontalLine() });
+      fly.appendChild(WC.flySep());
+      item('Draw Table', { icon: 'drawTable', onClick: () => WC.notImplemented('Draw Table') });
+      item('View Gridlines', { icon: 'viewGridlines', checked: gridlinesOn(), onClick: () => { document.getElementById('pm-editor')?.classList.toggle('show-grid'); } });
+      item('Borders and Shading…', { icon: 'document_border', onClick: () => WC.Dialogs.bordersAndShading() });
     });
   }
+  // Word's default paragraph border edge: single, 0.5pt (size is EIGHTH-points: 4),
+  // auto color, 1pt offset. Inside-H maps to OOXML w:between (faithful model + export);
+  // its render BETWEEN paragraphs needs the layout engine (Phase-4 flag). Inside-V has
+  // no paragraph OOXML equivalent (table/column concept) → flagged, no model write.
+  function borderDef() { return { val: 'single', size: 4, color: 'auto', space: 1 }; }
   function applyBorder(edge) {
-    if (edge && edge !== 'none' && edge !== 'all' && edge !== 'outside') lastBorderEdge = edge;
+    if (['top', 'bottom', 'left', 'right'].indexOf(edge) >= 0) lastBorderEdge = edge;
     const pm = WC.PM;
     if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
-    // Word's default paragraph border: single, 0.5pt (size is in EIGHTH-points: 4),
-    // auto color, 1pt offset. 'all'≡'outside' replicates the legacy simplification
-    // for single paragraphs (no inside-border concept yet; recorded deferral).
-    const DEF = { val: 'single', size: 4, color: 'auto', space: 1 };
-    const defCopy = () => ({ val: DEF.val, size: DEF.size, color: DEF.color, space: DEF.space });
-    // getAttributes reads ONE paragraph (selection head) — multi-paragraph selections
-    // seed single-edge accumulation from that paragraph only (recorded simplification).
+    if (edge === 'insideV') { WC.toast('Inside Vertical borders apply to tables/columns — deferred to the layout engine (Phase 4).'); return; }
+    // getAttributes reads ONE paragraph (selection head); multi-paragraph selections seed
+    // single-edge toggles from that paragraph only (recorded simplification, deferrals A.1).
     const attrs = pm.getEditor().getAttributes('paragraph') || {};
-    const pp = attrs.paragraphProperties || {};
-    const cur = pp.borders || {};
-    const borders = (edge === 'all' || edge === 'outside')
-      ? { top: defCopy(), bottom: defCopy(), left: defCopy(), right: defCopy() }
-      : Object.assign({}, cur, { [edge]: defCopy() }); // Word ACCUMULATES single edges
-    pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': borders });
+    const cur = Object.assign({}, (attrs.paragraphProperties || {}).borders || {});
+    const present = (k) => !!cur[k] && cur[k].val !== 'none' && cur[k].val !== 'nil';
+    if (edge === 'all') {
+      ['top', 'bottom', 'left', 'right', 'between'].forEach((k) => { cur[k] = borderDef(); });
+    } else if (edge === 'outside') {
+      ['top', 'bottom', 'left', 'right'].forEach((k) => { cur[k] = borderDef(); });
+      delete cur.between;
+    } else if (edge === 'inside' || edge === 'insideH') {
+      if (present('between')) delete cur.between; else cur.between = borderDef();
+      if (edge === 'inside') WC.toast('Inside Horizontal borders between paragraphs render with the layout engine (Phase 4); Inside Vertical needs a table.');
+    } else {
+      // single outer edge: toggle (Word removes an edge that is already present)
+      if (present(edge)) delete cur[edge]; else cur[edge] = borderDef();
+    }
+    const anyLeft = Object.keys(cur).some((k) => present(k));
+    if (!anyLeft) { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
+    pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': cur });
+  }
+  function insertHorizontalLine() {
+    const ed = WC.PM.getEditor();
+    if (ed && ed.commands && ed.commands.insertHorizontalRule) { ed.commands.insertHorizontalRule(); WC.PM.markDirty && WC.PM.markDirty(); }
+    else WC.notImplemented('Horizontal Line');
   }
 
   // Library glyph → engine style names (toggleOrderedListStyle / toggleBulletListStyle);
