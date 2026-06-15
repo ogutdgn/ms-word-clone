@@ -7,7 +7,7 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — backlog 1–5 DONE; Text Effects stage 2 in progress)
+## 2026-06-15 (RESUME HERE — backlog 1–5 DONE + Text Effects stage 2a; stage 2b is the next step)
 
 > Continuation of the /loop below. Branch `fix/ribbon-home`. All three gates green after each commit
 > (PM 373–374 pass / 1 known win-only `[10mm]` skip; smoke 9/9; roundtrip 27/0). Verified against REAL
@@ -29,10 +29,21 @@
    `labeled` opt; Insert small buttons stacked 3-per-column WITH labels. Header/Footer/Page Number stay
    `isBlocked` (layout) — deferrals A.1.
 
-**NEXT (in progress) — backlog #6: Text Effects stage 2.** Build the 4 net-new `w14:textOutline/glow/shadow/
-reflection` export translators (EMU / 60000ths-degree / 1000ths-% unit conversions) + bridge + RUN_PROPERTIES
-keys + per-effect **oracle round-trip vs real Word** (macOS AppleScript oracle). The quartet RENDERS today
-(CSS) but `save` drops it. See the 2026-06-15 Text Effects stage-1 entry below for the exact stage-2 spec.
+6. `feat(docx)` — **Text Effects stage 2a**: `w14:textOutline` + `w14:glow` now EXPORT and round-trip
+   (units pt×12700 EMU, probe-verified 2pt→25400 / 6pt→63500; new fork translators + bidirectional bridge
+   in `super-converter/styles.js`). The macOS oracle **timed out** this session (`AppleEvent -1712`, the
+   documented Word-for-Mac fragility — not a docx defect); structure mirrors the already-oracle-validated
+   typography-trio w14-under-`w:rPr`.
+
+**NEXT — Text Effects stage 2b (`w14:shadow` + `w14:reflection`).** Deferred ONLY because their units need
+oracle-derived values (shadow: cartesian {dx,dy,blur}→polar dist EMU/dir 60000ths-deg + sx/sy/kx/ky;
+reflection: preset string → the full stA/stPos/endA/endPos 1000ths-% + dist/dir/fadeDir set). Build them the
+same way as 2a (translator dir + `decodeRPrFromMarks`/`encodeMarksFromRPr` branches + `rpr-translator.js`
+registration) once the oracle is reachable. Full spec: **deferrals.md §A.2**. Also recommended: a confirming
+oracle open of a textOutline/glow docx in real Word (restart Word first — the session degraded).
+
+**Backlog COMPLETE** (1–5 fully, 6 = stage 2a done + 2b spec'd). Suggested wrap-up: PR the whole
+`fix/ribbon-home` branch (now ~14 commits across the Home tab + Insert + Editor + docx) into `main`.
 
 ---
 
