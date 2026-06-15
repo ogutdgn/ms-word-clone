@@ -270,6 +270,23 @@
     const m = markNames('subsup').join(' ');
     return m.includes('"vertAlign":"superscript"') && !m.includes('"vertAlign":"subscript"');
   });
+  await t('[1] strike on superscript: line-through tracks the raised span (Word parity)', async () => {
+    // Repro: super/subscript serializes as an INNER span(vertical-align+65%); strike
+    // is the OUTER <s>. If <s> paints line-through at its own (full-size, baseline)
+    // metrics the line lands UNDER the raised glyph. Fix moves line-through to the
+    // inner shifted span. Assert the inner span paints it and the outer <s> does not.
+    setDoc('strikesuper probe'); selectText('strikesuper');
+    run('superscript'); run('strikethrough'); await sleep(60);
+    const inner = Array.from(document.querySelectorAll('#pm-editor .ProseMirror s > span'))
+      .find((sp) => /vertical-align:\s*super/.test(sp.getAttribute('style') || ''));
+    if (!inner) return 'no <s> wrapping a vertical-align:super span found';
+    const outer = inner.closest('s');
+    const innerLine = getComputedStyle(inner).textDecorationLine;
+    const outerLine = getComputedStyle(outer).textDecorationLine;
+    // Inner (shifted, 65%) span must carry line-through so it paints through the
+    // raised glyph's middle; outer <s> must NOT paint its own normal-baseline line.
+    return /line-through/.test(innerLine) && !/line-through/.test(outerLine);
+  });
 
   await t('[1] in-view Mod-Z does not double-fire (engine handles it once)', async () => {
     setDoc('double fire probe'); selectText('double');

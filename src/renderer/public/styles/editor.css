@@ -432,6 +432,23 @@ body.pm-active #pm-editor {
 }
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
 
+/* Strikethrough on sub/superscript runs (Word parity).
+   The strike mark serializes as the OUTER <s>; the vertAlign mark serializes
+   as an INNER <span style="vertical-align: sub|super; font-size: 65%">. The
+   <s>'s line-through is painted at the OUTER element's full-size, normal-baseline
+   metrics, so it lands UNDER a superscript / above-the-bottom of a subscript
+   instead of through the shifted glyph. Fix: drop the decoration on <s> and
+   re-paint line-through on the inner shifted span, where it tracks the raised/
+   lowered, 65%-scaled text — through its middle, matching Word. */
+body.pm-active #pm-editor .ProseMirror s:has(> span[style*="vertical-align: sub"]),
+body.pm-active #pm-editor .ProseMirror s:has(> span[style*="vertical-align: super"]) {
+  text-decoration: none;
+}
+body.pm-active #pm-editor .ProseMirror s > span[style*="vertical-align: sub"],
+body.pm-active #pm-editor .ProseMirror s > span[style*="vertical-align: super"] {
+  text-decoration: line-through;
+}
+
 /* PM-mode visibility twins for show-marks / show-grid */
 body.pm-active #pm-editor.show-marks p::after { content: '¶'; color: #2b8aef; margin-left: 2px; }
 body.pm-active #pm-editor.show-grid { background-image: linear-gradient(#e9eef5 1px, transparent 1px), linear-gradient(90deg, #e9eef5 1px, transparent 1px); background-size: 24px 24px; }
