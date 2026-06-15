@@ -21,8 +21,10 @@
 >    build order **4a→4f** (§4). Its checklist is fed by `deferrals.md` §A.1.
 > 2. Read **[plan.md](plan.md)** (roadmap: Phase 3 PAUSED, Phase 4 ACTIVE) and its new
 >    **"Cross-platform / running on Windows"** section.
-> 3. **Branch first** off `main` (or merge `fix/ribbon-home` first — see below): e.g.
->    `build/phase-4a-pagination`. Never work on `main`.
+> 3. **Branch first** off `main`: e.g. `build/phase-4a-pagination`. Never work on `main`.
+>    (`fix/ribbon-home` was **fast-forward-merged into `main` and pushed** on 2026-06-15, so
+>    `main` already contains all the Home/Insert/Design/Editor work + this pivot. On Windows:
+>    `git pull origin main` then branch off it.)
 > 4. Sub-phase 4a = **pagination core** (model-driven multi-page sheets, line-level boundary,
 >    page-break/blank-page geometry), oracle-validated lines/page. PAGINATION.md is the prior art.
 >
@@ -33,10 +35,10 @@
 > (`src/main/main.js`), so `/tmp/...` → `C:\tmp\...` works. (`d1b591a`-era state; one commit pending
 > for the harness mkdir + these docs.)
 >
-> **Pre-pivot housekeeping:** `fix/ribbon-home` carries ~22 commits (Home/Insert/Design/Editor
-> hardening + the editor bug fixes). **Suggested: PR `fix/ribbon-home` → `main` before starting
-> Phase 4**, so Phase 4 branches off a clean integrated base. All gates green on it: PM 387/388
-> (1 known win-only `[10mm]` skip), smoke 9/9, roundtrip 27/0.
+> **Housekeeping (DONE 2026-06-15):** `fix/ribbon-home` (Home/Insert/Design/Editor hardening +
+> the editor bug fixes + this pivot) was **fast-forward-merged into `main` and pushed to origin**
+> — `main` is now the clean integrated base for Phase 4. All gates green: PM 387/388 (1 known
+> win-only `[10mm]` skip), smoke 9/9, roundtrip 27/0.
 
 ---
 
