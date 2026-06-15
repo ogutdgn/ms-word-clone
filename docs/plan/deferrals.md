@@ -39,7 +39,7 @@
 
 | Tab/section | Feature | Required layout capability | Flagged |
 |---|---|---|---|
-| Home → Paragraph → Borders | **Inside Horizontal border** between stacked paragraphs | The `w:between` border is set on the model + exports to .docx (faithful), but DRAWING the line between two adjacent same-bordered paragraphs needs the layout engine to group the block. | 2026-06-15 |
+| ~~Home → Paragraph → Borders~~ | ~~**Inside Horizontal border** between stacked paragraphs~~ | **RESOLVED 2026-06-15** (`e8d19aa`): in continuous flow two stacked paragraphs ARE adjacent blocks, so the "between" rule renders as the upper block's bottom border. `encodeCSSFromPPr` now implements Word's run-merge (top on first, bottom on last, between in the middle) + Enter carry-forward via `borderCarryPlugin`. No layout engine needed. | ~~2026-06-15~~ |
 | Home → Paragraph → Borders | **Inside Vertical border** on paragraphs | No paragraph OOXML equivalent (it is a table/multi-column concept). The dropdown item + dialog toggle are present; applying flags a Phase-4 toast and writes no model attr. | 2026-06-15 |
 | Home → Paragraph → Borders → Borders and Shading | **Page Border tab** (on-page render) | The tab writes a real `w:pgBorders` via `dePageBorders` (model + .docx faithful), but drawing a border around the page margins needs the layout engine. The tab carries an inline Phase-4 note. | 2026-06-15 |
 | Home → Paragraph → Borders → Borders and Shading | **Shadow / 3-D border depth** (Setting buttons) | Approximated to a flat Box today; the offset/bevel depth needs the layout engine. OK shows a Phase-4 toast. | 2026-06-15 |
@@ -67,6 +67,23 @@
 >   (`stA/stPos/endA/endPos` in 1000ths-%, `dist/dir/fadeDir`) needs Word's exact preset values.
 >   Build them the same way (translator dir + `decodeRPrFromMarks`/`encodeMarksFromRPr` branches +
 >   registration) once the oracle is reachable to validate the polar/preset numbers.
+
+### A.3 — Insert tab: non-layout content stubs (2026-06-15)
+
+> **Picture sizing RESOLVED (`f77f3e9`):** Insert → Pictures now inserts at the image's natural
+> size, clamped to the text-column width (aspect kept) — verified end-to-end via the real file
+> picker (1400×900 → full column width). Was a hardcoded 100×100 tiny box.
+
+These Insert controls are still STUBS (`WC.notImplemented` / honest degrade) — they are
+content-authoring surfaces, not layout-gated, but each is a sizeable feature in its own right and
+out of scope for the ribbon-hardening pass. Left for dedicated future slices:
+
+| Control | Note |
+|---|---|
+| Shapes / SmartArt / Chart / Screenshot / 3D Models | net-new authoring UIs (shape vocab, diagram engine, chart data model). 3D + Screenshot also touch host/cloud. |
+| Text Box / WordArt | insert inline today; off-flow positioning is the layout-engine item in §A.1. |
+| Signature Line / Object (embedded/OLE) | OLE embedding + signature provider — host-integration features. |
+| Equation | the equation editor builds OMML inline; the full equation authoring palette is a future slice. |
 
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 

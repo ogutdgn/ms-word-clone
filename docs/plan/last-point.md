@@ -7,7 +7,39 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — backlog 1–5 DONE + Text Effects stage 2a; stage 2b is the next step)
+## 2026-06-15 (RESUME HERE — carousel/borders/picture/design /loop: 4 items DONE, verified vs real Word)
+
+> Continuation /loop on `fix/ribbon-home`. User gave 4 concrete asks + screenshots; all done, each its
+> own commit, all three gates green after each (PM 384/385 = 1 known win-only `[10mm]` skip; smoke 9/9;
+> roundtrip 27/0). Verified against REAL Mac Word via computer-use throughout.
+
+**Done this session (commits newest last):**
+1. `feat(home)` `4b2df70` — **Quick Styles carousel**: shared `makeGalleryCarousel()` (ribbon.js) — ‹ prev
+   / › next flanking a clipped, paged viewport + a centered ▾ More. Pages by a full row, **disables the
+   arrow at the first/last page** (last page clamps to the final row), ▾ opens the expanded grid. Tiles
+   upgraded to Word's preview+name. Word model captured live: 17 styles, ~6/page.
+2. `fix(home)` `e8d19aa` — **paragraph borders carry on Enter + merge like Word**. Word model captured
+   live: a border is a paragraph property spanning the full column; Enter CONTINUES it; consecutive
+   same-bordered paragraphs MERGE (top on the first, bottom on the last, "between"/Inside-Horizontal
+   between). `encodeCSSFromPPr` rewritten with the run-merge (+4th param prevProps); new
+   `borderCarryPlugin.js` carries only borders on split; ParagraphNodeView re-renders both neighbours on
+   border change. **Inside-Horizontal now RENDERS** (was Phase-4-flagged).
+3. `fix(insert)` `f77f3e9` — **pictures insert at natural size, clamped to the column width** (were a
+   hardcoded 100×100 tiny box). `insertPictureFromDataUrl()` reads natural dims + clamps. Verified
+   end-to-end via the real file picker (1400×900 → full column width, aspect kept).
+4. `feat(design)` `7f94262` — **Word-faithful Design tab**: Themes button → big inline **Style Set
+   carousel** (mini Title/Heading previews, ‹/›/▾, reused makeGalleryCarousel) → Colors/Fonts/Spacing/
+   Effects/Set as Default → Watermark/Page Color/Page Borders. THEMES 9→30 (Office + alphabetical),
+   COLOR_SCHEMES 8→18, FONT_PAIRS reworked; Themes menu gains Reset/Browse/Save; Colors/Fonts gain
+   Customize…; **Page Color now opens the colour picker** (was hardcoded white).
+
+**Still open / next:** other Insert stubs (Shapes, SmartArt, Chart, Text Box, Equation, 3D, Screenshot,
+Signature, Object) remain — large/layout-gated, see deferrals §A.3. Text Effects stage 2b (shadow +
+reflection) still pending (deferrals §A.2). Suggested wrap-up: PR `fix/ribbon-home` → `main`.
+
+---
+
+## 2026-06-15 (backlog 1–5 DONE + Text Effects stage 2a; stage 2b is the next step)
 
 > Continuation of the /loop below. Branch `fix/ribbon-home`. All three gates green after each commit
 > (PM 373–374 pass / 1 known win-only `[10mm]` skip; smoke 9/9; roundtrip 27/0). Verified against REAL
