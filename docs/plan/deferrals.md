@@ -64,28 +64,32 @@
 > mid-cell-seam mangling + nested-cell mis-attribution (tables are skipped at any nesting depth),
 > asymmetric-margin band bleed, and the Linux opaque-headless-window regression. Two re-reviews of the
 > fix commits then caught over-reaches that were REVERTED: `pageBreakSource` page-broke on the wrong
-> side / for continuous sections, and the TRAILING-break feature grew an edge-case tail disproportionate
-> to its value — both deferred below.)
+> side / for continuous sections (still deferred to 4f, below).
+>
+> **UPDATE 2026-06-15 (4a2):** the forced-break mechanism was redesigned to place the seam AT the
+> break position `P` (pushing the content after `P` to the next page), which is the single fix the
+> notes below predicted. This RESOLVED both **mid-paragraph breaks** and **trailing (doc-final)
+> breaks** — they are now paginated + oracle-validated (`read-layout`: mid-para = one paragraph split
+> across 2 pages; trailing = +1 blank page; blank page = content lands on page 3, all matching Word
+> for Windows 16.0). The only forced-break edge still deferred is the section break, below.)
 
 - **Section breaks (`w:sectPr` → `pageBreakSource`) are NOT paginated.** A `w:sectPr` lives on a
   section's LAST paragraph (the break renders AFTER it) and is section-type-dependent (continuous vs
   next/even/odd-page), so it is left to the section-geometry sub-phase (4f). The COMMON imported manual
   page break is a run-level `<w:br w:type="page">` (→ `hardBreak[lineBreakType='page']`), which IS
   paginated. Until 4f, a section break imports as continuous flow.
-- **Trailing (doc-final) page break is NOT paginated.** A `Ctrl+Enter` at the very end of the document
-  (no content after it) does not add Word's trailing blank sheet; the page count is unchanged. The
-  feature was implemented then reverted — it grew a long edge tail (non-text content after the break,
-  caret-at-break-position page counting, deadband/signature staleness) for a minor case. A MID-document
-  page break / blank page (content after) IS paginated + oracle-validated. Revisit when the forced seam
-  is placed AT the break position (the same fix that handles mid-paragraph breaks).
+- ~~**Trailing (doc-final) page break is NOT paginated.**~~ **RESOLVED 2026-06-15 (4a2).** A
+  `Ctrl+Enter` at the very end of the document now adds Word's trailing blank sheet (+1 page). The
+  position-based forced seam (placed AT the break) handles it uniformly with mid-document breaks — no
+  special-casing. Oracle-validated (`read-layout` = 2 pages, matching Word).
 - **Page break inside a content-control / bibliography / index container.** The scan descends into all
-  top-level blocks except tables, so a break in such a container IS detected, but (like mid-paragraph)
-  it moves the next top-level block, not the container's internal remainder. Niche.
-- **Mid-paragraph manual break.** A `Ctrl+Enter` placed in the MIDDLE of a paragraph (text both
-  before and after) currently moves only the NEXT block to a new page; the after-the-break remainder
-  of that same paragraph stays on the current page. Word splits the paragraph at the break. Fix =
-  place the forced seam AT the break's position (like a line split). Common-case breaks (end of a
-  paragraph / between paragraphs) are correct + oracle-validated.
+  top-level blocks except tables, so a break in such a container IS detected and seams AT its position;
+  whether the container's internal remainder flows correctly across the seam is untested. Niche.
+- ~~**Mid-paragraph manual break.**~~ **RESOLVED 2026-06-15 (4a2).** A `Ctrl+Enter` in the MIDDLE of a
+  paragraph (text both before and after) now splits the paragraph at the break — the after-the-break
+  remainder moves to the next page. Implemented by placing the forced seam AT the break's position
+  (`placeForcedSeam`), exactly as the prior note predicted. Oracle-validated (`read-layout` = one
+  paragraph spanning 2 pages, matching Word).
 - **A single block taller than one page that can't be line-split** (an image > 1 page, or a <4-line
   block taller than the content area) overflows the sheet without a seam and the page count is
   best-effort. True image/object pagination is sub-phase 4b/4d territory.
