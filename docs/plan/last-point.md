@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-06-15 (RESUME HERE — new-session backlog: Home polish + Insert tab, as a /loop)
+
+> Clean handoff: working tree clean at `ab356f2`, all gates green (PM 353/354, smoke 9/9, roundtrip 27/0).
+> Mode the user set: **continuous /loop, do NOT ask, decide with engineering insight, compare against REAL
+> Word via computer use ALL the time** (incl. popup/dropdown behaviours), flag layout-engine items + post-
+> pagination items, keep going. Computer-use tools are loaded; new session must `request_access` (Microsoft
+> Word + the Electron clone) and start. Ultracode ON → use Workflow for substantive sub-tasks.
+
+**Queued work (user-provided screenshots captured the specs):**
+1. **Show/Hide ¶ icon WRONG** — `showHide` cmd should use the OLD pilcrow ("opposite P", ¶) icon, not the
+   current one. Fix the icon mapping (icons-fluent / icons.js / ribbon-data icon field). Quick.
+2. **Borders — expand to full Word parity** (Home → Paragraph → Borders split ▾). Real Word dropdown (per
+   screenshot): Bottom/Top/Left/Right Border (per-edge CHECK state), No Border, All Borders, Outside Borders,
+   Inside Borders, Inside Horizontal Border, Inside Vertical Border, Diagonal Down/Up (greyed outside tables),
+   Horizontal Line, Draw Table, View Gridlines, **Borders and Shading…**. Build the **Borders and Shading
+   dialog**: tabs Borders / Page Border / Shading; Setting None/Box/Shadow/3-D/Custom; Style/Color/Width;
+   clickable Preview edges; Apply to (Paragraph/Text); Options; Horizontal Line. (inside-borders between paras
+   + page borders likely need layout — FLAG/defer those; per-paragraph edges work today.) Verify via computer use.
+3. **Editor section — make it REAL** (cmd `editor`, currently a stub pane). User wants actual Spelling + Grammar
+   checking — investigate integrating a grammar/spell library (e.g. an offline dictionary + a grammar engine).
+   Screenshot shows: Editor Score, Corrections (Spelling N / Grammar N), Refinements, Similarity, Insights.
+   Spell-check is feasible offline; grammar is harder — note what's feasible vs cloud-only.
+4. **Insert tab ribbon — labels invisible on small screens** (user sees only icons). Even when narrow, controls
+   should be viewable/labeled like Word. Likely the Stage-A responsive condense over-hides labels OR the Insert
+   groups overflow. Make Insert UI-accurate to Word (buttons + arrangement); then per-feature: FLAG the
+   layout-engine-dependent ones (most Insert features — headers/footers/page-geometry/floating objects), make
+   the rest work. Compare via computer use.
+5. **STILL PENDING from Text Effects: stage 2** — the 4 net-new `w14:textOutline/glow/shadow/reflection` export
+   translators (EMU/60000ths-deg/1000ths-% units) + bridge + RUN_PROPERTIES keys + per-effect **oracle**
+   round-trip vs real Word. Quartet renders today but doesn't save to docx yet.
+6. After Home fully done → **Insert tab** (item 4), then the Home-tab PR.
+
 ## 2026-06-15 (Phase 3 — Text Effects & Typography rebuilt: button un-broken, trio docx-faithful)
 
 - **Branch:** `fix/ribbon-home`. **Phase:** Phase 3 Home tab — Text Effects rebuild (stage 1 DONE; quartet export = stage 2).
