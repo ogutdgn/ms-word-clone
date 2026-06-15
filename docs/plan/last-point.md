@@ -38,9 +38,23 @@
    review workflow** over the whole /loop diff (3 review dims × skeptical verify): it confirmed ONLY this
    one edge case; the border-merge plugin, both carousels, and the Design rebuild all held up.
 
-**Still open / next:** other Insert stubs (Shapes, SmartArt, Chart, Text Box, Equation, 3D, Screenshot,
-Signature, Object) remain — large/layout-gated, see deferrals §A.3. Text Effects stage 2b (shadow +
-reflection) still pending (deferrals §A.2). Suggested wrap-up: PR `fix/ribbon-home` → `main`.
+6. `fix(insert)` `2dca2e4` — **visible image selection + real video thumbnail** (user-reported editor bugs):
+   - **Image selection had NO feedback** — no CSS for `.ProseMirror-selectednode`, so a clicked image
+     looked unselectable → users thought images "couldn't be deleted". Added a Word-like selection frame
+     (accent outline + corner handles) in editor.css. Click → frame shows → Delete removes (verified live).
+   - **Online Video dropped a bare link** (CSP `img-src 'self' data: blob:` blocks remote posters) →
+     `insertVideoThumbnail()` now builds a self-contained **SVG poster** (play button + host + URL) inserted
+     as a normal image node. Verified with YouTube + Vimeo. Playback stays sandbox-deferred.
+   - Exposed `NodeSelection` (pm/index.ts, main.ts) for the suite. +3 tests (incl. picture-fallback).
+   - **Caret "can't change keyboard location":** could NOT reproduce a failure — click repositions the
+     caret in text / before+after images / empty space, and typing continues after an inserted image, all
+     matching real Word (compared side-by-side). The invisible image selection (now fixed) was the likely
+     cause. (An apparent "click replaced all text" was a batch-automation timing artifact, not the app.)
+
+**Still open / next:** image **resize handles are decorative** (drag-to-resize is a future slice); other
+Insert stubs (Shapes, SmartArt, Chart, Text Box, Equation, 3D, Screenshot, Signature, Object) remain —
+see deferrals §A.3. Text Effects stage 2b (shadow + reflection) still pending (deferrals §A.2). Suggested
+wrap-up: PR `fix/ribbon-home` → `main`.
 
 ---
 
