@@ -59,11 +59,21 @@
 #### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
 
 > The 4a pagination engine matches Word for the common cases (oracle-validated). These edges
-> are deliberately deferred (the high-value review findings were FIXED — imported `pageBreakSource`
-> / run `lineBreakType` breaks, trailing/blank-page count, the table mid-cell-seam mangling +
-> nested-cell mis-attribution, asymmetric-margin band bleed, the blank-page status-bar count, and
-> the Linux opaque-headless-window regression):
+> are deliberately deferred. (High-value review findings FIXED: imported run-level
+> `<w:br w:type="page">` breaks, trailing/blank-page count + its status-bar weighting, the table
+> mid-cell-seam mangling + nested-cell mis-attribution, asymmetric-margin band bleed, and the Linux
+> opaque-headless-window regression. A re-review of the fix commit then caught + reverted an
+> over-reach where `pageBreakSource` was page-broken on the wrong side and for continuous sections —
+> see the section-break bullet below.)
 
+- **Section breaks (`w:sectPr` → `pageBreakSource`) are NOT paginated.** A `w:sectPr` lives on a
+  section's LAST paragraph (the break renders AFTER it) and is section-type-dependent (continuous vs
+  next/even/odd-page), so it is left to the section-geometry sub-phase (4f). The COMMON imported manual
+  page break is a run-level `<w:br w:type="page">` (→ `hardBreak[lineBreakType='page']`), which IS
+  paginated. Until 4f, a section break imports as continuous flow.
+- **Page break inside a content-control / bibliography / index container.** The scan descends into all
+  top-level blocks except tables, so a break in such a container IS detected, but (like mid-paragraph)
+  it moves the next top-level block, not the container's internal remainder. Niche.
 - **Mid-paragraph manual break.** A `Ctrl+Enter` placed in the MIDDLE of a paragraph (text both
   before and after) currently moves only the NEXT block to a new page; the after-the-break remainder
   of that same paragraph stays on the current page. Word splits the paragraph at the break. Fix =

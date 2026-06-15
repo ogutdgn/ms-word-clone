@@ -55,6 +55,7 @@ interface Layout {
   breaks: Break[]
   tail: number // bottom spacer height (fills last sheet + bottom margin)
   tailBands: number[] // gap-band offsets in the tail (trailing blank pages from a doc-final page break)
+  trailingBreaks: number[] // positions of doc-final page breaks (exposed so the status bar counts them)
   pageCount: number
   signature: string
 }
@@ -262,7 +263,7 @@ function isLineSplittable(el: HTMLElement): boolean {
   return /^(P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(el.tagName)
 }
 
-function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], forceBefore: Set<number>, view: any): Layout {
+function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any): Layout {
   const breaks: Break[] = []
   let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
   let pageStartNat = 0 // natural top where the current page's content begins
@@ -286,11 +287,9 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], forceBefor
     pageStartNat = b.natTop
   }
   for (const b of blocks) {
-    // Forced page break before b: a hardBreak page node in the PREVIOUS block, and/or
-    // b itself being a paragraph imported with a page break (pageBreakSource) — both
-    // mean b starts a new page regardless of fill. Two breaks = a blank page.
-    let forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
-    if (b !== blocks[0] && forceBefore.has(b.pos)) forcedCount += 1
+    // A page break in the PREVIOUS block forces b onto a new page regardless of fill;
+    // two such breaks = a blank page in between.
+    const forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
     if (forcedCount > 0) {
       placeSeam(b, forcedCount)
     } else {
@@ -326,11 +325,16 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], forceBefor
     }
     prevPos = b.pos
   }
-  // Trailing forced break(s): a page break in (or after) the LAST block has no
-  // following block to push, so it was never consumed above. Each adds a trailing
-  // BLANK sheet (Word renders an empty page for a doc-final Ctrl+Enter).
+  // Trailing forced break(s): a page break in the LAST block with NO text after it has
+  // no following block to push, so it adds a trailing BLANK sheet (Word renders an empty
+  // page for a doc-final Ctrl+Enter). A break with text still after it (mid-last-paragraph)
+  // is NOT trailing — that is the deferred mid-paragraph case, not a blank page.
   const lastPos = blocks.length ? blocks[blocks.length - 1].pos : -1
-  const trailingForced = forced.filter((P) => P > lastPos).length
+  const docEnd = view?.state?.doc ? view.state.doc.content.size : 0
+  const trailingBreaks = forced.filter(
+    (P) => P > lastPos && view.state.doc.textBetween(P, docEnd).trim().length === 0,
+  )
+  const trailingForced = trailingBreaks.length
   pagesDone += trailingForced
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
@@ -354,8 +358,8 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], forceBefor
   const signature =
     `${g.pageH}|${Math.round(g.marginTop)}|${Math.round(g.marginBottom)}|top${Math.round(topMargin)}|` +
     breaks.map((b) => `${b.pos}:${Math.round(b.height)}:${b.bands.length}`).join(',') +
-    `|tail${Math.round(tail)}:${tailBands.length}|n${pageCount}`
-  return { geometry: g, topMargin, breaks, tail, tailBands, pageCount, signature }
+    `|tail${Math.round(tail)}:${tailBands.length}|trail${trailingBreaks.join('.')}|n${pageCount}`
+  return { geometry: g, topMargin, breaks, tail, tailBands, trailingBreaks, pageCount, signature }
 }
 
 function buildDecorations(view: any, layout: Layout): DecorationSet {
@@ -409,6 +413,7 @@ function layoutsClose(a: Layout, b: Layout): boolean {
   if (Math.abs(a.topMargin - b.topMargin) > 4) return false
   if (Math.abs(a.tail - b.tail) > TOL) return false
   if (a.tailBands.length !== b.tailBands.length) return false
+  if (a.trailingBreaks.length !== b.trailingBreaks.length) return false
   if (a.breaks.length !== b.breaks.length) return false
   for (let i = 0; i < a.breaks.length; i++) {
     // A line-split anchor can jitter by a char or two (posAtCoords rounding) while
@@ -480,22 +485,25 @@ class PaginationView {
     //   - inline hardBreak with lineBreakType='page' (run-level <w:br w:type=page> import)
     //   - a paragraph attr pageBreakSource (real Word paragraph/section page break import)
     //     → that paragraph STARTS a new page (a forced break BEFORE its block).
-    const forced: number[] = [] // absolute positions of inline page-break nodes
-    const forceBefore = new Set<number>() // top-level block positions that must start a new page
+    // Inline page breaks (absolute positions): our own hardBreak[pageBreakType='page']
+    // (Insert → Page Break / Ctrl+Enter) AND the run-level hardBreak[lineBreakType='page']
+    // that the importer produces from a real Word <w:br w:type="page"/>. Paragraph/section
+    // breaks (w:sectPr → a pageBreakSource attr) are NOT handled here — sectPr marks the
+    // section's LAST paragraph and is section-type-dependent (continuous vs next-page), so
+    // it belongs to the section-geometry sub-phase (4f); see deferrals.md §A.1b.
+    const forced: number[] = []
     view.state.doc.descendants((node: any, pos: number, parent: any) => {
-      const topLevel = parent && parent.type?.name === 'doc'
-      // Don't descend into a top-level NON-textblock (a table): a break nested in a
-      // cell paginates within that region (table row-split is Phase 4d), and must not
-      // push the next top-level block. (Paragraphs nest inline content in `run` nodes,
-      // so we DO descend into top-level textblocks to reach the hardBreak.)
-      if (topLevel && !node.isTextblock) return false
-      if (topLevel && node.isTextblock && node.attrs?.pageBreakSource) forceBefore.add(pos)
+      // Don't descend into a top-level TABLE: a break nested in a cell paginates within
+      // that region (table row-split is Phase 4d) and must not push the next block. We DO
+      // descend into other top-level blocks (paragraphs nest inline in `run` nodes;
+      // content-control / bibliography containers hold paragraphs that may carry a break).
+      if (parent && parent.type?.name === 'doc' && node.type?.name === 'table') return false
       if (node.type?.name === 'hardBreak' && (node.attrs?.pageBreakType === 'page' || node.attrs?.lineBreakType === 'page')) {
         forced.push(pos)
       }
       return undefined
     })
-    const layout = solve(blocks, g, forced, forceBefore, view)
+    const layout = solve(blocks, g, forced, view)
     // Exact match → done. Else, a deadband check absorbs sub-line jitter (line-split
     // geometry) so we settle rather than re-dispatch a near-identical layout forever.
     if (layout.signature === this.lastSignature) return
@@ -518,9 +526,13 @@ class PaginationView {
       PM.__pagination = layout
         ? {
             pageCount: layout.pageCount,
-            // `skip` = sheets this seam advances (1 normal, 2 a blank page) — the
-            // status bar weights the caret's page by skip, not by seam count.
-            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 })),
+            // `skip` = sheets this seam advances (1 normal, 2 a blank page) — the status
+            // bar weights the caret's page by skip, not by seam count. Trailing
+            // (doc-final) breaks render in the tail (not as seams), but are exposed here
+            // too so the caret on a trailing blank page reports the right page number.
+            breaks: layout.breaks
+              .map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 }))
+              .concat(layout.trailingBreaks.map((pos) => ({ pos, height: 0, skip: 1 }))),
             geometry: layout.geometry,
           }
         : { pageCount: 1, breaks: [], geometry: readGeometry(this.editor) }
