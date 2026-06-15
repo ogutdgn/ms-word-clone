@@ -552,7 +552,7 @@
     const KEY = 'wc.defaultPaste';
     const MODES = [
       ['keepSource', 'Keep Source Formatting (Default)'],
-      ['merge', 'Merge Formatting'],
+      ['merge', 'Match Formatting'],
       ['text', 'Keep Text Only'],
     ];
     let current = 'keepSource';

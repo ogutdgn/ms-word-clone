@@ -301,6 +301,7 @@ export function preinstallBridge() {
     pasteMerge: async () => false,
     pasteMergeHtml: () => false,
     defaultPasteMode: () => 'keepSource',
+    pasteOptionStates: () => ({ keepSource: false, match: false, keepText: false, picture: false }),
     clipboardFlavors: async () => null,
     refreshClipboardState: async () => false,
     selectAll: () => false,

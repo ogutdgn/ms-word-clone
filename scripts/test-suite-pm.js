@@ -916,7 +916,7 @@
     for (let i = 0; i < 20 && !document.querySelector('.flyout .fly-item'); i++) await sleep(50);
     const items = Array.from(document.querySelectorAll('.flyout .fly-item')).map((n) => n.textContent.trim());
     window.WC.closeFlyouts();
-    return ['Keep Source Formatting', 'Merge Formatting', 'Picture', 'Keep Text Only']
+    return ['Keep Source Formatting', 'Match Formatting', 'Picture', 'Keep Text Only']
       .every((l) => items.some((i) => i.startsWith(l)))
       && items.some((i) => i.startsWith('Paste Special'))
       && items.some((i) => i.startsWith('Set Default Paste'));
@@ -1014,13 +1014,47 @@
     const on = !paste.classList.contains('wc-disabled');
     return off && on;
   });
+  await t('[home] Paste Options state machine: buttons switch by content type (pure)', () => {
+    const f = PM().pasteOptionStates;
+    if (typeof f !== 'function') return 'pasteOptionStates not exposed';
+    const txt = f({ hasText: true });
+    const img = f({ hasImage: true });
+    const none = f({});
+    // text/html → Keep Source / Match / Keep Text active; Picture inactive
+    if (!(txt.keepSource && txt.match && txt.keepText && !txt.picture)) return 'text: ' + JSON.stringify(txt);
+    // image → Picture + Keep Source active; Match / Keep Text inactive
+    if (!(img.picture && img.keepSource && !img.match && !img.keepText)) return 'image: ' + JSON.stringify(img);
+    // empty clipboard → all inactive
+    if (none.keepSource || none.match || none.keepText || none.picture) return 'empty: ' + JSON.stringify(none);
+    return true;
+  });
+  await t('[home] Paste dropdown is context-aware (image disables text options; Match label)', async () => {
+    const pm = PM();
+    const orig = pm.clipboardFlavors;
+    pm.clipboardFlavors = async () => ({ hasText: false, hasHtml: false, hasImage: true });
+    try {
+      WC.Commands.dropdown({ cmd: 'paste', type: 'split' }, document.querySelector('[data-cmd="paste"]') || document.body);
+      await sleep(90);
+      const items = Array.from(document.querySelectorAll('.flyout .fly-item'));
+      const find = (re) => items.find((n) => re.test((n.querySelector('.fi-label') || n).textContent));
+      const dis = (n) => !!n && n.classList.contains('disabled');
+      const match = find(/Match Formatting/);
+      const keepText = find(/Keep Text Only/);
+      const picture = find(/Picture/);
+      if (WC.closeFlyouts) WC.closeFlyouts();
+      if (!match) return 'no Match Formatting item';
+      if (!keepText || !picture) return 'menu items missing';
+      // image-only: Keep Text Only disabled, Picture enabled
+      return dis(keepText) && !dis(picture);
+    } finally { pm.clipboardFlavors = orig; }
+  });
   await t('[home] Set Default Paste: dialog lists 3 modes + pasteDefault reads it', async () => {
     WC.Dialogs.setDefaultPaste(); await sleep(40);
     const list = document.querySelector('.ps-list');
     const labels = list ? Array.from(list.children).map((li) => li.textContent) : [];
     const has3 = labels.length === 3
       && labels.some((l) => /Keep Source/.test(l))
-      && labels.some((l) => /Merge/.test(l))
+      && labels.some((l) => /Match/.test(l))
       && labels.some((l) => /Text Only/.test(l));
     const cancel = Array.from(document.querySelectorAll('button')).find((b) => /^Cancel$/.test(b.textContent.trim()));
     if (cancel) cancel.click();

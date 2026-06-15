@@ -1682,13 +1682,18 @@
     const pm = WC.PM;
     pm.clipboardFlavors().then((fl) => {
       fl = fl || { hasText: false, hasHtml: false, hasImage: false };
+      // Context-aware Paste Options: the button set is fixed but each item's
+      // active/inactive state is driven by the clipboard content type (Word's
+      // exact labels vary by build, the enablement logic does not). The state
+      // machine lives in the bridge's pure pasteOptionStates(flavors).
+      const s = pm.pasteOptionStates(fl);
       WC.flyout(node, (fly) => {
         const item = (label, enabled, onClick) =>
           fly.appendChild(WC.flyItem(label, enabled ? { onClick } : { disabled: true }));
-        item('Keep Source Formatting', fl.hasHtml || fl.hasText, () => pm.pasteDefault());
-        item('Merge Formatting', fl.hasHtml || fl.hasText, () => pm.pasteMerge());
-        item('Picture', fl.hasImage, () => pm.pastePicture());
-        item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
+        item('Keep Source Formatting', s.keepSource, () => pm.pasteDefault());
+        item('Match Formatting', s.match, () => pm.pasteMerge());
+        item('Picture', s.picture, () => pm.pastePicture());
+        item('Keep Text Only', s.keepText, () => pm.pasteTextOnly());
         fly.appendChild(WC.flySep());
         fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
         fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.Dialogs.setDefaultPaste() }));

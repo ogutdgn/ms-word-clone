@@ -37,6 +37,26 @@ const MERGE_STRIP_PROPS = [
   'line-height', 'mso-ansi-font-size', 'mso-bidi-font-size',
   'mso-ascii-font-family', 'mso-hansi-font-family', 'mso-bidi-font-family',
 ]
+// Paste Options state machine (Word): which dropdown buttons are ACTIVE depends
+// on the clipboard content type. Word's exact label set varies by OS/build, but
+// the active/inactive logic is stable — so we keep a fixed button set and drive
+// enablement from the clipboard flavors. Pure + exported → unit-testable.
+//   - Keep Source Formatting : any pasteable content (text / html / image)
+//   - Match Formatting       : textual/styled content only (not an image)
+//   - Keep Text Only         : textual content only
+//   - Picture                : an image only
+export interface PasteFlavors { hasText?: boolean; hasHtml?: boolean; hasImage?: boolean }
+export function pasteOptionStates(fl: PasteFlavors | null) {
+  const f = fl || {}
+  const textish = !!(f.hasText || f.hasHtml)
+  return {
+    keepSource: textish || !!f.hasImage,
+    match: textish,
+    keepText: textish,
+    picture: !!f.hasImage,
+  }
+}
+
 export function mergeFormattingHtml(html: string): string {
   try {
     const docp = new DOMParser().parseFromString(html, 'text/html')
@@ -147,5 +167,5 @@ export function installClipboard(editor: AnyEditor) {
     return pasteMergeHtml(html)
   }
 
-  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState, pasteMerge, pasteMergeHtml, defaultPasteMode }
+  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState, pasteMerge, pasteMergeHtml, defaultPasteMode, pasteOptionStates }
 }
