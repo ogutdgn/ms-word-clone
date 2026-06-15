@@ -288,6 +288,41 @@
     return /line-through/.test(innerLine) && !/line-through/.test(outerLine);
   });
 
+  await t('[home] subscript/superscript toggles OFF on an empty doc (not one-way)', async () => {
+    // Repro: on an empty paragraph, sub/super lives in the paragraph run
+    // properties (not storedMarks); toggling off sent vertAlign:null which the
+    // run-property merge ignored, so it activated but never deactivated.
+    setDoc('');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 1, 1)));
+    await sleep(120);
+    if (PM().getState().superscript) return 'superscript already on before toggle';
+    run('superscript'); await sleep(140);
+    const on = PM().getState().superscript;
+    run('superscript'); await sleep(140);
+    const off = PM().getState().superscript;
+    if (!on) return 'did not activate on click 1';
+    if (off) return 'did not DEACTIVATE on click 2 (stuck on)';
+    return true;
+  });
+  await t('[home] Font Color applies to the CURRENT selection, not a stale capture', async () => {
+    // Repro: a prior captureSelection (combo focus / picker open) left savedSel;
+    // a main-face Font Color apply restored that STALE range, so the color landed
+    // on previously-touched text instead of the current selection.
+    setDoc('staleone staletwo');
+    const colorOf = (needle) => { let c = null; doc().descendants((n, p) => { if (c || !n.isText || !n.text) return; if (n.text.indexOf(needle) >= 0) { const ts = n.marks.find((m) => m.type.name === 'textStyle'); c = (ts && ts.attrs && ts.attrs.color) || null; } }); return c; };
+    // establish lastFontColor via the real picker on staleone
+    selectText('staleone');
+    const node = document.querySelector('[data-cmd="fontColor"]') || document.body;
+    window.WC.Commands.dropdown({ cmd: 'fontColor', type: 'split' }, node); await sleep(80);
+    const sw = document.querySelector('.flyout .color-swatch'); if (!sw) return 'no swatch in picker';
+    sw.click(); await sleep(120);
+    // leave a STALE capture on staleone, then select staletwo
+    selectText('staleone'); window.WC.PM.captureSelection();
+    selectText('staletwo'); await sleep(60);
+    window.WC.Commands.run({ cmd: 'fontColor', type: 'split' }); await sleep(150);
+    if (!colorOf('staletwo')) return 'current selection (staletwo) was NOT colored';
+    return true;
+  });
   await t('[1] in-view Mod-Z does not double-fire (engine handles it once)', async () => {
     setDoc('double fire probe'); selectText('double');
     // Doc snapshot MODULO sdBlockRev: the fork's block-revision stamp advances

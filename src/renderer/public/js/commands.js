@@ -51,8 +51,11 @@
   H.decreaseFontSize = () => stepFont(-1);
   H.font = (c, node) => openFontList(node);
   H.fontSize = (c, node) => openSizeList(node);
-  H.textHighlightColor = (c, node) => applyColor('hilite', lastHighlight);
-  H.fontColor = (c, node) => applyColor('fore', lastFontColor);
+  // Capture the CURRENT selection before a main-face apply so applyColor's
+  // withSelection restores THIS range, not a stale savedSel left by a prior combo
+  // focus / color-picker open (the "color lands on previously-touched text" bug).
+  H.textHighlightColor = (c, node) => { WC.PM.captureSelection(); applyColor('hilite', lastHighlight); };
+  H.fontColor = (c, node) => { WC.PM.captureSelection(); applyColor('fore', lastFontColor); };
 
   // ---- Paragraph ----
   H.alignLeft = () => { WC.PM.cmd('setTextAlign', 'left'); };
@@ -85,7 +88,7 @@
   H.sort = () => sortDialog();
   // Shading split button: main face applies the LAST-USED shading color (none on a
   // fresh doc, like Word). The arrow opens the color palette (dropdown -> colorMenu).
-  H.shading = (c, node) => { if (lastShade) applyColor('shade', lastShade); else colorMenu(node, 'shade'); };
+  H.shading = (c, node) => { if (lastShade) { WC.PM.captureSelection(); applyColor('shade', lastShade); } else colorMenu(node, 'shade'); };
   // Borders split button: main face applies the last-used edge (Word defaults to Bottom).
   H.borders = () => applyBorder(lastBorderEdge);
 
@@ -1535,28 +1538,43 @@
 
   function applyColor(kind, color) {
     const pm = WC.PM;
-    if (kind === 'fore') {
-      lastFontColor = color;
-      pm.cmd('setColor', color);
-      WC.Ribbon.setColorBar('fontColor', color);
-    } else if (kind === 'hilite') {
-      lastHighlight = color;
-      color === 'transparent' ? pm.cmd('unsetHighlight') : pm.cmd('setHighlight', color);
-      WC.Ribbon.setColorBar('textHighlightColor', color);
-    } else if (kind === 'shade') {
-      if (color && color !== 'transparent') lastShade = color;
-      if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
-      else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
-      WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
-    } else if (kind === 'page') {
-      pm.dePageColor(color); // design area — slice 10 PR2 (real w:background)
-    }
+    // withSelection: the color picker is a body-level flyout, so committing a swatch
+    // can arrive with the PM selection already disturbed — the fork's CustomSelection
+    // plugin clears its preserved snapshot (and can collapse the live selection) when
+    // the view blurs to anything it doesn't recognise as its own toolbar
+    // (custom-selection.js mousedown/blur/focus). colorMenu captureSelection()s on
+    // open; restore that captured range before the engine write so the color lands on
+    // the text the user actually selected — exactly as setFontName/setFontSize and the
+    // Font dialog already do. (Bare main-face apply has nothing captured -> no-op restore.)
+    pm.withSelection(() => {
+      if (kind === 'fore') {
+        lastFontColor = color;
+        pm.cmd('setColor', color);
+        WC.Ribbon.setColorBar('fontColor', color);
+      } else if (kind === 'hilite') {
+        lastHighlight = color;
+        color === 'transparent' ? pm.cmd('unsetHighlight') : pm.cmd('setHighlight', color);
+        WC.Ribbon.setColorBar('textHighlightColor', color);
+      } else if (kind === 'shade') {
+        if (color && color !== 'transparent') lastShade = color;
+        if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+        else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
+        WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
+      } else if (kind === 'page') {
+        pm.dePageColor(color); // design area — slice 10 PR2 (real w:background)
+      }
+    });
   }
 
   function colorMenu(node, kind) {
+    // Snapshot the live PM selection at flyout-open time — by the time a swatch is
+    // clicked the view has blurred to the body-level flyout and CustomSelection may
+    // have cleared/collapsed the selection (see applyColor note). withSelection
+    // (in applyColor and the unset paths below) restores this exact range.
+    WC.PM.captureSelection();
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = WC.PM; if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } return; }
+        if (color === null) { const pm = WC.PM; pm.withSelection(() => { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } }); return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });

@@ -361,6 +361,13 @@ The following upstream packages are included in this directory tree:
   for the duration of the synchronous paste — matching Word, where Keep Text Only never
   auto-linkifies. Default paste (Keep Source) is unaffected (flag unset → autolink still
   fires, like Word's AutoFormat).
+- **Empty-paragraph run-property CLEAR on a nulled attr (Phase 3 Home/Font, 2026-06-15):**
+  `core/helpers/syncParagraphRunProperties.js` `addParagraphRunProperty` now removes the
+  run-property keys for mark attributes explicitly set to null (reusing the sibling
+  `removeRunPropertiesForMark`, scoped to the null attrs). `decodeRPrFromMarks` omits null
+  attrs, so toggling subscript/superscript OFF on an EMPTY paragraph — where sub/super lives
+  in the paragraph run properties, not `storedMarks` — previously left the prior value in
+  place (it activated but never deactivated). Set paths and non-empty paragraphs are unchanged.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

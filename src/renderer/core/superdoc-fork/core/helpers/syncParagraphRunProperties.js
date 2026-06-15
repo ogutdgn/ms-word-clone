@@ -31,6 +31,20 @@ export function addParagraphRunProperty(tr, mark) {
     if (decodedRunProperties && typeof decodedRunProperties === 'object') {
       Object.assign(nextRunProperties, decodedRunProperties);
     }
+    // MS-WORD-CLONE FORK EDIT (Phase 3, Home/Font, NOTICE'd): an attr explicitly
+    // set to null is a CLEAR (e.g. toggling subscript/superscript OFF on an EMPTY
+    // paragraph, where sub/super lives in the paragraph run properties, not
+    // storedMarks). decodeRPrFromMarks omits null attrs, so the prior value would
+    // otherwise persist — the "activates but won't deactivate on an empty doc"
+    // bug. Remove the run-property keys for the nulled attrs (reuses the sibling
+    // remove helper, scoped to just the null attributes).
+    const nulledAttrs = {};
+    for (const [attr, val] of Object.entries(mark.attrs || {})) {
+      if (val == null) nulledAttrs[attr] = val;
+    }
+    if (Object.keys(nulledAttrs).length > 0) {
+      removeRunPropertiesForMark(nextRunProperties, { type: mark.type, attrs: nulledAttrs });
+    }
     return Object.keys(nextRunProperties).length > 0 ? nextRunProperties : null;
   });
 }
