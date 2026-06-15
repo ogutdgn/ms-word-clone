@@ -1014,6 +1014,14 @@
     const on = !paste.classList.contains('wc-disabled');
     return off && on;
   });
+  await t('[home] Office Clipboard auto-captures on copy (bridge path)', async () => {
+    setDoc('captureword alpha'); selectText('captureword'); await sleep(60);
+    window.WC.Clipboard.clear();
+    await PM().copySelection(); await sleep(120);
+    const items = window.WC.Clipboard.items;
+    if (!items.length) return 'history empty after copy';
+    return /captureword/.test(items[0].text || '');
+  });
   await t('[4] Select All selects the whole document via the menu', async () => {
     setDocs(['selall first para', 'selall second para']);
     const node = document.querySelector('[data-cmd="select"]') || document.body;

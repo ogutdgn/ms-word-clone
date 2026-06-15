@@ -51,6 +51,14 @@
   };
   WC.Clipboard = Clipboard;
 
+  // Auto-capture every copy/cut into the Office Clipboard history (Word parity).
+  // Catches keyboard Ctrl+C / Ctrl+X (prosemirror-view fires a DOM copy/cut event
+  // on the editable); ribbon Cut/Copy are also captured in the PM bridge. The
+  // 'cut' event fires before the default deletion, so the selection is still live.
+  // capture() dedups identical consecutive content, so the overlap is harmless.
+  document.addEventListener('copy', function () { try { Clipboard.capture(); } catch (e) { /* no selection */ } });
+  document.addEventListener('cut', function () { try { Clipboard.capture(); } catch (e) { /* no selection */ } });
+
   // ===================== Sensitivity label (retired) =====================
   // The legacy sensitivity-marker engine (a hidden in-document <p> on the retired
   // WC.Editor + the workarea bar) is gone. commands.js still wires the sensitivity

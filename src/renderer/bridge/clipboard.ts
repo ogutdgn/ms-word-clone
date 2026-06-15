@@ -43,11 +43,16 @@ export function installClipboard(editor: AnyEditor) {
     return _clipboardHasContent
   }
 
+  // Office Clipboard auto-capture (Word parity): record the selection into the
+  // 24-item history BEFORE a cut removes it. capture() dedups, so the parallel
+  // DOM copy/cut listener (keyboard path, home-features.js) is safe.
+  const capture = () => { try { (window as any).WC?.Clipboard?.capture?.() } catch { /* no store */ } }
+
   async function cutSelection(): Promise<boolean> {
-    focusView(); await api()?.cut(); _clipboardHasContent = true; nudgeRibbon(); return true
+    focusView(); capture(); await api()?.cut(); _clipboardHasContent = true; nudgeRibbon(); return true
   }
   async function copySelection(): Promise<boolean> {
-    focusView(); await api()?.copy(); _clipboardHasContent = true; nudgeRibbon(); return true
+    focusView(); capture(); await api()?.copy(); _clipboardHasContent = true; nudgeRibbon(); return true
   }
   async function pasteDefault(): Promise<boolean> {
     focusView(); await api()?.paste(); return true // fire-and-forget — content lands async
