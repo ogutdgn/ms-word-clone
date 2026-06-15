@@ -37,11 +37,23 @@ wired into the central ribbon state-sync. Full playbook:
 > kickoff._` means not yet researched/decided.
 
 ## Home
-_TBD — locked at section kickoff._
+
+**Clipboard** — scope locked 2026-06-14 (section kickoff). Not layout-coupled → zero 🕗 Phase-4
+items. This section also builds the shared **ribbon state-machine spine** (enablement + latch
+evaluator + per-control rule registry), generalized from `bridge/state-sync.ts`.
 
 | Section | Feature | Status | Note |
 |---|---|---|---|
-| Clipboard | _tbd_ | | |
+| Clipboard | Paste (default) | ✅ In scope | works (`pasteDefault`); + enablement (grey when clipboard empty) |
+| Clipboard | Paste options: Keep Source / Picture / Keep Text Only | ✅ In scope | work; flavor-aware dropdown |
+| Clipboard | Paste option: **Merge Formatting** | ✅ In scope | build destination-style reconciliation (was disabled) |
+| Clipboard | Paste Special dialog | ✅ In scope | flavor-driven |
+| Clipboard | Paste Special → **Paste Link** (OLE) | ⛔ Out of scope | no OLE backend in the clone; permanent |
+| Clipboard | **Set Default Paste…** | ✅ In scope (minimal) | settings panel (Keep Source / Merge / Text Only) honored by `pasteDefault` |
+| Clipboard | Cut / Copy | ✅ In scope | + enablement per Word's real selection rule (validate live) |
+| Clipboard | Format Painter (1-click / dbl-click sticky / Esc) | ✅ In scope | latch already synced; parity-verify |
+| Clipboard | Office Clipboard pane | ✅ In scope | + **wire auto-capture** on Cut/Copy (history was dead in PM) |
+| Clipboard | Ribbon state machine (spine) | ✅ In scope | built here once; later sections register rules |
 | Font | _tbd_ | | |
 | Paragraph | _tbd_ | | |
 | Styles | _tbd_ | | |
