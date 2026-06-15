@@ -34,14 +34,25 @@
   - **Merge Formatting** (`353999c`): `mergeFormattingHtml()` strips inheriting run props (font/size/color +
     mso-* aliases, `<font>` attrs), keeps emphasis tags → pasted text adopts the destination style; the Paste
     dropdown "Merge Formatting" item enabled (was a disabled stub).
-  - **Set Default Paste** (`f32b58c`): `D.setDefaultPaste` modal (Keep Source / Merge / Keep Text Only),
+  - **Set Default Paste** (`f32b58c`): `D.setDefaultPaste` modal (Keep Source / Match / Keep Text Only),
     persisted to `localStorage`; `pasteDefault()` honors it via `defaultPasteMode()`.
-- **Gates:** PM **334/335** (the 1 fail = `[10mm]` Leg-B reads a Windows-authored fixture absent on this Mac —
-  self-skips "fixture not readable", NOT a regression; +8 new `[home]` tests), smoke **9/9**, roundtrip **27/0**.
-- **Next:** (1) **live-Word visual eyeball** of Clipboard enablement + dialogs (user-triggered — grabs the
-  screen); (2) Home **section 2 = Font** (kickoff → scope-lock → register its state rules into the spine).
-  Optionally re-author the `[10mm]` fixture via the Mac oracle for a fully-green `test:pm`.
-- **Blockers/notes:** none. `fix/ribbon-home` carries 6 commits; PR the whole Home tab when its sections are done.
+  - **Keep Text Only autolink BUG fixed** (`f7fb8ad`, user-found via real-Word compare): pasting a URL with
+    Keep Text Only made a blue underlined link. Fork edit (NOTICE'd) — `handlePaste` 'plain-text' branch
+    early-returns when `editor.options.noPasteAutolink` is set; `pasteTextOnly` sets it around the paste.
+    Default paste (Keep Source) still autoformats URLs like Word's AutoFormat.
+  - **Context-aware Paste Options + Match Formatting label** (`d282074`, user-found): the Paste dropdown now
+    drives every button's active/inactive from `pasteOptionStates(flavors)` (pure, testable) — an image
+    disables the text options + enables Picture, etc. Renamed Merge→**Match Formatting** (user's Mac Word).
+    KEY DECISION (user): Word's exact paste-option labels vary by OS/build, so the locked behavior is the
+    **enablement state machine**, not the label set. (Researched: Mac "Match Formatting" = Win "Use
+    Destination Styles"; list/table/Excel/chart sources show different button sets — a future enhancement.)
+- **Gates:** PM **336/337** (the 1 fail = `[10mm]` Leg-B reads a Windows-authored fixture absent on this Mac —
+  self-skips "fixture not readable", NOT a regression; +10 new `[home]` tests), smoke **9/9**, roundtrip **27/0**.
+- **Next:** (1) optional broader live-Word eyeball (Format Painter, dialogs — user-triggered); (2) Home
+  **section 2 = Font** (kickoff → scope-lock → register Font state rules into the spine). Optionally re-author
+  the `[10mm]` fixture via the Mac oracle for a fully-green `test:pm`.
+- **Blockers/notes:** none. `fix/ribbon-home` carries 10 commits; PR the whole Home tab when its sections are done.
+  Clipboard section: all locked builds done + 2 user-found issues fixed.
 
 ## 2026-06-14 (planning) — Phase 3 RE-SCOPED: ribbon tab-by-tab hardening pass + ribbon state machine; pagination pulled up to Phase 4
 

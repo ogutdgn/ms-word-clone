@@ -45,8 +45,8 @@ evaluator + per-control rule registry), generalized from `bridge/state-sync.ts`.
 | Section | Feature | Status | Note |
 |---|---|---|---|
 | Clipboard | Paste (default) | ✅ In scope | works (`pasteDefault`); + enablement (grey when clipboard empty) |
-| Clipboard | Paste options: Keep Source / Picture / Keep Text Only | ✅ In scope | work; flavor-aware dropdown |
-| Clipboard | Paste option: **Merge Formatting** | ✅ In scope | build destination-style reconciliation (was disabled) |
+| Clipboard | Paste options: Keep Source / Picture / Keep Text Only | ✅ In scope | **context-aware** dropdown — each button's active/inactive driven by content type (`pasteOptionStates`); Keep Text Only no longer auto-linkifies a URL |
+| Clipboard | Paste option: **Match Formatting** | ✅ In scope | destination-style reconciliation (`mergeFormattingHtml`). Label is **Match Formatting** (user's Mac Word); exact paste-option labels vary by OS/build, so the *enablement state machine* is the locked behavior, not the label set |
 | Clipboard | Paste Special dialog | ✅ In scope | flavor-driven |
 | Clipboard | Paste Special → **Paste Link** (OLE) | ⛔ Out of scope | no OLE backend in the clone; permanent |
 | Clipboard | **Set Default Paste…** | ✅ In scope (minimal) | settings panel (Keep Source / Merge / Text Only) honored by `pasteDefault` |
