@@ -1870,6 +1870,15 @@
     await sleep(120);
     return (res && res.width === 80 && res.height === 60) || ('res=' + JSON.stringify(res));
   });
+  await t('[insert] Picture with undecodable/0-dim source falls back to a sensible default (not 100×100)', async () => {
+    setDoc('picbad: ');
+    // Undecodable PNG payload → Image.onerror → imageNaturalSize() resolves null.
+    const bad = 'data:image/png;base64,bm90YW5pbWFnZQ==';
+    const res = await window.WC.Commands.insertPictureFromDataUrl(bad, 'bad.png');
+    await sleep(120);
+    return (res && res.width >= 150 && res.height >= 100 && res.natural == null)
+      || ('res=' + JSON.stringify(res));
+  });
   await t('[6] insertBookmark wraps the selection in PAIRED start+end (same id)', async () => {
     setDoc('mark this range'); selectText('this range'); await sleep(60);
     PM().insertBookmark({ name: 'spot1' }); await sleep(120);

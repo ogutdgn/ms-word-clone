@@ -195,11 +195,16 @@
   async function insertPictureFromDataUrl(dataUrl, name) {
     if (!dataUrl) return null;
     const dims = await imageNaturalSize(dataUrl);
+    const maxW = contentWidthPx() || 600;
     let width, height;
     if (dims && dims.w > 0 && dims.h > 0) {
-      const maxW = contentWidthPx();
-      if (maxW > 0 && dims.w > maxW) { width = Math.round(maxW); height = Math.round(dims.h * (maxW / dims.w)); }
+      if (dims.w > maxW) { width = Math.round(maxW); height = Math.round(dims.h * (maxW / dims.w)); }
       else { width = dims.w; height = dims.h; }
+    } else {
+      // Natural size unavailable (decode failure, or a viewBox-only SVG that reports
+      // 0×0) — fall back to a sensible column-fit default, NOT the bridge's tiny 100×100.
+      width = Math.round(Math.min(maxW, 480));
+      height = Math.round(width * 0.75);
     }
     WC.PM.insertImage({ src: dataUrl, alt: name || 'Picture', width, height });
     return { width, height, natural: dims };
