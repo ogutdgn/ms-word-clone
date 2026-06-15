@@ -7,6 +7,29 @@
 
 ---
 
+## 2026-06-15 (Phase 3 — Home/Font eyeball bug fixes) — 3 user-found Font bugs fixed
+
+- **Branch:** `fix/ribbon-home` (continues). **Phase:** Phase 3 Home tab — Font section eyeball loop.
+- **3 user-found bugs (each root-caused via a headless probe, not guessed):**
+  - **Strikethrough drew UNDER sub/superscript text** (`6b5020b`): schema nests `<s>` outside the
+    `vertical-align` span, so line-through painted at the outer baseline. CSS fix moves the decoration to
+    the inner shifted span (through the glyph middle). Edge limit (documented): a *partially*-super
+    continuous strike run loses the strike on the non-super part.
+  - **Sub/superscript ACTIVATED but wouldn't DEACTIVATE on an empty doc** (`d9fbca6`): on an empty
+    paragraph sub/super lives in the paragraph RUN PROPERTIES, not storedMarks (probe: storedMarks:[]
+    yet superscript:true); toggle-off sent vertAlign:null which `addParagraphRunProperty` merged but
+    never cleared. Fork fix (NOTICE'd): clear run-property keys for nulled attrs. Probe: on→off→on works.
+  - **Font color "sometimes didn't stay"** (`d9fbca6`): it landed on previously-touched text. `applyColor`
+    now wraps the write in `withSelection` (restores the picker's captured range — the flyout blurs the
+    editor) AND the main-face color handlers `captureSelection()` FRESH so they target the CURRENT
+    selection, not a stale module-level `savedSel` from an earlier combo focus / picker open.
+- **Process note:** the `font-bugs-investigate` workflow STALLED (returned empty / TaskStop "no task
+  found"); I root-caused bugs 1+2 directly with probes. One stray workflow-agent edit (the `applyColor`
+  withSelection wrapper) was left in the tree — verified correct (it's the picker half of the color fix)
+  and folded in. Lesson: background agents launched with "propose only" can still leave working-tree edits.
+- **Gates:** PM **344/345** (1 = Windows-only `[10mm]` fixture skip; +3 bug tests), smoke **9/9**, roundtrip **27/0**.
+- **Next:** user visual eyeball to confirm all three feel right; then Home **section 3 = Paragraph**.
+
 ## 2026-06-14 (Phase 3 execution) — Home tab STARTED: Clipboard section built (ribbon state-machine spine + all locked features); test runs now headless on macOS
 
 - **Branch:** `fix/ribbon-home` (off `main` @ `3400932`); **PR pending** (one branch/PR per tab).
