@@ -5154,6 +5154,59 @@
       'print=' + seamsPrint + ' web=' + seamsWeb + ' back=' + seamsBack;
   });
 
+  // ---- Phase 4a: manual page breaks (hardBreak[pageBreakType='page']) ----
+  const caretToEndOf = (needle) => {
+    selectText(needle);
+    const s = v().state.selection;
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), s.to, s.to)));
+  };
+  const firstParaAfterSeam = (needle) => {
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    let sawSeam = false;
+    for (const el of Array.from(pm.children)) {
+      if (el.classList.contains('pm-page-spacer')) { if (el.querySelector('.pm-gap-band')) sawSeam = true; }
+      else if (sawSeam && el.tagName === 'P' && el.textContent.includes(needle)) return true;
+    }
+    return false;
+  };
+
+  await t('[4a] manual page break forces the next content onto a new page', async () => {
+    setDocs(['Mpb alpha line', 'Mpb bravo line', 'Mpb charlie line']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('bravo');
+    PM().insertPageBreak();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    if (pc <= before) return 'pageCount did not increase (' + before + ' -> ' + pc + ')';
+    return firstParaAfterSeam('charlie') || 'charlie not on the new page after the seam';
+  });
+
+  await t('[4a] blank page (two breaks) skips a sheet with two gap bands', async () => {
+    setDocs(['Bp alpha line', 'Bp bravo line', 'Bp charlie line']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('bravo');
+    PM().insertBlankPage();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
+    if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const seam = Array.from(pm.querySelectorAll(':scope > .pm-page-spacer')).find((s) => s.querySelector('.pm-gap-band'));
+    const bands = seam ? seam.querySelectorAll('.pm-gap-band').length : 0;
+    return bands === 2 || 'expected 2 gap bands on the blank-page seam, got ' + bands;
+  });
+
+  await t('[4a] manual page break exports as <w:br w:type="page">', async () => {
+    setDocs(['Exp alpha line', 'Exp bravo line']);
+    await sleep(200);
+    caretToEndOf('alpha');
+    PM().insertPageBreak();
+    await sleep(200);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()

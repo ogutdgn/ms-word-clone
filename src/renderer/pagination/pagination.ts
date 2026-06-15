@@ -15,11 +15,11 @@
 // internal state rebuild + Open/New) and stays OUT of the fork. Wired in
 // bridge/create-editor.ts via `getStarterExtensions().concat(Pagination)`.
 //
-// Iteration 1 scope: top/bottom page margins (currently unrendered — the fork
-// sets paddingTop/Bottom=0 for the docx editor), block-level page seams on
-// overflow, full-height last sheet, and a debug/probe hook. Line-level
-// intra-paragraph splitting (PAGINATION.md §7 binary search) and manual
-// page-break geometry land in the next iterations.
+// Scope so far: top/bottom page margins (the fork sets paddingTop/Bottom=0 for the
+// docx editor), block-level page seams on overflow, full-height last sheet, live
+// page count, and MANUAL page breaks (hardBreak[pageBreakType='page']) incl. blank
+// pages (two consecutive breaks → a skipped sheet). Line-level intra-paragraph
+// splitting (PAGINATION.md §7 binary search) is the remaining 4a item.
 
 import { Plugin, PluginKey, Decoration, DecorationSet } from '@/pm'
 // @ts-ignore - vendored fork JS module (no types)
@@ -44,6 +44,8 @@ interface Geometry {
 interface Break {
   pos: number // PM position the spacer sits before
   height: number // spacer height in layout px
+  bands: number[] // gray gap-band offsets within the spacer (1 per sheet boundary it spans;
+  // a blank page = a forced break that skips a sheet → 2 bands)
 }
 
 interface Layout {
@@ -66,9 +68,10 @@ function readGeometry(editor: any): Geometry {
 }
 
 // A full-bleed transparent spacer (the white sheet shows through as page margins).
-// `bandTop`/`bandHeight` >= 0 paints the gray inter-sheet gap + the two sheet-edge
-// shadows; -1 = no band (top-margin + tail spacers).
-function makeSpacer(height: number, bandTop: number, bleed: number): HTMLElement {
+// `bands` = the offsets (px from the spacer top) at which to paint a gray inter-sheet
+// gap + the two sheet-edge shadows; [] = no band (top-margin + tail spacers). A
+// normal seam has one band; a blank page (a forced break skipping a sheet) has two.
+function makeSpacer(height: number, bands: number[], bleed: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'pm-page-spacer'
   el.setAttribute('contenteditable', 'false')
@@ -78,7 +81,8 @@ function makeSpacer(height: number, bandTop: number, bleed: number): HTMLElement
   el.style.width = `calc(100% + ${2 * bleed}px)`
   el.style.marginLeft = `${-bleed}px`
   el.style.marginRight = `${-bleed}px`
-  if (bandTop >= 0) {
+  for (const bandTop of bands) {
+    if (bandTop < 0) continue
     const band = document.createElement('div')
     band.className = 'pm-gap-band'
     band.style.top = `${bandTop}px`
@@ -156,29 +160,56 @@ function measureBlocks(view: any): BlockMeasure[] {
 // The solver. WHICH block starts each page is decided from natural coords (stable);
 // each spacer's HEIGHT is then a measure-and-nudge: `newHeight = target - actualTop
 // + currentSpacerHeight` drives the block's rendered border-top to its page's
-// content-top, and `tail = desiredBottom - actualBottom(last)` fills the last sheet
-// exactly. Because moving a spacer by Δ moves the block below it by Δ, this is a
+// content-top. Because moving a spacer by Δ moves the block below it by Δ, this is a
 // unit-gain controller that converges in a couple of rAF passes and is stable at
 // the fixed point (newHeight == currentSpacerHeight). Margin collapsing is handled
 // automatically — we never model it, we measure the result.
-function solve(blocks: BlockMeasure[], g: Geometry): Layout {
+//
+// `forced` = positions of `hardBreak[pageBreakType='page']` nodes (manual page
+// breaks). A forced break in block X pushes the NEXT block onto a new page
+// regardless of fill; two consecutive forced breaks = a blank page (skip a sheet).
+// Because a forced break leaves the prior page partly empty, overflow is measured
+// against a PAGE-RELATIVE baseline `pageStartNat` (the natural top where the current
+// page's content began) rather than an absolute contentH grid.
+function solve(blocks: BlockMeasure[], g: Geometry, forced: number[]): Layout {
   const breaks: Break[] = []
-  let pagesDone = 0
+  let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
+  let pageStartNat = 0 // natural top where the current page's content begins
+  let prevPos = -1
+  // Place a seam before block b that skips `skip` sheets (1 = normal/single break,
+  // 2 = blank page). Nudges b's border-top to the content-top of its new page and
+  // paints one gap band per skipped sheet boundary.
+  const placeSeam = (b: BlockMeasure, skip: number) => {
+    pagesDone += skip
+    const target = pagesDone * g.pitch + g.marginTop
+    const h = target - b.actualTop + b.precSpacer
+    if (h > 1) {
+      const bands: number[] = []
+      // bottom band at the sheet boundary just above b; each earlier (skipped) sheet
+      // boundary is one pitch higher up the spacer.
+      for (let j = 0; j < skip; j++) bands.push(h - GAP - g.marginTop - j * g.pitch)
+      breaks.push({ pos: b.pos, height: h, bands })
+    }
+    pageStartNat = b.natTop
+  }
   for (const b of blocks) {
-    let guard = 0
-    while (b.natBottom > (pagesDone + 1) * g.contentH + EPS && guard++ < PAGE_GUARD) {
-      if (b.natTop > pagesDone * g.contentH + EPS) {
-        // b starts within the current page but overflows it → seam before b.
-        const k = breaks.length + 1 // b becomes the first block of page k+1
-        const target = k * g.pitch + g.marginTop // its border-top should land here
-        const h = target - b.actualTop + b.precSpacer
-        if (h > 1) breaks.push({ pos: b.pos, height: h })
-        pagesDone++
-        break // tall-block line-splitting is a later iteration
-      } else {
-        pagesDone++ // taller than a page; advance without an empty-page seam
+    // Manual page break(s) in the PREVIOUS block force b onto a new page.
+    const forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
+    if (forcedCount > 0) {
+      placeSeam(b, forcedCount)
+    } else {
+      let guard = 0
+      while (b.natBottom - pageStartNat > g.contentH + EPS && guard++ < PAGE_GUARD) {
+        if (b.natTop - pageStartNat > EPS) {
+          placeSeam(b, 1)
+          break // tall-block line-splitting is a later iteration
+        } else {
+          pagesDone++ // taller than a page; advance the baseline without an empty-page seam
+          pageStartNat += g.contentH
+        }
       }
     }
+    prevPos = b.pos
   }
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
@@ -194,7 +225,7 @@ function solve(blocks: BlockMeasure[], g: Geometry): Layout {
   const tail = last ? Math.max(g.marginBottom, desiredBottom - last.actualBottom - last.marginBottom) : g.pageH
   const signature =
     `${g.pageH}|${Math.round(g.marginTop)}|${Math.round(g.marginBottom)}|top${Math.round(topMargin)}|` +
-    breaks.map((b) => `${b.pos}:${Math.round(b.height)}`).join(',') +
+    breaks.map((b) => `${b.pos}:${Math.round(b.height)}:${b.bands.length}`).join(',') +
     `|tail${Math.round(tail)}|n${pageCount}`
   return { geometry: g, topMargin, breaks, tail, pageCount, signature }
 }
@@ -209,7 +240,7 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
   // DOM (skipping the render fn) when the key is unchanged, so a constant key
   // would freeze the spacer at its first-rendered height.
   decos.push(
-    Decoration.widget(0, () => makeSpacer(layout.topMargin, -1, bleed), {
+    Decoration.widget(0, () => makeSpacer(layout.topMargin, [], bleed), {
       side: -1,
       key: `pm-top-${Math.round(layout.topMargin)}`,
       ignoreSelection: true,
@@ -217,18 +248,18 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
   )
   for (const b of layout.breaks) {
     const pos = Math.min(Math.max(0, b.pos), docSize)
-    const bandTop = b.height - GAP - g.marginTop
+    const bands = b.bands
     decos.push(
-      Decoration.widget(pos, () => makeSpacer(b.height, bandTop, bleed), {
+      Decoration.widget(pos, () => makeSpacer(b.height, bands, bleed), {
         side: -1,
-        key: `pm-seam-${pos}-${Math.round(b.height)}`,
+        key: `pm-seam-${pos}-${Math.round(b.height)}-${bands.length}`,
         ignoreSelection: true,
       }),
     )
   }
   // Tail: full-height last sheet + bottom margin.
   decos.push(
-    Decoration.widget(docSize, () => makeSpacer(layout.tail, -1, bleed), {
+    Decoration.widget(docSize, () => makeSpacer(layout.tail, [], bleed), {
       side: 1,
       key: `pm-tail-${Math.round(layout.tail)}`,
       ignoreSelection: true,
@@ -287,7 +318,13 @@ class PaginationView {
 
     const g = readGeometry(this.editor)
     const blocks = measureBlocks(view)
-    const layout = solve(blocks, g)
+    // Manual page breaks: hardBreak nodes flagged pageBreakType='page' (Insert →
+    // Page Break / Ctrl+Enter). insertBlankPage inserts two consecutive ones.
+    const forced: number[] = []
+    view.state.doc.descendants((n: any, p: number) => {
+      if (n.type?.name === 'hardBreak' && n.attrs?.pageBreakType === 'page') forced.push(p)
+    })
+    const layout = solve(blocks, g, forced)
     if (layout.signature === this.lastSignature) return
     this.lastSignature = layout.signature
     this.publish(buildDecorations(view, layout), layout)
