@@ -104,17 +104,28 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
         break
     }
   }
-  // Head-paragraph only — getNodeAttributes returns the selection-start paragraph;
-  // no cross-paragraph intersection (matches legacy caret-based queryCommandState).
-  // Revisit if a later slice needs Word's mixed-alignment (all-buttons-off) behavior.
-  // Alignment + list state live on the paragraph node, not in the mark entries
+  // Alignment latch (Word): a collapsed cursor / uniform selection presses the
+  // one matching button (an unset paragraph defaults to Left — real Word presses
+  // Align Left on a fresh paragraph); a selection spanning paragraphs with MIXED
+  // alignment presses NONE (Phase 3). Justification lives on the paragraph node
   // (spec §7.5: paragraphProperties.justification, NOT a flat textAlign).
+  const normJust = (j: any) => (j === 'center' ? 'center' : j === 'right' ? 'right' : (j === 'both' || j === 'justify') ? 'justify' : 'left')
   const para = (editor.getAttributes('paragraph') || {}) as any
-  const just = para?.paragraphProperties?.justification ?? para?.textAlign ?? null
-  if (just === 'center') st.justifyCenter = true
-  else if (just === 'right') st.justifyRight = true
-  else if (just === 'both' || just === 'justify') st.justifyFull = true
-  else st.justifyLeft = true // explicit 'left' AND the unset default — real Word presses Align Left on a fresh paragraph (oracle-confirm in Task 13)
+  let align: string | null = normJust(para?.paragraphProperties?.justification ?? para?.textAlign ?? null)
+  const sel0 = editor.state.selection
+  if (!sel0.empty) {
+    const aligns = new Set<string>()
+    try {
+      editor.state.doc.nodesBetween(sel0.from, sel0.to, (node: any) => {
+        if (node.type?.name === 'paragraph') aligns.add(normJust(node.attrs?.paragraphProperties?.justification ?? node.attrs?.textAlign ?? null))
+      })
+    } catch { /* selection the iterator can't read */ }
+    align = aligns.size === 1 ? [...aligns][0] : aligns.size === 0 ? align : null // >1 distinct → mixed → none pressed
+  }
+  st.justifyCenter = align === 'center'
+  st.justifyRight = align === 'right'
+  st.justifyFull = align === 'justify'
+  st.justifyLeft = align === 'left'
   // List membership: use listRendering.numberingType (probe-confirmed: "bullet" or "decimal").
   // numberingProperties.numId presence also indicates a list paragraph.
   const listRendering = para?.listRendering
@@ -122,6 +133,11 @@ export function toQueryState(editor: AnyEditor): Record<string, any> {
     if (listRendering.numberingType === 'bullet') st.insertUnorderedList = true
     else if (listRendering.numberingType) st.insertOrderedList = true // decimal, lowerLetter, upperRoman…; undefined = custom marker, no toggle
   }
+  // Phase 3 Paragraph facts: inList (decrease-indent stays enabled inside a list
+  // even at 0 left indent) + formattingMarks (Show/Hide ¶ latch — read from the DOM
+  // class the toggle flips, so the latch lives in the state machine, not the handler).
+  st.inList = !!(st.insertUnorderedList || st.insertOrderedList)
+  st.formattingMarks = !!document.getElementById('pm-editor')?.classList.contains('show-marks')
   // Resolved (style-cascade-included) paragraph values for the Layout spinners and the
   // Paragraph dialog seeds. Inline attrs alone miss style-derived indents/spacing
   // (getActiveFormatting is inline-only — recorded engine constraint).

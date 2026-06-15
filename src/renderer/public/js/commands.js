@@ -80,10 +80,12 @@
     if (inList) pm.cmd(px > 0 ? 'increaseListIndent' : 'decreaseListIndent');
     else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
   }
-  H.showHide = (c, node) => {
-    const target = document.getElementById('pm-editor');
-    const on = target.classList.toggle('show-marks');
-    if (node) node.classList.toggle('toggled', on);
+  H.showHide = () => {
+    // Flip the DOM class only; the ribbon state machine owns the button latch
+    // ({ latched: st.formattingMarks }, registered in home-features.js). Toggling a
+    // class fires no editor transaction, so nudge a ribbon re-eval to re-latch now.
+    document.getElementById('pm-editor')?.classList.toggle('show-marks');
+    WC.PM && WC.PM._scheduleRibbonSync && WC.PM._scheduleRibbonSync();
   };
   H.sort = () => sortDialog();
   // Shading split button: main face applies the LAST-USED shading color (none on a
@@ -1690,7 +1692,9 @@
         // 'Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral;
         // real Word does true date parsing.
         const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
-        let ok = false; WC.PM.withSelection(() => { ok = WC.PM.sortParagraphs(opts); }); if (!ok) WC.toast('Select multiple paragraphs to sort.');
+        // Word keeps Sort enabled and silently sorts whatever exists (a single
+        // paragraph is a no-op) — no "select multiple paragraphs" toast.
+        WC.PM.withSelection(() => { WC.PM.sortParagraphs(opts); });
       } },
       { label: 'Cancel' },
     ] });

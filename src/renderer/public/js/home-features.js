@@ -80,4 +80,12 @@
   WC.registerRibbonRule('copy', { enabled: (st) => !!st.hasSelection });
   WC.registerRibbonRule('paste', { enabled: (st) => !!st.clipboardHasContent });
   WC.registerRibbonRule('formatPainter', { latched: (st) => !!st.painterArmed });
+
+  // ===================== Paragraph ribbon state rules =====================
+  // Word: Decrease Indent greys at zero left indent unless in a list (can't go
+  // below the margin); Show/Hide ¶ latches while formatting marks are visible.
+  // (Alignment + list latches stay on the legacy TOGGLE_MAP path — they already
+  // work; not double-registering here avoids two writers of the 'toggled' class.)
+  WC.registerRibbonRule('decreaseIndent', { enabled: (st) => !!st.inList || (st.indentLeftIn || 0) > 0 });
+  WC.registerRibbonRule('showHide', { latched: (st) => !!st.formattingMarks });
 })();

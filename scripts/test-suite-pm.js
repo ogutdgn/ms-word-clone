@@ -1233,6 +1233,56 @@
     if (!items.length) return 'history empty after copy';
     return /captureword/.test(items[0].text || '');
   });
+  await t('[home] Paragraph group renders the two-row arrangement', () => {
+    const grp = document.querySelector('.ribbon-group[data-group="paragraph"]');
+    if (!grp) return 'paragraph group not found';
+    const rows = grp.querySelectorAll('.para-grid .para-row');
+    if (rows.length !== 2) return 'expected 2 para rows, got ' + rows.length;
+    const has = (row, cmd) => !!rows[row].querySelector('[data-cmd="' + cmd + '"]');
+    return (has(0, 'bullets') && has(0, 'decreaseIndent') && has(0, 'showHide')
+      && has(1, 'alignLeft') && has(1, 'justify') && has(1, 'borders')) || 'rows missing expected controls';
+  });
+  await t('[home] Decrease Indent greys at zero indent, enables with indent', async () => {
+    setDoc('indentprobe text');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 3, 3)));
+    await sleep(160);
+    const di = window.WC.Ribbon.controlIndex.decreaseIndent?.node;
+    if (!di) return 'decreaseIndent not in controlIndex';
+    const offAtZero = di.classList.contains('wc-disabled');
+    run('increaseIndent'); await sleep(160);
+    const onWithIndent = !di.classList.contains('wc-disabled');
+    if (!offAtZero) return 'decreaseIndent not greyed at zero indent';
+    if (!onWithIndent) return 'decreaseIndent still greyed after increasing indent';
+    return true;
+  });
+  await t('[home] Show/Hide ¶ latches via the state machine', async () => {
+    setDoc('marks probe');
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 3, 3)));
+    await sleep(140);
+    const sh = window.WC.Ribbon.controlIndex.showHide?.node;
+    if (!sh) return 'showHide not in controlIndex';
+    if (sh.classList.contains('toggled')) { run('showHide'); await sleep(150); } // normalize off
+    run('showHide'); await sleep(160);
+    const on = sh.classList.contains('toggled') && document.getElementById('pm-editor').classList.contains('show-marks');
+    run('showHide'); await sleep(160);
+    const off = !sh.classList.contains('toggled') && !document.getElementById('pm-editor').classList.contains('show-marks');
+    if (!on) return 'did not latch on';
+    if (!off) return 'did not unlatch';
+    return true;
+  });
+  await t('[home] alignment: uniform presses one, mixed-selection presses none', async () => {
+    setDocs(['alignone para', 'aligntwo para']);
+    selectText('alignone'); run('center'); await sleep(120);
+    selectText('alignone'); await sleep(160);
+    const btn = (cmd) => window.WC.Ribbon.controlIndex[cmd]?.node;
+    if (!btn('center').classList.contains('toggled')) return 'uniform center not pressed';
+    let from = null, to = null;
+    doc().descendants((n, p) => { if (!n.isText || !n.text) return; const i1 = n.text.indexOf('alignone'); if (i1 >= 0 && from === null) from = p + i1; const i2 = n.text.indexOf('aligntwo'); if (i2 >= 0) to = p + i2 + 'aligntwo'.length; });
+    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), from, to)));
+    await sleep(160);
+    const nonePressed = ['alignLeft', 'center', 'alignRight', 'justify'].every((c) => !btn(c).classList.contains('toggled'));
+    return nonePressed || 'mixed selection did not clear all alignment buttons';
+  });
   await t('[4] Select All selects the whole document via the menu', async () => {
     setDocs(['selall first para', 'selall second para']);
     const node = document.querySelector('[data-cmd="select"]') || document.body;

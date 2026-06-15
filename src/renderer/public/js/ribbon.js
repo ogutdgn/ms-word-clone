@@ -150,6 +150,11 @@
         // combos, then Grow/Shrink/Change Case/Clear Formatting; row 2 = the
         // B/I/U… formatting buttons. Cmd ids already match Word.
         this.renderFontGroupBody(body, group);
+      } else if (group.id === 'paragraph') {
+        // Home Paragraph group: explicit two-row Word arrangement (matches the
+        // user screenshot). Row 1 = lists + indents + sort + show/hide; row 2 =
+        // alignment + line spacing + shading + borders.
+        this.renderParagraphGroupBody(body, group);
       } else {
         // Pens gallery: inline pen tiles (Word shows the pens directly in the ribbon)
         if (gallery && group.id === 'pens') body.appendChild(this.renderPensGallery(gallery));
@@ -204,6 +209,23 @@
         if (ROW2.has(c.cmd)) { row2.appendChild(this.renderControl(c, 'small')); return; }
         if (c.type === 'combo') { row1.appendChild(this.renderCombo(c)); return; }
         row1.appendChild(this.renderControl(c, 'small'));
+      });
+      grid.appendChild(row1);
+      grid.appendChild(row2);
+      body.appendChild(grid);
+    },
+
+    // Home Paragraph group body: two rows in Word's order. Row 2 = alignment +
+    // line spacing + shading + borders; everything else (lists, indents, sort,
+    // show/hide) goes in row 1, preserving declaration order. Routed through
+    // renderControl so controlIndex/toggleNodes/state-rule wiring is preserved.
+    renderParagraphGroupBody(body, group) {
+      const ROW2 = new Set(['alignLeft', 'center', 'alignRight', 'justify', 'lineAndParagraphSpacing', 'shading', 'borders']);
+      const grid = el('div', { class: 'para-grid' });
+      const row1 = el('div', { class: 'para-row' });
+      const row2 = el('div', { class: 'para-row' });
+      group.controls.forEach((c) => {
+        (ROW2.has(c.cmd) ? row2 : row1).appendChild(this.renderControl(c, 'small'));
       });
       grid.appendChild(row1);
       grid.appendChild(row2);
