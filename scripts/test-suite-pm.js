@@ -1840,6 +1840,36 @@
     let src = null; doc().descendants((n) => { if (n.type.name === 'image') src = n.attrs.src; });
     return hasNode('image') && /^data:image\/png/.test(src || '');
   });
+  const mkImg = (w, h) => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'); x.fillStyle = '#3366cc'; x.fillRect(0, 0, w, h);
+    return c.toDataURL('image/png');
+  };
+  const columnWidthPx = () => {
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const cs = getComputedStyle(pm);
+    return pm.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  };
+  await t('[insert] Picture inserts at NATURAL size, clamped to the column width (not tiny 100px)', async () => {
+    setDoc('picbig: ');
+    const res = await window.WC.Commands.insertPictureFromDataUrl(mkImg(1600, 800), 'big.png');
+    await sleep(140);
+    const img = document.querySelector('#pm-editor .ProseMirror img');
+    if (!img || !res) return 'no image / no result';
+    const colW = columnWidthPx();
+    const renderedW = img.getBoundingClientRect().width;
+    const clampedToColumn = res.width <= Math.round(colW) + 1 && Math.abs(renderedW - res.width) <= 3;
+    const notTiny = renderedW > 150; // would be 100 under the old hardcoded default
+    const aspectKept = Math.abs((res.width / res.height) - (1600 / 800)) < 0.05;
+    return (clampedToColumn && notTiny && aspectKept)
+      || JSON.stringify({ colW: Math.round(colW), renderedW: Math.round(renderedW), resW: res.width, resH: res.height });
+  });
+  await t('[insert] small Picture keeps its natural size (no forced 100×100 box)', async () => {
+    setDoc('picsmall: ');
+    const res = await window.WC.Commands.insertPictureFromDataUrl(mkImg(80, 60), 'small.png');
+    await sleep(120);
+    return (res && res.width === 80 && res.height === 60) || ('res=' + JSON.stringify(res));
+  });
   await t('[6] insertBookmark wraps the selection in PAIRED start+end (same id)', async () => {
     setDoc('mark this range'); selectText('this range'); await sleep(60);
     PM().insertBookmark({ name: 'spot1' }); await sleep(120);

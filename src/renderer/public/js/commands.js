@@ -171,10 +171,43 @@
     [['AutoFit Contents', 'contents'], ['AutoFit Window', 'window'], ['Fixed Column Width', 'fixed']]
       .forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableAutoFit(mode); } })));
   });
+  // Decode the natural pixel size of an image data-URL (resolves null on failure).
+  function imageNaturalSize(src) {
+    return new Promise((resolve) => {
+      try {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+        img.onerror = () => resolve(null);
+        img.src = src;
+      } catch (_) { resolve(null); }
+    });
+  }
+  // The live text-column width in CSS px (page width minus L/R margins/padding).
+  function contentWidthPx() {
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    if (!pm) return 0;
+    const cs = getComputedStyle(pm);
+    return Math.max(0, pm.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+  }
+  // Word inserts a picture at its NATURAL size, then shrinks it to the text-column
+  // width (preserving aspect ratio) if it's wider. The bridge used to hardcode
+  // 100×100, so every photo came in tiny — read the real dimensions and clamp.
+  async function insertPictureFromDataUrl(dataUrl, name) {
+    if (!dataUrl) return null;
+    const dims = await imageNaturalSize(dataUrl);
+    let width, height;
+    if (dims && dims.w > 0 && dims.h > 0) {
+      const maxW = contentWidthPx();
+      if (maxW > 0 && dims.w > maxW) { width = Math.round(maxW); height = Math.round(dims.h * (maxW / dims.w)); }
+      else { width = dims.w; height = dims.h; }
+    }
+    WC.PM.insertImage({ src: dataUrl, alt: name || 'Picture', width, height });
+    return { width, height, natural: dims };
+  }
   H.pictures = async () => {
     const r = await window.wordAPI.pickImage();
     if (!r || !r.ok) return;
-    WC.PM.insertImage({ src: r.dataUrl, alt: r.name || 'Picture' });
+    await insertPictureFromDataUrl(r.dataUrl, r.name);
   };
   H.link = () => WC.Dialogs.insertLink();
   H.symbol = (c, node) => WC.Dialogs.symbol(node);
@@ -1278,6 +1311,8 @@
 
   // ============ dispatch ============
   const Commands = {
+    // Insert a picture from a data-URL at natural size, clamped to the column width.
+    insertPictureFromDataUrl,
     run(control, node) {
       WC.closeFlyouts(); WC.hideTip();
       const cmd = control.cmd;
