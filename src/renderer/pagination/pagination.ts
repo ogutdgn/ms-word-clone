@@ -94,6 +94,7 @@ function makeSpacer(height: number, bands: number[], bleed: number): HTMLElement
 
 interface BlockMeasure {
   pos: number // PM position before the block (decoration anchor)
+  el: HTMLElement // the block's DOM node (for line-box measurement when it straddles a page)
   natTop: number // natural (spacer-free) cumulative top, for the break DECISION
   natBottom: number
   actualTop: number // current rendered border-top (px from box top), for spacer SIZING
@@ -124,7 +125,16 @@ function measureBlocks(view: any): BlockMeasure[] {
       continue
     }
     const r = el.getBoundingClientRect()
-    const self = r.height / zoom
+    // A line-split seam lives INSIDE its paragraph, so the block's own rect height
+    // includes it — subtract intra-block spacer heights to recover the stable
+    // NATURAL block height (the split DECISION must not see its own seam, else the
+    // straddle test flip-flops and pagination oscillates). actualTop/Bottom stay
+    // actual (the nudge needs the real, seam-inclusive positions).
+    const innerSpacers = Array.from(el.querySelectorAll('.pm-page-spacer')).reduce(
+      (a, s) => a + s.getBoundingClientRect().height / zoom,
+      0,
+    )
+    const naturalSelf = Math.max(0, r.height / zoom - innerSpacers)
     let pos: number
     try {
       pos = Math.max(0, view.posAtDOM(el, 0) - 1)
@@ -134,8 +144,9 @@ function measureBlocks(view: any): BlockMeasure[] {
     }
     blocks.push({
       pos,
+      el,
       natTop: cum,
-      natBottom: cum + self,
+      natBottom: cum + naturalSelf,
       actualTop: (r.top - boxTop) / zoom,
       actualBottom: (r.bottom - boxTop) / zoom,
       marginBottom: parseFloat(getComputedStyle(el).marginBottom) || 0,
@@ -152,9 +163,75 @@ function measureBlocks(view: any): BlockMeasure[] {
           ? (kids[j].getBoundingClientRect().top - r.bottom) / zoom
           : blocks[blocks.length - 1].marginBottom // seam between → own bottom margin
     }
-    cum += self + Math.max(0, gap)
+    cum += naturalSelf + Math.max(0, gap)
   }
   return blocks
+}
+
+// Measure a block's LINE boxes for intra-paragraph splitting. Returns, per line:
+//   - `top`/`bottom`: NATURAL (spacer-free) coords relative to the block top — the
+//     split DECISION uses these so it's stable across passes (a split seam injected
+//     INTO the paragraph shifts the lines below it; we subtract our own spacer
+//     heights to recover the stable natural layout, exactly as measureBlocks does).
+//   - `screenTop`: the line's CURRENT screen top — the nudge uses this for the seam
+//     height (it converges via the unit-gain controller).
+// Lines are grouped from Range.getClientRects() (one rect per line fragment), with
+// our own .pm-page-spacer rects skipped.
+function lineRectsOf(el: HTMLElement, zoom: number): Array<{ top: number; bottom: number; screenTop: number; above: number }> {
+  const elTop = el.getBoundingClientRect().top
+  const spacers = Array.from(el.querySelectorAll('.pm-page-spacer')).map((s) => {
+    const r = s.getBoundingClientRect()
+    return { top: (r.top - elTop) / zoom, bottom: (r.bottom - elTop) / zoom, h: r.height / zoom }
+  })
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  const lines: Array<{ top: number; bottom: number; screenTop: number; above: number }> = []
+  for (const r of Array.from(range.getClientRects())) {
+    if (r.width <= 0 || r.height <= 0) continue
+    const aTop = (r.top - elTop) / zoom
+    const aBottom = (r.bottom - elTop) / zoom
+    // Skip a rect that IS one of our spacers (matches its geometry).
+    if (spacers.some((sp) => Math.abs(sp.top - aTop) < 2 && Math.abs(sp.h - (aBottom - aTop)) < 2)) continue
+    const above = spacers.filter((sp) => sp.bottom <= aTop + 1).reduce((a, sp) => a + sp.h, 0)
+    const top = aTop - above // natural (seam-subtracted) — stable split decision
+    const bottom = aBottom - above
+    const last = lines[lines.length - 1]
+    if (last && Math.abs(last.top - top) < 2) last.bottom = Math.max(last.bottom, bottom)
+    // `above` = intra-block seam height above this line = the line's precSpacer (the
+    // nudge adds it back so the seam is stable at the fixed point, not collapsed to 0).
+    else lines.push({ top, bottom, screenTop: r.top, above })
+  }
+  return lines
+}
+
+// Find a line-level split inside block `b` at `localBoundary` (the natural distance
+// from b's top to the current page's content bottom). Returns the PM position to
+// seam at + the split line's natural local top + its current actual top, or null
+// (split impossible — caller moves the block wholesale). Honors widow/orphan: at
+// least 2 lines stay on each side (Word's default), so it never splits a paragraph
+// with fewer than 4 lines.
+function findLineSplit(b: BlockMeasure, localBoundary: number, zoom: number, boxTop: number, view: any) {
+  const lines = lineRectsOf(b.el, zoom)
+  if (lines.length < 4) return null
+  let L = -1
+  for (let i = 0; i < lines.length; i++) if (lines[i].bottom <= localBoundary + EPS) L = i
+  let splitIdx = L + 1
+  if (splitIdx < 2) return null // orphan: fewer than 2 lines fit on the current page
+  if (lines.length - splitIdx < 2) {
+    splitIdx = lines.length - 2 // widow: pull back so >=2 lines move to the next page
+    if (splitIdx < 2) return null
+  }
+  const line = lines[splitIdx]
+  const left = b.el.getBoundingClientRect().left + 6
+  let pos: number | null = null
+  try {
+    const r = view.posAtCoords({ left, top: line.screenTop + 2 })
+    pos = r ? r.pos : null
+  } catch {
+    pos = null
+  }
+  if (pos == null || pos <= b.pos) return null
+  return { pos, localTop: line.top, actualTop: (line.screenTop - boxTop) / zoom, precSpacer: line.above }
 }
 
 // The solver. WHICH block starts each page is decided from natural coords (stable);
@@ -171,11 +248,13 @@ function measureBlocks(view: any): BlockMeasure[] {
 // Because a forced break leaves the prior page partly empty, overflow is measured
 // against a PAGE-RELATIVE baseline `pageStartNat` (the natural top where the current
 // page's content began) rather than an absolute contentH grid.
-function solve(blocks: BlockMeasure[], g: Geometry, forced: number[]): Layout {
+function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any): Layout {
   const breaks: Break[] = []
   let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
   let pageStartNat = 0 // natural top where the current page's content begins
   let prevPos = -1
+  const boxTop = view?.dom ? view.dom.getBoundingClientRect().top : 0
+  const zoom = (window as any).WC?.PM?.zoom || 1
   // Place a seam before block b that skips `skip` sheets (1 = normal/single break,
   // 2 = blank page). Nudges b's border-top to the content-top of its new page and
   // paints one gap band per skipped sheet boundary.
@@ -200,13 +279,31 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[]): Layout {
     } else {
       let guard = 0
       while (b.natBottom - pageStartNat > g.contentH + EPS && guard++ < PAGE_GUARD) {
-        if (b.natTop - pageStartNat > EPS) {
-          placeSeam(b, 1)
-          break // tall-block line-splitting is a later iteration
-        } else {
-          pagesDone++ // taller than a page; advance the baseline without an empty-page seam
-          pageStartNat += g.contentH
+        // Try to SPLIT b at the line where it crosses the page boundary (Word splits
+        // a straddling paragraph at the line, keeping >=2 lines each side).
+        const localBoundary = pageStartNat + g.contentH - b.natTop // b-local Y of the page bottom
+        const split =
+          localBoundary > 0 && localBoundary < b.natBottom - b.natTop
+            ? findLineSplit(b, localBoundary, zoom, boxTop, view)
+            : null
+        if (split) {
+          pagesDone++
+          const target = pagesDone * g.pitch + g.marginTop
+          // Add back the seam currently above this line (split.precSpacer) so the
+          // seam is stable at the fixed point (h == precSpacer), not collapsed to 0.
+          const h = target - split.actualTop + split.precSpacer
+          if (h > 1) breaks.push({ pos: split.pos, height: h, bands: [h - GAP - g.marginTop] })
+          pageStartNat = b.natTop + split.localTop // the rest of b begins the new page here
+          continue // b may cross more page boundaries (very tall) → re-check
         }
+        if (b.natTop - pageStartNat > EPS) {
+          placeSeam(b, 1) // short block / orphan: move it wholesale to the next page
+          break
+        }
+        // Starts at the page top, overflows, and can't be split (e.g. a <4-line block
+        // somehow taller than a page) → advance the baseline to avoid an infinite loop.
+        pagesDone++
+        pageStartNat += g.contentH
       }
     }
     prevPos = b.pos
@@ -268,11 +365,34 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
   return DecorationSet.create(view.state.doc, decos)
 }
 
+// Two layouts are "the same" if the page count, break positions and band counts
+// match and the spacer heights agree within ~one line. A deadband (vs an exact
+// signature) absorbs the sub-line measurement jitter inherent to line-split
+// geometry (getClientRects / posAtCoords rounding), so the engine settles instead
+// of re-dispatching a near-identical layout every frame (busy-loop + flicker).
+function layoutsClose(a: Layout, b: Layout): boolean {
+  const TOL = 24
+  if (a.pageCount !== b.pageCount) return false
+  if (Math.abs(a.topMargin - b.topMargin) > 4) return false
+  if (Math.abs(a.tail - b.tail) > TOL) return false
+  if (a.breaks.length !== b.breaks.length) return false
+  for (let i = 0; i < a.breaks.length; i++) {
+    // A line-split anchor can jitter by a char or two (posAtCoords rounding) while
+    // staying on the same visual line; a real line change moves it by a whole line's
+    // worth of characters, so a tiny tolerance absorbs jitter without masking it.
+    if (Math.abs(a.breaks[i].pos - b.breaks[i].pos) > 4) return false
+    if (a.breaks[i].bands.length !== b.breaks[i].bands.length) return false
+    if (Math.abs(a.breaks[i].height - b.breaks[i].height) > TOL) return false
+  }
+  return true
+}
+
 class PaginationView {
   view: any
   editor: any
   raf = 0
   lastSignature = ''
+  lastLayout: Layout | null = null
   destroyed = false
 
   constructor(view: any, editor: any) {
@@ -311,6 +431,7 @@ class PaginationView {
     if (!this.printView()) {
       if (this.lastSignature !== 'empty') {
         this.lastSignature = 'empty'
+        this.lastLayout = null
         this.publish(DecorationSet.empty, null)
       }
       return
@@ -324,9 +445,13 @@ class PaginationView {
     view.state.doc.descendants((n: any, p: number) => {
       if (n.type?.name === 'hardBreak' && n.attrs?.pageBreakType === 'page') forced.push(p)
     })
-    const layout = solve(blocks, g, forced)
+    const layout = solve(blocks, g, forced, view)
+    // Exact match → done. Else, a deadband check absorbs sub-line jitter (line-split
+    // geometry) so we settle rather than re-dispatch a near-identical layout forever.
     if (layout.signature === this.lastSignature) return
+    if (this.lastLayout && layoutsClose(this.lastLayout, layout)) return
     this.lastSignature = layout.signature
+    this.lastLayout = layout
     this.publish(buildDecorations(view, layout), layout)
   }
 

@@ -5207,6 +5207,26 @@
     return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
   });
 
+  await t('[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)', async () => {
+    window.WC.editor.commands.selectAll();
+    const words = [];
+    for (let i = 1; i <= 600; i++) words.push('word' + i);
+    window.WC.editor.commands.insertContent('<p>' + words.join(' ') + '</p>');
+    const box = document.getElementById('pm-editor');
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const pg = PM().__pagination;
+    if (pg.pageCount < 2) return 'expected multi-page, got ' + pg.pageCount;
+    if (pg.breaks.length < 1) return 'no line-split seam placed (breaks=' + pg.breaks.length + ')';
+    // the seam must be INSIDE the single paragraph (a line split, not a whole-block move)
+    const seamInPara = document.querySelector('#pm-editor .ProseMirror > p .pm-page-spacer');
+    if (!seamInPara) return 'seam not inside the paragraph (line-split expected)';
+    // box is (within the convergence deadband) an exact number of sheets
+    const g = pg.geometry, GAP = 14;
+    const expected = pg.pageCount * g.pageH + (pg.pageCount - 1) * GAP;
+    return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()
