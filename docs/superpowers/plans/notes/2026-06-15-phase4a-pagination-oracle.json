@@ -1,0 +1,24 @@
+{
+  "task": "Phase 4a pagination core — geometry validated vs Word for Windows 16.0 (COM oracle)",
+  "date": "2026-06-15",
+  "branch": "build/phase-4a-pagination",
+  "oracleVerb": "scripts/oracle/word-oracle-win.ps1 read-layout (NEW): page count + per-paragraph start-page + break paragraphs",
+  "fixture": "C:/tmp/wc-pg-fixture.docx — 70 single-line Aptos-12 paragraphs, exported by the clone",
+  "comparison": {
+    "before_any_fix": { "clonePages": 3, "cloneBreakParas": [26, 50], "wordPages": 2, "wordBreakParas": [45], "cause": "browser-default 16px <p> margins (~25 lines/page vs Word ~44)" },
+    "after_paragraph_margin_reset": { "clonePages": 2, "cloneBreakParas": [46], "wordPages": 2, "wordBreakParas": [45], "delta": "off by one line (line-height 19.2 vs Word ~19.6)" },
+    "after_lineheight_1.225": { "clonePages": 2, "cloneBreakParas": [45], "wordPages": 2, "wordBreakParas": [45], "verdict": "EXACT MATCH — page count + break paragraph identical to real Word" }
+  },
+  "fixes": [
+    "editor.css: reset browser-default <p> margin for #pm-editor (fork reset ol/ul/li but not p, and only under .sd-editor-scoped which the bare mount lacks)",
+    "ProseMirrorRenderer.ts DEFAULT_LINE_HEIGHT 1.2 -> 1.225 (Word's Aptos-12 single-line metric; `normal` gives Chromium's 18px which != Word) [NOTICE'd]",
+    "src/main/main.js: paint the headless probe window transparent+inactive on Windows so rAF (and the rAF-driven state-sync + pagination measurer) run at 60fps instead of the ~2fps occluded-window throttle"
+  ],
+  "engine": "src/renderer/pagination/pagination.ts — owned Pagination extension + measure-and-nudge PM plugin (widget-decoration seams + page margins, geometry from editor.getPageStyles())",
+  "gatesAfter": { "test:pm": "398/398", "test:smoke": "9/9", "test:roundtrip": "27/0" },
+  "remaining4a": [
+    "manual page-break geometry (hardBreak pageBreakType='page' forces a page boundary; the node + DOM detection are confirmed but the seam is not yet rendered)",
+    "blank-page (two consecutive hardBreaks) — multi-band seam skipping a full page",
+    "line-level intra-paragraph splitting (binary search, PAGINATION.md §7) for a paragraph taller than a page"
+  ]
+}
