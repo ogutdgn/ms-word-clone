@@ -162,6 +162,14 @@
     window.WC.Commands.run({ cmd: 'showHide' });
     return on === true && !document.getElementById('pm-editor').classList.contains('show-marks');
   });
+  await t('[home] showHide renders the pilcrow (¶) glyph, not the eye_off Fluent icon', () => {
+    // Word's Show/Hide ¶ uses the pilcrow. We removed showHide from the Fluent map so
+    // WC.icon falls back to the hand-authored two-stem pilcrow in icons.js (P.showhide).
+    const fluentLeak = !!(window.WC.FLUENT && window.WC.FLUENT.showHide);
+    const html = window.WC.icon('showHide', 24);
+    const isPilcrow = /M18 4H14/.test(html);
+    return !fluentLeak && isPilcrow;
+  });
   await t('[0a] wordCount dialog reads the PM doc (words AND pages row)', () => {
     setDoc('alpha beta gamma');
     window.WC.Dialogs.wordCount();

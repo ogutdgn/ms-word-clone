@@ -26,7 +26,6 @@
  "decreaseIndent": "text_indent_decrease",
  "increaseIndent": "text_indent_increase",
  "sort": "text_sort_ascending",
- "showHide": "eye_off",
  "alignLeft": "text_align_left",
  "center": "text_align_center",
  "alignRight": "text_align_right",

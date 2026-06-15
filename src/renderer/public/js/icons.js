@@ -32,7 +32,7 @@
     decreaseIndent: '<path d="M4 6h16M9 10h11M9 14h11M4 18h16M7 12 3 9v6z" fill="currentColor" stroke="currentColor"/>',
     increaseIndent: '<path d="M4 6h16M11 10h9M11 14h9M4 18h16M3 9l4 3-4 3z" fill="currentColor" stroke="currentColor"/>',
     sort: '<path d="M6 5v14M6 19l-3-3M6 19l3-3" stroke="currentColor"/><path d="M12 6h8M12 10h6M12 14h4M12 18h2" stroke="currentColor"/>',
-    showhide: '<path d="M13 4h6M16 4v16M13 4a4 4 0 0 0 0 8h3" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    showhide: '<path d="M18 4H14M14 4a4 4 0 0 0 0 8M14 4v16M18 4v16" fill="none" stroke="currentColor" stroke-width="1.7"/>',
     alignLeft: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10" stroke="currentColor"/>',
     center: '<path d="M4 6h16M7 10h10M4 14h16M7 18h10" stroke="currentColor"/>',
     alignRight: '<path d="M4 6h16M10 10h10M4 14h16M10 18h10" stroke="currentColor"/>',
