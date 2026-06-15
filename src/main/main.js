@@ -146,7 +146,7 @@ function createWindow() {
     if (process.argv.includes('--start-maximized')) toggleFauxMaximize();
     if (!isHeadless) {
       mainWindow.show();
-    } else if (process.platform !== 'darwin') {
+    } else if (process.platform === 'win32') {
       // Headless probe runs (test:pm/smoke/roundtrip) must still PAINT so that
       // requestAnimationFrame runs at full speed. On Windows a never-shown
       // window is treated as occluded and Chromium throttles rAF to ~2fps,
@@ -154,11 +154,13 @@ function createWindow() {
       // the pagination measurer — so chrome assertions miss their ~150ms wait
       // windows (probe-confirmed: bold toggle lights at 1150ms, not 150ms).
       // Show it fully transparent + inactive: rAF runs at 60fps, the window
-      // never steals focus, and nothing is visible to the user. (macOS already
-      // ticks rAF under the dock-less accessory policy set above, so its proven
-      // no-show path is left untouched.)
-      try { mainWindow.setOpacity(0); } catch { /* opacity unsupported → still inactive */ }
-      try { mainWindow.showInactive(); } catch { /* fall back to never-shown */ }
+      // never steals focus, and nothing is visible to the user.
+      // WIN32 ONLY: setOpacity is a documented no-op on Linux (Electron docs), so
+      // showInactive there would pop an OPAQUE window during headless/CI runs.
+      // macOS uses the dock-less accessory policy above; Linux keeps the never-shown
+      // path (xvfb/CI hide it anyway).
+      mainWindow.setOpacity(0);
+      mainWindow.showInactive();
     }
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
     maybeScreenshot();

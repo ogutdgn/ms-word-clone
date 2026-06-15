@@ -36,7 +36,8 @@ interface Geometry {
   pageH: number
   marginTop: number
   marginBottom: number
-  marginSide: number // left/right page margin = #pm-editor L/R padding; the spacer bleed
+  marginLeft: number // left page margin = #pm-editor padding-left; the spacer's left bleed
+  marginRight: number // right page margin = #pm-editor padding-right; the spacer's right bleed
   contentH: number
   pitch: number
 }
@@ -53,6 +54,7 @@ interface Layout {
   topMargin: number
   breaks: Break[]
   tail: number // bottom spacer height (fills last sheet + bottom margin)
+  tailBands: number[] // gap-band offsets in the tail (trailing blank pages from a doc-final page break)
   pageCount: number
   signature: string
 }
@@ -62,25 +64,29 @@ function readGeometry(editor: any): Geometry {
   const pageH = (ps.pageSize?.height ?? 11) * PX_PER_IN
   const marginTop = (ps.pageMargins?.top ?? 1) * PX_PER_IN
   const marginBottom = (ps.pageMargins?.bottom ?? 1) * PX_PER_IN
-  const marginSide = (ps.pageMargins?.left ?? 1) * PX_PER_IN
+  // L and R margins are independent (gutter/mirror margins); the fork pads #pm-editor
+  // paddingLeft=left, paddingRight=right, so the spacer must bleed each side by its
+  // own margin or the gray gap band misaligns on a doc with asymmetric margins.
+  const marginLeft = (ps.pageMargins?.left ?? 1) * PX_PER_IN
+  const marginRight = (ps.pageMargins?.right ?? 1) * PX_PER_IN
   const contentH = Math.max(PX_PER_IN, pageH - marginTop - marginBottom)
-  return { pageH, marginTop, marginBottom, marginSide, contentH, pitch: pageH + GAP }
+  return { pageH, marginTop, marginBottom, marginLeft, marginRight, contentH, pitch: pageH + GAP }
 }
 
 // A full-bleed transparent spacer (the white sheet shows through as page margins).
 // `bands` = the offsets (px from the spacer top) at which to paint a gray inter-sheet
 // gap + the two sheet-edge shadows; [] = no band (top-margin + tail spacers). A
 // normal seam has one band; a blank page (a forced break skipping a sheet) has two.
-function makeSpacer(height: number, bands: number[], bleed: number): HTMLElement {
+function makeSpacer(height: number, bands: number[], leftBleed: number, rightBleed: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'pm-page-spacer'
   el.setAttribute('contenteditable', 'false')
   el.style.height = `${Math.max(0, height)}px`
-  // Bleed past #pm-editor's L/R padding so the gray gap band spans the full sheet
-  // width (edge-to-edge), not just the centered text column.
-  el.style.width = `calc(100% + ${2 * bleed}px)`
-  el.style.marginLeft = `${-bleed}px`
-  el.style.marginRight = `${-bleed}px`
+  // Bleed past #pm-editor's L/R padding (each side by ITS OWN margin) so the gray
+  // gap band spans the full sheet width edge-to-edge even with asymmetric margins.
+  el.style.width = `calc(100% + ${leftBleed + rightBleed}px)`
+  el.style.marginLeft = `${-leftBleed}px`
+  el.style.marginRight = `${-rightBleed}px`
   for (const bandTop of bands) {
     if (bandTop < 0) continue
     const band = document.createElement('div')
@@ -248,7 +254,15 @@ function findLineSplit(b: BlockMeasure, localBoundary: number, zoom: number, box
 // Because a forced break leaves the prior page partly empty, overflow is measured
 // against a PAGE-RELATIVE baseline `pageStartNat` (the natural top where the current
 // page's content began) rather than an absolute contentH grid.
-function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any): Layout {
+// Only true text blocks (paragraphs, headings, list items, quotes) are split at the
+// line. Tables/figures/other block widgets are NOT — their getClientRects are
+// cell/row boxes, not text lines, so line-splitting would inject a seam mid-cell and
+// mangle the render. They are moved wholesale (table row-split across pages is 4d).
+function isLineSplittable(el: HTMLElement): boolean {
+  return /^(P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(el.tagName)
+}
+
+function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], forceBefore: Set<number>, view: any): Layout {
   const breaks: Break[] = []
   let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
   let pageStartNat = 0 // natural top where the current page's content begins
@@ -272,18 +286,22 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
     pageStartNat = b.natTop
   }
   for (const b of blocks) {
-    // Manual page break(s) in the PREVIOUS block force b onto a new page.
-    const forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
+    // Forced page break before b: a hardBreak page node in the PREVIOUS block, and/or
+    // b itself being a paragraph imported with a page break (pageBreakSource) — both
+    // mean b starts a new page regardless of fill. Two breaks = a blank page.
+    let forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
+    if (b !== blocks[0] && forceBefore.has(b.pos)) forcedCount += 1
     if (forcedCount > 0) {
       placeSeam(b, forcedCount)
     } else {
       let guard = 0
       while (b.natBottom - pageStartNat > g.contentH + EPS && guard++ < PAGE_GUARD) {
         // Try to SPLIT b at the line where it crosses the page boundary (Word splits
-        // a straddling paragraph at the line, keeping >=2 lines each side).
+        // a straddling paragraph at the line, keeping >=2 lines each side). Only true
+        // text blocks are splittable — a table is moved wholesale (row-split = 4d).
         const localBoundary = pageStartNat + g.contentH - b.natTop // b-local Y of the page bottom
         const split =
-          localBoundary > 0 && localBoundary < b.natBottom - b.natTop
+          isLineSplittable(b.el) && localBoundary > 0 && localBoundary < b.natBottom - b.natTop
             ? findLineSplit(b, localBoundary, zoom, boxTop, view)
             : null
         if (split) {
@@ -308,6 +326,12 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
     }
     prevPos = b.pos
   }
+  // Trailing forced break(s): a page break in (or after) the LAST block has no
+  // following block to push, so it was never consumed above. Each adds a trailing
+  // BLANK sheet (Word renders an empty page for a doc-final Ctrl+Enter).
+  const lastPos = blocks.length ? blocks[blocks.length - 1].pos : -1
+  const trailingForced = forced.filter((P) => P > lastPos).length
+  pagesDone += trailingForced
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
   // the first line of each page at the top margin; this also removes the first
@@ -316,28 +340,36 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
   const topMargin = first ? Math.max(0, g.marginTop - first.actualTop + first.precSpacer) : g.marginTop
   // Tail: fill from where the content region ends (last block's MARGIN-box bottom —
   // its bottom margin renders below the border box, before the tail) to the bottom
-  // of the last sheet, so the box is exactly `pageCount` sheets tall.
+  // of the last sheet, so the box is exactly `pageCount` sheets tall. Trailing blank
+  // pages get a gap band at each sheet boundary the tail crosses.
   const last = blocks[blocks.length - 1]
+  const contentVisualBottom = last ? last.actualBottom + last.marginBottom : 0
   const desiredBottom = (pageCount - 1) * g.pitch + g.pageH
-  const tail = last ? Math.max(g.marginBottom, desiredBottom - last.actualBottom - last.marginBottom) : g.pageH
+  const tail = last ? Math.max(g.marginBottom, desiredBottom - contentVisualBottom) : g.pageH
+  const tailBands: number[] = []
+  if (last && trailingForced > 0) {
+    const contentPage = pageCount - trailingForced // 1-based page the last content sits on
+    for (let j = 0; j < trailingForced; j++) tailBands.push((contentPage - 1 + j) * g.pitch + g.pageH - contentVisualBottom)
+  }
   const signature =
     `${g.pageH}|${Math.round(g.marginTop)}|${Math.round(g.marginBottom)}|top${Math.round(topMargin)}|` +
     breaks.map((b) => `${b.pos}:${Math.round(b.height)}:${b.bands.length}`).join(',') +
-    `|tail${Math.round(tail)}|n${pageCount}`
-  return { geometry: g, topMargin, breaks, tail, pageCount, signature }
+    `|tail${Math.round(tail)}:${tailBands.length}|n${pageCount}`
+  return { geometry: g, topMargin, breaks, tail, tailBands, pageCount, signature }
 }
 
 function buildDecorations(view: any, layout: Layout): DecorationSet {
   const g = layout.geometry
   const decos: any[] = []
   const docSize = view.state.doc.content.size
-  const bleed = g.marginSide
+  const lb = g.marginLeft
+  const rb = g.marginRight
   // Top page margin (the fork renders the docx editor with paddingTop:0).
   // NOTE: the dynamic height MUST be in the key — ProseMirror reuses a widget's
   // DOM (skipping the render fn) when the key is unchanged, so a constant key
   // would freeze the spacer at its first-rendered height.
   decos.push(
-    Decoration.widget(0, () => makeSpacer(layout.topMargin, [], bleed), {
+    Decoration.widget(0, () => makeSpacer(layout.topMargin, [], lb, rb), {
       side: -1,
       key: `pm-top-${Math.round(layout.topMargin)}`,
       ignoreSelection: true,
@@ -347,18 +379,19 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
     const pos = Math.min(Math.max(0, b.pos), docSize)
     const bands = b.bands
     decos.push(
-      Decoration.widget(pos, () => makeSpacer(b.height, bands, bleed), {
+      Decoration.widget(pos, () => makeSpacer(b.height, bands, lb, rb), {
         side: -1,
         key: `pm-seam-${pos}-${Math.round(b.height)}-${bands.length}`,
         ignoreSelection: true,
       }),
     )
   }
-  // Tail: full-height last sheet + bottom margin.
+  // Tail: full-height last sheet + bottom margin (+ gap bands for trailing blank pages).
+  const tailBands = layout.tailBands
   decos.push(
-    Decoration.widget(docSize, () => makeSpacer(layout.tail, [], bleed), {
+    Decoration.widget(docSize, () => makeSpacer(layout.tail, tailBands, lb, rb), {
       side: 1,
-      key: `pm-tail-${Math.round(layout.tail)}`,
+      key: `pm-tail-${Math.round(layout.tail)}-${tailBands.length}`,
       ignoreSelection: true,
     }),
   )
@@ -375,6 +408,7 @@ function layoutsClose(a: Layout, b: Layout): boolean {
   if (a.pageCount !== b.pageCount) return false
   if (Math.abs(a.topMargin - b.topMargin) > 4) return false
   if (Math.abs(a.tail - b.tail) > TOL) return false
+  if (a.tailBands.length !== b.tailBands.length) return false
   if (a.breaks.length !== b.breaks.length) return false
   for (let i = 0; i < a.breaks.length; i++) {
     // A line-split anchor can jitter by a char or two (posAtCoords rounding) while
@@ -439,13 +473,29 @@ class PaginationView {
 
     const g = readGeometry(this.editor)
     const blocks = measureBlocks(view)
-    // Manual page breaks: hardBreak nodes flagged pageBreakType='page' (Insert →
-    // Page Break / Ctrl+Enter). insertBlankPage inserts two consecutive ones.
-    const forced: number[] = []
-    view.state.doc.descendants((n: any, p: number) => {
-      if (n.type?.name === 'hardBreak' && n.attrs?.pageBreakType === 'page') forced.push(p)
+    // Page breaks, scanned at TOP LEVEL ONLY (a break nested inside a table cell or
+    // footnote must paginate within that region, not push the next top-level block;
+    // table row-split is Phase 4d). Covers all three representations:
+    //   - inline hardBreak with pageBreakType='page' (our insertPageBreak / Ctrl+Enter)
+    //   - inline hardBreak with lineBreakType='page' (run-level <w:br w:type=page> import)
+    //   - a paragraph attr pageBreakSource (real Word paragraph/section page break import)
+    //     → that paragraph STARTS a new page (a forced break BEFORE its block).
+    const forced: number[] = [] // absolute positions of inline page-break nodes
+    const forceBefore = new Set<number>() // top-level block positions that must start a new page
+    view.state.doc.descendants((node: any, pos: number, parent: any) => {
+      const topLevel = parent && parent.type?.name === 'doc'
+      // Don't descend into a top-level NON-textblock (a table): a break nested in a
+      // cell paginates within that region (table row-split is Phase 4d), and must not
+      // push the next top-level block. (Paragraphs nest inline content in `run` nodes,
+      // so we DO descend into top-level textblocks to reach the hardBreak.)
+      if (topLevel && !node.isTextblock) return false
+      if (topLevel && node.isTextblock && node.attrs?.pageBreakSource) forceBefore.add(pos)
+      if (node.type?.name === 'hardBreak' && (node.attrs?.pageBreakType === 'page' || node.attrs?.lineBreakType === 'page')) {
+        forced.push(pos)
+      }
+      return undefined
     })
-    const layout = solve(blocks, g, forced, view)
+    const layout = solve(blocks, g, forced, forceBefore, view)
     // Exact match → done. Else, a deadband check absorbs sub-line jitter (line-split
     // geometry) so we settle rather than re-dispatch a near-identical layout forever.
     if (layout.signature === this.lastSignature) return
@@ -468,7 +518,9 @@ class PaginationView {
       PM.__pagination = layout
         ? {
             pageCount: layout.pageCount,
-            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height) })),
+            // `skip` = sheets this seam advances (1 normal, 2 a blank page) — the
+            // status bar weights the caret's page by skip, not by seam count.
+            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 })),
             geometry: layout.geometry,
           }
         : { pageCount: 1, breaks: [], geometry: readGeometry(this.editor) }

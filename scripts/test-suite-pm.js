@@ -5227,6 +5227,48 @@
     return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
   });
 
+  await t('[4a] trailing manual page break adds a blank page', async () => {
+    setDocs(['Trail alpha', 'Trail omega']); // 'omega' is the unique last word of the last block
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('omega'); // caret at the very end of the document
+    PM().insertPageBreak();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    return pc === before + 1 || 'trailing break: pageCount ' + before + ' -> ' + pc + ' (expected +1)';
+  });
+
+  await t('[4a] status bar weights the caret page by a blank-page seam (skip=2)', async () => {
+    setDocs(['Sbp alpha', 'Sbp bravo', 'Sbp gamma']);
+    await sleep(300);
+    caretToEndOf('bravo');
+    PM().insertBlankPage();
+    let pc = 1;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 3) break; }
+    if (pc < 3) return 'blank page pageCount=' + pc + ' (expected 3)';
+    const skips = (PM().__pagination.breaks || []).map((b) => b.skip);
+    if (!skips.includes(2)) return 'no skip=2 seam exposed: ' + JSON.stringify(skips);
+    caretToEndOf('gamma'); // caret on the 3rd sheet (sheet 2 is the blank page)
+    await sleep(300);
+    const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
+    return txt === 'Page 3 of 3' || 'status="' + txt + '" (expected "Page 3 of 3")';
+  });
+
+  await t('[4a] a straddling table is moved wholesale, never line-split mid-cell', async () => {
+    window.WC.editor.commands.selectAll();
+    const fillers = Array.from({ length: 40 }, (_, i) => '<p>Tbl filler ' + (i + 1) + '.</p>').join('');
+    const rows = Array.from({ length: 14 }, (_, r) => '<tr><td>Row ' + (r + 1) + ' A</td><td>Row ' + (r + 1) + ' B</td></tr>').join('');
+    window.WC.editor.commands.insertContent(fillers + '<table>' + rows + '</table><p>tbl after</p>');
+    const box = document.getElementById('pm-editor');
+    let prev = -1, stable = 0;
+    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    if (pm.querySelectorAll('table').length < 1) return 'no table rendered';
+    if (PM().__pagination.pageCount < 2) return 'expected multi-page with the table';
+    const inside = pm.querySelectorAll('table .pm-page-spacer').length;
+    return inside === 0 || 'a page-spacer was injected inside a table (' + inside + ') — table mangled';
+  });
+
   const pass = results.filter((r) => r.pass).length;
   return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
 })()

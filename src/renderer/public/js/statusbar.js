@@ -65,7 +65,9 @@
       // + the caret's page (number of seams above the caret + 1).
       const pg = WC.PM.__pagination || { pageCount: c.pages || 1, breaks: [] };
       let cur = 1;
-      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).length + 1; } catch (e) {}
+      // Weight each seam above the caret by the sheets it skips (a blank page is ONE
+      // seam that advances TWO pages), so the page number is right after a blank page.
+      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).reduce((a, b) => a + (b.skip || 1), 0) + 1; } catch (e) {}
       this.pageEl.textContent = 'Page ' + Math.min(cur, pg.pageCount || 1) + ' of ' + (pg.pageCount || 1);
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
