@@ -44,9 +44,11 @@ let lastImportBlanked = false
 // ---- D6 registry (spec §5.1/§7.1a): cmd-id → area, + the Phase-7 deferred set. ----
 // Doc-touching cmd ids ONLY — app-level cmds are absent (= never blocked here).
 // Single-world (slice 11+): all areas are permanently on the PM engine. The only
-// meaningful distinction is the Phase-7 DEFERRED areas (layout/header/text-effects)
+// meaningful distinction is the Phase-7 DEFERRED areas (layout/header)
 // whose engine support is pending pagination — isBlocked honestly blocks those.
-const DEFERRED = new Set<string>(['text-effects', 'layout-page', 'layout-arrange', 'header-footer']) // Phase-7-deferred areas (not yet on the PM engine)
+// (text-effects FLIPPED in Phase 3: Text Effects & Typography now runs on the PM
+// engine via textStyle attrs + w14 converter work — no longer deferred.)
+const DEFERRED = new Set<string>(['layout-page', 'layout-arrange', 'header-footer']) // Phase-7-deferred areas (not yet on the PM engine)
 const AREA: Record<string, string> = {
   // character (slice 1)
   bold: 'character', italic: 'character', underline: 'character', strikethrough: 'character',
@@ -54,8 +56,9 @@ const AREA: Record<string, string> = {
   increaseFontSize: 'character', decreaseFontSize: 'character', font: 'character',
   fontSize: 'character', textHighlightColor: 'character', fontColor: 'character',
   changeCase: 'character',
-  // no engine equivalent — revisit with design (slice 10)
-  textEffectsAndTypography: 'text-effects',
+  // Text Effects & Typography FLIPPED onto the PM engine (Phase 3) — a character/
+  // font feature (textStyle attrs + w14 OOXML), no longer deferred.
+  textEffectsAndTypography: 'character',
   // clipboard (slice 4)
   cut: 'clipboard', copy: 'clipboard', paste: 'clipboard',
   formatPainter: 'clipboard', formatPainterLock: 'clipboard',

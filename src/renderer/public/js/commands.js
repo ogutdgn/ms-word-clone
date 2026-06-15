@@ -310,7 +310,7 @@
   H.pageColor2 = H.pageColor;
 
   // ---- Home: Text Effects, Multilevel List, Dictate, extras ----
-  H.textEffectsAndTypography = (c, node) => textEffectsMenu(node);
+  H.textEffectsAndTypography = (c, node) => { WC.PM.captureSelection(); textEffectsMenu(node); };
   H.multilevelList = (c, node) => multilevelMenu(node);
   H.dictate = () => WC.toast("Dictate isn't available in this clone");
   H.sensitivity = () => WC.toast("Sensitivity labels aren't available in this clone");
@@ -333,44 +333,54 @@
       fly.appendChild(row('Stylistic Sets', () => stylisticSetsMenu(node)));
     });
   }
+  // Apply a Text Effect via the PM engine. The flyout blurs the editor, so restore
+  // the selection captured when the Text Effects menu opened (withSelection), then
+  // setMark the textStyle attr (null clears). Mirrors the font-color path.
+  const applyTE = (attr, value) => WC.PM.withSelection(() => WC.PM.cmd('setMark', 'textStyle', { [attr]: value }));
+  const GLOW_BLUE = '#156082';
   function outlineMenu(node) {
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('No Outline', { onClick: () => E().applyInlineStyles({ webkitTextStroke: '', webkitTextFillColor: '' }) }));
-      [['¾ pt', 1], ['1 pt', 1.33], ['1½ pt', 2], ['2¼ pt', 3], ['3 pt', 4]].forEach(([lbl, px]) =>
-        fly.appendChild(WC.flyItem(lbl + ' outline', { onClick: () => E().applyInlineStyles({ webkitTextStroke: px + 'px currentColor', webkitTextFillColor: 'transparent' }) })));
+      fly.appendChild(WC.flyItem('No Outline', { onClick: () => applyTE('textOutline', null) }));
+      [['¾ pt', 0.75], ['1 pt', 1], ['1½ pt', 1.5], ['2¼ pt', 2.25], ['3 pt', 3]].forEach(([lbl, w]) =>
+        fly.appendChild(WC.flyItem(lbl + ' outline', { onClick: () => applyTE('textOutline', { widthPt: w, color: 'currentColor', fill: 'transparent' }) })));
       fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Outline Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => E().applyInlineStyles({ webkitTextStroke: '1.5px ' + color, webkitTextFillColor: 'currentColor' })))) }));
+      fly.appendChild(WC.flyItem('Outline Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => applyTE('textOutline', { widthPt: 1.5, color, fill: 'currentColor' })))) }));
     });
   }
   function shadowMenu(node) {
-    const presets = [['Bottom Right', '2px 2px 2px rgba(0,0,0,.45)'], ['Bottom', '0 2px 2px rgba(0,0,0,.45)'], ['Bottom Left', '-2px 2px 2px rgba(0,0,0,.45)'], ['Right', '2px 0 2px rgba(0,0,0,.45)'], ['Center', '0 0 4px rgba(0,0,0,.5)'], ['Left', '-2px 0 2px rgba(0,0,0,.45)'], ['Top Right', '2px -2px 2px rgba(0,0,0,.45)'], ['Top', '0 -2px 2px rgba(0,0,0,.45)'], ['Top Left', '-2px -2px 2px rgba(0,0,0,.45)']];
-    WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('No Shadow', { onClick: () => E().applyInlineStyles({ textShadow: '' }) })); presets.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => E().applyInlineStyles({ textShadow: v }) }))); });
+    // 8 directional presets (dx,dy in pt) + No Shadow; color is a 45%-black.
+    const presets = [['Bottom Right', 1, 1], ['Bottom', 0, 1], ['Bottom Left', -1, 1], ['Right', 1, 0], ['Left', -1, 0], ['Top Right', 1, -1], ['Top', 0, -1], ['Top Left', -1, -1]];
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyItem('No Shadow', { onClick: () => applyTE('textShadowW14', null) }));
+      presets.forEach(([l, dx, dy]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('textShadowW14', { dx: dx * 1.5, dy: dy * 1.5, blur: 1.5, color: 'rgba(0,0,0,0.45)', preset: l }) })));
+    });
   }
   function reflectionMenu(node) {
-    const presets = [['Tight', 'below 2px linear-gradient(transparent 55%, rgba(255,255,255,.45) 100%)'], ['Half', 'below 4px linear-gradient(transparent 45%, rgba(255,255,255,.4) 100%)'], ['Full', 'below 6px linear-gradient(transparent 30%, rgba(255,255,255,.35) 100%)']];
-    WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('No Reflection', { onClick: () => E().applyInlineStyles({ webkitBoxReflect: '' }) })); presets.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => E().applyInlineStyles({ webkitBoxReflect: v }) }))); });
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyItem('No Reflection', { onClick: () => applyTE('textReflection', null) }));
+      [['Tight', 'tight'], ['Half', 'half'], ['Full', 'full']].forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('textReflection', v) })));
+    });
   }
   function glowMenu(node) {
-    const glow = (color, r) => Array(3).fill('0 0 ' + r + 'px ' + color).join(', ');
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('No Glow', { onClick: () => E().applyInlineStyles({ textShadow: '' }) }));
-      [['5 pt', 4], ['8 pt', 6], ['11 pt', 8], ['18 pt', 12]].forEach(([l, r]) => fly.appendChild(WC.flyItem(l + ' glow', { onClick: () => E().applyInlineStyles({ textShadow: glow('var(--word-blue)', r) }) })));
+      fly.appendChild(WC.flyItem('No Glow', { onClick: () => applyTE('textGlow', null) }));
+      [['5 pt', 5], ['8 pt', 8], ['11 pt', 11], ['18 pt', 18]].forEach(([l, r]) => fly.appendChild(WC.flyItem(l + ' glow', { onClick: () => applyTE('textGlow', { radiusPt: r, color: GLOW_BLUE }) })));
       fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Glow Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => E().applyInlineStyles({ textShadow: glow(color, 8) })))) }));
+      fly.appendChild(WC.flyItem('Glow Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => applyTE('textGlow', { radiusPt: 8, color })))) }));
     });
   }
   function numberStylesMenu(node) {
     const opts = [['Default', 'normal'], ['Proportional Lining', 'lining-nums proportional-nums'], ['Tabular Lining', 'lining-nums tabular-nums'], ['Proportional Oldstyle', 'oldstyle-nums proportional-nums'], ['Tabular Oldstyle', 'oldstyle-nums tabular-nums']];
-    WC.flyout(node, (fly) => opts.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => E().applyInlineStyles({ fontVariantNumeric: v }) }))));
+    WC.flyout(node, (fly) => opts.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('fontVariantNumeric', v === 'normal' ? null : v) }))));
   }
   function ligaturesMenu(node) {
     const opts = [['None', 'none'], ['Standard Only', 'common-ligatures'], ['Standard and Contextual', 'common-ligatures contextual'], ['Historical and Discretionary', 'discretionary-ligatures historical-ligatures'], ['All', 'common-ligatures discretionary-ligatures historical-ligatures contextual']];
-    WC.flyout(node, (fly) => opts.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => E().applyInlineStyles({ fontVariantLigatures: v }) }))));
+    WC.flyout(node, (fly) => opts.forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('fontVariantLigatures', v) }))));
   }
   function stylisticSetsMenu(node) {
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('Default', { onClick: () => E().applyInlineStyles({ fontFeatureSettings: 'normal' }) }));
-      for (let n = 1; n <= 8; n++) fly.appendChild(WC.flyItem('Set ' + n, { onClick: () => E().applyInlineStyles({ fontFeatureSettings: '"ss' + String(n).padStart(2, '0') + '" 1' }) }));
+      fly.appendChild(WC.flyItem('Default', { onClick: () => applyTE('fontFeatureSettings', null) }));
+      for (let n = 1; n <= 8; n++) fly.appendChild(WC.flyItem('Set ' + n, { onClick: () => applyTE('fontFeatureSettings', '"ss' + String(n).padStart(2, '0') + '" 1') }));
     });
   }
 

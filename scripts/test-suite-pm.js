@@ -1283,6 +1283,48 @@
     const nonePressed = ['alignLeft', 'center', 'alignRight', 'justify'].every((c) => !btn(c).classList.contains('toggled'));
     return nonePressed || 'mixed selection did not clear all alignment buttons';
   });
+  await t('[home] Text Effects is on the PM engine (no longer D6-blocked)', () =>
+    PM().isBlocked('textEffectsAndTypography') === false || 'textEffectsAndTypography still D6-blocked');
+  await t('[home] Text Effects menu opens + applies via PM (no retired-WC.Editor crash)', async () => {
+    setDoc('teprobe text'); selectText('teprobe'); await sleep(40);
+    let threw = null;
+    try {
+      window.WC.Commands.run({ cmd: 'textEffectsAndTypography', type: 'dropdown', label: 'Text Effects' }, document.querySelector('[data-cmd="textEffectsAndTypography"]') || document.body);
+      await sleep(60);
+    } catch (e) { threw = e.message; }
+    const rows = Array.from(document.querySelectorAll('.flyout .fly-item')).map((n) => n.textContent);
+    if (window.WC.closeFlyouts) window.WC.closeFlyouts();
+    if (threw) return 'menu dispatch threw: ' + threw;
+    return (rows.some((r) => /Outline/.test(r)) && rows.some((r) => /Number Styles/.test(r))) || ('menu did not open with effect rows: ' + JSON.stringify(rows));
+  });
+  await t('[home] Text Effects: number styles export w14 + round-trip', async () => {
+    setDoc('numrt text'); selectText('numrt'); PM().cmd('setMark', 'textStyle', { fontVariantNumeric: 'oldstyle-nums tabular-nums' }); await sleep(80);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!(/w14:numForm/.test(xml) && /w14:numSpacing/.test(xml))) return 'w14:numForm/numSpacing missing from export';
+    const b = await PM().exportDocxBytes(); await PM().openDocx(b); await sleep(220);
+    const attr = (() => { let a = null; doc().descendants((n) => { if (a || !n.isText || !n.text) return; if (n.text.indexOf('numrt') >= 0) { const ts = n.marks.find((m) => m.type.name === 'textStyle'); a = ts?.attrs?.fontVariantNumeric; } }); return a; })();
+    return /oldstyle-nums/.test(attr || '') || ('round-trip lost the attr: ' + attr);
+  });
+  await t('[home] Text Effects: ligatures (Standard+Contextual) export + round-trip', async () => {
+    setDoc('ligrt text'); selectText('ligrt'); PM().cmd('setMark', 'textStyle', { fontVariantLigatures: 'common-ligatures contextual' }); await sleep(80);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!(/w14:ligatures/.test(xml) && /w14:cntxtAlts/.test(xml))) return 'w14:ligatures/cntxtAlts missing from export';
+    const b = await PM().exportDocxBytes(); await PM().openDocx(b); await sleep(220);
+    const attr = (() => { let a = null; doc().descendants((n) => { if (a || !n.isText || !n.text) return; if (n.text.indexOf('ligrt') >= 0) { const ts = n.marks.find((m) => m.type.name === 'textStyle'); a = ts?.attrs?.fontVariantLigatures; } }); return a; })();
+    return /contextual/.test(attr || '') || ('round-trip lost ligatures: ' + attr);
+  });
+  await t('[home] Text Effects: all quartet effects apply + render', async () => {
+    const hasStyle = (frag) => !!document.querySelector('#pm-editor .ProseMirror [style*="' + frag + '"]');
+    setDoc('q1 x'); selectText('q1'); PM().cmd('setMark', 'textStyle', { textOutline: { widthPt: 1.5, color: '#ff0000', fill: 'transparent' } }); await sleep(70);
+    if (!hasStyle('-webkit-text-stroke')) return 'outline did not render';
+    setDoc('q2 x'); selectText('q2'); PM().cmd('setMark', 'textStyle', { textGlow: { radiusPt: 8, color: '#156082' } }); await sleep(70);
+    if (!hasStyle('text-shadow')) return 'glow did not render';
+    setDoc('q3 x'); selectText('q3'); PM().cmd('setMark', 'textStyle', { textShadowW14: { dx: 1.5, dy: 1.5, blur: 1.5, color: 'rgba(0,0,0,0.45)' } }); await sleep(70);
+    if (!hasStyle('text-shadow')) return 'shadow did not render';
+    setDoc('q4 x'); selectText('q4'); PM().cmd('setMark', 'textStyle', { textReflection: 'half' }); await sleep(70);
+    if (!hasStyle('-webkit-box-reflect')) return 'reflection did not render';
+    return true;
+  });
   await t('[4] Select All selects the whole document via the menu', async () => {
     setDocs(['selall first para', 'selall second para']);
     const node = document.querySelector('[data-cmd="select"]') || document.body;

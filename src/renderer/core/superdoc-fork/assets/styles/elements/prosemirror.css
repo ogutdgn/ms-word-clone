@@ -17,7 +17,12 @@
   white-space: break-spaces;
   -webkit-font-variant-ligatures: none;
   font-variant-ligatures: none;
-  font-feature-settings: 'liga' 0; /* the above doesn't seem to work in Edge */
+  /* MS-WORD-CLONE FORK EDIT (Phase 3, Text Effects, NOTICE'd): the upstream
+     `font-feature-settings: 'liga' 0` (an Edge-only fallback) is REMOVED — it is
+     inherited and beats a per-run span's font-variant-ligatures / font-feature-
+     settings, so Ligatures + Stylistic Sets would never render. In Electron
+     (Chromium) `font-variant-ligatures: none` already disables ligatures by
+     default, and a per-run inline value overrides it. */
   z-index: 0; /* Needed to place images behind text with lower z-index */
 }
 

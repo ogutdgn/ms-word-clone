@@ -368,6 +368,26 @@ The following upstream packages are included in this directory tree:
   attrs, so toggling subscript/superscript OFF on an EMPTY paragraph — where sub/super lives
   in the paragraph run properties, not `storedMarks` — previously left the prior value in
   place (it activated but never deactivated). Set paths and non-empty paragraphs are unchanged.
+- **Text Effects & Typography on the PM engine (Phase 3 Home/Font, 2026-06-15):**
+  the "Text Effects & Typography" button was dead (its menus called the retired
+  `WC.Editor`). Rebuilt as `textStyle` mark attrs + converter bridge:
+  - `extensions/text-style/text-style.js` — 7 new textStyle attrs: the typography
+    trio `fontVariantNumeric` / `fontVariantLigatures` / `fontFeatureSettings`
+    (CSS values) and the visual quartet `textOutline` / `textGlow` /
+    `textShadowW14` / `textReflection` (structured), each with renderDOM (glow +
+    shadow share ONE `text-shadow` compositor) + parseDOM (data-attr round-trip).
+  - `core/super-converter/styles.js` — `encodeMarksFromRPr`/`decodeRPrFromMarks`
+    bridge the typography trio between the existing `w14:numForm`/`numSpacing`/
+    `ligatures`/`cntxtAlts`/`stylisticSets` run properties and the CSS attrs
+    (compose/split helpers; "Standard and Contextual" maps to ligatures=standard
+    + cntxtAlts to avoid the `standardContextual` enum the exporter drops).
+  - `extensions/run/calculateInlineRunPropertiesPlugin.js` — the trio keys added
+    to `RUN_PROPERTIES_DERIVED_FROM_MARKS` so user edits re-export.
+  - `assets/styles/elements/prosemirror.css` — removed the editor-wide
+    `font-feature-settings: 'liga' 0` (an Edge fallback that, inherited, beat
+    per-run Ligatures/Stylistic Sets in Chromium).
+  The visual quartet renders in-app today; its net-new `w14:textOutline/glow/
+  shadow/reflection` export translators are the follow-up.
 - All other editing-engine logic (ProseMirror schema, extensions, converters, DOCX
   import/export) is unmodified from upstream commit 03ab3f3.
 

@@ -30,6 +30,12 @@ const RUN_PROPERTIES_DERIVED_FROM_MARKS = new Set([
   'fontFamily',
   'vertAlign',
   'position',
+  // Text Effects & Typography (Phase 3): mark-derived so user edits re-export.
+  'numForm',
+  'numSpacing',
+  'ligatures',
+  'contextualAlternates',
+  'stylisticSets',
 ]);
 
 export const TRANSIENT_HYPERLINK_STYLE_IDS = new Set(['Hyperlink', 'FollowedHyperlink']);

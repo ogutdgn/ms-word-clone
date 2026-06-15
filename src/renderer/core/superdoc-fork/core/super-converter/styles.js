@@ -38,6 +38,62 @@ const getToCssFontFamily = () => {
  * @param {Object} docx - Parsed DOCX structure used for theme lookups.
  * @returns {Array<Object>} Mark definitions representing the run styling.
  */
+// MS-WORD-CLONE FORK EDIT (Phase 3, Text Effects & Typography, NOTICE'd):
+// compose/split between the w14 typography run properties and the textStyle CSS
+// attrs (fontVariantNumeric / fontVariantLigatures / fontFeatureSettings). The
+// v3 translators for w14:numForm/numSpacing/ligatures/cntxtAlts/stylisticSets
+// already round-trip the run properties; these helpers bridge them to CSS.
+const NUM_FORM_TO_CSS = { lining: 'lining-nums', oldStyle: 'oldstyle-nums' };
+const NUM_SPACING_TO_CSS = { proportional: 'proportional-nums', tabular: 'tabular-nums' };
+const LIGATURES_TO_CSS = {
+  none: 'none',
+  standard: 'common-ligatures',
+  standardContextual: 'common-ligatures contextual',
+  historicalDiscretional: 'discretionary-ligatures historical-ligatures',
+  all: 'common-ligatures discretionary-ligatures historical-ligatures contextual',
+};
+function composeFontVariantNumeric(numForm, numSpacing) {
+  const parts = [NUM_FORM_TO_CSS[numForm], NUM_SPACING_TO_CSS[numSpacing]].filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
+}
+function splitFontVariantNumeric(css) {
+  const v = String(css || '');
+  const numForm = /lining-nums/.test(v) ? 'lining' : /oldstyle-nums/.test(v) ? 'oldStyle' : null;
+  const numSpacing = /proportional-nums/.test(v) ? 'proportional' : /tabular-nums/.test(v) ? 'tabular' : null;
+  return { numForm, numSpacing };
+}
+function composeFontVariantLigatures(ligatures, contextualAlternates) {
+  let css = LIGATURES_TO_CSS[ligatures] || null;
+  if (contextualAlternates && css && css !== 'none' && !/contextual/.test(css)) css += ' contextual';
+  if (!css && contextualAlternates) css = 'common-ligatures contextual';
+  return css;
+}
+function splitFontVariantLigatures(css) {
+  const v = String(css || '');
+  const contextualAlternates = /contextual/.test(v);
+  let ligatures = null;
+  if (v === 'none') ligatures = 'none';
+  else if (/discretionary-ligatures/.test(v) && /historical-ligatures/.test(v) && /common-ligatures/.test(v)) ligatures = 'all';
+  else if (/discretionary-ligatures/.test(v) || /historical-ligatures/.test(v)) ligatures = 'historicalDiscretional';
+  // "Standard and Contextual" = standard ligatures + the separate contextual-
+  // alternates switch (both, like Word) — avoids the combined 'standardContextual'
+  // enum value (which the w14:ligatures export drops); round-trips via cntxtAlts.
+  else if (/common-ligatures/.test(v)) ligatures = 'standard';
+  return { ligatures, contextualAlternates };
+}
+function composeFontFeatureSettings(stylisticSets) {
+  if (!Array.isArray(stylisticSets)) return null;
+  const parts = stylisticSets
+    .filter((s) => Number.isFinite(s?.id))
+    .map((s) => `"ss${String(s.id).padStart(2, '0')}" 1`);
+  return parts.length ? parts.join(', ') : null;
+}
+function splitFontFeatureSettings(css) {
+  const sets = [];
+  String(css || '').replace(/["']ss(\d{2})["']\s*1/gi, (_, n) => { sets.push({ id: parseInt(n, 10), val: true }); return ''; });
+  return sets;
+}
+
 export function encodeMarksFromRPr(runProperties, docx) {
   if (!runProperties || typeof runProperties !== 'object') {
     return [];
@@ -174,6 +230,15 @@ export function encodeMarksFromRPr(runProperties, docx) {
       }
     }
   });
+
+  // Text Effects typography trio: compose the CSS attrs from the w14 run props
+  // (two keys → one CSS value for numeric; ligatures + cntxtAlts → one value).
+  const fvn = composeFontVariantNumeric(runProperties.numForm, runProperties.numSpacing);
+  if (fvn) textStyleAttrs.fontVariantNumeric = fvn;
+  const fvl = composeFontVariantLigatures(runProperties.ligatures, runProperties.contextualAlternates);
+  if (fvl) textStyleAttrs.fontVariantLigatures = fvl;
+  const ffs = composeFontFeatureSettings(runProperties.stylisticSets);
+  if (ffs) textStyleAttrs.fontFeatureSettings = ffs;
 
   if (Object.keys(textStyleAttrs).length) {
     marks.push({ type: 'textStyle', attrs: textStyleAttrs });
@@ -667,6 +732,25 @@ export function decodeRPrFromMarks(marks) {
                 runProperties.styleId = value;
               }
               break;
+            // Text Effects typography trio: split the CSS attr back into the w14
+            // run properties so the existing v3 translators re-emit them.
+            case 'fontVariantNumeric': {
+              const { numForm, numSpacing } = splitFontVariantNumeric(value);
+              if (numForm) runProperties.numForm = numForm;
+              if (numSpacing) runProperties.numSpacing = numSpacing;
+              break;
+            }
+            case 'fontVariantLigatures': {
+              const { ligatures, contextualAlternates } = splitFontVariantLigatures(value);
+              if (ligatures) runProperties.ligatures = ligatures;
+              if (contextualAlternates) runProperties.contextualAlternates = true;
+              break;
+            }
+            case 'fontFeatureSettings': {
+              const sets = splitFontFeatureSettings(value);
+              if (sets.length) runProperties.stylisticSets = sets;
+              break;
+            }
           }
         });
         break;
