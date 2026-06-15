@@ -1089,6 +1089,17 @@
     const marks = markNames('KEPTITALIC');
     return r === true && marks.some((m) => m.startsWith('italic'));
   });
+  await t('[home] Font group renders the Word two-row arrangement', () => {
+    const grp = document.querySelector('.ribbon-group[data-group="font"]');
+    if (!grp) return 'font group not found';
+    const rows = grp.querySelectorAll('.font-grid .font-row');
+    if (rows.length !== 2) return 'expected 2 font rows, got ' + rows.length;
+    const combos = rows[0].querySelectorAll('.rcombo');
+    if (combos.length !== 2) return 'row1 should have 2 combos, got ' + combos.length;
+    const r2 = rows[1];
+    const has = (cmd) => !!r2.querySelector('[data-cmd="' + cmd + '"]');
+    return has('bold') && has('italic') && has('underline') && has('fontColor') || 'row2 missing formatting buttons';
+  });
   await t('[home] font combos show the effective value on an empty doc (not blank)', async () => {
     setDoc('');
     v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), 1, 1)));

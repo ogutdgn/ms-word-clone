@@ -106,6 +106,12 @@
       if (gallery && group.id === 'styles') {
         body.appendChild(this.renderStylesGallery(gallery));
         rest.length = 0; // styles group handled
+      } else if (group.id === 'font') {
+        // Home Font group: explicit two-row Word arrangement (the generic
+        // 3-per-column packing only loosely matched Word). Row 1 = name + size
+        // combos, then Grow/Shrink/Change Case/Clear Formatting; row 2 = the
+        // B/I/U… formatting buttons. Cmd ids already match Word.
+        this.renderFontGroupBody(body, group);
       } else {
         // Pens gallery: inline pen tiles (Word shows the pens directly in the ribbon)
         if (gallery && group.id === 'pens') body.appendChild(this.renderPensGallery(gallery));
@@ -146,6 +152,24 @@
       }
       g.appendChild(label);
       return g;
+    },
+
+    // Home Font group body: two rows in Word's order. Row 2 holds the character
+    // formatting buttons; everything else (combos + Grow/Shrink/Change Case/Clear)
+    // goes in row 1, preserving declaration order.
+    renderFontGroupBody(body, group) {
+      const ROW2 = new Set(['bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'textEffectsAndTypography', 'textHighlightColor', 'fontColor']);
+      const grid = el('div', { class: 'font-grid' });
+      const row1 = el('div', { class: 'font-row' });
+      const row2 = el('div', { class: 'font-row' });
+      group.controls.forEach((c) => {
+        if (ROW2.has(c.cmd)) { row2.appendChild(this.renderControl(c, 'small')); return; }
+        if (c.type === 'combo') { row1.appendChild(this.renderCombo(c)); return; }
+        row1.appendChild(this.renderControl(c, 'small'));
+      });
+      grid.appendChild(row1);
+      grid.appendChild(row2);
+      body.appendChild(grid);
     },
 
     renderCombo(c) {

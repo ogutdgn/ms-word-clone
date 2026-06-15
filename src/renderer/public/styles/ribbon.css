@@ -172,6 +172,11 @@
 .ctrl-stack { display: flex; flex-direction: column; justify-content: center; gap: 1px; height: 66px; }
 .ctrl-row { display: flex; align-items: center; gap: 1px; }
 
+/* Home Font group: explicit two-row layout (Word arrangement) */
+.font-grid { display: flex; flex-direction: column; justify-content: center; gap: 3px; height: 66px; }
+.font-row { display: flex; align-items: center; gap: 1px; }
+.font-row .rcombo { margin: 0 1px; }
+
 /* split button: main action + dropdown arrow as two hit areas */
 .rsplit { display: inline-flex; border-radius: 3px; border: 1px solid transparent; }
 .rsplit:hover { border-color: var(--btn-border); }
