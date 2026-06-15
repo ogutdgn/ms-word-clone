@@ -49,8 +49,14 @@
 ## B — Cloud-runtime stubs (docs/NOT_IMPLEMENTED.md is the authority)
 
 Office.js add-ins · 3D models · online pictures/video playback · co-authoring ·
-translator services · Editor (cloud grammar) · Researcher. Loop obligation: no jarring
-"not implemented" toasts — graceful Word-like degradation only.
+translator services · **Editor cloud ML** (the ML Editor Score, Similarity, Insights, and
+the Formality / Punctuation Conventions / Resume / Vocabulary refinements) · Researcher.
+Loop obligation: no jarring "not implemented" toasts — graceful Word-like degradation only.
+
+> **Now shipping OFFLINE (2026-06-15):** the Editor pane's **Spelling** (nspell + a vendored
+> SCOWL en_US Hunspell dictionary), **Grammar** (mechanical rules), and the **Clarity +
+> Conciseness** refinements (heuristics) are real and run with no network — see
+> `src/renderer/proofing/`. Only the ML/cloud pieces above stay in §B.
 
 ## C — Recorded decisions & known deviations (as of end of slice 7)
 

@@ -623,6 +623,36 @@
     // the real glyph = a page rect + a dashed inner border; _generic has no dasharray
     return html.indexOf('stroke-dasharray="1.5 1.5"') >= 0 && html.indexOf('M8 12h8') < 0;
   });
+  await t('[editor] Proofing spell-check flags real misspellings with dictionary suggestions', async () => {
+    await window.WC.Proofing.ensureReady();
+    const hits = window.WC.Proofing.spellCheck('I beleive this is definately correct.');
+    const words = hits.map((h) => h.word.toLowerCase());
+    const believe = (hits.find((h) => h.word.toLowerCase() === 'beleive') || {}).suggestions || [];
+    return words.indexOf('beleive') >= 0 && words.indexOf('definately') >= 0 && words.indexOf('correct') < 0 && believe.indexOf('believe') >= 0;
+  });
+  await t('[editor] Proofing grammar-check flags repeated word, a/an, and "could of"', () => {
+    const kinds = window.WC.Proofing.grammarCheck('the the cat. this is a apple. it could of worked').map((h) => h.kind);
+    return kinds.indexOf('repeat') >= 0 && kinds.indexOf('article') >= 0 && kinds.indexOf('confusion') >= 0;
+  });
+  await t('[editor] Proofing refinement flags weasel words (Conciseness) + passive voice (Clarity)', () => {
+    const cats = window.WC.Proofing.refineCheck('It is very really being improved by them.').map((h) => h.category);
+    return cats.indexOf('Conciseness') >= 0 && cats.indexOf('Clarity') >= 0;
+  });
+  await t('[editor] Editor pane renders real counts and a suggestion fixes the doc via PM', async () => {
+    setDoc('I beleive this is definately a teh test.');
+    await window.WC.Proofing.ensureReady();
+    const ex = document.getElementById('editor-pane'); if (ex) ex.remove();
+    window.WC.Dialogs.editorPane(); await sleep(140);
+    const pane = document.getElementById('editor-pane');
+    const rows = Array.from(pane.querySelectorAll('.tp-result')).map((r) => r.textContent);
+    const spellingRow = rows.find((r) => /^Spelling/.test(r)) || '';
+    const spellingCount = parseInt((spellingRow.match(/\d+/) || ['0'])[0], 10);
+    const btn = pane.querySelector('.tp-body button'); const label = btn ? btn.textContent : '';
+    if (btn) btn.click(); await sleep(80);
+    const fixed = doc().textContent.indexOf('beleive') < 0;
+    pane.remove();
+    return spellingCount >= 2 && label === 'believe' && fixed;
+  });
   await t('[2] sort dialog OK reorders paragraphs ascending (one undo step)', async () => {
     setDocs(['banana', 'cherry', 'apple']);
     window.WC.editor.commands.selectAll();

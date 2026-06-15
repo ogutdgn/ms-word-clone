@@ -6,6 +6,7 @@ import { TextSelection } from '@/pm'
 import { fixtureArrayBuffer, negationArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
 import { createPmEditor } from '@/bridge/create-editor'
+import { installProofing } from '@/proofing/proofing'
 // Fork element styles (markers/tabs): the bridge imports @core/Editor.js directly, so
 // superdoc-fork/index.js → style.css never enters the build. Without the .sd-editor-tab
 // inline-block rule, list-marker separators and typed tabs render zero-width.
@@ -20,6 +21,8 @@ w.__WC_FIXTURE_NEGATION = negationArrayBuffer
 
 // SYNCHRONOUS (before the async mount): mode flag + page flip + D6 stub.
 preinstallBridge()
+// Offline proofing engine for the Editor pane (lazy dictionary build on first use).
+installProofing(w)
 
 const host = document.getElementById('pages') || document.body
 const mountEl = document.createElement('div')

@@ -71,7 +71,10 @@ evaluator + per-control rule registry), generalized from `bridge/state-sync.ts`.
 | Editing | _tbd_ | | |
 | Adobe Acrobat | (whole section) | ⛔ Out of scope | third-party plugin (proposed — confirm at kickoff) |
 | Voice / Dictate | (whole section) | ⛔ Out of scope | cloud speech (deferrals.md §B) (proposed) |
-| Editor | (whole section) | ⛔ Out of scope | cloud grammar (deferrals.md §B) (proposed) |
+| Editor | Spelling — real offline dictionary | ✅ In scope | nspell + a vendored SCOWL en_US Hunspell dictionary; suggestions + Ignore All + Add to Dictionary |
+| Editor | Grammar — mechanical rules | ✅ In scope | repeated words, a/an, spacing, "could of"→have, sentence capitalization (offline) |
+| Editor | Refinements — Clarity + Conciseness | ✅ In scope (partial) | heuristic weasel-word / wordy-phrase / passive-voice signals (offline) |
+| Editor | Editor Score, Similarity, Insights, Formality/Punctuation/Resume/Vocabulary refinements | ⛔ Out of scope | Microsoft 365 cloud ML Editor (deferrals.md §B); honestly flagged in the pane |
 | Add-ins | (whole section) | ⛔ Out of scope | Office.js marketplace (proposed) |
 
 **Styles** — scope locked 2026-06-15 (section kickoff; verified vs real Word via computer use + a

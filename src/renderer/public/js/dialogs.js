@@ -585,97 +585,117 @@
   };
 
   // ---- Editor / Proofing pane ----
-  const MISSPELLINGS = {
-    teh: 'the', recieve: 'receive', seperate: 'separate', definately: 'definitely', occured: 'occurred',
-    untill: 'until', wich: 'which', accross: 'across', becuase: 'because', beleive: 'believe',
-    calender: 'calendar', enviroment: 'environment', goverment: 'government', neccessary: 'necessary',
-    occassion: 'occasion', publically: 'publicly', tommorow: 'tomorrow', wierd: 'weird', adn: 'and',
-    thier: 'their', alot: 'a lot', acheive: 'achieve', arguement: 'argument', begining: 'beginning',
-  };
-  function scanSpelling(root) {
-    const issues = [];
-    const ignored = D._ignoredSpelling || (D._ignoredSpelling = {});
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    let node;
-    while ((node = walker.nextNode())) {
-      const re = /[A-Za-z]+/g; let m;
-      while ((m = re.exec(node.nodeValue))) {
-        const word = m[0]; const low = word.toLowerCase();
-        if (MISSPELLINGS[low] && !ignored[low]) issues.push({ node, index: m.index, word, suggestion: matchCase(word, MISSPELLINGS[low]) });
-      }
-    }
-    return issues;
-  }
-  function matchCase(orig, sugg) { if (orig[0] === orig[0].toUpperCase()) return sugg[0].toUpperCase() + sugg.slice(1); return sugg; }
-  // Editor pane (slice 8 task 6, parity P4) — Word's layout, locally degraded
-  // (class B: Editor Score/Refinements are Microsoft 365 cloud services; the clone
-  // ships its local spell engine in Word's shell, no jarring stub). PM mode reads
-  // the PM DOM and replaces through engine transactions — a direct nodeValue write
-  // under PM would desync the model from the view.
+  // Real offline proofing via window.WC.Proofing (src/renderer/proofing/proofing.ts):
+  // nspell + a vendored SCOWL en_US Hunspell dictionary for spelling, mechanical rules
+  // for grammar, and heuristic refinements (Clarity/Conciseness). The ML Editor Score,
+  // Similarity, Insights and Formality/Punctuation/Resume/Vocabulary refinements need
+  // the Microsoft 365 cloud Editor and stay honestly flagged (deferrals.md §B).
+  // Replacements go through PM transactions (a direct nodeValue write would desync the
+  // model from the view), mapped back to exact doc positions via scanModel().
   D.editorPane = function () {
     let pane = document.getElementById('editor-pane'); if (pane) { pane.remove(); return; }
     document.querySelectorAll('.taskpane.right').forEach((p) => p.remove()); // C11: right-dock panes replace each other
     pane = el('div', { class: 'taskpane right', id: 'editor-pane' });
     const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Editor' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
     const body = el('div', { class: 'tp-body' });
-    const pm = () => (WC.PM.ready ? WC.PM : null);
     const root = () => WC.PM.getEditor().view.dom;
-    function pmReplaceWord(word, suggestion) {
-      const ed = pm().getEditor();
-      let hit = null;
+    const ignoredSp = D._ignoredSpelling || (D._ignoredSpelling = {});
+    const ignoredGr = D._ignoredGrammar || (D._ignoredGrammar = {});
+    const P = () => WC.Proofing;
+
+    // Flatten the doc to text with a char-index → PM-position map (\n between blocks so
+    // a grammar span never crosses a paragraph). Replacements use exact positions.
+    function scanModel() {
+      const ed = WC.PM.getEditor(); const segs = []; let full = '';
       ed.state.doc.descendants((node, pos) => {
-        if (hit) return false;
-        if (node.isText && node.text) {
-          const m = new RegExp('\\b' + word + '\\b').exec(node.text);
-          if (m) { hit = { from: pos + m.index, to: pos + m.index + word.length }; return false; }
-        }
+        if (node.isText && node.text) { segs.push({ s: full.length, from: pos, len: node.text.length }); full += node.text; }
+        else if (node.isBlock && full.length && !full.endsWith('\n')) { full += '\n'; }
         return true;
       });
-      if (hit) ed.view.dispatch(ed.state.tr.insertText(suggestion, hit.from, hit.to));
+      const pmPosOf = (idx) => { for (let i = 0; i < segs.length; i++) { const g = segs[i]; if (idx >= g.s && idx <= g.s + g.len) return g.from + (idx - g.s); } return null; };
+      return { full, pmPosOf };
+    }
+    function replaceAt(from, length, repl) {
+      if (from == null) return;
+      const ed = WC.PM.getEditor();
+      ed.view.dispatch(ed.state.tr.insertText(repl, from, from + length));
+    }
+    function card(title, color, message, actions) {
+      const c = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px', marginBottom: '8px' } });
+      c.appendChild(el('div', {}, [el('span', { style: { textDecoration: 'underline wavy ' + color, color, fontWeight: '600' }, text: title })]));
+      if (message) c.appendChild(el('div', { style: { fontSize: '12px', color: '#666', margin: '4px 0' }, text: message }));
+      const wrap = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' } });
+      actions.forEach((a) => { const b = el('button', { class: 'btn', text: a.label }); b.addEventListener('click', a.onClick); wrap.appendChild(b); });
+      c.appendChild(wrap); body.appendChild(c);
     }
     function render() {
       body.innerHTML = '';
-      const issues = scanSpelling(root());
-      // Word's cloud Editor Score, degraded to the local spelling signal (P4).
-      const pct = issues.length ? Math.max(40, 100 - issues.length * 10) : 100;
+      if (!P() || !P().isReady()) {
+        body.appendChild(el('div', { style: { textAlign: 'center', padding: '34px 0', color: '#888' }, text: 'Checking spelling and grammar…' }));
+        if (P()) P().ensureReady().then(() => { if (document.getElementById('editor-pane')) render(); });
+        return;
+      }
+      const { full, pmPosOf } = scanModel();
+      const spelling = P().spellCheck(full).filter((s) => !ignoredSp[s.word.toLowerCase()]);
+      const grammar = P().grammarCheck(full).filter((g) => !ignoredGr[g.kind + ':' + g.text]);
+      const refine = P().refineCheck(full);
+      const corrections = spelling.length + grammar.length;
+      const score = corrections === 0 && refine.length === 0 ? 100 : Math.max(40, 100 - spelling.length * 8 - grammar.length * 5 - refine.length * 2);
       body.appendChild(el('div', { style: { textAlign: 'center', padding: '8px 0 4px' } }, [
-        el('div', { style: { fontSize: '30px', fontWeight: '700', color: issues.length ? '#b85c00' : 'var(--word-blue)' }, text: pct + '%' }),
+        el('div', { style: { fontSize: '30px', fontWeight: '700', color: corrections ? '#b85c00' : 'var(--word-blue)' }, text: score + '%' }),
         el('div', { style: { color: '#444', fontWeight: '600' }, text: 'Editor Score' }),
-        el('div', { style: { fontSize: '11px', color: '#888', margin: '2px 0 6px' }, text: 'Local proofing only — cloud refinements require Microsoft 365.' }),
+        el('div', { style: { fontSize: '11px', color: '#888', margin: '2px 0 6px' }, text: 'Local spelling, grammar & style. Cloud refinements need Microsoft 365.' }),
       ]));
-      const section = (t) => el('div', { style: { fontWeight: '600', margin: '10px 0 4px', fontSize: '12px' }, text: t });
-      const row = (label, badge, disabled) => {
-        const r = el('div', { class: 'tp-result', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: disabled ? '.55' : '1' } }, [
+      const section = (t) => body.appendChild(el('div', { style: { fontWeight: '600', margin: '12px 0 4px', fontSize: '12px' }, text: t }));
+      const row = (label, badge, opts) => {
+        opts = opts || {};
+        const r = el('div', { class: 'tp-result', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: opts.disabled ? '.55' : '1' } }, [
           el('span', { text: label }),
-          el('b', { text: badge, style: { color: badge === '✓' ? '#107C10' : (disabled ? '#888' : '#b85c00') } }),
+          el('b', { text: badge, style: { color: badge === '✓' ? '#107C10' : (opts.disabled ? '#888' : '#b85c00') } }),
         ]);
-        if (disabled) r.title = 'Requires the Microsoft 365 cloud Editor service — not available in this clone.';
-        return r;
+        if (opts.disabled) r.title = 'Requires the Microsoft 365 cloud Editor service — not available in this clone.';
+        body.appendChild(r);
       };
-      body.appendChild(section('Corrections'));
-      body.appendChild(row('Spelling', issues.length ? String(issues.length) : '✓'));
-      body.appendChild(row('Grammar', '✓'));
-      body.appendChild(section('Refinements'));
-      ['Clarity', 'Conciseness', 'Formality', 'Punctuation Conventions', 'Resume', 'Vocabulary'].forEach((t) => body.appendChild(row(t, '—', true)));
-      body.appendChild(section('Similarity'));
-      body.appendChild(row('Similarity check', '—', true));
-      if (issues.length) body.appendChild(section('Spelling'));
-      issues.forEach((iss) => {
-        const card = el('div', { style: { border: '1px solid #e1dfdd', borderRadius: '4px', padding: '8px', marginBottom: '8px' } });
-        card.appendChild(el('div', {}, [el('span', { style: { textDecoration: 'underline wavy #d13438', color: '#d13438', fontWeight: '600' }, text: iss.word })]));
-        card.appendChild(el('div', { style: { fontSize: '12px', color: '#666', margin: '4px 0' }, text: 'Suggestion:' }));
-        const sug = el('button', { class: 'btn', style: { display: 'block', width: '100%', textAlign: 'left', marginBottom: '4px' }, text: iss.suggestion });
-        sug.addEventListener('click', () => { pmReplaceWord(iss.word, iss.suggestion); render(); });
-        card.appendChild(sug);
-        const row2 = el('div', { style: { display: 'flex', gap: '6px' } }, [
-          el('button', { class: 'btn', text: 'Ignore', onclick: () => { (D._ignoredSpelling[iss.word.toLowerCase()] = true); render(); } }),
-          el('button', { class: 'btn', text: 'Ignore All', onclick: () => { D._ignoredSpelling[iss.word.toLowerCase()] = true; render(); } }),
-        ]);
-        card.appendChild(row2);
-        body.appendChild(card);
-      });
+      const clarity = refine.filter((r) => r.category === 'Clarity');
+      const concise = refine.filter((r) => r.category === 'Conciseness');
+      section('Corrections');
+      row('Spelling', spelling.length ? String(spelling.length) : '✓');
+      row('Grammar', grammar.length ? String(grammar.length) : '✓');
+      section('Refinements');
+      row('Clarity', clarity.length ? String(clarity.length) : '✓');
+      row('Conciseness', concise.length ? String(concise.length) : '✓');
+      ['Formality', 'Punctuation Conventions', 'Vocabulary'].forEach((t) => row(t, '—', { disabled: true }));
+      section('Similarity');
+      row('Similarity check', '—', { disabled: true });
+
+      if (spelling.length) {
+        section('Spelling');
+        spelling.forEach((iss) => {
+          const acts = iss.suggestions.map((s) => ({ label: s, onClick: () => { replaceAt(pmPosOf(iss.index), iss.word.length, s); render(); } }));
+          acts.push({ label: 'Ignore All', onClick: () => { ignoredSp[iss.word.toLowerCase()] = true; render(); } });
+          acts.push({ label: 'Add to Dictionary', onClick: () => { P().add(iss.word); render(); } });
+          card(iss.word, '#d13438', iss.suggestions.length ? 'Spelling' : 'No suggestions', acts);
+        });
+      }
+      if (grammar.length) {
+        section('Grammar');
+        grammar.forEach((iss) => {
+          const acts = [];
+          if (iss.suggestion != null) acts.push({ label: 'Change to “' + iss.suggestion + '”', onClick: () => { replaceAt(pmPosOf(iss.index), iss.length, iss.suggestion); render(); } });
+          acts.push({ label: 'Ignore', onClick: () => { ignoredGr[iss.kind + ':' + iss.text] = true; render(); } });
+          card(iss.text.replace(/\n/g, '¶'), '#0F6CBD', iss.message, acts);
+        });
+      }
+      if (refine.length) {
+        section('Refinement suggestions');
+        refine.forEach((iss) => {
+          const acts = [];
+          if (iss.suggestion != null) acts.push({ label: 'Change to “' + iss.suggestion + '”', onClick: () => { replaceAt(pmPosOf(iss.index), iss.length, iss.suggestion); render(); } });
+          card(iss.text, '#6a5acd', iss.message, acts);
+        });
+      }
       const on = root().getAttribute('spellcheck') !== 'false';
-      const cbk = el('input', { type: 'checkbox', checked: on ? 'checked' : null });
+      const cbk = el('input', { type: 'checkbox' }); cbk.checked = on;
       cbk.addEventListener('change', () => root().setAttribute('spellcheck', cbk.checked ? 'true' : 'false'));
       body.appendChild(el('label', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', fontSize: '12px' } }, [cbk, el('span', { text: 'Check spelling as you type' })]));
     }
