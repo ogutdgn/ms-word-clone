@@ -544,6 +544,46 @@
     });
   };
 
+  // ---- Set Default Paste (PM-only) ----
+  // Word's Options→Advanced cut/copy/paste has several knobs; the clone ships the
+  // primary "default paste" mode that plain Paste (Ctrl+V / the split-button main
+  // face) honors. Persisted to localStorage; read by the bridge's defaultPasteMode.
+  D.setDefaultPaste = function () {
+    const KEY = 'wc.defaultPaste';
+    const MODES = [
+      ['keepSource', 'Keep Source Formatting (Default)'],
+      ['merge', 'Merge Formatting'],
+      ['text', 'Keep Text Only'],
+    ];
+    let current = 'keepSource';
+    try { current = localStorage.getItem(KEY) || 'keepSource'; } catch (e) { /* no storage */ }
+    let chosen = Math.max(0, MODES.findIndex(([id]) => id === current));
+    const list = el('ul', { class: 'ps-list' }, MODES.map(([id, label], i) =>
+      el('li', { class: 'ps-item' + (i === chosen ? ' selected' : ''), text: label, tabindex: '0', dataset: { mode: id } })));
+    const select = (i) => { chosen = i; list.querySelectorAll('li').forEach((n, j) => n.classList.toggle('selected', j === chosen)); };
+    list.addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) select(Array.from(list.children).indexOf(li)); });
+    const body = el('div', {}, [
+      el('div', { class: 'row', text: 'Pasting (plain Paste / Ctrl+V) uses:' }),
+      list,
+    ]);
+    const apply = () => {
+      try { localStorage.setItem(KEY, MODES[chosen][0]); } catch (e) { /* no storage */ }
+      WC.toast('Default paste set to “' + MODES[chosen][1].replace(' (Default)', '') + '”.');
+    };
+    const handle = WC.dialog({ title: 'Set Default Paste', width: '420px', body, footer: [
+      { label: 'OK', primary: true, onClick: apply },
+      { label: 'Cancel' },
+    ] });
+    list.addEventListener('dblclick', (e) => { if (e.target.closest('li')) { apply(); handle.close(); } });
+    list.addEventListener('keydown', (e) => {
+      const li = e.target.closest('li'); if (!li) return;
+      const i = Array.from(list.children).indexOf(li);
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(i); apply(); handle.close(); }
+      else if (e.key === 'ArrowDown' && list.children[i + 1]) { e.preventDefault(); list.children[i + 1].focus(); select(i + 1); }
+      else if (e.key === 'ArrowUp' && list.children[i - 1]) { e.preventDefault(); list.children[i - 1].focus(); select(i - 1); }
+    });
+  };
+
   // ---- Editor / Proofing pane ----
   const MISSPELLINGS = {
     teh: 'the', recieve: 'receive', seperate: 'separate', definately: 'definitely', occured: 'occurred',

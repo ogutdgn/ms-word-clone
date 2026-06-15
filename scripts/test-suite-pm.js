@@ -1014,6 +1014,23 @@
     const on = !paste.classList.contains('wc-disabled');
     return off && on;
   });
+  await t('[home] Set Default Paste: dialog lists 3 modes + pasteDefault reads it', async () => {
+    WC.Dialogs.setDefaultPaste(); await sleep(40);
+    const list = document.querySelector('.ps-list');
+    const labels = list ? Array.from(list.children).map((li) => li.textContent) : [];
+    const has3 = labels.length === 3
+      && labels.some((l) => /Keep Source/.test(l))
+      && labels.some((l) => /Merge/.test(l))
+      && labels.some((l) => /Text Only/.test(l));
+    const cancel = Array.from(document.querySelectorAll('button')).find((b) => /^Cancel$/.test(b.textContent.trim()));
+    if (cancel) cancel.click();
+    // Contract: pasteDefault resolves the mode from localStorage via defaultPasteMode.
+    localStorage.setItem('wc.defaultPaste', 'text');
+    const reads = PM().defaultPasteMode && PM().defaultPasteMode() === 'text';
+    localStorage.setItem('wc.defaultPaste', 'keepSource'); // restore so other tests get native paste
+    if (!has3) return 'dialog modes: ' + JSON.stringify(labels);
+    return reads === true;
+  });
   await t('[home] Merge Formatting keeps bold, drops source font/size/color', async () => {
     setDoc('mergedest base');
     const sel = selectText('base');

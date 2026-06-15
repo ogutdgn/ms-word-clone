@@ -13,6 +13,18 @@ type AnyEditor = any
 let _clipboardHasContent = false
 export const clipboardHasContent = (): boolean => _clipboardHasContent
 
+// Set Default Paste (Word Options → Advanced): the mode plain Paste (Ctrl+V /
+// the split-button main face) uses. Persisted in localStorage by the dialog
+// (dialogs.js D.setDefaultPaste); read here. 'keepSource' is Word's default.
+export type DefaultPasteMode = 'keepSource' | 'merge' | 'text'
+export function defaultPasteMode(): DefaultPasteMode {
+  try {
+    const m = localStorage.getItem('wc.defaultPaste')
+    if (m === 'merge' || m === 'text') return m
+  } catch { /* no storage */ }
+  return 'keepSource'
+}
+
 // Merge Formatting (Word's middle paste option): keep the source's "meaningful"
 // run formatting (bold/italic/underline/strike/links/lists/sub-superscript) but
 // adopt the DESTINATION paragraph's font, size, and color so the pasted text
@@ -79,7 +91,13 @@ export function installClipboard(editor: AnyEditor) {
     focusView(); capture(); await api()?.copy(); _clipboardHasContent = true; nudgeRibbon(); return true
   }
   async function pasteDefault(): Promise<boolean> {
-    focusView(); await api()?.paste(); return true // fire-and-forget — content lands async
+    // Honor the Set Default Paste mode (Word). keepSource → native paste; merge →
+    // destination-style reconciliation; text → unformatted. (pasteTextOnly/pasteMerge
+    // are hoisted function declarations, safe to call before their definition.)
+    const mode = defaultPasteMode()
+    if (mode === 'text') return pasteTextOnly()
+    if (mode === 'merge') return pasteMerge()
+    focusView(); await api()?.paste(); return true // keepSource — fire-and-forget, content lands async
   }
   async function pasteTextOnly(): Promise<boolean> {
     const text = await api()?.readText()
@@ -121,5 +139,5 @@ export function installClipboard(editor: AnyEditor) {
     return pasteMergeHtml(html)
   }
 
-  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState, pasteMerge, pasteMergeHtml }
+  return { cutSelection, copySelection, pasteDefault, pasteTextOnly, pasteHTML, pastePicture, clipboardFlavors, refreshClipboardState, pasteMerge, pasteMergeHtml, defaultPasteMode }
 }

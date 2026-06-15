@@ -1691,7 +1691,7 @@
         item('Keep Text Only', fl.hasText, () => pm.pasteTextOnly());
         fly.appendChild(WC.flySep());
         fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
-        fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.toast('Set Default Paste is not implemented (recorded deferral).') }));
+        fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.Dialogs.setDefaultPaste() }));
       });
     });
   }
