@@ -337,7 +337,9 @@
       fly.appendChild(WC.flyItem('Odd Page', { onClick: () => insertPageBreak() }));
     });
   }
-  H.pageColor = (c, node) => applyColor('page', '#FFFFFF');
+  // Page Color opens the colour picker (Theme/Standard/No Color/More Colors) — it
+  // used to hardcode white, ignoring the dropdown entirely.
+  H.pageColor = (c, node) => colorMenu(node, 'page');
 
   // ---- Design ----
   H.pageColor2 = H.pageColor;
@@ -554,10 +556,14 @@
   }
 
   // ---- Design tab ----
-  H.themes = (c, node) => galleryMenu(node, 'Office Themes', WC.Design.THEMES, (t, silent) => { if (silent) WC.PM.dePreviewTheme('theme', t); else WC.PM.deApplyTheme(t); }, (t) => firstFont(t.body) === currentDocFont());
+  H.themes = (c, node) => galleryMenu(node, 'Office', WC.Design.THEMES, (t, silent) => { if (silent) WC.PM.dePreviewTheme('theme', t); else WC.PM.deApplyTheme(t); }, (t) => firstFont(t.body) === currentDocFont(), [
+    { label: 'Reset to Theme from Template', onClick: () => { if (WC.Design.THEMES[0]) WC.PM.deApplyTheme(WC.Design.THEMES[0]); } },
+    { label: 'Browse for Themes…', onClick: () => WC.notImplemented('Browse for Themes') },
+    { label: 'Save Current Theme…', onClick: () => WC.notImplemented('Save Current Theme') },
+  ]);
   H.styleSet = (c, node) => styleSetGallery(node);
-  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Colors')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} /* livePreviewCell's click owns the commit (dePreviewCommit + apply) */ }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => { if (silent) WC.PM.dePreviewTheme('colors', item); else WC.PM.deApplyColors(item); }); fly.appendChild(it); }); });
-  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Fonts')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => { if (silent) WC.PM.dePreviewTheme('fonts', item); else WC.PM.deApplyFonts(item); }); fly.appendChild(it); }); });
+  H.colors = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Office')); WC.Design.COLOR_SCHEMES.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} /* livePreviewCell's click owns the commit (dePreviewCommit + apply) */ }); it.insertBefore(swatchRow(s.accents), it.firstChild); livePreviewCell(it, s, (item, silent) => { if (silent) WC.PM.dePreviewTheme('colors', item); else WC.PM.deApplyColors(item); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Customize Colors…', { onClick: () => WC.notImplemented('Customize Colors') })); });
+  H.fonts = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Office')); WC.Design.FONT_PAIRS.forEach((p) => { const it = WC.flyItem(p.name, { onClick: () => {} }); it.querySelector('.fi-label').style.fontFamily = p.body; livePreviewCell(it, p, (item, silent) => { if (silent) WC.PM.dePreviewTheme('fonts', item); else WC.PM.deApplyFonts(item); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Customize Fonts…', { onClick: () => WC.notImplemented('Customize Fonts') })); });
   // PM: paragraph spacing is COMMIT-ONLY (no hover preview) — spacing changes are applied via
   // docDefaults/Normal redefinition; a transient live preview isn't wired (honest degrade). Click commits.
   H.paragraphSpacing = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('Built-In')); WC.Design.SPACING.forEach((s) => { const it = WC.flyItem(s.name, { onClick: () => {} }); livePreviewCell(it, s, (item, silent) => { if (!silent) WC.PM.deParagraphSpacing(item); }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Custom Paragraph Spacing…', { onClick: () => WC.Dialogs.paragraph() })); });
@@ -612,10 +618,10 @@
     cell.addEventListener('mouseleave', () => { WC.PM.dePreviewRestore(); });
     cell.addEventListener('click', () => { WC.PM.dePreviewCommit(); WC.closeFlyouts(); apply(item, false); });
   }
-  function galleryMenu(node, title, items, apply, isActive) {
+  function galleryMenu(node, title, items, apply, isActive, footer) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader(title));
-      const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px', padding: '4px 10px' } });
+      const grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', padding: '4px 10px' } });
       items.forEach((t) => {
         const active = isActive && isActive(t);
         const cell = el('div', { title: t.name, style: { border: '1px solid ' + (active ? '#2b579a' : '#e1dfdd'), outline: active ? '1px solid #2b579a' : 'none', borderRadius: '2px', padding: '6px', cursor: 'pointer', textAlign: 'center', position: 'relative' } });
@@ -627,6 +633,10 @@
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
+      if (footer && footer.length) {
+        fly.appendChild(WC.flySep());
+        footer.forEach((f) => fly.appendChild(WC.flyItem(f.label, { onClick: f.onClick })));
+      }
     });
   }
   function swatchRow(accents) { const row = el('span', { style: { display: 'inline-flex', width: '40px', height: '12px', marginRight: '8px' } }); accents.slice(0, 6).forEach((a) => row.appendChild(el('span', { style: { flex: 1, background: a } }))); return row; }

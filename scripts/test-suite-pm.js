@@ -4931,6 +4931,44 @@
   await t('[11] legacy WC.Editor is retired', () => typeof window.WC.Editor === 'undefined');
   await t('[11] Design themes table survives', () => Array.isArray(window.WC.Design.THEMES) && window.WC.Design.THEMES.length > 0);
   await t('[11] Design color/font/spacing/styleset tables survive', () => Array.isArray(window.WC.Design.COLOR_SCHEMES) && window.WC.Design.COLOR_SCHEMES.length > 0 && Array.isArray(window.WC.Design.FONT_PAIRS) && !!window.WC.Design.SPACING && !!window.WC.Design.STYLE_SETS);
+  await t('[design] Style Set is an inline carousel (tiles + ‹/› nav + ▾ More)', () => {
+    const node = window.WC.Ribbon.renderDesignStyleSetGallery({ cmd: 'styleSet' });
+    const isCarousel = node.classList.contains('rgallery') && node.classList.contains('styleset-gallery');
+    const tiles = node.querySelectorAll('.rgallery-track .styleset-cell').length;
+    const hasNav = !!node.querySelector('.rgallery-nav.prev') && !!node.querySelector('.rgallery-nav.next');
+    const hasMore = !!node.querySelector('.rgallery-more');
+    return (isCarousel && tiles >= 5 && hasNav && hasMore) || ('carousel=' + isCarousel + ' tiles=' + tiles + ' nav=' + hasNav + ' more=' + hasMore);
+  });
+  await t('[design] Themes gallery has Word’s full list (≥20) + Reset/Browse/Save footer', () => {
+    window.WC.Commands.run({ cmd: 'themes', type: 'dropdown' }, document.body);
+    const fly = document.querySelector('.flyout');
+    const labels = fly ? Array.from(fly.querySelectorAll('.fly-item .fi-label')).map((l) => l.textContent) : [];
+    const hasReset = labels.some((l) => /Reset to Theme from Template/.test(l));
+    const hasBrowse = labels.some((l) => /Browse for Themes/.test(l));
+    const hasSave = labels.some((l) => /Save Current Theme/.test(l));
+    window.WC.closeFlyouts();
+    return (window.WC.Design.THEMES.length >= 20 && hasReset && hasBrowse && hasSave)
+      || ('themes=' + window.WC.Design.THEMES.length + ' reset=' + hasReset + ' browse=' + hasBrowse + ' save=' + hasSave);
+  });
+  await t('[design] Page Color opens the colour picker (No Color / More Colors), not hardcoded white', () => {
+    window.WC.Commands.run({ cmd: 'pageColor', type: 'dropdown' }, document.body);
+    const fly = document.querySelector('.flyout');
+    const txt = fly ? fly.textContent : '';
+    const ok = /No Color/.test(txt) && /More Colors/.test(txt);
+    window.WC.closeFlyouts();
+    return ok || 'pageColor did not open a colour picker';
+  });
+  await t('[design] Colors & Fonts dropdowns include a Customize… footer', () => {
+    window.WC.Commands.run({ cmd: 'colors', type: 'dropdown' }, document.body);
+    let fly = document.querySelector('.flyout');
+    const colorsOk = !!fly && /Customize Colors/.test(fly.textContent);
+    window.WC.closeFlyouts();
+    window.WC.Commands.run({ cmd: 'fonts', type: 'dropdown' }, document.body);
+    fly = document.querySelector('.flyout');
+    const fontsOk = !!fly && /Customize Fonts/.test(fly.textContent);
+    window.WC.closeFlyouts();
+    return (colorsOk && fontsOk) || ('colors=' + colorsOk + ' fonts=' + fontsOk);
+  });
   await t('[11] setThemeColors survives (bridge/design.ts dep)', () => typeof window.WC.setThemeColors === 'function');
   await t('[11] Draw pen registry survives', () => Array.isArray(window.WC.Draw.PENS) && window.WC.Draw.PENS.length > 0 && Array.isArray(window.WC.Draw.customPens));
   await t('[11] Ref shared-state slots survive', () => typeof window.WC.Ref.citationStyle === 'string' && Array.isArray(window.WC.Ref.sources));

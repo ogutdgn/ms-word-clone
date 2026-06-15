@@ -301,6 +301,23 @@
 }
 .style-cell:hover { border-color: var(--word-blue); }
 .style-cell.active { border-color: var(--word-blue); box-shadow: inset 0 0 0 1px var(--word-blue); }
+/* Design Style Set inline gallery — mini document previews (Title/Heading/body). */
+.styleset-cell {
+  flex: 0 0 auto; width: 64px; height: 52px; border: 1px solid #e3e3e3; border-radius: 2px;
+  background: #fff; cursor: pointer; overflow: hidden; padding: 4px 5px;
+}
+.styleset-cell:hover { border-color: var(--word-blue); }
+.styleset-cell.active { border-color: var(--word-blue); box-shadow: inset 0 0 0 1px var(--word-blue); }
+.styleset-cell .ss-doc { display: flex; flex-direction: column; gap: 2px; }
+.styleset-cell.ss-center .ss-doc { align-items: center; }
+.styleset-cell .ss-title { font-size: 9px; font-weight: 700; line-height: 1.1; padding: 0 2px; border-radius: 1px; }
+.styleset-cell .ss-head { font-size: 6.5px; font-weight: 600; line-height: 1.1; }
+.styleset-cell .ss-line { height: 2px; align-self: stretch; background: #e2e2e2; border-radius: 1px; }
+.styleset-cell .ss-line.short { width: 60%; align-self: auto; }
+.styleset-cell.ss-center .ss-line.short { align-self: center; }
+.styleset-gallery .ss-grid-expanded { display: grid; grid-template-columns: repeat(4, 90px); gap: 6px; margin-bottom: 2px; }
+.styleset-gallery .ss-grid-expanded .styleset-cell { width: 90px; height: 64px; }
+
 /* Expanded Quick Styles gallery (the "More" flyout) — Word's full grid + commands. */
 .flyout.styles-flyout { padding: 6px; min-width: 0; }
 .styles-flyout .styles-grid-expanded { display: grid; grid-template-columns: repeat(4, 92px); gap: 4px; margin-bottom: 2px; }

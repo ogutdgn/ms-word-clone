@@ -157,6 +157,10 @@
         // user screenshot). Row 1 = lists + indents + sort + show/hide; row 2 =
         // alignment + line spacing + shading + borders.
         this.renderParagraphGroupBody(body, group);
+      } else if (group.id === 'document-formatting') {
+        // Design Document Formatting: Themes button, then the big inline Style Set
+        // carousel (Word's dominant element), then Colors/Fonts/Spacing/Set-as-Default.
+        this.renderDesignFormattingGroup(body, group);
       } else {
         // Pens gallery: inline pen tiles (Word shows the pens directly in the ribbon)
         if (gallery && group.id === 'pens') body.appendChild(this.renderPensGallery(gallery));
@@ -374,6 +378,73 @@
         }, { align: 'right' });
       };
       return this.makeGalleryCarousel(styles.map(cell), { className: 'styles-gallery', onMore: openMore });
+    },
+
+    // Design tab "Document Formatting": the Themes button, then the big inline
+    // Style Set gallery carousel (Word's dominant element), then the small
+    // Colors / Fonts / Paragraph Spacing / Effects / Set as Default controls.
+    renderDesignFormattingGroup(body, group) {
+      const themes = group.controls.find((c) => c.cmd === 'themes');
+      const gallery = group.controls.find((c) => c.cmd === 'styleSet');
+      const rest = group.controls.filter((c) => c !== themes && c !== gallery && c.type !== 'combo');
+      if (themes) body.appendChild(this.renderControl(themes, 'large'));
+      if (gallery) body.appendChild(this.renderDesignStyleSetGallery(gallery));
+      for (let i = 0; i < rest.length; i += 3) {
+        const stack = el('div', { class: 'ctrl-stack' });
+        rest.slice(i, i + 3).forEach((c) => {
+          const row = el('div', { class: 'ctrl-row' });
+          row.appendChild(this.renderControl(c, 'small', { labeled: true }));
+          stack.appendChild(row);
+        });
+        body.appendChild(stack);
+      }
+    },
+
+    // The inline Style Set gallery — mini document previews (Title / Heading / body),
+    // varied per set, clicked to apply. The ▾ More opens the full grid + Reset/Save.
+    renderDesignStyleSetGallery(c) {
+      const sets = (WC.Design && WC.Design.STYLE_SETS) ? WC.Design.STYLE_SETS : [];
+      const variant = (name) => {
+        const n = String(name).toLowerCase();
+        return {
+          accent: /elegant|black|word 2010/.test(n) ? '#222' : '#2b579a',
+          caps: /distinctive|lines|shaded/.test(n),
+          underline: /lines/.test(n),
+          center: /centered/.test(n),
+          shaded: /shaded/.test(n),
+        };
+      };
+      const cell = (name) => {
+        const v = variant(name);
+        const node = el('div', { class: 'styleset-cell' + (v.center ? ' ss-center' : ''), title: name, dataset: { styleset: name } });
+        const docp = el('div', { class: 'ss-doc' });
+        const title = el('div', { class: 'ss-title', text: 'Title' });
+        title.style.color = v.shaded ? '#fff' : v.accent;
+        if (v.shaded) title.style.background = v.accent;
+        const head = el('div', { class: 'ss-head', text: v.caps ? 'HEADING 1' : 'Heading 1' });
+        head.style.color = v.accent;
+        if (v.underline) head.style.borderBottom = '1px solid ' + v.accent;
+        docp.appendChild(title); docp.appendChild(head);
+        docp.appendChild(el('div', { class: 'ss-line' }));
+        docp.appendChild(el('div', { class: 'ss-line' }));
+        docp.appendChild(el('div', { class: 'ss-line short' }));
+        node.appendChild(docp);
+        node.addEventListener('mousedown', (e) => e.preventDefault());
+        node.addEventListener('click', () => { if (WC.PM && WC.PM.deApplyStyleSet) WC.PM.deApplyStyleSet(name); if (WC.closeFlyouts) WC.closeFlyouts(); });
+        return node;
+      };
+      const openMore = (anchor) => {
+        WC.flyout(anchor, (fly) => {
+          fly.classList.add('styles-flyout');
+          const fg = el('div', { class: 'ss-grid-expanded' });
+          sets.forEach((name) => fg.appendChild(cell(name)));
+          fly.appendChild(fg);
+          fly.appendChild(WC.flySep());
+          fly.appendChild(WC.flyItem('Reset to the Default Style Set', { onClick: () => { if (WC.PM && WC.PM.deApplyStyleSet) WC.PM.deApplyStyleSet('Default'); } }));
+          fly.appendChild(WC.flyItem('Save as a New Style Set…', { onClick: () => WC.notImplemented('Save as a New Style Set') }));
+        }, { align: 'right' });
+      };
+      return this.makeGalleryCarousel(sets.map(cell), { className: 'styleset-gallery', onMore: openMore });
     },
 
     renderSpinner(c) {
