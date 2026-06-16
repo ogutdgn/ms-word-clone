@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — pagination caret fix + AutoFit Contents (4d.5) DONE; AutoFit trio complete)
+## 2026-06-16 (RESUME HERE — image stretch/render+export fix DONE; pagination + AutoFit trio + image-fidelity all solid)
+
+> **Branch:** `main` (image fix merged PR #59 `cbb7725`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 434 / smoke 9 / roundtrip 27.**
+>
+> **Image stretch/divergent-box fix (PR #59) — render+export half of §A.1c CLOSED:** a picture whose
+> stored box diverged from its intrinsic aspect (a stretched image, or one imported from Word) was
+> aspect-forced in BOTH render (`height:auto`) and export (a legacy "scale to intrinsic PNG aspect"
+> step collapsed a 240×60 box to 60×60). Fixed: the `size` renderDOM emits the literal height when both
+> dims are stored; the exporter SKIPS the aspect-scaling when the model has an explicit box. `/code-review`
+> caught a REGRESSION (honoring boxes exposed the bridge's 100×100 placeholder for dimensionless inserts
+> — Insert→Screenshot — which the export aspect-correction used to mask, so screenshots would ship
+> squashed). Root-fixed: the bridge `insertImage` now computes NATURAL dims (sync
+> `readImageDimensionsFromDataUri`, clamped to the text column) instead of the placeholder. Re-review +
+> hardening (single-dim honored, 0-px floor, padding-aware clamp). Oracle `read-shapes`: a 240×60 box →
+> Word renders 180pt×45pt (stretched, not forced). 2 new `[4b]` tests. **STILL deferred (§A.1c):** the
+> overlay EDGE-handle free-stretch UI + a Lock-Aspect-Ratio control (Word gates free-stretch on that
+> checkbox) — the render/export now honor a divergent box, so this is just the interaction UI.
+>
+> **State of the layout engine:** pagination solid (caret bug fixed + exhaustively audited), AutoFit
+> trio complete, image fidelity (resize + stretch + dimensionless sizing) solid. **NEXT (the big
+> remaining pieces all need a focused/fresh session — deferrals §A.1b/d/e):**
+>   1. **The FRAMES-OVERLAY / paged-layout rework** — the keystone that unblocks line-split coords-safe
+>      render, table row-split (a tall table still overflows the gap — reproduced), AND faithful floating
+>      image/shape reposition + render z-stacking. Highest leverage.
+>   2. **4e headers/footers + fields** (currently blocked).
+>   3. Smaller: the image free-stretch overlay UI + Lock-Aspect control (§A.1c interaction half).
+> Branch off `main`. **Session is VERY long — a fresh session is strongly recommended.**
+
+---
+
+## 2026-06-16 (pagination caret fix + AutoFit Contents (4d.5) DONE; AutoFit trio complete)
 
 > **Branch:** `main` (caret Fix A merged PR #54 `11909cd`; AutoFit Contents merged PR #56 `c70c1fb`;
 > branches deleted). **Phase:** 4 (layout engine). Gates: **PM 432 / smoke 9 / roundtrip 27.**

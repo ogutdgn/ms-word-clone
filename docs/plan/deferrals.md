@@ -154,13 +154,16 @@
 > The 4b overlay does live, aspect-locked, oracle-validated image resize. These edges are
 > deferred (none affect the common corner-drag-resize-a-picture path).
 
-- **Free (one-axis) stretch is not supported; `lockAspectRatio` is not read.** All 8 handles
-  resize PROPORTIONALLY (height = width / aspect), which is Word's default
-  (`a:picLocks/@noChangeAspect`). Word lets the user UNCHECK "Lock aspect ratio" and stretch a
-  single axis with an edge handle — the clone always locks, and the `node.attrs.lockAspectRatio`
-  attr is currently ignored. Free-stretch also needs the fork's image `size` renderDOM to honor an
-  explicit height (it emits `height: auto` today), and the exporter to emit the model height for a
-  data-URI image even when it diverges from the intrinsic aspect. → a 4b follow-up.
+- **Free (one-axis) stretch: RENDER+EXPORT FIXED 2026-06-16 (PR #59); the overlay UI + Lock-Aspect
+  control remain.** The fork image `size` renderDOM now emits the literal `height:Npx` when both dims
+  are stored (was `height:auto`), and the exporter honors an explicit divergent box (skips the legacy
+  intrinsic-aspect scaling) — so a stretched/divergent-box picture round-trips correctly (oracle:
+  240×60 box → Word 180pt×45pt, not aspect-forced). Also fixed the bridge's 100×100 placeholder for
+  dimensionless inserts (Insert→Screenshot now sizes to natural dims). **STILL deferred:** the resize
+  OVERLAY still resizes all 8 handles PROPORTIONALLY (Word's default, `a:picLocks/@noChangeAspect`);
+  to let the user free-stretch a single axis with an edge handle, the overlay must read
+  `node.attrs.lockAspectRatio` (default true) and a Lock-Aspect-Ratio UI control (Word gates
+  free-stretch on that checkbox) must set it. Render/export are ready; this is the interaction half.
 - **Inline images are TOP-LEFT (flow) anchored, not opposite-corner anchored.** An inline image
   resizes from its text-flow position, so the SE / E / S handles feel natural (grow down-right) while
   the NW / N / W handles are size-only (the top-left stays pinned, matching the inline box). True
