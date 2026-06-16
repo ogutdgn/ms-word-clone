@@ -109,9 +109,12 @@ export function handleTableCellNode({
     }
   }
 
-  // Vertical Align
+  // Vertical Align. The node attr `verticalAlign` is the CSS `vertical-align` value (the cell's
+  // renderDOM uses it verbatim), but OOXML w:vAlign/@w:val uses the ST_VerticalJc enum where CENTER
+  // is `center` (CSS uses `middle`). Map OOXML `center` → CSS `middle` so an imported centered cell
+  // actually renders centered (and round-trips — the exporter maps `middle` back to `center`).
   const verticalAlign = tableCellProperties.vAlign;
-  if (verticalAlign) attributes['verticalAlign'] = verticalAlign;
+  if (verticalAlign) attributes['verticalAlign'] = verticalAlign === 'center' ? 'middle' : verticalAlign;
 
   // Cell Margins
   attributes.cellMargins = getTableCellMargins(tableCellProperties.cellMargins, referencedStyles);
