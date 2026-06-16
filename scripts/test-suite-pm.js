@@ -2140,7 +2140,11 @@
     if (!m) return 'no <wp:extent> in exported XML';
     const okCx = Math.abs(+m[1] - Math.round(180 * 9525)) <= 9525;
     const okCy = Math.abs(+m[2] - Math.round(50 * 9525)) <= 9525;
-    return (okCx && okCy) || ('extent cx=' + m[1] + ' cy=' + m[2] + ' vs 180x50');
+    if (!okCx || !okCy) return 'extent cx=' + m[1] + ' cy=' + m[2] + ' vs 180x50';
+    // An absurd dimension is bounded to MAX_DIM (4000) — the numeric path can't exceed the drag overlay.
+    PM().setImageSize({ height: 10000 }); await sleep(60); selectImage();
+    s = imgSize();
+    return (s && s.height === 4000 && s.width === 180) || 'height not capped at MAX_DIM=4000: ' + JSON.stringify(s);
   });
 
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };

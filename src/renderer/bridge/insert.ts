@@ -385,9 +385,14 @@ export function installInsert(editor: AnyEditor) {
       if (givenW) h = Math.round(w / aspect)
       else if (givenH) w = Math.round(h * aspect)
     }
-    // Clamp width to the editable content column (mirrors the resize overlay's upper bound).
+    // Clamp width to the editable content column (mirrors the resize overlay's upper bound), then
+    // bound both dims to the overlay's MAX_DIM so the numeric path can't produce a box the drag
+    // overlay couldn't (re-derive the partner when locked so the cap keeps the ratio).
+    const MAX_DIM = 4000
     const maxW = (editor.view?.dom as HTMLElement)?.clientWidth || 0
     if (maxW > 1 && w > maxW) { w = Math.round(maxW); if (locked && aspect > 0) h = Math.round(w / aspect) }
+    if (w > MAX_DIM) { w = MAX_DIM; if (locked && aspect > 0) h = Math.round(w / aspect) }
+    if (h > MAX_DIM) { h = MAX_DIM; if (locked) w = Math.round(h * aspect) }
     w = Math.max(1, w); h = Math.max(1, h)
     if (w === curW && h === curH) { refocus(); return true } // no change
     try {
