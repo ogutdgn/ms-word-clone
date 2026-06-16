@@ -2549,6 +2549,23 @@
     });
     return hasNode('bookmarkStart') && hasNode('bookmarkEnd') && startId != null && startId === endId && name === 'spot1';
   });
+  await t('[6] EXPORT: insertBookmark → paired <w:bookmarkStart w:name w:id> + <w:bookmarkEnd> (same id; Word: Bookmarks.Exists)', async () => {
+    // The test above covers the live NODES; this guards the EXPORT — a paired bookmarkStart/bookmarkEnd
+    // with the SAME id and the name, the structure Word needs. Word COM-validated: Bookmarks.Count=1,
+    // .Exists("spot1")=true, .Item("spot1").Name="spot1" (oracle-probe-6-bookmark.js + validate-bookmark-win.ps1).
+    setDoc('mark this range'); selectText('this range'); await sleep(60);
+    PM().insertBookmark({ name: 'spot1' }); await sleep(120);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const start = (xml.match(/<w:bookmarkStart\b[^>]*\/?>/) || [])[0];
+    const end = (xml.match(/<w:bookmarkEnd\b[^>]*\/?>/) || [])[0];
+    if (!start) return 'no <w:bookmarkStart> in export';
+    if (!end) return 'no <w:bookmarkEnd> in export';
+    if (!/w:name="spot1"/.test(start)) return 'bookmarkStart w:name not "spot1": ' + start;
+    const startId = (start.match(/w:id="([^"]*)"/) || [])[1];
+    const endId = (end.match(/w:id="([^"]*)"/) || [])[1];
+    if (startId == null || startId !== endId) return 'bookmarkStart/End ids mismatch (start=' + startId + ' end=' + endId + ') — Word drops an unpaired bookmark';
+    return true;
+  });
   await t('[6] listBookmarks returns inserted bookmarks; goToBookmark finds one', async () => {
     setDoc('alpha beta gamma'); selectText('beta');
     PM().insertBookmark({ name: 'bk_beta' }); await sleep(80);
