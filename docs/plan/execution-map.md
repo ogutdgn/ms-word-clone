@@ -450,6 +450,15 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (bookmark export test, `/loop` 5-min cadence)
+- [x] **Bookmark export test (PR #102 `c3166eb`)** — scout-v3 #2. New `[6]` test: paired `<w:bookmarkStart
+  w:name w:id>` + `<w:bookmarkEnd>` (same id) + probe + reusable `validate-bookmark-win.ps1`. **Word
+  COM-validated:** Bookmarks.Count=1, .Exists("spot1")=true, .Name="spot1". `/code-review` clean.
+  Gates: **PM 459 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** v3 #4 char-format matrix (underline-style / font size / color / rFonts / sub-sup — clean
+  COM lock-ins; underline-style has the enum-mapping fidelity risk). #3 highlight over-exposure = real bug,
+  UX-fix judgment (steer). Bigger items (a14 / frames-overlay / 4e headers) need a steered session.
+
 ### 2026-06-16 (hyperlink export test, `/loop` 5-min cadence)
 - [x] **Hyperlink export test (PR #100 `6cd1647`)** — scout-v3 #1. New `[6]` test: `<w:hyperlink r:id>` +
   External `<Relationship>` (Target=url, TargetMode=External) in document.xml.rels + probe + reusable

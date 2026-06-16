@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — hyperlink export test DONE (PR #100); scout-v3 #1 shipped; next = #2 bookmark / #4 char-format)
+## 2026-06-16 (RESUME HERE — bookmark export test DONE (PR #102); scout-v3 #1+#2 shipped; next = #4 char-format matrix)
+
+> **Branch:** `main` (bookmark test merged PR #102 `c3166eb`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 459 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Bookmark export test — DONE (PR #102):** took **scout-v3 #2**. `insertBookmark` was wired but
+> export-untested. Added a `[6]` test: paired `<w:bookmarkStart w:name="spot1" w:id="N"/>` +
+> `<w:bookmarkEnd w:id="N"/>` (same id) + `oracle-probe-6-bookmark.js` + reusable `validate-bookmark-win.ps1`.
+> **🔬 Word COM-validated:** opens clean, `Bookmarks.Count=1`, `.Exists("spot1")=true`, `.Item("spot1").Name=
+> "spot1"`. `/code-review` clean (no findings).
+>
+> **🗂️ SCOUT BACKLOG v3 (updated — pick next):**
+>   1. ~~Hyperlink export+COM~~ **DONE (PR #100).**  2. ~~Bookmark export+COM~~ **DONE (PR #102).**
+>   3. **HIGHLIGHT color over-exposure (REAL fidelity bug)** — non-keyword highlight swatches export as
+>      `w:shd` not `w:highlight` → Word `wdNoHighlight`. Fix = restrict the picker to Word's 15
+>      ST_HighlightColor keywords (a UX change — judgment call; consider steering with the user).
+>   4. **Character-format export+COM matrix — RECOMMENDED NEXT.** A batch of clean lock-ins, each a near-clone
+>      of validate-cellshading: **font color** (Font.Color RGB long, FF0000→255; catches BGR swap), **font
+>      size** (w:sz is HALF-points: 20pt→w:sz=40; Font.Size==20), **rFonts** (Font.Name), **underline style**
+>      (Font.Underline wdUnderline enum — the CSS→OOXML `dashed→dash`/`wavy→wave` mapping has a fidelity
+>      RISK, most likely to catch a bug), **sub/superscript** (Font.Subscript/Superscript). Pick one per slice.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness (multilevel mints abstractNum).
+>
+> **NEXT:** v3 #4 — start with **underline-style** (highest fidelity risk: CSS→OOXML enum map) or **font size**
+> (half-points, very high-use). Then font color / rFonts / sub-sup as further clean lock-ins. #3 highlight is a
+> real bug but its fix is a UX judgment call (restrict the picker) — flag for a steered decision. The bigger
+> items (a14 picture effects / frames-overlay / 4e headers) still need a STEERED focused session. spawn_tasks
+> (NOT loop work): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (hyperlink export test DONE (PR #100); scout-v3 #1 shipped; next = #2 bookmark / #4 char-format)
 
 > **Branch:** `main` (hyperlink test merged PR #100 `6cd1647`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 458 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
