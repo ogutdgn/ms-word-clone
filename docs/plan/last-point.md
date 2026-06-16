@@ -7,7 +7,37 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — Phase 4b IMAGE RESIZE COMPLETE + merged; 4c (floating) next)
+## 2026-06-16 (RESUME HERE — Phase 4c.1 TEXT WRAP COMPLETE + merged; 4c.2 drag-reposition next)
+
+> **Branch:** `main` (4c.1 merged via PR #42 `4bbdb51`; branch deleted). **Phase:** 4 (layout
+> engine); **4a pagination + 4b image resize + 4c.1 text-wrap are DONE**, all oracle-validated.
+> Sub-phase **4c.2 (drag-to-reposition the floating image) is NEXT** — branch off `main`.
+>
+> **4c.1 done (PR #42):** the ribbon **Wrap Text** menu now works. `WC.PM.setImageWrap(mode)`
+> (`bridge/insert.ts`) maps inline/square/tight/through/topbottom/behind/front → the image's
+> `wrap`+`isAnchor` attrs (one setNodeMarkup). The fork ALREADY renders wrap (float/shape-outside/
+> absolute → real reflow) and round-trips it; the gap was the ribbon calling a never-defined
+> `WC.Layout` stub (commands.js re-pointed to `WC.PM.setImageWrap`). KEY FIX: the fork's anchor
+> exporter (`translate-anchor-node.js`) now emits a schema-valid `CT_Anchor` for a GENERATED
+> (inline→floating) anchor — always a `<wp:simplePos>` child + the required attrs
+> (simplePos/behindDoc/locked/layoutInCell/allowOverlap); without them **Word refused to open the
+> file**. For tight/through, `setImageWrap` seeds a default bounding-box `wp:wrapPolygon` (CT_WrapTight
+> requires one). Oracle (`read-shapes`): all 6 floating modes OPEN in Word as floatingShapes.
+> Code-reviewed (no correctness bugs); edges in deferrals.md §A.1d.
+>
+> **Gates on main: PM 419 / smoke 9 / roundtrip 27.**
+>
+> **NEXT — sub-phase 4c.2 (drag-to-reposition)** then **4c.3 (z-order)**: branch
+> `build/phase-4c2-reposition` off `main`. Build a frames overlay (MIRROR the 4b resize overlay in
+> `src/renderer/imageresize/`, mounted in `#pages`) that drags a FLOATING image and writes
+> `marginOffset` (→ `wp:posOffset` EMU); validate the exported position vs the oracle (`read-shapes`).
+> NOTE: when a custom `marginOffset` exists, reset it on inline-toggle (the §A.1d latent note).
+> 4c.3 = wire Bring Forward/Send Backward → mutate the image `relativeHeight` attr (the ribbon items
+> still call the retired `WC.Layout.*` → throw). Then 4d tables → 4e headers/footers → 4f.
+
+---
+
+## 2026-06-15 (Phase 4b IMAGE RESIZE COMPLETE + merged; 4c (floating) next)
 
 > **Branch:** `main` (4b merged via PR #40 `6d8c448`; branch deleted). **Phase:** 4 (layout
 > engine); **4a pagination + 4b image resize are both DONE**, all oracle-validated. Sub-phase
