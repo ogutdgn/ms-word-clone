@@ -327,6 +327,7 @@ export function preinstallBridge() {
     removeBookmark: () => false, renameBookmark: () => false,
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
+    setImageWrap: () => false, // Phase 4c pre-mount stub (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
     insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,
     tableDeleteRow: () => false, tableDeleteColumn: () => false, tableDeleteTable: () => false,

@@ -9,7 +9,7 @@
 // NOTE: the fork's editor.chain() does NOT support .focus() as a chain step.
 // Focus is restored after each operation via editor.view?.focus() (same pattern as commands.ts).
 
-import { TextSelection } from '@/pm'
+import { TextSelection, NodeSelection } from '@/pm'
 
 type AnyEditor = any
 
@@ -204,7 +204,72 @@ export function installInsert(editor: AnyEditor) {
     return ok !== false
   }
 
+  // The currently NodeSelection-selected image, or null. (Wrap/position/z-order all act
+  // on the selected picture — the same NodeSelection the resize overlay keys on.)
+  function selectedImage(): { node: any; pos: number } | null {
+    const sel = editor.state.selection
+    if (sel?.node?.type?.name === 'image') return { node: sel.node, pos: sel.from }
+    return null
+  }
+
+  // Phase 4c — text wrap / floating. Maps the ribbon "Wrap Text" modes to the image's
+  // `wrap` + `isAnchor` attrs (the fork's renderDOM already turns these into float/
+  // shape-outside/absolute, and the exporter into wp:anchor + the wrap element). Done as a
+  // single setNodeMarkup (not the fork setWrapping command) so we can ALSO seed a valid
+  // anchorData + marginOffset for floating types — without positionH/V the exported
+  // wp:anchor is schema-incomplete. Word default square inset = 0.13" L/R (~12px).
+  function setImageWrap(mode: string): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then choose how text wraps around it.'); return false }
+    const SPECS: Record<string, { type: string; attrs: Record<string, any> }> = {
+      inline: { type: 'Inline', attrs: {} },
+      square: { type: 'Square', attrs: { wrapText: 'bothSides', distLeft: 12, distRight: 12 } },
+      tight: { type: 'Tight', attrs: { distLeft: 12, distRight: 12 } },
+      through: { type: 'Through', attrs: { distLeft: 12, distRight: 12 } },
+      topbottom: { type: 'TopAndBottom', attrs: {} },
+      behind: { type: 'None', attrs: { behindDoc: true } },
+      front: { type: 'None', attrs: { behindDoc: false } },
+    }
+    const spec = SPECS[mode]
+    if (!spec) return false
+    const wrapAttrs: Record<string, any> = { ...spec.attrs }
+    // CT_WrapTight/CT_WrapThrough REQUIRE a <wp:wrapPolygon> — without one Word refuses to
+    // open the file. For a plain rectangular image, default to the bounding-box polygon (px
+    // corners; objToPolygon closes it), exactly as Word does until the user edits the points.
+    if (spec.type === 'Tight' || spec.type === 'Through') {
+      const sz = sel.node.attrs.size || {}
+      const w = sz.width > 0 ? sz.width : 100
+      const h = sz.height > 0 ? sz.height : 100
+      wrapAttrs.polygon = [[0, 0], [w, 0], [w, h], [0, h]]
+    }
+    const next: Record<string, any> = {
+      ...sel.node.attrs,
+      wrap: { type: spec.type, attrs: wrapAttrs },
+      isAnchor: spec.type !== 'Inline',
+    }
+    if (spec.type === 'Inline') {
+      // Back to in-line with text: drop the anchor framing so export emits wp:inline.
+      next.anchorData = null
+    } else {
+      // Seed a column/paragraph-relative anchor + zero offset if the image has none yet,
+      // so the exported wp:anchor carries positionH/positionV (drag-reposition = 4c.2).
+      if (!next.anchorData) next.anchorData = { hRelativeFrom: 'column', vRelativeFrom: 'paragraph' }
+      const mo = next.marginOffset || {}
+      if (mo.horizontal == null && mo.top == null) next.marginOffset = { horizontal: 0, top: 0 }
+    }
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, next, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* keep the image selected; best-effort */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false // stale/invalid selection (e.g. the node moved under us) — never throw
+    }
+    refocus()
+    return true
+  }
+
   return {
+    setImageWrap,
     insertLink,
     removeLink,
     insertImage,
