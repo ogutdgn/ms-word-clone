@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (w:tcPr child-order CT_TcPr fix, `/loop`)
+- [x] **w:tcPr child-order fix (PR #82 `6d42e34`)** — scout-backlog #5. `tcPr-translator.js` passes a
+  `TCPR_XML_ORDER` (CT_TcPr §17.4.66 sequence) so decoded cell-prop children stable-sort to schema order on
+  export (mirror of the PR #77 `tblPr` fix). Reproduced the out-of-order export (`<w:tcBorders>` before
+  `<w:tcW>`; the exporter migrates `attrs.borders` LAST). 1 `[4d]` test (red pre-fix) +
+  `oracle-probe-4d-tcorder.js` + new reusable `scripts/oracle/validate-open-win.ps1`. `/code-review high`
+  clean. Gates: **PM 449 / smoke 9 / roundtrip 27**.
+- [x] **🔬 Word-tolerance finding (re-ranks scout #5):** COM-validated that live Word 16 TOLERATES the
+  out-of-order `w:tcPr` (opens clean, `savedOnOpen=true`, no repair; control corrupt file correctly rejected).
+  So this shipped as OOXML spec-compliance + `tblPr` consistency, NOT a Word-crash fix. LESSON re-confirmed:
+  COM-validate before trusting a corruption hypothesis.
+- [ ] **NEXT:** scout #3 (cell margins stub → wire the inches flyout — recommended) or #2 (picture effects).
+
 ### 2026-06-16 (Table cell vAlign fix via ultracode scout, `/loop`)
 - [x] **Ultracode parallel-SCOUT workflow** (6 agents) ranked wired-but-untested table/image features by
   latent-Word-bug risk. Top hit → fixed; backlog recorded in last-point.md (picture effects, cell margins
