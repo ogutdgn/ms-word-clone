@@ -2250,11 +2250,13 @@ export const Table = Node.create({
       ...(resizable
         ? [
             columnResizing({
-              // Disable PM's visual handles (custom overlay handles resizing)
-              // Set to 0 to prevent PM from rendering its own resize handles
-              // while keeping transaction helpers and constraint logic
+              // Phase 4d: enable prosemirror-tables' built-in column resize — hover a column
+              // border → col-resize cursor → drag updates the cells' `colwidth` (px) live, and
+              // on release it persists (the exporter writes it back as w:gridCol + w:tcW). This
+              // is Word's drag-the-border behaviour. (Was 0, which disabled the hit-zone for a
+              // custom overlay that was never built, so resize didn't work at all.)
               // @ts-expect-error - Options types will be fixed in TS migration
-              handleWidth: 0,
+              handleWidth: 5,
               // @ts-expect-error - Options types will be fixed in TS migration
               cellMinWidth: this.options.cellMinWidth,
               // @ts-expect-error - Options types will be fixed in TS migration

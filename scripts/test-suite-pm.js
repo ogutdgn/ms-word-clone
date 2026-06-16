@@ -2162,6 +2162,44 @@
     doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
     return hasNode('table') && rows === 3 && cols === 4;
   });
+  await t('[4d] column resize is armed: hovering a column border sets the resize handle', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(200);
+    const cell = document.querySelector('#pm-editor .ProseMirror table tr td, #pm-editor .ProseMirror table tr th');
+    if (!cell) return 'no table cell rendered';
+    // The columnResizing plugin's state carries `activeHandle` (-1 = none, >=0 = armed).
+    const activeHandle = () => { const st = v().state; for (const pl of st.plugins) { try { const s = pl.getState && pl.getState(st); if (s && typeof s === 'object' && 'activeHandle' in s) return s.activeHandle; } catch (e) {} } return 'no-plugin'; };
+    if (activeHandle() === 'no-plugin') return 'columnResizing plugin not present';
+    const r = cell.getBoundingClientRect();
+    const mm = (x, y) => cell.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window }));
+    mm(r.right - 2, r.top + r.height / 2); await sleep(60); // hover the right border → arm
+    const armed = activeHandle();
+    mm(r.left + 10, r.top + r.height / 2); await sleep(60); // mid-cell → disarm
+    const disarmed = activeHandle();
+    if (!(typeof armed === 'number' && armed >= 0)) return 'border hover did not arm the resize handle (handleWidth disabled?): ' + armed;
+    return disarmed === -1 || 'mid-cell did not disarm: ' + disarmed;
+  });
+
+  await t('[4d] a resized column exports as w:gridCol/w:tcW (colwidth round-trips)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    // Set the first column's cells to 180px (what a resize-drag writes) via setNodeMarkup;
+    // in a 2-col table the first cell of each row is at even indices [0, 2].
+    const cells = []; doc().descendants((n, pos) => { if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') cells.push({ pos, node: n }); });
+    if (cells.length < 4) return 'expected 4 cells, got ' + cells.length;
+    const col1Before = cells[1].node.attrs.colwidth && cells[1].node.attrs.colwidth[0]; // unresized column (insertTable default)
+    let tr = v().state.tr;
+    for (const idx of [0, 2]) tr = tr.setNodeMarkup(cells[idx].pos, undefined, { ...cells[idx].node.attrs, colwidth: [180] });
+    v().dispatch(tr); await sleep(150);
+    let xml;
+    try { xml = await window.WC.editor.exportDocx({ exportXmlOnly: true }); } catch (e) { return 'export threw: ' + String(e); }
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    if (gridCols.length < 2) return 'expected 2 <w:gridCol>, got ' + JSON.stringify(gridCols);
+    // The resized column 0 = 180px → 2700 twips (1px = 15 twips @96dpi); column 1 keeps its
+    // own (insertTable default) width, distinct from column 0.
+    const okCol0 = gridCols[0] === 180 * 15;
+    const okCol1 = gridCols[1] === (col1Before || 0) * 15 && gridCols[1] !== gridCols[0];
+    return (okCol0 && okCol1) || 'gridCol twips wrong: ' + JSON.stringify(gridCols) + ' (col0 want ' + (180 * 15) + ', col1 want ' + ((col1Before || 0) * 15) + ')';
+  });
+
   // ---- migrate the legacy 9 table ops (caret-in-table) ----
   await t('[6] table addRow below grows the row count', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
