@@ -450,6 +450,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (RE-SCOUT v3 + bullet-list export test + found a real bug, `/loop` 5-min cadence)
+- [x] **#4-rPr SKIPPED** (judgment): low value (Word tolerates), CUA-adjacent (near reserved task_c62b4d4c),
+  not cleanly testable via test:pm. Pivoted to re-scout.
+- [x] **RE-SCOUT v3** (3 agents: char-format / lists / hyperlinks-bookmarks-images) → v3 queue in last-point.md.
+- [x] **Bullet-list export test (PR #98 `b1b634d`)** — new `[2]` test: bullet → `w:numPr` linked to
+  numbering.xml abstractNum (ilvl 0 numFmt bullet) + probes. **Word COM-validated:** bullet "•", numbered "1.".
+  `/code-review` clean. Gates: **PM 457 / smoke 9 / roundtrip 27**.
+- [x] **🐞 FOUND + FLAGGED a real bug (spawn_task `task_eb50ae00`):** bullet-then-numbered adjacent paras →
+  the bullet loses its marker (COM "no numbering"). Robust repro `oracle-probe-2-mixedlist.js`. Fork list-toggle
+  logic; not a bounded slice → focused task. **The re-scout paid off.**
+- [ ] **NEXT:** v3 #1 hyperlink export+COM (or #2 bookmark) → char-format matrix (#4); bigger items need a steered session.
+
 ### 2026-06-16 (distribute-columns geometry export test, `/loop` 5-min cadence)
 - [x] **Distribute-columns geometry export test (PR #96 `701a4a9`)** — scout-v2 #5. New `[6b]` test:
   uneven (widen col 0) → assert uneven (non-vacuous) → distribute → 3 EQUAL `<w:gridCol>` + probe +

@@ -7,7 +7,47 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — distribute-columns geometry export test DONE (PR #96); scout-v2 ≈ done → #4 then RE-SCOUT v3)
+## 2026-06-16 (RESUME HERE — bullet-list export test DONE (PR #98) via RE-SCOUT v3; found+flagged a real mixed-list BUG; v3 queue recorded)
+
+> **Branch:** `main` (lists test merged PR #98 `b1b634d`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 457 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **#4-rPr SKIPPED (judgment):** the rPr order fix is low value (Word tolerates), its out-of-order path is
+> the document-api/plan-engine `runProperties` bag (CUA-adjacent — near the reserved `task_c62b4d4c`), and
+> it's not cleanly reproducible via the `test:pm` gate (normal PM marks export rPr in fixed order). Skipped
+> to avoid low-value + reserved-task-adjacent work. Pivoted to RE-SCOUT v3.
+>
+> **RE-SCOUT v3 + bullet-list export test — DONE (PR #98):** 3 parallel agents scouted FRESH areas
+> (character-format, lists/numbering, hyperlinks/bookmarks/images). Shipped the lists pick: a `[2]` test that
+> a session-created BULLET list exports `w:numPr` linked through `word/numbering.xml` (`w:num`→`w:abstractNum`
+> whose `w:ilvl="0"` level has `w:numFmt="bullet"`) — the full chain Word needs. **🔬 Word COM-validated**
+> (read-para-props): isolated bullet → `listType "bullet"`/`"•"`, numbered → `"simple numbering"`/`"1."`. `/code-review` clean.
+>
+> **🐞 REAL BUG FOUND + FLAGGED (spawn_task `task_eb50ae00`):** a bullet paragraph followed by a numbered
+> paragraph LOSES the bullet when the numbered list is applied (model: para1 listType null; COM: "no
+> numbering", no marker). Reproduced robustly (`scripts/oracle-probe-2-mixedlist.js`; caret-by-text, not an
+> artifact). Fix is in intricate fork list-toggle logic (regression risk to working list tests) → NOT a
+> bounded loop slice → focused spawn_task. **The re-scout paid off — found a real common-scenario bug.**
+>
+> **🗂️ SCOUT BACKLOG v3 (from this re-scout — pick next):**
+>   1. **HYPERLINK export + COM (rec high) — RECOMMENDED NEXT.** `WC.PM.insertLink` → `w:hyperlink`+r:id; no
+>      COM test. Needs a small `read-hyperlinks` verb in word-oracle-win.ps1 (Hyperlinks.Count/.Address). Clean.
+>   2. **BOOKMARK export + COM (rec high)** — `WC.PM.insertBookmark` → paired `w:bookmarkStart/End`; needs a
+>      `read-bookmarks` verb (Bookmarks.Exists/.Name). Clean; can share a session with #1.
+>   3. **HIGHLIGHT color over-exposure (rec, REAL fidelity bug)** — non-keyword highlight swatches export as
+>      `w:shd` shading not `w:highlight` → Word reads `wdNoHighlight`. Fix = restrict the highlight picker to
+>      Word's 15 ST_HighlightColor keywords (a UX change — judgment call, maybe steer with user).
+>   4. **Character-format export+COM matrix** (font color/size half-points/rFonts/underline-style/sub-sup) —
+>      a batch of clean lock-ins; underline-style + highlight have the enum-mapping fidelity risk.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness (multilevel mints from-scratch abstractNum).
+>
+> **NEXT:** v3 #1 (hyperlink — cleanest core feature) or #2 (bookmark). Then the char-format matrix (#4). The
+> bigger items (a14 picture effects / frames-overlay / 4e headers) still need a STEERED focused session.
+> 2+-table corruption (`task_0e043993`), CUA vAlign (`task_c62b4d4c`), mixed-list (`task_eb50ae00`) = spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (distribute-columns geometry export test DONE (PR #96); scout-v2 ≈ done → #4 then RE-SCOUT v3)
 
 > **Branch:** `main` (distribute test merged PR #96 `701a4a9`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 456 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
