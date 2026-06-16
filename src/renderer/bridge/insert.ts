@@ -340,9 +340,30 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Toggle the selected picture's aspect-ratio lock (OOXML a:picLocks/@noChangeAspect). When
+  // unlocked, the resize overlay's edge handles free-stretch a single axis; the render + export
+  // already honor the resulting divergent box. Default (no attr) is LOCKED, matching Word.
+  function setImageLockAspect(locked: boolean): boolean {
+    const sel = selectedImage()
+    if (!sel) {
+      ;(window as any).WC?.toast?.('Select a picture first', 'Click a picture to lock or unlock its aspect ratio.')
+      return false
+    }
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, lockAspectRatio: !!locked }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
+    setImageLockAspect,
     insertLink,
     removeLink,
     insertImage,

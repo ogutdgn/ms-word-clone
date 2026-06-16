@@ -28,6 +28,7 @@ import { Extension } from '@core/Extension.js'
 export const imageResizeKey = new PluginKey('wcImageResize')
 
 const MIN_W = 16 // px — never let an image collapse to nothing (export guards >0 too)
+const MAX_DIM = 4000 // px — upper bound on a free-stretch axis (a runaway drag can't blow out layout)
 
 // 8 handles. `gx`/`gy` = fractional placement on the box (0=left/top … 1=right/bottom).
 // `dx`/`dy` = which way the handle grows the box (+1 right/down, -1 left/up, 0 fixed axis).
@@ -57,6 +58,7 @@ class ImageResizeView {
     startW: number
     startH: number
     aspect: number
+    lockAspect: boolean // image's lockAspectRatio attr (default true = Word's noChangeAspect)
     spec: HandleSpec
     startClientX: number
     startClientY: number
@@ -183,6 +185,9 @@ class ImageResizeView {
       startW,
       startH,
       aspect: startH > 0 ? startW / startH : 1,
+      // Word default = aspect LOCKED (a:picLocks/@noChangeAspect). Only an explicit `false`
+      // (e.g. an imported picture with the lock unchecked) enables free one-axis stretch.
+      lockAspect: sel.node?.attrs?.lockAspectRatio !== false,
       spec,
       startClientX: e.clientX,
       startClientY: e.clientY,
@@ -201,20 +206,36 @@ class ImageResizeView {
     const z = this.zoom()
     const dxc = (e.clientX - d.startClientX) / z
     const dyc = (e.clientY - d.startClientY) / z
-    // Aspect-locked: width is the master dimension. Corner + E/W handles drive from the
-    // horizontal delta; pure N/S handles drive from the vertical delta scaled by aspect.
-    let widthDelta: number
-    if (d.spec.dx !== 0) widthDelta = d.spec.dx * dxc
-    else widthDelta = d.spec.dy * dyc * d.aspect
     const maxW = this.maxWidth()
-    const width = Math.max(MIN_W, Math.min(maxW, d.startW + widthDelta))
-    const height = width / d.aspect
+    let width: number
+    let height: number
+    if (!d.lockAspect) {
+      // FREE stretch: each handle drives only the axes it touches — an edge handle moves one
+      // axis (the other fixed), a corner handle distorts both independently.
+      width = d.spec.dx !== 0 ? d.startW + d.spec.dx * dxc : d.startW
+      height = d.spec.dy !== 0 ? d.startH + d.spec.dy * dyc : d.startH
+      width = Math.max(MIN_W, Math.min(maxW, width))
+      height = Math.max(MIN_W, Math.min(MAX_DIM, height))
+    } else {
+      // Aspect-locked (Word default): width is the master dimension. Corner + E/W handles drive
+      // from the horizontal delta; pure N/S handles drive from the vertical delta scaled by aspect.
+      let widthDelta: number
+      if (d.spec.dx !== 0) widthDelta = d.spec.dx * dxc
+      else widthDelta = d.spec.dy * dyc * d.aspect
+      width = Math.max(MIN_W, Math.min(maxW, d.startW + widthDelta))
+      height = width / d.aspect
+    }
     d.width = width
     d.height = height
-    // Live preview (cheap DOM; the real model write happens once on pointer-up).
+    // Live preview (cheap DOM; the real model write happens once on pointer-up). Set BOTH axes —
+    // the image renderDOM now honors an explicit height, so a free-stretch previews correctly.
     d.nodeDOM.style.width = width + 'px'
+    d.nodeDOM.style.height = height + 'px'
     const innerImg = d.nodeDOM.tagName === 'IMG' ? d.nodeDOM : d.nodeDOM.querySelector('img')
-    if (innerImg && innerImg !== d.nodeDOM) (innerImg as HTMLElement).style.width = width + 'px'
+    if (innerImg && innerImg !== d.nodeDOM) {
+      ;(innerImg as HTMLElement).style.width = width + 'px'
+      ;(innerImg as HTMLElement).style.height = height + 'px'
+    }
     // Keep the overlay box tracking the preview.
     if (this.overlay) {
       this.overlay.style.width = width + 'px'

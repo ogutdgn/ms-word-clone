@@ -2021,6 +2021,49 @@
     return Math.abs(sz.width / sz.height - 2.5) < 0.2 || 'natural aspect 2.5:1 not kept, got ' + JSON.stringify(sz);
   });
 
+  await t('[4b] setImageLockAspect(false) → an edge handle free-stretches ONE axis', async () => {
+    if (typeof PM().setImageLockAspect !== 'function') return 'PM.setImageLockAspect missing (red)';
+    setDoc('fs1: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'fs1.png'); // 2:1
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    if (PM().setImageLockAspect(false) !== true) return 'setImageLockAspect returned false';
+    selectImage(); await sleep(100); // re-assert selection after the markup change
+    const before = imgSize();
+    if (!(await dragHandle('e', 60, 0))) return 'E handle not found';
+    const after = imgSize();
+    if (!(after.width > before.width + 20)) return 'E-drag did not widen (' + JSON.stringify(before) + ' -> ' + JSON.stringify(after) + ')';
+    // free one-axis stretch: width grew, height UNCHANGED (aspect diverges from the original 2:1).
+    return Math.abs(after.height - before.height) <= 2 || ('height changed on a free E-stretch (want one-axis): ' + JSON.stringify({ before, after }));
+  });
+
+  await t('[4b] an unlocked image: a N (top) handle free-stretches HEIGHT only', async () => {
+    setDoc('fs2: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'fs2.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    PM().setImageLockAspect(false); selectImage(); await sleep(120);
+    const before = imgSize();
+    if (!(await dragHandle('n', 0, -40))) return 'N handle not found';
+    const after = imgSize();
+    if (!(after.height > before.height + 15)) return 'N-drag did not grow height (' + JSON.stringify(before) + ' -> ' + JSON.stringify(after) + ')';
+    return Math.abs(after.width - before.width) <= 2 || ('width changed on a free N-stretch (want one-axis): ' + JSON.stringify({ before, after }));
+  });
+
+  await t('[4b] a LOCKED image (default) keeps aspect on an edge drag', async () => {
+    setDoc('fs3: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'fs3.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    const before = imgSize(); // default = locked (no lockAspectRatio attr → treated as locked)
+    if (!(await dragHandle('e', 60, 0))) return 'E handle not found';
+    const after = imgSize();
+    return Math.abs(after.width / after.height - before.width / before.height) < 0.06 || ('locked image distorted on E-drag: ' + JSON.stringify(after));
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

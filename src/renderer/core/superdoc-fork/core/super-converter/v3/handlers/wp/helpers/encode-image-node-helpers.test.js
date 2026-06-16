@@ -1211,7 +1211,7 @@ describe('handleImageNode', () => {
   });
 
   describe('lockAspectRatio / noChangeAspect import defaults', () => {
-    it('defaults lockAspectRatio to false when a:picLocks element is absent', () => {
+    it('defaults lockAspectRatio to true when a:picLocks element is absent (Word UI default = locked)', () => {
       const node = makeNode();
       const graphic = node.elements.find((el) => el.name === 'a:graphic');
       const picPic = graphic.elements[0].elements[0];
@@ -1228,7 +1228,9 @@ describe('handleImageNode', () => {
 
       const result = handleImageNode(node, makeParams(), false);
 
-      expect(result.attrs.lockAspectRatio).toBe(false);
+      // WC: a picture without a:picLocks is treated as aspect-locked to match Word's UI default
+      // (so the resize overlay does not free-stretch normal imported photos).
+      expect(result.attrs.lockAspectRatio).toBe(true);
     });
 
     it('sets lockAspectRatio to true when noChangeAspect="1"', () => {
