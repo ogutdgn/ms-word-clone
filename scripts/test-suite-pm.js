@@ -2206,6 +2206,31 @@
     return (gridCols[0] === 180 * 15) || 'resize dropped — gridCol still stale: ' + JSON.stringify(gridCols) + ' (col0 want 2700)';
   });
 
+  await t('[4d] a set row height exports as w:trHeight (px → twips, NUMBER, rule kept)', async () => {
+    // Guards the bug the 4d.1 review surfaced: the export reconciliation wrote the row-height
+    // value as a STRING, which the trHeight decode (typeof === 'number') silently dropped — so
+    // a set/changed row height produced NO <w:trHeight> at all. Now it's a number + keeps rule.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    let rowPos = null, rowNode = null;
+    doc().descendants((n, pos) => { if (n.type.name === 'tableRow' && rowPos == null) { rowPos = pos; rowNode = n; } });
+    if (rowPos == null) return 'no table row';
+    // Mimic setRowHeight(60,'atLeast'): top-level rowHeight px + nested {value:px, rule}.
+    v().dispatch(v().state.tr.setNodeMarkup(rowPos, undefined, {
+      ...rowNode.attrs,
+      rowHeight: 60,
+      tableRowProperties: { ...(rowNode.attrs.tableRowProperties || {}), rowHeight: { value: 60, rule: 'atLeast' } },
+    }));
+    await sleep(150);
+    let xml;
+    try { xml = await window.WC.editor.exportDocx({ exportXmlOnly: true }); } catch (e) { return 'export threw: ' + String(e); }
+    const m = xml.match(/<w:trHeight\b[^>]*\/?>/);
+    if (!m) return 'no <w:trHeight> in export (row height dropped)';
+    const val = (m[0].match(/w:val="(\d+)"/) || [])[1];
+    const rule = (m[0].match(/w:hRule="([a-zA-Z]+)"/) || [])[1];
+    // 60px → 900 twips; rule preserved as atLeast.
+    return (val === '900' && rule === 'atLeast') || 'w:trHeight wrong: ' + m[0] + ' (want w:val="900" w:hRule="atLeast")';
+  });
+
   // ---- migrate the legacy 9 table ops (caret-in-table) ----
   await t('[6] table addRow below grows the row count', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
