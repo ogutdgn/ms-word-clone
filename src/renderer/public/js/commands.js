@@ -171,11 +171,10 @@
     [['AutoFit Contents', 'contents'], ['AutoFit Window', 'window'], ['Fixed Column Width', 'fixed']]
       .forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableAutoFit(mode); } })));
   });
-  // Cell Size — Row Height / Column Width (4d.3). A flyout with an inches number field +
-  // common presets; routes to the PM bridge (tableSetRowHeight → w:trHeight, tableSetCellWidth
-  // → colwidth/w:gridCol). Both act on the selected row(s)/column(s) (caret is in the table).
-  // px = inches × 96 (the model + exporters convert to twips).
-  function tblSizeFly(node, title, presets, apply) {
+  // Generic inches-input Size flyout (shared by table Cell Size 4d.3 + Picture Size 4b). A number
+  // field (inches) + common presets; `apply(inches)` routes to the relevant PM bridge verb. px =
+  // inches × 96 (the model + exporters convert to twips/EMU).
+  function sizeFly(node, title, presets, apply) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader(title));
       const row = el('div', { style: { padding: '4px 8px', display: 'flex', gap: '6px', alignItems: 'center' } });
@@ -189,10 +188,18 @@
       presets.forEach(([label, inches]) => fly.appendChild(WC.flyItem(label, { onClick: () => apply(inches) })));
     });
   }
-  H.tblRowHeight = (c, node) => tblSizeFly(node, 'Row Height', [['0.2"', 0.2], ['0.3"', 0.3], ['0.5"', 0.5], ['1.0"', 1.0]],
+  // Table Cell Size — Row Height / Column Width (4d.3) → tableSetRowHeight (w:trHeight) /
+  // tableSetCellWidth (colwidth/w:gridCol). Both act on the selected row(s)/column(s).
+  H.tblRowHeight = (c, node) => sizeFly(node, 'Row Height', [['0.2"', 0.2], ['0.3"', 0.3], ['0.5"', 0.5], ['1.0"', 1.0]],
     (inches) => { const p = TPM(); if (p && p.tableSetRowHeight) p.tableSetRowHeight(Math.round(inches * 96), 'atLeast'); });
-  H.tblColWidth = (c, node) => tblSizeFly(node, 'Column Width', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['2.5"', 2.5]],
+  H.tblColWidth = (c, node) => sizeFly(node, 'Column Width', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['2.5"', 2.5]],
     (inches) => { const p = TPM(); if (p && p.tableSetCellWidth) p.tableSetCellWidth(Math.round(inches * 96)); });
+  // Picture Size — Height / Width (Word's Picture Format → Size group) → WC.PM.setImageSize, which
+  // honors the aspect lock (a locked picture's edited dim drives the other) and writes wp:extent.
+  H.imgHeight = (c, node) => sizeFly(node, 'Picture Height', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['3.0"', 3.0]],
+    (inches) => { if (WC.PM && WC.PM.setImageSize) WC.PM.setImageSize({ height: Math.round(inches * 96) }); });
+  H.imgWidth = (c, node) => sizeFly(node, 'Picture Width', [['1.0"', 1.0], ['2.0"', 2.0], ['3.0"', 3.0], ['4.0"', 4.0]],
+    (inches) => { if (WC.PM && WC.PM.setImageSize) WC.PM.setImageSize({ width: Math.round(inches * 96) }); });
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1445,6 +1452,9 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.PM.setImageZOrder('forward') })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.PM.setImageZOrder('toFront') })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.PM.setImageWrap('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.PM.setImageZOrder('backward') })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.PM.setImageZOrder('toBack') })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.PM.setImageWrap('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
+      // Picture Format → Size group (4b numeric Height/Width). Redundant with Commands.run's
+      // H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
+      if (cmd === 'imgHeight' || cmd === 'imgWidth') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.
