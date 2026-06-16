@@ -259,6 +259,18 @@
     const want = labels.map((l) => l[1]);
     return (vals.join(',') === want.join(',')) || ('w:u vals mismatch (got [' + vals.join(',') + '] want [' + want.join(',') + '])');
   });
+  await t('[1] EXPORT: font color → <w:color w:val="FF0000"> (Word: Font.Color = 255, no BGR swap)', async () => {
+    // The font-color MARK is covered above; this guards the EXPORT — setColor must emit <w:color w:val>
+    // with the bare hex (no '#'). Applied to the WHOLE paragraph (uniform run). Word COM-validated:
+    // Paragraphs(1).Range.Font.Color = 255 (RGB long for FF0000; a BGR/RGB swap would read 16711680) —
+    // oracle-probe-1-fontcolor.js + scripts/oracle/validate-fontcolor-win.ps1.
+    setDoc('colored text'); selectText('colored text'); await sleep(40);
+    WC.PM.cmd('setColor', '#FF0000'); await sleep(80);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const val = (xml.match(/<w:color\b[^>]*w:val="([^"]*)"/) || [])[1];
+    if (!val) return 'no <w:color w:val> in export';
+    return /^ff0000$/i.test(val) || ('w:color w:val not FF0000 (hex must round-trip, no #): ' + val);
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
