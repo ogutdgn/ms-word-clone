@@ -5277,6 +5277,53 @@
     return pc >= 2 || 'continuous-typed ender wrongly suppressed the break (pageCount=' + pc + ', expected 2 — the next/body section is nextPage)';
   });
 
+  await t('[4a] a CONTINUOUS middle section stays on the page (next-section governs)', async () => {
+    // The discriminating multi-section case (oracle-validated): intro / s1end[sectPr] /
+    // s2end[sectPr=continuous] / tail. The break after s1end is governed by s2's type
+    // (continuous → NO break); the break after s2end by the body (nextPage → break). So
+    // intro,s1end,s2end share page 1 and tail is page 2 — a naive "break on every sectPr"
+    // would give 3 pages. Guards the exact rule the prior 4f spike got backwards.
+    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
+    setDocs(['Cms intro', 'Cms ess1end', 'Cms ess2end', 'Cms mtail']);
+    await sleep(300);
+    const stamp = (needle, val) => {
+      let tgt = null;
+      doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes(needle)) tgt = { node, pos }; return true; });
+      if (!tgt) return false;
+      caretToEndOf(needle); window.WC.editor.commands.insertSectionBreakAtSelection({});
+      doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes(needle)) tgt = { node, pos }; return true; });
+      const pp = JSON.parse(JSON.stringify(tgt.node.attrs.paragraphProperties || {}));
+      if (!pp.sectPr) pp.sectPr = { type: 'element', name: 'w:sectPr', elements: [] };
+      pp.sectPr.elements = (pp.sectPr.elements || []).filter((el) => el.name !== 'w:type');
+      if (val) pp.sectPr.elements.unshift({ type: 'element', name: 'w:type', attributes: { 'w:val': val }, elements: [] });
+      v().dispatch(v().state.tr.setNodeMarkup(tgt.pos, undefined, { ...tgt.node.attrs, paragraphProperties: pp, pageBreakSource: 'sectPr' }, tgt.node.marks));
+      return true;
+    };
+    stamp('ess1end', null); await sleep(120);
+    stamp('ess2end', 'continuous'); await sleep(500);
+    const pc = PM().__pagination.pageCount, seams = (PM().__pagination.breaks || []).length;
+    if (pc !== 2) return 'expected 2 pages (continuous middle stays on page 1), got ' + pc + ' (naive break-on-every-sectPr = 3)';
+    if (seams !== 1) return 'expected exactly 1 seam (only the s2end→tail break), got ' + seams;
+    const yt = textY('Cms mtail'), ys = textY('Cms ess2end');
+    return (yt != null && ys != null && ys < pageContentTop(2) - 30 && yt >= pageContentTop(2) - 30)
+      || 'ess2end Y=' + Math.round(ys) + ' (want page 1) / mtail Y=' + Math.round(yt) + ' (want page 2 top ' + Math.round(pageContentTop(2)) + ')';
+  });
+
+  await t('[4a] section break before a TABLE pushes the table to a new page', async () => {
+    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
+    window.WC.editor.commands.selectAll();
+    window.WC.editor.commands.insertContent('<p>Tbs intro</p><p>Tbs tend</p><table><tr><td>Tbs cellA</td><td>cellB</td></tr></table><p>Tbs after</p>');
+    await sleep(350);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('tend'); // non-first paragraph (the insert command rejects offset 0)
+    window.WC.editor.commands.insertSectionBreakAtSelection({});
+    let pc = before;
+    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    if (pc <= before) return 'section break before a table did not add a page (' + before + ' -> ' + pc + ')';
+    const yCell = textY('Tbs cellA');
+    return (yCell != null && yCell >= pageContentTop(2) - 30) || 'table cellA Y=' + Math.round(yCell) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
+  });
+
   await t('[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)', async () => {
     window.WC.editor.commands.selectAll();
     const words = [];

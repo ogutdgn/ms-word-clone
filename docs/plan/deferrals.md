@@ -80,7 +80,13 @@
 > section's type (the next ender's sectPr, or the body sectPr for the final section). Confirmed: a
 > 3-para doc with one section break renders 2 pages in Word REGARDLESS of whether the ending
 > paragraph's own `w:type` is absent, `continuous`, or `nextPage` (all → page break, because the body
-> section defaults to nextPage). Per-section GEOMETRY and even/odd parity remain deferred (next bullet).
+> section defaults to nextPage). The MULTI-section rule is also oracle-validated: a doc whose MIDDLE
+> section is `continuous` renders that middle section on the SAME page (2 pages, not the 3 a naive
+> "break on every sectPr" gives) — Word and the engine agree. A section break before a TABLE also
+> paginates correctly. `nextColumn` is treated as a page break (we render single-column; true columns
+> are 4f). NOTE: the fork's `insertSectionBreakAtSelection` refuses the FIRST paragraph
+> (`paraPos <= 0`) — a UI-command limitation, not an engine one; an IMPORTED first-paragraph sectPr is
+> still handled. Per-section GEOMETRY and even/odd parity remain deferred (next bullet).
 - **Section GEOMETRY + even/odd parity (the rest of section breaks → 4f).** The next-page section-break
   page BOUNDARY is paginated (4a3, above), but the engine still reads a single document-level
   `getPageStyles()`, so a section that changes margins / page size / orientation renders the new
