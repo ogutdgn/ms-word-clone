@@ -2008,6 +2008,19 @@
     return (okW && okH) || ('extent ' + Math.round(cx / 9525) + 'x' + Math.round(cy / 9525) + 'px (want 240x60 — aspect-forced?)');
   });
 
+  await t('[4b] a dimensionless insertImage sizes to natural dims, not a squashing 100x100 placeholder', async () => {
+    // Insert → Screenshot/Icon call insertImage without dims. The bridge must size to the image's
+    // natural (clamped) box, not 100x100 — else a non-square image is squashed (now that the
+    // exporter honors explicit boxes, a placeholder would ship distorted).
+    setDoc('dimless: ');
+    PM().insertImage({ src: mkImg(200, 80), alt: 'wide' }); // NO width/height → bridge computes natural (2.5:1)
+    await sleep(250);
+    let sz = null; doc().descendants((n) => { if (n.type.name === 'image' && !sz) sz = n.attrs.size; });
+    if (!sz) return 'no image size';
+    if (sz.width === 100 && sz.height === 100) return 'sized to the 100x100 placeholder (squashes non-square images)';
+    return Math.abs(sz.width / sz.height - 2.5) < 0.2 || 'natural aspect 2.5:1 not kept, got ' + JSON.stringify(sz);
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
