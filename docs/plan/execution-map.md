@@ -450,6 +450,16 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (paragraph shading export test, `/loop` 5-min cadence)
+- [x] **Paragraph shading export test (PR #94 `ce86522`)** — scout-v2 #2. New `[2]` test:
+  `<w:pPr><w:shd w:val="clear" w:fill="..." w:color="auto">` (guards `val="clear"` + hex + CT_Shd) + probe
+  + reusable `validate-parashading-win.ps1`. **Word COM-validated:** FF0000 → `Paragraphs(1).Shading.
+  BackgroundPatternColor=255`, opens clean. Test-only. `/code-review` clean. Gates: **PM 455 / smoke 9 / roundtrip 27**.
+- [ ] **DECISION POINT** (see last-point): 5 COM-validated export lock-ins shipped (all confirm Word fidelity;
+  marginal value diminishing). Backlog v2 nearly done — remaining #5 (distribute geometry, bounded) + #4
+  (order sweep, Word-tolerant/portability-only). NEXT: #5 then #4-rPr, then RE-SCOUT or escalate to a bigger
+  focused item (a14 picture effects / frames-overlay / 4e headers — better suited to a steered session).
+
 ### 2026-06-16 (paragraph border export test, `/loop` 5-min cadence)
 - [x] **Paragraph bottom-border export test (PR #92 `dc86aca`)** — scout-v2 #3. New `[2]` test:
   `<w:pBdr><w:bottom w:val="single" w:sz="4" w:color="auto" w:space="1">` + probe + reusable
