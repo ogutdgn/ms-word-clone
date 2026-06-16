@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Crop DONE (PR #69); fixed user-crop export gap; frames-overlay keystone / 4e headers next)
+## 2026-06-16 (RESUME HERE — Picture Rotate/Flip DONE (PR #71); Picture Format tab is Word-complete; frames-overlay keystone / 4e headers next)
+
+> **Branch:** `main` (Rotate/Flip merged PR #71 `6dd541c`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 443 / smoke 9 / roundtrip 27.**
+>
+> **Picture Rotate/Flip — DONE (PR #71):** wired Word's Picture Format → Arrange → Rotate (Rotate
+> Right/Left 90° / Flip Vertical/Horizontal / Reset) onto the fork's ALREADY-COMPLETE `transformData`
+> pipeline — the render applies `transform: rotate()/scaleX(-1)/scaleY(-1)`, the exporter writes
+> `a:xfrm` rot/flipH/flipV, the importer reads them back. Only the UI + a bridge setter were missing
+> (same "engine shipped, just unwired" shape as 4c.1 wrap / 4c.3 z-order). New `setImageTransform({rotate?,
+> flipH?,flipV?,reset?})`: `rotate` is a relative delta normalized 0..359, flips toggle, transformData
+> kept minimal. `H.imgRotate` = a Word-matching flyout. `/code-review` clean (no production bugs).
+> 1 `[4b]` test.
+>
+> **🏁 The Picture Format tab is now Word-complete: Size (Crop / Height / Width / Lock Aspect) +
+> Arrange (Wrap / Bring Forward / Send Backward / Rotate) + Accessibility (Alt Text).** Image features
+> done: insert, drag+numeric resize, wrap/float, z-order, free-stretch, lock-aspect, alt-text, crop,
+> rotate/flip — all ribbon-reachable + round-tripping.
+>
+> **NEXT — the remaining Phase-4 work is now genuinely the big architectural items:**
+>   1. **The FRAMES-OVERLAY / paged-layout rework (THE KEYSTONE, deferrals §A.1b/d/e)** — unblocks
+>      line-split coords-safe render, table row-split, faithful floating image/shape REPOSITION (4c.2)
+>      + render z-stacking. **NOT a clean single-PR slice** — I checked the position render (image.js
+>      ~385-660): floating-image left/top is spread across ~10 interacting branches (hRelativeFrom
+>      page/margin/column, alignH, behindDoc, absolute-vs-float), so faithful reposition needs careful
+>      oracle-iterated work, NOT an autonomous one-shot. Warrants a dedicated multi-PR push or user steer.
+>   2. **4e headers/footers + fields** (`header-footer` AREA still DEFERRED) — its own subsystem; also
+>      coupled to real multi-page sheets (Phase-7-gated) for a per-page editing region.
+>   3. Tiny image remnants: Change Picture (needs a file-picker + media re-registration), Reset Size
+>      (PNG-only natural-dim decode), a crop DRAG-overlay (vs the numeric flyout).
+> Branch off `main`.
+
+---
+
+## 2026-06-16 (Picture Crop DONE (PR #69); fixed user-crop export gap; frames-overlay keystone / 4e headers next)
 
 > **Branch:** `main` (Crop merged PR #69 `ce1b31e`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 442 / smoke 9 / roundtrip 27.**
