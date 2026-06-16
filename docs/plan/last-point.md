@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Floating-image arrow-nudge DONE (PR #75); 4c.2 reposition now has numeric + keyboard affordances)
+## 2026-06-16 (RESUME HERE — Table positioning DONE (PR #77, NON-image): Indent + alignment + Word-corruption fix; multi-table-corruption bug FLAGGED)
+
+> **Branch:** `main` (table positioning merged PR #77 `1fa57cd`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 447 / smoke 9 / roundtrip 27.** Word COM-validated.
+>
+> **Table page-positioning — DONE (PR #77, the first NON-image slice this session):** wired Word's
+> Table Properties → **Indent** (the unwired `tableSetIndent` bridge verb → an inches flyout in the
+> Table Design Alignment group) + added the missing **test coverage** for the existing-but-untested
+> table **Alignment** (Align Left/Center/Right). **🔬 ORACLE CAUGHT A WORD-CORRUPTION BUG:** an
+> aligned/indented table exported a `w:tblPr` with children in the WRONG ORDER (`w:jc`/`w:tblInd` AFTER
+> `w:tblLook`), violating `CT_TblPrBase` (§17.4.60) → **Word rejected the file as corrupt.** Root cause:
+> `decodeProperties` (fork) emits children in `tableProperties` key-insertion order, so a
+> programmatically-added property lands after tblLook. Fix: `createNestedPropertiesTranslator` now takes
+> an optional `xmlOrder`; `tblPr-translator` passes the CT_TblPrBase order + the decode stable-sorts to
+> it (imported tables already in order → no-op, roundtrip byte-stable). **Re-oracle (single-table
+> fixtures): centered table → Rows.Alignment=center(1); left+indent 0.5" → Rows(1).LeftIndent=36pt.**
+> New `scripts/oracle-probe-4d-tablepos.js`. `/code-review` clean.
+>
+> **⚠️ SEPARATE BUG FLAGGED (spawn_task):** a doc with **2+ tables** exports Word-CORRUPT (reproduces
+> with two PLAIN tables, no positioning) — a pre-existing base multi-table export bug that the fork-based
+> `test:roundtrip` gate misses (it reopens via the fork, not Word). Needs its own fix + a Word-open or
+> structural regression check.
+>
+> **NEXT — bigger items + the flagged bug:**
+>   1. **Fix the 2+-table Word-corruption** (flagged; high-value — affects any multi-table doc).
+>   2. **FRAMES-OVERLAY keystone** (deferrals §A.1b/d/e) — line-split render, table row-split, faithful
+>      floating reposition render + z-stacking. Multi-PR architectural.
+>   3. **4e headers/footers** (`header-footer` DEFERRED). Other bounded table/layout features (cell
+>      margins, table borders/shading validation, column-balance).
+> **LESSON re-confirmed:** the fork-based roundtrip gate does NOT catch Word-corruption — oracle-validate
+> (Word COM open) any new docx-emitting feature. Branch off `main`.
+
+---
+
+## 2026-06-16 (Floating-image arrow-nudge DONE (PR #75); 4c.2 reposition now has numeric + keyboard affordances)
 
 > **Branch:** `main` (nudge merged PR #75 `b87dbbd`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 445 / smoke 9 / roundtrip 27.**
