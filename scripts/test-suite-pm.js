@@ -2179,25 +2179,31 @@
     return disarmed === -1 || 'mid-cell did not disarm: ' + disarmed;
   });
 
-  await t('[4d] a resized column exports as w:gridCol/w:tcW (colwidth round-trips)', async () => {
+  await t('[4d] a column resize OVERRIDES a stale imported grid on export (round-trips)', async () => {
+    // Guards the data-loss bug the 4c→4d review found: an IMPORTED table carries a `grid`
+    // attr (twips) that the exporter emits as w:gridCol verbatim. A drag writes `colwidth`
+    // (px) but left `grid` stale, so the resize was DROPPED on save. The grid-sync
+    // appendTransaction now rebuilds `grid` from the new colwidth, so the resize wins.
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
-    // Set the first column's cells to 180px (what a resize-drag writes) via setNodeMarkup;
-    // in a 2-col table the first cell of each row is at even indices [0, 2].
+    let tablePos = null, tableNode = null;
+    doc().descendants((n, pos) => { if (n.type.name === 'table' && tablePos == null) { tablePos = pos; tableNode = n; } });
     const cells = []; doc().descendants((n, pos) => { if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') cells.push({ pos, node: n }); });
     if (cells.length < 4) return 'expected 4 cells, got ' + cells.length;
-    const col1Before = cells[1].node.attrs.colwidth && cells[1].node.attrs.colwidth[0]; // unresized column (insertTable default)
+    // Simulate an imported table: a STALE grid (9999 twips/col) + matching colwidth + not userEdited.
+    let setup = v().state.tr.setNodeMarkup(tablePos, undefined, { ...tableNode.attrs, grid: [{ col: 9999 }, { col: 9999 }], userEdited: false });
+    for (const c of cells) setup = setup.setNodeMarkup(c.pos, undefined, { ...c.node.attrs, colwidth: [666] });
+    v().dispatch(setup); await sleep(120);
+    // Now RESIZE column 0 to 180px (what a drag writes).
+    const cells2 = []; doc().descendants((n, pos) => { if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') cells2.push({ pos, node: n }); });
     let tr = v().state.tr;
-    for (const idx of [0, 2]) tr = tr.setNodeMarkup(cells[idx].pos, undefined, { ...cells[idx].node.attrs, colwidth: [180] });
-    v().dispatch(tr); await sleep(150);
+    for (const idx of [0, 2]) tr = tr.setNodeMarkup(cells2[idx].pos, undefined, { ...cells2[idx].node.attrs, colwidth: [180] });
+    v().dispatch(tr); await sleep(180);
     let xml;
     try { xml = await window.WC.editor.exportDocx({ exportXmlOnly: true }); } catch (e) { return 'export threw: ' + String(e); }
     const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
     if (gridCols.length < 2) return 'expected 2 <w:gridCol>, got ' + JSON.stringify(gridCols);
-    // The resized column 0 = 180px → 2700 twips (1px = 15 twips @96dpi); column 1 keeps its
-    // own (insertTable default) width, distinct from column 0.
-    const okCol0 = gridCols[0] === 180 * 15;
-    const okCol1 = gridCols[1] === (col1Before || 0) * 15 && gridCols[1] !== gridCols[0];
-    return (okCol0 && okCol1) || 'gridCol twips wrong: ' + JSON.stringify(gridCols) + ' (col0 want ' + (180 * 15) + ', col1 want ' + ((col1Before || 0) * 15) + ')';
+    // Column 0 = 180px → 2700 twips (NOT the stale 9999); the grid-sync must have fired.
+    return (gridCols[0] === 180 * 15) || 'resize dropped — gridCol still stale: ' + JSON.stringify(gridCols) + ' (col0 want 2700)';
   });
 
   // ---- migrate the legacy 9 table ops (caret-in-table) ----

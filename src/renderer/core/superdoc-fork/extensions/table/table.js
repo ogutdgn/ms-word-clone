@@ -2275,6 +2275,51 @@ export const Table = Node.create({
         allowTableNodeSelection: this.options.allowTableNodeSelection,
       }),
 
+      // Phase 4d.1: the interactive columnResizing drag writes each cell's `colwidth` (px) but
+      // leaves the table's `grid` attr (twips) stale — and the EXPORTER emits w:gridCol straight
+      // from `grid`, so a drag-resize on an imported table is DROPPED on save. When a table's
+      // first-row column widths change, rebuild `grid` from the new colwidths (+ mark userEdited)
+      // so the resize round-trips. (The programmatic setCellWidth path already sets userEdited;
+      // this also re-syncs the grid, covering both the drag and any colwidth write.)
+      new Plugin({
+        key: new PluginKey('tableColwidthGridSync'),
+        appendTransaction(transactions, oldState, newState) {
+          if (!transactions.some((t) => t.docChanged)) return null;
+          const sig = (doc) => {
+            const out = [];
+            doc.descendants((node, pos) => {
+              if (node.type.name === 'table') {
+                let cw = '';
+                node.firstChild?.forEach((cell) => {
+                  cw += (cell.attrs.colwidth || []).join(',') + '|';
+                });
+                out.push({ pos, cw });
+                return false; // top-level tables only (don't descend); nested-table resize is rare
+              }
+              return undefined;
+            });
+            return out;
+          };
+          const before = sig(oldState.doc);
+          const after = sig(newState.doc);
+          if (before.length !== after.length) return null; // a table was added/removed, not a resize
+          let tr = null;
+          for (let i = 0; i < after.length; i += 1) {
+            if (after[i].cw === before[i].cw) continue; // this table's columns didn't change
+            const node = newState.doc.nodeAt(after[i].pos);
+            if (!node) continue;
+            // Rebuild the grid (twips) from the first row's colwidths (px) so the export matches.
+            const newGrid = [];
+            node.firstChild?.forEach((cell) => {
+              (cell.attrs.colwidth || []).forEach((w) => newGrid.push({ col: pixelsToTwips(Math.max(1, Math.round(Number(w) || 0))) }));
+            });
+            if (!newGrid.length) continue;
+            tr = (tr || newState.tr).setNodeMarkup(after[i].pos, undefined, { ...node.attrs, userEdited: true, grid: newGrid });
+          }
+          return tr;
+        },
+      }),
+
       createTableBoundaryNavigationPlugin(),
 
       // Normalize table style on paste / setContent / insertContent.

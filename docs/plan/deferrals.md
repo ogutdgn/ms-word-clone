@@ -203,8 +203,12 @@
 #### A.1e — Phase-4d tables: status + remaining (column resize done 2026-06-16)
 
 > Column RESIZE is DONE (4d.1): prosemirror-tables `columnResizing` re-enabled (`handleWidth` 0→5);
-> drag a column border → `colwidth` (px) → exports `w:gridCol`/`w:tcW`. Validated: border-hover arms
-> the handle (`activeHandle` ≥ 0) + oracle `read-table` reads 180px as 135pt. These remain:
+> drag a column border → `colwidth` (px). A grid-sync `appendTransaction` (table.js) rebuilds the
+> table's `grid` attr (twips) from the changed colwidths, because the EXPORTER emits `w:gridCol`
+> verbatim from `grid` — without the sync a resize on an IMPORTED table (which carries a `grid`)
+> was silently DROPPED on save (caught by `/code-review`). Validated: border-hover arms the handle
+> (`activeHandle` ≥ 0); oracle `read-table` reads a 180px resize as 135pt for BOTH a new table and an
+> imported (stale-grid) table. These remain:
 
 - **Row RESIZE is not built, AND `setRowHeight` has a px-vs-twips export-unit bug.** `setRowHeight(px,
   rule)` stores px in `tableRowProperties.rowHeight.value`, but the exporter writes that straight into
