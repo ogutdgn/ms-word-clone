@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Position 4c.2 DONE + simplePos fix (PR #73); first keystone reposition step, oracle-validated)
+## 2026-06-16 (RESUME HERE — Floating-image arrow-nudge DONE (PR #75); 4c.2 reposition now has numeric + keyboard affordances)
+
+> **Branch:** `main` (nudge merged PR #75 `b87dbbd`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 445 / smoke 9 / roundtrip 27.**
+>
+> **Floating-image arrow-key nudge — DONE (PR #75):** Word's arrow-key nudge of a selected floating
+> object, the second 4c.2 reposition affordance (alongside the numeric Position flyout). The
+> `wcImageResize` PM plugin gained a `handleKeyDown` (`handleNudgeKeyDown`, `image-resize.ts`): a
+> floating-image NodeSelection + arrow → `WC.PM.setImagePosition({±step, relative:true})` (plain=8px,
+> Shift=1px), consuming the arrow (the picture is selected, not text). Bumped the extension priority
+> 1→200 (> the keymap's 100) so the nudge `handleKeyDown` wins DETERMINISTICALLY (was relying on the
+> keymap's arrow handlers bailing on a NodeSelection). `/code-review` + re-review clean (the priority
+> reorder is side-effect-free — ImageResize adds no decorations/transactions). 1 `[4c]` test (cumulative
+> +16px without re-select proves selection persists across nudges).
+>
+> **4c.2 reposition status: numeric Position flyout + arrow-key nudge both DONE** (session-inserted
+> floating pictures; imported pictures refused — see below).
+>
+> **NEXT — still the bigger items + 4c.2 follow-ons:**
+>   1. **FRAMES-OVERLAY keystone** (deferrals §A.1b/d/e) — line-split coords-safe render, table row-split,
+>      faithful Square/Tight RENDER position + render z-stacking. Multi-PR architectural.
+>   2. **4c.2 remaining:** a DRAG overlay (mirror the 4b resize overlay — needs preview + a move-region +
+>      avoid clobbering the rotation transform); faithful reposition of IMPORTED floating pictures (patch
+>      the preserved `wp:positionH/V` in `originalDrawingChildren` — fiddly merge-plumbing, currently refused).
+>   3. **4e headers/footers + fields** (`header-footer` AREA DEFERRED).
+> Branch off `main`. **NOTE:** the image area is now very deeply covered (Picture Format tab Word-complete
+> + resize + crop + rotate + position + nudge). Consider whether the next high-value work is the keystone
+> or a different subsystem.
+
+---
+
+## 2026-06-16 (Picture Position 4c.2 DONE + simplePos fix (PR #73); first keystone reposition step, oracle-validated)
 
 > **Branch:** `main` (Position merged PR #73 `cc566cb`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 444 / smoke 9 / roundtrip 27.** Validation: Word COM read-shapes.

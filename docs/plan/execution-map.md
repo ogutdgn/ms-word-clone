@@ -450,6 +450,15 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Floating-image arrow-key nudge 4c.2, `/loop` "keep go")
+- [x] **Arrow-key nudge (4c.2, PR #75 `b87dbbd`)** — Word's arrow-key reposition of a selected floating
+  picture (plain=8px, Shift=1px). The `wcImageResize` plugin gained `handleKeyDown` (handleNudgeKeyDown) →
+  `setImagePosition({±step, relative:true})`. Bumped extension priority 1→200 so the nudge wins over the
+  keymap deterministically. `/code-review` + re-review clean. 1 `[4c]` test (cumulative +16px without
+  re-select proves selection persists). Gates: **PM 445 / smoke 9 / roundtrip 27**.
+- [x] **4c.2 reposition now has numeric (flyout) + keyboard (nudge) affordances.** Remaining = drag overlay
+  + imported-image reposition (both deferred §A.1d). Image area is now very deeply covered.
+
 ### 2026-06-16 (Picture Position 4c.2 + oracle-caught simplePos fix, `/loop` "keep go")
 - [x] **Picture absolute Position (4c.2, PR #73 `cc566cb`)** — first floating reposition step.
   `setImagePosition({horizontal,top,relative?})` → `marginOffset` → render left/top + `wp:positionH/V`
