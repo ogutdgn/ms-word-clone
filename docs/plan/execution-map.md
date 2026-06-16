@@ -450,6 +450,16 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Size group — numeric Height/Width, `/loop` "keep go")
+- [x] **Picture Size group (PR #65 `361fb53`)** — Word's Picture Format → Size group (numeric Height +
+  Width) on the Picture Format tab. New bridge verb `setImageSize({width?,height?})` (`bridge/insert.ts`):
+  honors the aspect lock (locked → edited dim drives the other), clamps width to the content column +
+  both dims to the overlay's `MAX_DIM=4000`. Generalized `tblSizeFly` → `sizeFly` and reused for
+  `H.imgHeight`/`H.imgWidth`. Wires onto the already-shipped `size`-attr → `wp:extent` export (4b-proven).
+- [x] **`/code-review` clean** + a review-noted MAX_DIM clamp added & re-reviewed clean via brute-force
+  simulation. 1 `[4b]` test (lock-derive both ways, unlocked divergence 180×50, wp:extent EMU, 10000→cap
+  4000). Gates: **PM 440 / smoke 9 / roundtrip 27**.
+
 ### 2026-06-16 (Picture Format contextual tab + Arrange un-block, `/loop` "keep go")
 - [x] **Picture Format contextual tab (closes §A.1c)** — new `picture-tools-pm.js` injects a "Picture
   Format" tab on image `NodeSelection` (mirrors `table-tools-pm.js`): Size (Lock Aspect Ratio →
