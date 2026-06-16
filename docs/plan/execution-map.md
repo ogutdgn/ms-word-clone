@@ -450,6 +450,20 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Table Cell Margins flyout, `/loop` 5-min cadence)
+- [x] **Table Cell Margins flyout (PR #84 `96681ff`)** — scout-backlog #3. Wired the dead `H.tblCellMargins`
+  stub to an inches flyout (Top/Bottom/Left/Right + Apply) → `WC.PM.tableSetCellMargins` (px=in×96). Bridge +
+  w:tcMar export already worked; only the UI was missing.
+- [x] **Prefill fix (from `/code-review`):** new `tableGetCellMargins()` bridge reader prefills the flyout
+  with the cell's CURRENT margins (Word Cell Options behavior) so re-editing one side no longer clobbers the
+  others. Guard checks `tableInfo().inTable`.
+- [x] **🔬 Word COM-validated:** 0.5" all sides → `Cells(1).Top/Bottom/Left/RightPadding = 36pt` (720 twips),
+  opens clean. 1 `[4d]` test (ribbon path + re-open prefill assertion) + `oracle-probe-4d-cellmargins.js` +
+  reusable `validate-cellmargins-win.ps1`. `/code-review high` + adversarial re-review clean. Gates: **PM 450
+  / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** scout #2 (picture effects — bigger) or #4 (cell shading export test — smallest). Deferred:
+  Word's "Same as whole table" inherit checkbox.
+
 ### 2026-06-16 (w:tcPr child-order CT_TcPr fix, `/loop`)
 - [x] **w:tcPr child-order fix (PR #82 `6d42e34`)** — scout-backlog #5. `tcPr-translator.js` passes a
   `TCPR_XML_ORDER` (CT_TcPr §17.4.66 sequence) so decoded cell-prop children stable-sort to schema order on
