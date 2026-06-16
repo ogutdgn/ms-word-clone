@@ -233,8 +233,28 @@
 - **Row-split across a page boundary is not done.** The pagination engine still moves a table wholesale
   (skips it at any depth — pagination.ts). Row-split needs: measure row heights, find the boundary row,
   split via the fork's `splitTableAtRow`, seam before the continuation, repeat header rows. 4d.
-- **AutoFit (contents/window/fixed) geometry is not wired** beyond the existing distribute-rows/cols
-  commands; the ribbon AutoFit dropdown needs the layout pass. 4d.
+- ~~**AutoFit (contents/window/fixed) geometry is not wired**~~ **WINDOW + FIXED DONE 2026-06-16 (4d.4).**
+  `autoFitTable('window', targetWidthPx)` (fork `extensions/table/table.js`) now scales every column
+  **proportionally** to fill the page text-column width — writes per-cell `colwidth` (px) via the
+  TableMap; the `tableColwidthGridSync` plugin rebuilds the twips `grid`, so the in-app render AND the
+  export (`w:gridCol`/`w:tcW`) both fill (no Phase-7 paint). `'fixed'` keeps the current widths +
+  `tableLayout:'fixed'`. `'contents'` now also clears any prior Window stretch (was a no-op on
+  `tableWidth`). The bridge (`tableAutoFit`, `bridge/table.ts`) computes the text width from
+  `getPageStyles()` (`pageSize − L/R margins`)×96 and passes it down. Oracle `read-table` (real Word 16):
+  Window 1:2 cols → 155.85pt + 311.65pt (sum 467.5pt = 6.5" text column, ratio 2.0); Fixed 120/180px →
+  90pt + 135pt preserved; both open WITHOUT repair. Regression-tested (`[4d] AutoFit Window/Fixed/Contents …`).
+  **Still deferred — AutoFit CONTENTS in-app reflow:** sizing columns to their CONTENT needs
+  Word-equivalent text metrics (a content-measurement layout pass), so the live in-app shrink-to-content
+  is layout-pass-deferred; the EXPORT intent is correct (`tableLayout:'autofit'` + cleared stretch), so
+  Word content-fits the exported file when it opens it.
+- **AutoFit cleanup-refactor (deferred, from the 4d.4 /code-review).** `/code-review high` found **zero
+  correctness bugs** but flagged that `autoFitTable('window')`, `distributeColumnsEvenly`, and
+  `setCellWidth` each hand-roll the same "walk the TableMap, dedupe by cellIndex, write a colspan-sliced
+  `colwidth` array" loop, and that Window + distribute are arguably one primitive: **set all columns to
+  sum exactly to TOTAL, distributed `even|proportional`**. A future tables-cleanup pass could extract a
+  shared `setColumnsToTotal(total, mode)` helper (mind the divergences: distribute/setCellWidth set
+  `userEdited:true` explicitly while autofit relies on the grid-sync plugin for it; different total-resolution
+  fallbacks). Deferred from 4d.4 to avoid regressing the existing tested commands on a surgical slice.
 - **Column-resize UX is prosemirror-tables' built-in** (thin drag indicator + col-resize cursor), not a
   Word-styled handle overlay. Faithful behaviour (drag the border); a fancier overlay is optional polish.
 - **Grid-sync colspan edge (low).** The grid-sync rebuilds `grid` by pushing one entry per first-row

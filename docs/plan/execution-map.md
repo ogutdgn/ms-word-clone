@@ -29,17 +29,32 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2+4d.3 DONE; table RELOCATE / frames-overlay / 4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2+4d.3+4d.4 DONE; table RELOCATE / row-split / frames-overlay / 4e NEXT
+> **4d.4 AutoFit Window+Fixed geometry DONE + MERGED** (PR #52 `627cfdf`): AutoFit stored only the
+> layout/width INTENT — the column geometry it visibly produces was never applied (Window didn't fill
+> the page; window→contents stayed stretched). Now `autoFitTable('window', targetWidthPx)` (fork
+> `extensions/table/table.js`) **scales every column proportionally to fill** the page text-column
+> width (writes per-cell `colwidth` via the TableMap → grid-sync rebuilds the twips `grid` → in-app
+> render AND export both fill, no Phase-7 paint); `'contents'` now also clears any prior Window stretch.
+> The bridge (`tableAutoFit`, `bridge/table.ts`) computes the text width from `getPageStyles()`. Oracle
+> `read-table`: Window 1:2 → 155.85pt+311.65pt (sum 6.5" text column, ratio 2.0); Fixed 120/180px →
+> 90pt+135pt preserved; both open WITHOUT repair. 4 `[4d]` tests. `/code-review` high: **zero correctness
+> findings** (5 cleanup/altitude unify-primitive findings deferred — would refactor tested commands).
+> Gates: **PM 429 / smoke 9 / roundtrip 27**. **AutoFit Contents** in-app reflow stays a layout-pass
+> deferral (export intent correct). **NEXT (pick one):** remaining 4d — **table RELOCATE →
+> row-split-across-pages → AutoFit Contents**; OR the **FRAMES-OVERLAY** (§A.1d); OR **4e headers/footers**.
+> Session is VERY long — a fresh session is strongly recommended next.
+>
+> <details><summary>Prior 4d.3 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4d.3 Row/Column size ribbon controls DONE + MERGED** (PR #50 `3c1b527`): added **Row Height** +
 > **Column Width** `dropdown` controls to the Table Layout "Cell Size" group (`table-tools-pm.js`) →
 > shared `tblSizeFly` flyout (`commands.js`, inches input + presets) → `tableSetRowHeight(px,'atLeast')`
 > / `tableSetCellWidth(px)` (inches×96=px; model/exporter → twips). Cmds added to the dropdown-dispatcher
 > allow-list. Oracle: 0.5" → row 36pt atLeast; 1.5" → col 108pt. `/code-review` xhigh: **zero findings.**
-> Gates: **PM 425 / smoke 9 / roundtrip 27**. The row-resize UI affordance (deferred §A.1e) is now built
-> as the faithful Word ribbon control (a drag handle/overlay remains optional polish). **NEXT (pick one):**
-> the remaining 4d items — **table RELOCATE → row-split-across-pages → AutoFit**; OR the **FRAMES-OVERLAY**
-> (§A.1d — faithful image reposition 4c.2 + render z-stacking + floating shapes); OR **4e headers/footers + fields**.
-> Session is VERY long — a fresh session is strongly recommended next.
+> Gates: **PM 425 / smoke 9 / roundtrip 27**.
+>
+> </details>
 >
 > <details><summary>Prior 4d.2 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -406,6 +421,29 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4d.4 — AutoFit Window+Fixed geometry, `/loop`)
+- [x] **Diagnosed the AutoFit gap** — `autoFitTable` stored only the layout/width INTENT
+  (`tableLayout`/`tblW`); the column geometry AutoFit visibly produces was never applied (the deferral's
+  "needs the layout pass"). Window didn't fill the page; window→contents stayed stuck-stretched.
+- [x] **Window geometry** (fork `extensions/table/table.js`): `autoFitTable('window', targetWidthPx)`
+  scales every column **proportionally** to fill the page text-column width — writes per-cell `colwidth`
+  via the TableMap; the `tableColwidthGridSync` plugin rebuilds the twips `grid` → in-app render AND
+  export (`w:gridCol`/`w:tcW`) both fill (no Phase-7 paint).
+- [x] **Contents fix**: `'contents'` now also clears a prior Window stretch (`delete tableWidth`; was a no-op).
+- [x] **Bridge** (`bridge/table.ts`): `tableAutoFit` computes the text width from `getPageStyles()`
+  (`pageSize − L/R margins`)×96 and passes it down; `'fixed'`/`'contents'` ignore it.
+- [x] **Oracle-validated** (`read-table`, real Word 16): Window 1:2 → 155.85pt+311.65pt (sum 467.5pt =
+  6.5" text column, ratio 2.0); Fixed 120/180px → 90pt+135pt preserved; both open WITHOUT repair.
+- [x] **+4 `[4d]` regression tests** (Window proportional fill + precondition guard, Fixed preserves,
+  Contents clears stretch, full ribbon flyout path) + oracle authoring probe. Gates: **PM 429 / smoke 9
+  / roundtrip 27**.
+- [x] **`/code-review` (high)**: **zero correctness findings**; 5 cleanup/altitude "unify Window +
+  `distributeColumnsEvenly` + `setCellWidth` into one `setColumnsToTotal(total, even|proportional)`
+  primitive" findings DEFERRED (would refactor existing tested commands — recorded in deferrals §A.1e).
+- [x] **4d.4 COMPLETE + merged** (PR #52 `627cfdf`). AutoFit Contents in-app reflow stays a layout-pass
+  deferral. NEXT (pick one): table RELOCATE / row-split / AutoFit Contents; OR frames-overlay (§A.1d);
+  OR 4e headers/footers. Session very long — fresh session recommended.
 
 ### 2026-06-16 (Phase 4d.3 — Row/Column size ribbon controls, `/loop`)
 - [x] **Built the row-resize UI affordance** (deferred §A.1e) as the faithful Word ribbon controls:
