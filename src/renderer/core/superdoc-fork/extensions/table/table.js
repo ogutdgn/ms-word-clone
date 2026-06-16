@@ -2285,18 +2285,18 @@ export const Table = Node.create({
         key: new PluginKey('tableColwidthGridSync'),
         appendTransaction(transactions, oldState, newState) {
           if (!transactions.some((t) => t.docChanged)) return null;
+          // Only top-level tables (doc.forEach, NOT descendants — the latter would walk every
+          // paragraph's inline content on every keystroke). A table nested in a container is rare
+          // and intentionally out of scope here. `offset` is the table's doc position.
           const sig = (doc) => {
             const out = [];
-            doc.descendants((node, pos) => {
-              if (node.type.name === 'table') {
-                let cw = '';
-                node.firstChild?.forEach((cell) => {
-                  cw += (cell.attrs.colwidth || []).join(',') + '|';
-                });
-                out.push({ pos, cw });
-                return false; // top-level tables only (don't descend); nested-table resize is rare
-              }
-              return undefined;
+            doc.forEach((node, offset) => {
+              if (node.type.name !== 'table') return;
+              let cw = '';
+              node.firstChild?.forEach((cell) => {
+                cw += (cell.attrs.colwidth || []).join(',') + '|';
+              });
+              out.push({ pos: offset, cw });
             });
             return out;
           };

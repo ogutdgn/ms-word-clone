@@ -225,6 +225,11 @@
   commands; the ribbon AutoFit dropdown needs the layout pass. 4d.
 - **Column-resize UX is prosemirror-tables' built-in** (thin drag indicator + col-resize cursor), not a
   Word-styled handle overlay. Faithful behaviour (drag the border); a fancier overlay is optional polish.
+- **Grid-sync colspan edge (low).** The grid-sync rebuilds `grid` by pushing one entry per first-row
+  `colwidth` array element. If a first-row merged cell's `colwidth` array is SHORTER than its colspan
+  (the codebase normally keeps them equal), the rebuilt grid has fewer entries than columns; the export
+  count stays right (`max(cellCount, gridLen)`) but a trailing sub-column falls back to a computed
+  width. Rare; not padded defensively. (Per /code-review re-review.)
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 
