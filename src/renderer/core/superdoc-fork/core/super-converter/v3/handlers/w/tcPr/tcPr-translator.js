@@ -34,10 +34,24 @@ const propertyTranslators = [
   headersTranslator,
 ];
 
+// CT_TcPr (ECMA-376 §17.4.66, an ordered xsd:sequence) REQUIRES this child sequence. The exporter
+// otherwise emits children in tableCellProperties key-insertion order, so a programmatically-added
+// property exports out of sequence — e.g. setCellBorders migrates attrs.borders into
+// tableCellProperties LAST, so <w:tcBorders> lands AFTER <w:tcW>/<w:shd>/<w:vAlign>, violating the
+// schema. Live Word 16 tolerates this on read (COM-validated: opens clean, no repair), but strict
+// OOXML consumers (Open XML SDK validator, some LibreOffice paths) reject out-of-sequence children;
+// this mirrors the w:tblPr ordering fix (PR #77). Imported cells already arrive in schema order, so
+// the stable-sort is a no-op for them (byte-stable round-trip).
+const TCPR_XML_ORDER = [
+  'w:cnfStyle', 'w:tcW', 'w:gridSpan', 'w:hMerge', 'w:vMerge', 'w:tcBorders', 'w:shd',
+  'w:noWrap', 'w:tcMar', 'w:textDirection', 'w:tcFitText', 'w:vAlign', 'w:hideMark',
+  'w:headers', 'w:cellIns', 'w:cellDel', 'w:cellMerge',
+];
+
 /**
  * The NodeTranslator instance for the w:tcPr element.
  * @type {import('@translator').NodeTranslator}
  */
 export const translator = NodeTranslator.from(
-  createNestedPropertiesTranslator('w:tcPr', 'tableCellProperties', propertyTranslators),
+  createNestedPropertiesTranslator('w:tcPr', 'tableCellProperties', propertyTranslators, {}, [], TCPR_XML_ORDER),
 );
