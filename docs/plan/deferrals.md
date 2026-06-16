@@ -169,10 +169,28 @@
   user can't reposition it. Mirror the 4b resize overlay. (Latent: once 4c.2 writes a custom
   `marginOffset`, toggling to inline and back re-uses the stale offset — `setImageWrap`'s re-seed
   guard only fires when horizontal/top are null, not 0; reset it when 4c.2 lands.)
-- **Z-order Bring Forward / Send Backward is not wired (4c.3).** Those ribbon items (+ the Position
-  preset grid) still call the retired `WC.Layout.*` (undefined → throws on click). 4c.3 wires them to
-  mutate the image `relativeHeight` attr. Only the wrap items (incl. "Behind/In Front of Text") are
-  wired in 4c.1.
+- ~~**Z-order Bring Forward / Send Backward is not wired (4c.3).**~~ **WIRED 2026-06-16 (4c.3).**
+  `WC.PM.setImageZOrder(forward|backward|toFront|toBack)` mutates the floating image's
+  `relativeHeight` relative to the other floating images (Word-sane values near the OOXML base);
+  the ribbon Bring Forward / Bring to Front / Send Backward / Send to Back items call it (was the
+  undefined `WC.Layout.*`). EXPORT is faithful + round-trips — oracle `read-shapes` confirms Word
+  reads distinct `ZOrderPosition`s. **RENDER caveat (needs the frames-overlay):** the fork renders
+  z-order as `z-index = max(0, relativeHeight − BASE)`, which (a) only affects ABSOLUTE (`wrap=None`)
+  images — CSS-floated Square/Tight/Through stack by document order — and (b) conflates "behind text"
+  (a negative z-index when `relativeHeight` is null) with inter-object stacking (`≥0`). So in-app
+  z-stacking is partial; full render fidelity needs all floating objects rendered as absolutely-
+  positioned frames with a managed z-index (the §3 frames-overlay). The "in front of / behind TEXT"
+  toggle is the separate `behindDoc` (handled by `setImageWrap('front'|'behind')`). Also: for an
+  IMPORTED floating image, `setImageZOrder` updates the top-level `relativeHeight` (EXPORT prefers it,
+  so the .docx is correct) but `anchorData.renderDOM` still emits a z-index from the stale
+  `originalAttributes.relativeHeight`, so the in-app re-stack may not show — another frames-overlay item.
+- **Faithful free-RELOCATE + render z-stacking both need the frames-overlay (the big remaining 4c).**
+  The current render positions floating images via CSS float (Square/Tight/Through) or absolute
+  left/top (None only), and z-orders via z-index (positioned elements only). Faithful free-positioning
+  with text wrap, AND faithful inter-object stacking, require rendering every floating object as an
+  absolutely-positioned frame with text-exclusion (shape-outside / manual line exclusion) — the
+  LAYOUT_ENGINE.md §3 frames overlay. 4c.1 (wrap) + 4c.3 (z-order export) are done on the current
+  CSS-based render; the frames-overlay is the substantial remaining floating-objects work.
 - **Tight/Through wrap follows the bounding box, not the image outline.** The default polygon is the
   image's rectangle (Word's own seed), so Tight ≈ Square for a rectangular image and does NOT hug a
   transparent-PNG silhouette; there is no polygon-edit UI. Faithful for rectangular images.

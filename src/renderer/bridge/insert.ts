@@ -268,8 +268,50 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Phase 4c.3 — z-order (Bring Forward / Send Backward / to Front / to Back). Mutates the
+  // selected FLOATING image's `relativeHeight` (OOXML unsignedInt) relative to the other
+  // floating images: the fork renders it as z-index (max(0, relativeHeight - BASE)) and the
+  // exporter writes it back. NB the z-index only re-stacks ABSOLUTE (wrap='None') images;
+  // CSS-floated (Square/Tight/Through) images stack by document order regardless — full
+  // float re-stacking needs the frames-overlay render (deferred). "in front of / behind
+  // TEXT" is the behindDoc toggle handled by setImageWrap('front'|'behind').
+  const Z_BASE = 251658240 // OOXML_Z_INDEX_BASE
+  // null/undefined → the base (NOT 0: Number(null) is 0, which would make relativeHeight
+  // tiny → z-index clamps to 0 and Word gets a non-default stacking value).
+  const relH = (v: any): number => { if (v == null) return Z_BASE; const n = Number(v); return Number.isFinite(n) ? n : Z_BASE }
+  function setImageZOrder(dir: string): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a floating picture to change its stacking order.'); return false }
+    if (!sel.node.attrs.isAnchor) { (window as any).WC?.toast?.('Bring Forward / Send Backward needs a floating picture', 'Use Wrap Text first (an in-line picture has no stacking order).'); return false }
+    const others: number[] = []
+    editor.state.doc.descendants((n: any, pos: number) => {
+      if (n.type?.name === 'image' && n.attrs?.isAnchor && pos !== sel.pos) others.push(relH(n.attrs.relativeHeight))
+    })
+    const cur = relH(sel.node.attrs.relativeHeight)
+    let next = cur
+    if (dir === 'toFront') next = others.length ? Math.max(...others) + 1 : cur
+    else if (dir === 'toBack') next = others.length ? Math.min(...others) - 1 : cur
+    // forward/backward use >=/<= so a TIED peer (the default state: two freshly-floated
+    // images both at Z_BASE) is included — move ONE step above/below the nearest peer at
+    // or beyond `cur`. Strict >/< would no-op on a tie (and over-shoot past a tie with 3+).
+    else if (dir === 'forward') { const hi = others.filter((r) => r >= cur); next = hi.length ? Math.min(...hi) + 1 : cur }
+    else if (dir === 'backward') { const lo = others.filter((r) => r <= cur); next = lo.length ? Math.max(...lo) - 1 : cur }
+    else return false
+    if (next === cur) { refocus(); return true } // already front/back, or the only floating object — no-op
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, relativeHeight: next }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
+    setImageZOrder,
     insertLink,
     removeLink,
     insertImage,

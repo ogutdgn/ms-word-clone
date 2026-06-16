@@ -377,6 +377,9 @@ function Read-Shapes([string]$docxPath) {
     for ($j = 1; $j -le $m; $j++) {
       $s = $doc.Shapes.Item($j)
       $wPt = [double]$s.Width; $hPt = [double]$s.Height
+      $left = $null; try { $left = [math]::Round([double]$s.Left, 2) } catch {}
+      $top = $null; try { $top = [math]::Round([double]$s.Top, 2) } catch {}
+      $z = $null; try { $z = [int]$s.ZOrderPosition } catch {}
       $floating += [pscustomobject][ordered]@{
         index = $j
         type = [int]$s.Type
@@ -384,6 +387,9 @@ function Read-Shapes([string]$docxPath) {
         heightPt = [math]::Round($hPt, 2)
         widthEmu = [int][math]::Round($wPt * 12700)
         heightEmu = [int][math]::Round($hPt * 12700)
+        leftPt = $left
+        topPt = $top
+        zOrder = $z
       }
     }
   } catch {}
