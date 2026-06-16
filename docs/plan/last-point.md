@@ -7,7 +7,45 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Table positioning DONE (PR #77, NON-image): Indent + alignment + Word-corruption fix; multi-table-corruption bug FLAGGED)
+## 2026-06-16 (RESUME HERE — 2+-table Word-corruption ROOT-CAUSED (not shipped; reverted, re-flagged); env blocked clean validation)
+
+> **Branch:** `main` (clean; the fix was REVERTED, not merged). **Phase:** 4. Gates unchanged: **PM 447 /
+> smoke 9 / roundtrip 27.** Investigation iteration — no PR this round.
+>
+> **Investigated the flagged "2+-table Word-corrupt export" bug. ROOT CAUSE FOUND + a fix confirmed
+> at the structure level, but NOT shipped** (couldn't get a clean end-to-end Word-validation of the
+> real save path before the environment broke; refused to ship an unvalidated docx fix per the lesson).
+>
+> **Root cause:** OOXML `CT_Tc` requires a table cell to END with a paragraph — a `w:tbl` may NOT be the
+> last block of a `w:tc` or Word rejects the file as corrupt. The natural "insert table, then insert
+> another table" NESTS the 2nd table in the 1st cell (caret stays in the cell, which is Word-correct),
+> and the export omits the required trailing `<w:p/>`. (Single tables + two SIBLING tables — each
+> followed by a `w:p` — already open fine; NOT a sibling-table bug.) **Confirmed by manual patch:** insert
+> `<w:p/>` after the nested `</w:tbl>` in document.xml → rezip → Word OPENS it.
+>
+> **The fix (logic confirmed):** `translateTableCell` (`super-converter/v3/handlers/w/tc/helpers/
+> translate-table-cell.js`) — when the cell's content ends with a `w:tbl`, append
+> `{ name: 'w:p', type: 'element', elements: [] }` (the `type:'element'` is REQUIRED — a bare `{name:'w:p'}`
+> is dropped by the serializer `#generateXml`). With it, `exportDocx({exportXmlOnly})` AND
+> `exportDocx({getUpdatedDocs})['word/document.xml']` both gain the trailing p (`</w:tbl><w:p` count 1→2).
+>
+> **⚠️ THE BLOCKER (must resolve to ship):** early `exportDocxBytes()` (Blob) saves appeared to STILL lack
+> the p, even though `getUpdatedDocs` (the SAME `updatedDocs` the Blob zips) HAS it and the DocxZipper code
+> overrides `word/document.xml` with `updatedDocs`. Likely the no-p Blob results were stale-build/confounded,
+> but I couldn't confirm — `saveBytes` started returning false mid-session (probably a hung headless WINWORD
+> locking `C:\tmp` from my many COM `Documents.Open` calls). **Re-flagged via spawn_task `task_0e043993`** with
+> the full repro + fix + the Blob/XML-divergence question.
+>
+> **KEY LESSON (re-confirmed HARD):** `exportDocx({exportXmlOnly})` and `test:roundtrip` (fork reopen) BOTH
+> miss Word-corruption — a fix can FALSE-GREEN. Validate the REAL save path (`exportDocxBytes` → `saveBytes`
+> → Word COM `Documents.Open`). Ensure no leftover WINWORD locks before validating.
+>
+> **NEXT:** (1) finish the 2+-table fix with a real Word-validated save (fresh env); (2) frames-overlay
+> keystone; (3) 4e headers/footers. Branch off `main`.
+
+---
+
+## 2026-06-16 (Table positioning DONE (PR #77, NON-image): Indent + alignment + Word-corruption fix; multi-table-corruption bug FLAGGED)
 
 > **Branch:** `main` (table positioning merged PR #77 `1fa57cd`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 447 / smoke 9 / roundtrip 27.** Word COM-validated.
