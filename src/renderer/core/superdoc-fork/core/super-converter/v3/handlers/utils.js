@@ -508,6 +508,7 @@ export function createNestedPropertiesTranslator(
   propertyTranslators,
   defaultEncodedAttrs = {},
   attributeHandlers = [],
+  xmlOrder = null,
 ) {
   const propertyTranslatorsByXmlName = {};
   const propertyTranslatorsBySdName = {};
@@ -541,6 +542,19 @@ export function createNestedPropertiesTranslator(
 
       // Process property translators
       const elements = decodeProperties(params, propertyTranslatorsBySdName, currentValue);
+
+      // decodeProperties emits children in the `sdName` object's KEY-INSERTION order, which breaks
+      // OOXML's strict child sequence when properties are added programmatically (e.g. a setTableX
+      // command appends w:jc/w:tblInd AFTER w:tblLook — invalid, Word rejects it as corrupt). When a
+      // schema order is supplied, (stable-)sort the children into it. Imported nodes already arrive in
+      // schema order, so the sort is a no-op for them (byte-stable round-trip).
+      if (xmlOrder && elements.length > 1) {
+        const rank = (name) => { const i = xmlOrder.indexOf(name); return i === -1 ? xmlOrder.length : i; };
+        elements
+          .map((el, i) => ({ el, i }))
+          .sort((a, b) => rank(a.el.name) - rank(b.el.name) || a.i - b.i)
+          .forEach((entry, idx) => { elements[idx] = entry.el; });
+      }
 
       if (elements.length === 0) {
         return undefined;
