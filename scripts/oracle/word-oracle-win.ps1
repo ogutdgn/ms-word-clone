@@ -79,7 +79,7 @@ $b = if ($argv.Count -gt 2) { $argv[2] } else { $null }
 $c = if ($argv.Count -gt 3) { $argv[3] } else { $null }
 
 function Usage-Exit {
-  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | read-layout <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
+  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | read-layout <file.docx> [--out r.json] | read-shapes <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
   exit 2
 }
 
@@ -348,6 +348,48 @@ function Read-Layout([string]$docxPath) {
   return [pscustomobject][ordered]@{ pages = $pages; lines = $lines; paragraphs = $n; breakParas = @($breaks); perPara = $perPara }
 }
 
+# read-shapes — Word's IMAGE/SHAPE GEOMETRY ground truth for the Phase-4 layout engine
+# (sub-phase 4b image resize, 4c floating, 4d tables). Reports every InlineShape and
+# floating Shape with its Width/Height in POINTS and the EMU equivalent (pt * 12700),
+# so a resized image's clone-exported wp:extent (px * 9525) can be cross-checked against
+# what Word actually renders. 260px => 195pt => 2476500 EMU.
+function Read-Shapes([string]$docxPath) {
+  $doc = Open-Doc $docxPath $true
+  $inline = @()
+  try {
+    $n = $doc.InlineShapes.Count
+    for ($i = 1; $i -le $n; $i++) {
+      $s = $doc.InlineShapes.Item($i)
+      $wPt = [double]$s.Width; $hPt = [double]$s.Height
+      $inline += [pscustomobject][ordered]@{
+        index = $i
+        type = [int]$s.Type
+        widthPt = [math]::Round($wPt, 2)
+        heightPt = [math]::Round($hPt, 2)
+        widthEmu = [int][math]::Round($wPt * 12700)
+        heightEmu = [int][math]::Round($hPt * 12700)
+      }
+    }
+  } catch {}
+  $floating = @()
+  try {
+    $m = $doc.Shapes.Count
+    for ($j = 1; $j -le $m; $j++) {
+      $s = $doc.Shapes.Item($j)
+      $wPt = [double]$s.Width; $hPt = [double]$s.Height
+      $floating += [pscustomobject][ordered]@{
+        index = $j
+        type = [int]$s.Type
+        widthPt = [math]::Round($wPt, 2)
+        heightPt = [math]::Round($hPt, 2)
+        widthEmu = [int][math]::Round($wPt * 12700)
+        heightEmu = [int][math]::Round($hPt * 12700)
+      }
+    }
+  } catch {}
+  return [pscustomobject][ordered]@{ inlineShapes = @($inline); floatingShapes = @($floating) }
+}
+
 # Resolve a (possibly relative) path against the PowerShell $PWD — NOT the .NET
 # process CWD, which can differ in hosted sessions ([IO.Path]::GetFullPath alone
 # would key off the process CWD while Test-Path/Resolve-Path key off $PWD).
@@ -399,6 +441,9 @@ try {
   } elseif ($cmd -eq 'read-layout' -and $a) {
     Start-WordInstance
     Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-layout'; layout = (Read-Layout $a) })
+  } elseif ($cmd -eq 'read-shapes' -and $a) {
+    Start-WordInstance
+    Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-shapes'; shapes = (Read-Shapes $a) })
   } elseif ($cmd -eq 'roundtrip' -and $a -and $b) {
     Start-WordInstance
     Invoke-Roundtrip $a $b
