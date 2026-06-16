@@ -29,14 +29,25 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2 DONE; 4d.3 row-UI / frames-overlay / 4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2+4d.3 DONE; table RELOCATE / frames-overlay / 4e NEXT
+> **4d.3 Row/Column size ribbon controls DONE + MERGED** (PR #50 `3c1b527`): added **Row Height** +
+> **Column Width** `dropdown` controls to the Table Layout "Cell Size" group (`table-tools-pm.js`) →
+> shared `tblSizeFly` flyout (`commands.js`, inches input + presets) → `tableSetRowHeight(px,'atLeast')`
+> / `tableSetCellWidth(px)` (inches×96=px; model/exporter → twips). Cmds added to the dropdown-dispatcher
+> allow-list. Oracle: 0.5" → row 36pt atLeast; 1.5" → col 108pt. `/code-review` xhigh: **zero findings.**
+> Gates: **PM 425 / smoke 9 / roundtrip 27**. The row-resize UI affordance (deferred §A.1e) is now built
+> as the faithful Word ribbon control (a drag handle/overlay remains optional polish). **NEXT (pick one):**
+> the remaining 4d items — **table RELOCATE → row-split-across-pages → AutoFit**; OR the **FRAMES-OVERLAY**
+> (§A.1d — faithful image reposition 4c.2 + render z-stacking + floating shapes); OR **4e headers/footers + fields**.
+> Session is VERY long — a fresh session is strongly recommended next.
+>
+> <details><summary>Prior 4d.2 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4d.2 row-height EXPORT fix DONE + MERGED** (PR #48 `8849c4e`): `tr-translator` reconciliation wrote
 > the nested row-height `value` as a STRING → the `trHeight` decode (typeof===number) silently dropped
 > it → a set row height produced NO `<w:trHeight>` (Word saw auto). Now a number + keeps the rule.
-> Oracle: 60px → 45pt atLeast. Gates: **PM 423 / smoke 9 / roundtrip 27**. **NEXT (pick one):** 4d.3
-> row-resize UI affordance (drag overlay / ribbon Row Height — heights round-trip now but no UI to set
-> one) → table RELOCATE → row-split → AutoFit; OR the FRAMES-OVERLAY (§A.1d); OR 4e headers/footers.
-> Session is very long — a fresh session is ideal next.
+> Oracle: 60px → 45pt atLeast. Gates: **PM 423 / smoke 9 / roundtrip 27**.
+> </details>
 >
 > <details><summary>Prior 4d.1 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -395,6 +406,21 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4d.3 — Row/Column size ribbon controls, `/loop`)
+- [x] **Built the row-resize UI affordance** (deferred §A.1e) as the faithful Word ribbon controls:
+  **Row Height** + **Column Width** `dropdown`s in the Table Layout "Cell Size" group (`table-tools-pm.js`).
+- [x] **`commands.js`**: shared `tblSizeFly(node,title,presets,apply)` flyout (inches number input + presets)
+  + `H.tblRowHeight` → `tableSetRowHeight(px,'atLeast')`, `H.tblColWidth` → `tableSetCellWidth(px)`
+  (inches×96=px). Added both cmds to the dropdown-dispatcher allow-list (was returning "no options").
+- [x] **Oracle-validated** (`read-table`): Row Height 0.5" → row 1 = 36pt heightRule=atLeast;
+  Column Width 1.5" → col 0 = 108pt.
+- [x] **+2 `[4d]` regression tests** (full ribbon path: `WC.Commands.dropdown` → flyout preset → assert
+  model attr + exported OOXML). Gates: **PM 425 / smoke 9 / roundtrip 27**.
+- [x] **`/code-review`** (xhigh, 3 finder passes incl. a test false-pass sweep): **zero findings**
+  (all `WC.fly*` helpers exist, `flyItem` auto-closes, bridge signatures match, 2160-twip column ≠ 4680 default).
+- [x] **4d.3 COMPLETE + merged** (PR #50 `3c1b527`). NEXT (pick one): table RELOCATE / row-split / AutoFit;
+  OR the FRAMES-OVERLAY (§A.1d); OR 4e headers/footers. Session very long — fresh session recommended.
 
 ### 2026-06-16 (Phase 4d.2 — row-height export fix, `/loop`)
 - [x] **Investigated row resize** — the suspected px-vs-twips bug was misdiagnosed: `tr-translator`
