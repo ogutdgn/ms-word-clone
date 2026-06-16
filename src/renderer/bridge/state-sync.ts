@@ -279,6 +279,10 @@ export function installStateSync(editor: AnyEditor) {
     st.inTable = inTable
     // No-op until Stage F (table-tools-pm.js) ships syncContextualTabs — must not throw.
     ;(window as any).WC?.TableToolsPM?.syncContextualTabs?.(inTable)
+    // Picture Format contextual tab: shown when a single picture (image NodeSelection) is selected.
+    const imgSel: any = w.WC?.view?.state?.selection
+    const imageSelected = !!(imgSel && imgSel.node && imgSel.node.type?.name === 'image')
+    ;(window as any).WC?.PictureToolsPM?.syncContextualTab?.(imageSelected)
     w.WC?.StatusBar?.update?.()
     // Real-Word fidelity: QAT undo/redo grey out when the stacks are empty
     // (st.canUndo/canRedo computed once in toQueryState).
