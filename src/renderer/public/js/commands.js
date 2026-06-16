@@ -200,6 +200,31 @@
     (inches) => { if (WC.PM && WC.PM.setImageSize) WC.PM.setImageSize({ height: Math.round(inches * 96) }); });
   H.imgWidth = (c, node) => sizeFly(node, 'Picture Width', [['1.0"', 1.0], ['2.0"', 2.0], ['3.0"', 3.0], ['4.0"', 4.0]],
     (inches) => { if (WC.PM && WC.PM.setImageSize) WC.PM.setImageSize({ width: Math.round(inches * 96) }); });
+  // Picture Alt Text (Word's Picture Format → Alt Text pane) → WC.PM.setImageAltText. A flyout with
+  // a description textarea (prefilled from the selected picture) + a "Mark as decorative" checkbox.
+  // The description is the node's `title` attr (→ wp:docPr/@descr); decorative disables it.
+  H.imgAltText = (c, node) => {
+    const sel = window.WC.view && window.WC.view.state && window.WC.view.state.selection;
+    const a = (sel && sel.node && sel.node.type.name === 'image') ? sel.node.attrs : {};
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyHeader('Alt Text'));
+      const wrap = el('div', { style: { padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' } });
+      const ta = el('textarea', { rows: '3', placeholder: 'Describe this picture for accessibility…', style: { width: '210px', resize: 'vertical' } });
+      ta.value = a.title || '';
+      const dec = el('input', { type: 'checkbox' });
+      dec.checked = !!a.decorative; ta.disabled = dec.checked;
+      const decRow = el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center', fontSize: '12px' } });
+      decRow.appendChild(dec); decRow.appendChild(document.createTextNode('Mark as decorative'));
+      dec.addEventListener('change', () => { ta.disabled = dec.checked; });
+      const btn = el('button', { class: 'fly-set-btn', text: 'Apply' });
+      btn.addEventListener('click', () => {
+        if (WC.PM && WC.PM.setImageAltText) WC.PM.setImageAltText({ title: ta.value, decorative: dec.checked });
+        WC.closeFlyouts();
+      });
+      wrap.appendChild(ta); wrap.appendChild(decRow); wrap.appendChild(btn);
+      fly.appendChild(wrap);
+    });
+  };
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1452,9 +1477,9 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.PM.setImageZOrder('forward') })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.PM.setImageZOrder('toFront') })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.PM.setImageWrap('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.PM.setImageZOrder('backward') })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.PM.setImageZOrder('toBack') })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.PM.setImageWrap('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
-      // Picture Format → Size group (4b numeric Height/Width). Redundant with Commands.run's
-      // H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
-      if (cmd === 'imgHeight' || cmd === 'imgWidth') return H[cmd](control, node);
+      // Picture Format → Size group (4b numeric Height/Width) + Alt Text. Redundant with
+      // Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
+      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.
