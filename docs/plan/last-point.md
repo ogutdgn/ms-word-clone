@@ -7,6 +7,53 @@
 
 ---
 
+## 2026-06-16 (RESUME HERE — PAGINATION CARET BUG root-caused + primary fix merged; line-split rework remains)
+
+> **Branch:** `main` (caret Fix A merged via PR #54 `11909cd`; branch deleted). **Phase:** 4 (layout
+> engine) — a USER-REPORTED REGRESSION pass: "page breaks, blank pages break normal text-editor
+> behavior + the mouse/caret location inside the page." Gates: **PM 431 / smoke 9 / roundtrip 27.**
+>
+> **What this session did (deep-research debugging, `/loop` redirected to fix pagination):**
+> 1. **Root-caused** via a parallel research Workflow (PM-internals + Word behavior + history) + a
+>    headless reproduction probe (`scripts/probe-pagination-caret.js`). THREE causes (full writeup in
+>    the [[pagination-caret-rootcause]] memory + deferrals.md §A.1b): **(1) PRIMARY** — forced/blank-page
+>    seams were a block `<div>` spacer injected at the INLINE hardBreak position INSIDE a paragraph's
+>    inline flow; block-in-inline corrupts PM's `posAtCoords` hit-testing (the full-width tall spacer
+>    rect becomes "closest" for any x) → clicking the next page mislands the caret. Probe proof:
+>    `.pm-page-spacer` with a `<span>` parent + a page-2 margin click landing on a page-1 pos.
+>    **(2)** `focus.ts` was suspected multi-page-unaware. **(3)** rAF height-keyed widget recreation.
+> 2. **FIXED the PRIMARY, high-severity case (Fix A, PR #54):** forced breaks that END a block +
+>    blank pages + section breaks now emit a coords-safe BLOCK-BOUNDARY seam before the next block
+>    (`emitSeamBefore`/`trailingForcedCount`, pagination.ts) instead of an inline in-`<p>` spacer.
+>    `trailingForcedCount` walks the block's inline LEAVES (the model wraps inline in `run` nodes) +
+>    skips tables; a seam reports `pages` (band span) so the status bar weights, not counts. Probe:
+>    blockInInline 1→0 (manual break), 2→0 (blank page). 2 new `[4a]` regressions (red before).
+>    `/code-review high` + a re-review of the review-fixes → clean (doc-start guard, table guard, the
+>    per-keystroke perf guard, a vacuous-test fix). Render-only → model/export unchanged → oracle page
+>    counts preserved (geometry tests + roundtrip green).
+> 3. **`focus.ts` CONFIRMED FINE post-Fix-A (cause 2 dismissed):** a repro probe showed a page-2 outer-
+>    margin click lands correctly on page 2 — focus.ts only clamps X (keeps Y), and Fix A un-poisoned
+>    `posAtCoords`, so the clamp maps to the right page-2 line. No focus.ts change needed.
+> 4. **Line-split / mid-paragraph in-`<p>` spacer = the LOW-SEVERITY remainder (NOT fixed):** an auto
+>    line-split (paragraph overflowing a page) + a mid-paragraph manual break still render a block
+>    spacer inside inline flow. BUT probes show word round-trips stay clean (delta 0) — only clicks in
+>    the NARROW GAP region of a split paragraph misland. Fixing it coords-safely is HARD/RISKY
+>    (mid-paragraph vertical space inherently needs an in-flow box; no trivial fix — likely a custom
+>    paragraph NodeView that splits its rendering, or the frames-overlay). Documented, deferred.
+>
+> **NEXT (pick one):**
+>   1. **Line-split coords-safe rendering** (the remaining caret edge) — a focused/fresh session: design
+>      a coords-safe mid-paragraph gap (custom split-paragraph NodeView OR overlay). LOW severity, so
+>      lower priority than new features. Reproduce with a TRULY page-overflowing paragraph (≥50 lines;
+>      short `w0 w1 …` tokens fit ~34 lines/page — use longer content).
+>   2. **Resume the layout-engine feature roadmap** (the 4d.4 entry below): table RELOCATE / row-split /
+>      AutoFit Contents; OR the FRAMES-OVERLAY (which would ALSO unblock the line-split fix); OR 4e
+>      headers/footers.
+> The user's PRIMARY complaint (page breaks + blank pages breaking the caret) is RESOLVED. Branch off
+> `main`. **Session is VERY long — a fresh session is strongly recommended.**
+
+---
+
 ## 2026-06-16 (RESUME HERE — Phase 4d.4 AutoFit Window/Fixed geometry DONE; table RELOCATE / row-split / frames-overlay / 4e next)
 
 > **Branch:** `main` (4d.4 merged via PR #52 `627cfdf`; branch deleted). **Phase:** 4 (layout

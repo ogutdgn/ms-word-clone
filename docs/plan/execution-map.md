@@ -29,7 +29,20 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2+4d.3+4d.4 DONE; table RELOCATE / row-split / frames-overlay / 4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a..4d.4 DONE + a PAGINATION CARET-BUG fix; line-split rework / 4d / frames-overlay / 4e NEXT
+> **PAGINATION CARET BUG (user-reported) — root-caused + PRIMARY fix MERGED** (PR #54 `11909cd`):
+> page breaks + blank pages were breaking editing + the caret/click position because their seam was a
+> block `<div>` injected at the INLINE hardBreak position inside a paragraph (block-in-inline corrupts
+> PM `posAtCoords`). FIXED: forced/blank/section seams now emit a coords-safe BLOCK-BOUNDARY seam
+> (`emitSeamBefore`/`trailingForcedCount`, pagination.ts); probe blockInInline 1→0 / 2→0; 2 `[4a]`
+> regressions; `/code-review` + re-review clean. `focus.ts` CONFIRMED fine post-fix (no change needed).
+> Render-only → oracle page counts preserved. Gates: **PM 431 / smoke 9 / roundtrip 27**. **REMAINS
+> (low-severity, deferrals §A.1b):** line-split + mid-paragraph in-`<p>` spacers still misland a click in
+> the narrow GAP of a page-overflowing paragraph (word round-trips stay clean) — a hard coords-safe
+> rework (custom split-paragraph NodeView / frames-overlay). Full writeup: [[pagination-caret-rootcause]].
+>
+> <details><summary>Prior 4d.4 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4d.4 AutoFit Window+Fixed geometry DONE + MERGED** (PR #52 `627cfdf`): AutoFit stored only the
 > layout/width INTENT — the column geometry it visibly produces was never applied (Window didn't fill
 > the page; window→contents stayed stretched). Now `autoFitTable('window', targetWidthPx)` (fork
@@ -44,6 +57,8 @@
 > deferral (export intent correct). **NEXT (pick one):** remaining 4d — **table RELOCATE →
 > row-split-across-pages → AutoFit Contents**; OR the **FRAMES-OVERLAY** (§A.1d); OR **4e headers/footers**.
 > Session is VERY long — a fresh session is strongly recommended next.
+>
+> </details>
 >
 > <details><summary>Prior 4d.3 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -421,6 +436,31 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Pagination CARET BUG — root-cause + primary fix, `/loop` redirected by the user)
+- [x] **User redirected the loop** to fix pagination: "page breaks, blank pages break normal editing +
+  the mouse/caret location inside the page." Used `systematic-debugging` (root cause before any fix).
+- [x] **Deep research** via a parallel Workflow (PM `posAtCoords`/`coordsAtPos` internals, the seam DOM,
+  real-Word interaction behavior, git/deferrals history, repro-test design) + a headless reproduction
+  probe (`scripts/probe-pagination-caret.js`).
+- [x] **Reproduced + root-caused**: forced/blank-page seams were a block `<div>` injected at the INLINE
+  hardBreak position INSIDE a paragraph → block-in-inline corrupts PM `posAtCoords` → clicking the next
+  page mislands the caret. Probe: `.pm-page-spacer` with a `<span>` parent + a page-2 margin click landing
+  on a page-1 pos.
+- [x] **Fix A (PR #54 `11909cd`)**: forced breaks that END a block + blank pages + section breaks now emit
+  a coords-safe BLOCK-BOUNDARY seam before the next block (`emitSeamBefore`/`trailingForcedCount`,
+  pagination.ts); a seam reports `pages` (band span) so the status bar weights, not counts. 2 new `[4a]`
+  regressions (red before). Probe: blockInInline 1→0 / 2→0.
+- [x] **`/code-review high` + re-review of the review-fixes** (the project's "re-review your own fixes"
+  lesson): clean. Fixed doc-start guard, table guard in `trailingForcedCount`, a per-keystroke perf guard,
+  and a vacuous test assertion.
+- [x] **`focus.ts` CONFIRMED FINE post-fix** (cause 2 dismissed via a repro probe — it only clamps X, and
+  Fix A un-poisoned posAtCoords). No change needed.
+- [x] **Line-split / mid-paragraph in-`<p>` spacer = LOW-severity remainder, documented** (deferrals §A.1b
+  + [[pagination-caret-rootcause]] memory): only clicks in the narrow GAP of a page-overflowing paragraph
+  misland (word round-trips stay clean); coords-safe fix is hard/risky → deferred to a focused session.
+- [x] Render-only change → model/export unchanged → oracle page counts preserved. Gates: **PM 431 /
+  smoke 9 / roundtrip 27**. PRIMARY user complaint RESOLVED.
 
 ### 2026-06-16 (Phase 4d.4 — AutoFit Window+Fixed geometry, `/loop`)
 - [x] **Diagnosed the AutoFit gap** — `autoFitTable` stored only the layout/width INTENT
