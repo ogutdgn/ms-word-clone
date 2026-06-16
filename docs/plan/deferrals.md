@@ -245,9 +245,20 @@
   `insertTable`; and synthetic drags don't drive PM pointer plugins headlessly.)
 - **Table RELOCATE (drag the table) is not built.** Needs a move handle + (for a floating table) an
   anchor; mirror the image frames-overlay. 4d.
-- **Row-split across a page boundary is not done.** The pagination engine still moves a table wholesale
-  (skips it at any depth — pagination.ts). Row-split needs: measure row heights, find the boundary row,
-  split via the fork's `splitTableAtRow`, seam before the continuation, repeat header rows. 4d.
+- **Row-split across a page boundary is not done — REPRODUCED as a visible bug 2026-06-16.** The
+  pagination engine moves a table wholesale (skips it at any depth — pagination.ts). A table taller
+  than a page therefore OVERFLOWS: probe (60-row table, height 1296px > 864px page-content) renders its
+  top on page 2 and its bottom on page 3 with NO seam inside it, so the middle rows paint across the
+  page boundary / in the gray inter-sheet gap. Row-split needs: measure row heights, find the boundary
+  row, seam before the continuation, repeat header rows. **⚠️ ARCHITECTURAL CONVERGENCE:** a FAITHFUL
+  row-split keeps ONE table in the model (Word splits a table visually, not into two `<w:tbl>`) and so
+  needs a COORDS-SAFE gap rendered at a table-row boundary — a `<div>` between `<tr>`s is invalid DOM,
+  the SAME block-in-invalid-context problem as the line-split in-`<p>` spacer (§A.1b) and faithful
+  floating-object reposition (§A.1d). **All three remaining layout items converge on the
+  FRAMES-OVERLAY / paged-layout rework** (render pages as real containers, or a coords-safe overlay that
+  pushes content without an in-flow box) — the keystone for: line-split coords-safe render, row-split,
+  faithful image/shape reposition + render z-stacking. It is the highest-leverage next layout piece and
+  (per repeated guidance) warrants a fresh, focused session. 4d/§3.
 - ~~**AutoFit (contents/window/fixed) geometry is not wired**~~ **WINDOW + FIXED DONE 2026-06-16 (4d.4).**
   `autoFitTable('window', targetWidthPx)` (fork `extensions/table/table.js`) now scales every column
   **proportionally** to fill the page text-column width — writes per-cell `colwidth` (px) via the
