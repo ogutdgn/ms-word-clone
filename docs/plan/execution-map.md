@@ -450,6 +450,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Table positioning — first NON-image slice, `/loop` "keep go")
+- [x] **Table Indent + Alignment coverage + w:tblPr-order fix (PR #77 `1fa57cd`)** — wired the unwired
+  `tableSetIndent` (Indent flyout in the Table Design Alignment group) + tested the existing-but-untested
+  table Alignment. **🔬 ORACLE caught a Word-corruption bug:** aligned/indented tables exported `w:tblPr`
+  with `w:jc`/`w:tblInd` AFTER `w:tblLook` (violates CT_TblPrBase → Word rejects as corrupt). Fixed:
+  `createNestedPropertiesTranslator` takes an `xmlOrder`, `tblPr-translator` passes the schema order +
+  stable-sorts (imported tables = no-op). Word COM-validated: center→Rows.Alignment=1, indent 0.5"→
+  LeftIndent=36pt. `/code-review` clean. +2 `[4d]` tests + `oracle-probe-4d-tablepos.js`. Gates: **PM 447
+  / smoke 9 / roundtrip 27**.
+- [x] **⚠️ Flagged (spawn_task):** a doc with 2+ tables exports Word-CORRUPT (two PLAIN tables repro) —
+  separate pre-existing base bug the fork-roundtrip gate misses. LESSON: oracle-validate (Word-open) docx features.
+
 ### 2026-06-16 (Floating-image arrow-key nudge 4c.2, `/loop` "keep go")
 - [x] **Arrow-key nudge (4c.2, PR #75 `b87dbbd`)** — Word's arrow-key reposition of a selected floating
   picture (plain=8px, Shift=1px). The `wcImageResize` plugin gained `handleKeyDown` (handleNudgeKeyDown) →
