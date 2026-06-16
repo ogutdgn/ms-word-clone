@@ -450,6 +450,21 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Format contextual tab + Arrange un-block, `/loop` "keep go")
+- [x] **Picture Format contextual tab (closes §A.1c)** — new `picture-tools-pm.js` injects a "Picture
+  Format" tab on image `NodeSelection` (mirrors `table-tools-pm.js`): Size (Lock Aspect Ratio →
+  `H.imgLockAspect` → `setImageLockAspect`) + Arrange (Wrap Text / Bring Forward / Send Backward).
+  `state-sync.ts` drives `WC.PictureToolsPM.syncContextualTab`; probe-confirmed show-on-select /
+  hide-on-deselect. (PR #63 `4064a71`)
+- [x] **Dead-control root-cause fix (caught by `/code-review`)** — `wrapText`/`bringForward`/
+  `sendBackward` were gated by the coarse `layout-arrange` DEFERRED flag and toasted "not available"
+  instead of reaching their already-shipped bridge verbs (4c.1 wrap / 4c.3 z-order). Added an
+  `ENGINE_READY` allow-set in `bridge/index.ts` un-blocking exactly those three; `align`/`group`/
+  `rotate`/`position`/`selectionPane` (undefined `WC.Layout.*`) STAY blocked. Re-reviewed clean. (PR #63 `4e13be8`)
+- [x] **2 `[4b]` tests**: tab appears on select + Lock Aspect toggles the attr; the three Arrange cmds
+  report `isBlocked===false` (while `align`/`rotate` stay blocked) and `bringForward` via the ribbon
+  `run()` path reaches `setImageZOrder`. Gates: **PM 439 / smoke 9 / roundtrip 27**. **Merged PR #63 `c914f66`.**
+
 ### 2026-06-16 (AutoFit Contents 4d.5 + exhaustive pagination audit, `/loop` "keep going")
 - [x] **Audited pagination exhaustively** (post Fix A) via headless probes — ALL behaviors clean:
   auto-overflow (70 paras → break at line 45 = the oracle), manual breaks, blank pages, clicking at
