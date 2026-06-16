@@ -29,7 +29,17 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1 DONE; 4d.2 row-resize / frames-overlay / 4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1+4d.2 DONE; 4d.3 row-UI / frames-overlay / 4e NEXT
+> **4d.2 row-height EXPORT fix DONE + MERGED** (PR #48 `8849c4e`): `tr-translator` reconciliation wrote
+> the nested row-height `value` as a STRING → the `trHeight` decode (typeof===number) silently dropped
+> it → a set row height produced NO `<w:trHeight>` (Word saw auto). Now a number + keeps the rule.
+> Oracle: 60px → 45pt atLeast. Gates: **PM 423 / smoke 9 / roundtrip 27**. **NEXT (pick one):** 4d.3
+> row-resize UI affordance (drag overlay / ribbon Row Height — heights round-trip now but no UI to set
+> one) → table RELOCATE → row-split → AutoFit; OR the FRAMES-OVERLAY (§A.1d); OR 4e headers/footers.
+> Session is very long — a fresh session is ideal next.
+>
+> <details><summary>Prior 4d.1 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4d.1 table COLUMN RESIZE DONE + MERGED** (PR #46 `52d88dd`): re-enabled prosemirror-tables
 > `columnResizing` (`handleWidth` 0→5); drag a column border → `colwidth`. A grid-sync
 > `appendTransaction` rebuilds the table `grid` (twips) from the changed colwidths so the resize
@@ -39,6 +49,8 @@
 > 4d.2 row RESIZE (+ fix the `setRowHeight` px-vs-twips export bug; no built-in row resize → custom
 > handle) → table RELOCATE → row-split → AutoFit; OR the FRAMES-OVERLAY (faithful image reposition +
 > render z-stacking + floating shapes, LAYOUT_ENGINE.md §3); OR 4e headers/footers. deferrals §A.1d/§A.1e.
+>
+> </details>
 >
 > <details><summary>Prior 4c.3 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -383,6 +395,18 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4d.2 — row-height export fix, `/loop`)
+- [x] **Investigated row resize** — the suspected px-vs-twips bug was misdiagnosed: `tr-translator`
+  already reconciles px→twips, but rebuilt the nested `value` as a STRING, which the `trHeight` decode
+  (`typeof === number`) silently dropped → a set row height produced NO `<w:trHeight>` (Word: auto).
+- [x] **Fix** (PR #48, merge `8849c4e`, `fix(docx)`): write a NUMBER value + spread the existing nested
+  rowHeight (keep `rule`). +1 `[4d]` test; fixed a stale vendored `tr-translator.test.js`.
+- [x] **Oracle-validated**: 60px row → `w:trHeight w:val="900" w:hRule="atLeast"` → Word 45pt atLeast;
+  unset rows stay auto. Imported unchanged rows skip the reconciliation (roundtrip gate green).
+- [x] **`/code-review`**: confirmed idempotent + no string consumers; caught the stale vendored test (fixed).
+  Gates: **PM 423 / smoke 9 / roundtrip 27**.
+- [x] **4d.2 COMPLETE + merged.** Row-resize UI affordance (drag/spinner) deferred to 4d.3 (deferrals §A.1e).
 
 ### 2026-06-16 (Phase 4d.1 — table column resize, `/loop`)
 - [x] **Investigated the table subsystem** — prosemirror-tables `columnResizing` already loaded but

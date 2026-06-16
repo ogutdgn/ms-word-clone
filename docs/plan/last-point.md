@@ -7,7 +7,37 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Phase 4d.1 table COLUMN RESIZE DONE; 4d.2 (row resize) or frames-overlay next)
+## 2026-06-16 (RESUME HERE — Phase 4d.2 row-height export fix DONE; 4d.3 row-resize UI / frames-overlay / 4e next)
+
+> **Branch:** `main` (4d.2 merged via PR #48 `8849c4e`; branch deleted). **Phase:** 4 (layout
+> engine). DONE so far: 4a pagination, 4b image resize, 4c.1 wrap, 4c.3 z-order, 4d.1 column resize,
+> 4d.2 row-height export. All oracle-validated. Gates: **PM 423 / smoke 9 / roundtrip 27.**
+>
+> **4d.2 done (PR #48):** fixed the row-height EXPORT round-trip. `tr-translator`'s reconciliation
+> rebuilt the nested row-height `value` as a STRING (`String(pixelsToTwips(...))`), which the
+> `trHeight` decode silently dropped (`typeof value === 'number'` guard) — so a set/changed row height
+> produced NO `<w:trHeight>` (Word saw auto-height); it also dropped the `rule`. Now a NUMBER + spreads
+> the existing nested rowHeight (keeps rule). Imported unchanged rows skip the reconciliation (round-trip
+> gate stayed green). Oracle: 60px → `w:trHeight w:val="900" w:hRule="atLeast"` → Word 45pt atLeast.
+> (NB the bug was the string cast, NOT px-vs-twips as first diagnosed.) Fixed a stale vendored
+> `tr-translator.test.js` (not run by the electron gates; vitest absent).
+>
+> **NEXT — pick one** (deferrals.md §A.1d frames-overlay, §A.1e tables):
+>   1. **4d.3 — row-resize UI affordance** (heights now round-trip, but there's no way to SET one from
+>      the UI: no built-in row resize → custom drag overlay, OR wire a ribbon Row Height control;
+>      `setRowHeight`/`tableSetRowHeight` exist programmatically). Then table RELOCATE → row-split → AutoFit.
+>   2. **The FRAMES-OVERLAY** (bigger 4c piece) — absolutely-positioned floating frames + text-exclusion;
+>      unblocks faithful image reposition (4c.2) + render z-stacking + floating Shapes/TextBox.
+>   3. **4e (headers/footers + fields)** — currently fully blocked (toast). High value.
+> Branch off `main`. **NOTE the session is now very long** — a fresh session is ideal for the next slice.
+>
+> GOTCHAS for tables (4d.3): caret won't stay in an HTML-`insertContent`ed table (use `insertTable`);
+> synthetic full-drag doesn't drive PM pointer plugins headlessly (validate via plugin-arm + direct attr
+> write + oracle); `read-table` oracle verb reports col widths + row heights (auto rows = 9999999 pt).
+
+---
+
+## 2026-06-16 (Phase 4d.1 table COLUMN RESIZE DONE; 4d.2 (row resize) or frames-overlay next)
 
 > **Branch:** `main` (4d.1 merged via PR #46 `52d88dd`; branch deleted). **Phase:** 4 (layout
 > engine); **4a + 4b + 4c.1 wrap + 4c.3 z-order + 4d.1 column-resize are DONE**, all oracle-validated.
