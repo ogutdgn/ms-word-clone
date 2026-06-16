@@ -2049,6 +2049,25 @@
       || 'tight export missing wrapTight/wrapPolygon (Word would reject)';
   });
 
+  await t('[4c] behind/front/topbottom export the right wrap element + behindDoc (CT_Anchor)', async () => {
+    const wrapOf = async (mode) => {
+      setDoc('wrapm: ');
+      PM().insertImage({ src: mkImg(120, 90), alt: 'wm', width: 120, height: 90 });
+      await sleep(250);
+      if (selectImage() == null) return null;
+      PM().setImageWrap(mode); await sleep(140);
+      return await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    };
+    const behind = await wrapOf('behind');
+    if (!behind || !/<wp:wrapNone/.test(behind) || !/behindDoc="1"/.test(behind)) return 'behind: expected wrapNone + behindDoc="1"';
+    const front = await wrapOf('front');
+    if (!front || !/<wp:wrapNone/.test(front) || !/behindDoc="0"/.test(front)) return 'front: expected wrapNone + behindDoc="0"';
+    const tb = await wrapOf('topbottom');
+    if (!tb || !/<wp:wrapTopAndBottom/.test(tb)) return 'topbottom: expected wp:wrapTopAndBottom';
+    // all three are floating anchors with the required simplePos child
+    return /<wp:anchor[^>]*simplePos=/.test(tb) && /<wp:simplePos/.test(tb) || 'topbottom anchor missing required simplePos';
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');

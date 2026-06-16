@@ -53,7 +53,7 @@
 | Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
 | ~~Insert → Pages~~ | ~~**Page Break vertical geometry**~~ | **RESOLVED 2026-06-15 (Phase 4a)**: the pagination engine (`src/renderer/pagination/pagination.ts`) renders manual page breaks (`hardBreak[pageBreakType='page']`) and blank pages (two consecutive breaks) as real page boundaries, plus auto multi-page flow + line-level intra-paragraph splitting. Oracle-validated vs Word for Windows 16.0 (`word-oracle-win.ps1 read-layout`): break paragraph + page count match exactly. | ~~2026-06-15~~ |
 | ~~Insert → Picture / object selection~~ | ~~**Image RESIZE** (drag handles)~~ | **RESOLVED 2026-06-15 (Phase 4b)**: live resize via an owned 8-handle overlay (`src/renderer/imageresize/image-resize.ts`) — drag writes the image `size` attr (px), which the exporter turns into `wp:extent`/`a:ext` (EMU). Aspect-locked (Word's default). Oracle-validated (`read-shapes`): 200×100→260×130 px renders in Word as 195pt×97.5pt = 2476500×1238250 EMU. See §A.1c for the remaining 4b edges. | ~~2026-06-15~~ |
-| Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE + text-wrap** (floating) | Insert is **inline only**; drag-to-reposition + inline⇄floating + wrap (square/tight/through/top&bottom/behind/in-front) need the frames overlay + `w:anchor`/`posH`/`posV`. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
+| Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE** (floating) + ~~text-wrap~~ | **text-wrap RESOLVED 2026-06-15 (Phase 4c.1)**: `WC.PM.setImageWrap(mode)` wires the ribbon Wrap Text (inline/square/tight/through/top&bottom/behind/in-front) to the image `wrap`+`isAnchor` attrs → renders (float/shape-outside/absolute, real reflow) + exports a schema-valid `wp:anchor`; oracle-validated (all 6 floating modes open as floatingShapes). **Still deferred**: drag-to-RELOCATE (4c.2), z-order Bring/Send (4c.3), and the §A.1d edges. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
 | Insert / Table Tools → Table | **Column/row RESIZE, table RELOCATE, row-split across pages** | Tables render but the grid is fixed: dragging column/row borders (`w:gridCol`/`w:trHeight`), moving a table, and splitting a tall table's rows across a page boundary all need the table layout pass. LAYOUT_ENGINE.md §2 #4–6 / sub-phase 4d. | 2026-06-15 |
 
 #### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
@@ -156,6 +156,31 @@
 - **No automated oracle gate for image geometry in `test:pm`.** The `[4b]` tests assert
   self-consistent geometry (size grows, aspect locked, `wp:extent` EMU = px × 9525) + handle
   alignment; the Word-side parity is the manual `word-oracle-win.ps1 read-shapes` step.
+
+#### A.1d — Phase-4c image floating/wrap: recorded limitations (from the `/code-review` pass, 2026-06-15)
+
+> 4c.1 (text-wrap wiring) is DONE + oracle-validated (all 6 floating modes open in Word as
+> floatingShapes; the exporter now emits a schema-valid CT_Anchor). These edges remain.
+
+- **Drag-to-RELOCATE is not built (4c.2).** `setImageWrap` floats the image and seeds a
+  column/paragraph-relative anchor at offset {0,0}; there is no overlay yet to drag a floating
+  image to an arbitrary position (which would write `marginOffset` → `wp:posOffset`). So a freshly
+  wrapped image sits at its paragraph/column origin rather than wherever Word would keep it; the
+  user can't reposition it. Mirror the 4b resize overlay. (Latent: once 4c.2 writes a custom
+  `marginOffset`, toggling to inline and back re-uses the stale offset — `setImageWrap`'s re-seed
+  guard only fires when horizontal/top are null, not 0; reset it when 4c.2 lands.)
+- **Z-order Bring Forward / Send Backward is not wired (4c.3).** Those ribbon items (+ the Position
+  preset grid) still call the retired `WC.Layout.*` (undefined → throws on click). 4c.3 wires them to
+  mutate the image `relativeHeight` attr. Only the wrap items (incl. "Behind/In Front of Text") are
+  wired in 4c.1.
+- **Tight/Through wrap follows the bounding box, not the image outline.** The default polygon is the
+  image's rectangle (Word's own seed), so Tight ≈ Square for a rectangular image and does NOT hug a
+  transparent-PNG silhouette; there is no polygon-edit UI. Faithful for rectangular images.
+- **Image-in-table-cell floating is unverified.** `setImageWrap` floats an image at any selection
+  depth (export sets `layoutInCell=1`), but in-cell anchoring vs Word isn't tested.
+- **No automated Word-open gate.** The `[4c]` tests assert the export carries the required
+  CT_Anchor attrs + wrap element (string match) — they'd catch a missing `simplePos`/`wrapPolygon` —
+  but "does Word actually open it" is the manual `word-oracle-win.ps1 read-shapes` step.
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 
