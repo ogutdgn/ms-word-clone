@@ -7,7 +7,40 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Repeat Header Row export test DONE (PR #88) via RE-SCOUT; fresh SCOUT BACKLOG v2 recorded)
+## 2026-06-16 (RESUME HERE — merged-cell gridSpan export test DONE (PR #90); scout-v2 #1 shipped; next = #2/#3)
+
+> **Branch:** `main` (gridSpan test merged PR #90 `efdaf1e`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 453 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Merged-cell gridSpan export test — DONE (PR #90):** took **scout-v2 #1**. `tableMerge` (horizontal) was
+> the only structural table edit with no export coverage. Added a `[6b]` test: a horizontal merge emits
+> `<w:gridSpan w:val="2">` on the surviving cell AND `<w:tblGrid>` keeps all 3 `<w:gridCol>` (a gridSpan/grid
+> mismatch is what makes Word repair-prompt) + `oracle-probe-6b-gridspan.js` + reusable
+> `validate-gridspan-win.ps1`. **🔬 Word COM-validated:** the saved doc OPENS WITHOUT REPAIR, reads
+> `Rows(1).Cells.Count=2` (merged) / `Rows(2)=3` — the Cells.Count read is a POSITIVE structural guard
+> (a silent repair that dropped the merge would read 3). **No corruption** (the horizontal merge is valid
+> OOXML — distinct from the reserved 2+-table corruption `task_0e043993`). Test-only. `/code-review` clean.
+>
+> **🗂️ SCOUT BACKLOG v2 (updated — pick next):**
+>   1. ~~Merged-cell gridSpan export~~ **DONE (PR #90).**
+>   2. **Paragraph SHADING export + COM (rec 0.95) — RECOMMENDED NEXT.** Wired (commands.js ~1810,
+>      `{val:'clear',fill}`), no COM-validated export test. Assert `<w:pPr><w:shd w:val="clear" w:fill="FF0000">`;
+>      COM `Selection.ParagraphFormat.Shading.BackgroundPatternColor=255`. Mirror the cell-shading recipe (PR #86).
+>   3. **Paragraph BORDERS export + COM (rec 0.93)** — wired (commands.js ~207), no COM test. The eighths→
+>      half-point (`w:sz=4` → 0.5pt) mapping is a real fidelity risk. COM `ParagraphFormat.Borders(...).LineStyle/LineWidth`.
+>   4. **OOXML child-ORDER sweep: w:rPr / w:pPr / w:trPr / w:numPr** — spec-compliance (Word tolerates), mirrors
+>      PR #77/#82; rPr highest-reachability; multi-file, lower real value. Proposed xmlOrder arrays in the scout output.
+>   5. **distributeColumns/Rows geometry export tests (rec 0.7)** — assert even `<w:gridCol>`/`<w:trHeight>` export.
+>   - **Bigger (defer):** line-spacing rule dropdown, special-indent (first-line/hanging) dropdown, Tabs dialog;
+>     picture effects via a14 (deferred #2 from the earlier session).
+>
+> **NEXT:** scout-v2 #2 (paragraph shading export+COM — highest confidence, mirrors PR #86) or #3 (paragraph
+> borders — has a real unit-mapping risk). The 2+-table corruption (`task_0e043993`) + CUA vAlign
+> (`task_c62b4d4c`) stay focused-session spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (Repeat Header Row export test DONE (PR #88) via RE-SCOUT; fresh SCOUT BACKLOG v2 recorded)
 
 > **Branch:** `main` (repeat-header test merged PR #88 `478c8a4`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 452 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**

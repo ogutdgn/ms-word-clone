@@ -450,6 +450,14 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (merged-cell gridSpan export test, `/loop` 5-min cadence)
+- [x] **Merged-cell gridSpan export test (PR #90 `efdaf1e`)** — scout-v2 #1. Horizontal `tableMerge` → new
+  `[6b]` test: `<w:gridSpan w:val="2">` + `<w:tblGrid>` keeps all 3 `<w:gridCol>` + probe + reusable
+  `validate-gridspan-win.ps1`. **Word COM-validated:** opens WITHOUT repair, `Rows(1).Cells.Count=2` /
+  `Rows(2)=3` (positive structural guard against silent repair). No corruption. Test-only. `/code-review`
+  clean. Gates: **PM 453 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** scout-v2 #2 (paragraph shading export+COM) or #3 (paragraph borders export+COM).
+
 ### 2026-06-16 (RE-SCOUT + Repeat Header Row export test, `/loop` 5-min cadence)
 - [x] **RE-SCOUT** (backlog was exhausted): 4 parallel agents over CSS↔OOXML mapping / table export gaps /
   latent OOXML-order / paragraph-layout export gaps → fresh **SCOUT BACKLOG v2** in last-point.md (merged-cell
