@@ -7,7 +7,39 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — bullet-list export test DONE (PR #98) via RE-SCOUT v3; found+flagged a real mixed-list BUG; v3 queue recorded)
+## 2026-06-16 (RESUME HERE — hyperlink export test DONE (PR #100); scout-v3 #1 shipped; next = #2 bookmark / #4 char-format)
+
+> **Branch:** `main` (hyperlink test merged PR #100 `6cd1647`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 458 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Hyperlink export test — DONE (PR #100):** took **scout-v3 #1**. `insertLink` was wired but export-untested.
+> Added a `[6]` test: `<w:hyperlink r:id="rIdN">` + a matching External `<Relationship>` (Target=url,
+> `TargetMode="External"`) in `word/_rels/document.xml.rels` + `oracle-probe-6-hyperlink.js` + reusable
+> `validate-hyperlink-win.ps1`. **🔬 Word COM-validated:** opens clean, `Hyperlinks.Count=1`,
+> `.Address="https://example.com/"`, `.TextToDisplay="click here"` — the External relationship resolves.
+> `/code-review` clean (hardened the rels lookup to `.find('Relationships')`).
+>
+> **🗂️ SCOUT BACKLOG v3 (updated — pick next):**
+>   1. ~~Hyperlink export+COM~~ **DONE (PR #100).**
+>   2. **BOOKMARK export + COM (rec high) — RECOMMENDED NEXT.** `WC.PM.insertBookmark({name})` → paired
+>      `<w:bookmarkStart w:name=.. w:id=..>`/`<w:bookmarkEnd>`. Needs a `validate-bookmark-win.ps1`
+>      (`doc.Bookmarks.Count`/`.Exists(name)`/`.Item(name).Name`). Use a clean ASCII name (the bridge
+>      collapses whitespace to `_`; Word rejects names with spaces/leading digits). Clean core feature.
+>   3. **HIGHLIGHT color over-exposure (REAL fidelity bug)** — non-keyword highlight swatches export as
+>      `w:shd` not `w:highlight` → Word `wdNoHighlight`. Fix = restrict the picker to Word's 15
+>      ST_HighlightColor keywords (a UX change — judgment call; maybe steer with user).
+>   4. **Character-format export+COM matrix** (font color/size half-points/rFonts/underline-style/sub-sup) —
+>      clean lock-ins; underline-style + highlight carry the enum-mapping fidelity risk. A batch.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness (multilevel mints abstractNum).
+>
+> **NEXT:** v3 #2 (bookmark — cleanest core feature, mirrors the hyperlink recipe) then #4 (char-format
+> matrix). The bigger items (a14 picture effects / frames-overlay / 4e headers) still need a STEERED focused
+> session. spawn_tasks (NOT loop work): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list
+> `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (bullet-list export test DONE (PR #98) via RE-SCOUT v3; found+flagged a real mixed-list BUG; v3 queue recorded)
 
 > **Branch:** `main` (lists test merged PR #98 `b1b634d`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 457 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
