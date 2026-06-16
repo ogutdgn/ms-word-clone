@@ -29,7 +29,19 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a (pagination) + 4b (image resize) COMPLETE; 4c (floating) NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a + 4b + 4c.1 (text-wrap) COMPLETE; 4c.2 (reposition) NEXT
+> **4c.1 text-wrap DONE + MERGED** (PR #42 `4bbdb51`): `WC.PM.setImageWrap(mode)` wires the ribbon
+> Wrap Text (7 modes) to the image `wrap`+`isAnchor` attrs — the fork already renders (float/shape-
+> outside/absolute) + round-trips; the gap was a phantom `WC.Layout` stub. Key fix: the anchor
+> exporter now emits a schema-valid `CT_Anchor` (simplePos child + required attrs) so Word OPENS a
+> freshly-floated image; tight/through get a default bounding-box `wp:wrapPolygon`. Oracle: all 6
+> floating modes open as floatingShapes. Gates: **PM 419 / smoke 9 / roundtrip 27**. Edges →
+> deferrals.md §A.1d. **NEXT: 4c.2 drag-to-reposition** (frames overlay mirroring the 4b resize
+> overlay → writes `marginOffset`/`wp:posOffset`), then **4c.3 z-order** (Bring/Send →
+> `relativeHeight`). Branch `build/phase-4c2-reposition` off `main`. Then 4d tables → 4e → 4f.
+>
+> <details><summary>Prior 4b CURRENT-PHASE note (kept for context)</summary>
+>
 > **4b image resize DONE + MERGED** (PR #40 `6d8c448`): a live 8-handle resize overlay
 > (`src/renderer/imageresize/image-resize.ts`, owned/out-of-fork) writes the image `size` attr →
 > `wp:extent`/`a:ext` (EMU); aspect-locked (Word default); the overlay rides `#pages` so it tracks the
@@ -38,6 +50,8 @@
 > 27**. **NEXT: sub-phase 4c (floating anchor/position/wrap)** — branch `build/phase-4c-floating` off
 > `main`; the frames overlay (inline⇄floating, drag-reposition, text-wrap, `w:anchor`/`posH`/`posV`);
 > LAYOUT_ENGINE.md §2.3. Then 4d tables → 4e headers/footers → 4f page-bg/columns/section-geometry.
+>
+> </details>
 >
 > <details><summary>Prior 4a CURRENT-PHASE note (kept for context)</summary>
 >
@@ -342,6 +356,23 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4c.1 — image text wrap, `/loop`)
+- [x] **Investigated the floating subsystem** — found the fork already RENDERS wrap (float/shape-
+  outside/absolute → real reflow) + round-trips it; the gap was the ribbon calling a never-defined
+  `WC.Layout`. Validated render + export with probes.
+- [x] **`WC.PM.setImageWrap(mode)`** (PR #42, merge `4bbdb51`, `feat(layout)`): wires the ribbon Wrap
+  Text (inline/square/tight/through/topbottom/behind/front) to the image `wrap`+`isAnchor` attrs;
+  seeds anchorData + (for tight/through) a default bounding-box `wp:wrapPolygon`. commands.js
+  re-pointed off the phantom `WC.Layout`.
+- [x] **`fix(docx)` valid CT_Anchor** (`translate-anchor-node.js`): a generated (inline→floating)
+  anchor now emits the required `<wp:simplePos>` child + attrs (simplePos/behindDoc/locked/
+  layoutInCell/allowOverlap) — Word REFUSED to open the file without them. Oracle-caught.
+- [x] **Oracle-validated** via `read-shapes`: all 6 floating modes open in Word as floatingShapes
+  (square 120×90 px = 90pt×67.5pt). tight/through were rejected pre-polygon-fix.
+- [x] **`/code-review` (2 angles + verifiers)**: no correctness bugs; added behind/front/topbottom
+  export tests + recorded 4c edges (deferrals.md §A.1d: 4c.2 reposition, 4c.3 z-order, tight=bbox).
+- [x] **4c.1 COMPLETE + merged.** Gates: **PM 419 / smoke 9 / roundtrip 27**. NEXT: 4c.2 drag-reposition.
 
 ### 2026-06-15 (Phase 4b — image resize, `/loop`)
 - [x] **Oracle `read-shapes` verb** (`307338c`, `test(oracle)`): InlineShapes + floating Shapes
