@@ -7,7 +7,37 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Phase 4c.1 wrap + 4c.3 z-order DONE; the FRAMES-OVERLAY is the remaining 4c)
+## 2026-06-16 (RESUME HERE — Phase 4d.1 table COLUMN RESIZE DONE; 4d.2 (row resize) or frames-overlay next)
+
+> **Branch:** `main` (4d.1 merged via PR #46 `52d88dd`; branch deleted). **Phase:** 4 (layout
+> engine); **4a + 4b + 4c.1 wrap + 4c.3 z-order + 4d.1 column-resize are DONE**, all oracle-validated.
+>
+> **4d.1 done (PR #46):** table **column resize** works. Re-enabled prosemirror-tables `columnResizing`
+> (`handleWidth` 0→5 in `extensions/table/table.js` — it was 0, disabling the drag hit-zone for a
+> never-built custom overlay). Drag a column border → cells' `colwidth` (px). KEY FIX: a grid-sync
+> `appendTransaction` (table.js) rebuilds the table's `grid` attr (twips) from the changed colwidths +
+> marks `userEdited`, because the exporter emits `w:gridCol` verbatim from `grid` — without it a resize
+> on an IMPORTED table (which carries a grid) was silently DROPPED on save (caught by `/code-review`).
+> New oracle verb `read-table` (column widths + row heights, pt). Oracle-validated: 180px resize →
+> `w:gridCol=2700` → Word 135pt, for BOTH new + imported (stale-grid) tables. Code-reviewed +
+> re-reviewed (grid-sync round-trip + a per-keystroke deep-walk perf fix).
+>
+> **Gates on main: PM 422 / smoke 9 / roundtrip 27.**
+>
+> **NEXT — pick one** (both recorded; deferrals.md §A.1d frames-overlay, §A.1e tables):
+>   1. **4d.2 — row RESIZE** (+ FIX the known `setRowHeight` px-vs-twips export bug: it stores px in
+>      `tableRowProperties.rowHeight.value` but the exporter writes that as `w:trHeight w:val` which
+>      Word reads as TWIPS → ~15× too small). prosemirror-tables has NO built-in row resize → needs a
+>      custom handle/overlay. Then table RELOCATE, row-split across pages, AutoFit.
+>   2. **The FRAMES-OVERLAY** (the bigger 4c piece) — render every floating object as an absolutely-
+>      positioned frame with text-exclusion → unblocks faithful free-REPOSITION (4c.2) + render
+>      z-stacking + floating Shapes/TextBox (#7). LAYOUT_ENGINE.md §3.
+>   3. **4e (headers/footers + fields)** — currently fully blocked (toast).
+> Branch off `main`. Recommend 4d.2 (continues tables) or 4e (high-value, currently blocked).
+
+---
+
+## 2026-06-16 (Phase 4c.1 wrap + 4c.3 z-order DONE; the FRAMES-OVERLAY is the remaining 4c)
 
 > **Branch:** `main` (4c.3 z-order merged via PR #44 `66d691e`; branch deleted). **Phase:** 4
 > (layout engine); **4a + 4b + 4c.1 (text wrap) + 4c.3 (z-order export) are DONE**, all

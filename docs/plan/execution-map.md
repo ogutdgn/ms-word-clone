@@ -29,7 +29,19 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a + 4b + 4c.1 wrap + 4c.3 z-order DONE; FRAMES-OVERLAY or 4d/4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a+4b+4c.1+4c.3+4d.1 DONE; 4d.2 row-resize / frames-overlay / 4e NEXT
+> **4d.1 table COLUMN RESIZE DONE + MERGED** (PR #46 `52d88dd`): re-enabled prosemirror-tables
+> `columnResizing` (`handleWidth` 0→5); drag a column border → `colwidth`. A grid-sync
+> `appendTransaction` rebuilds the table `grid` (twips) from the changed colwidths so the resize
+> round-trips (the exporter emits `w:gridCol` from `grid`; otherwise an IMPORTED-table resize was
+> dropped on save — caught by review). New oracle verb `read-table`. Oracle-validated: 180px → Word
+> 135pt for new + imported tables. Gates: **PM 422 / smoke 9 / roundtrip 27**. **NEXT (pick one):**
+> 4d.2 row RESIZE (+ fix the `setRowHeight` px-vs-twips export bug; no built-in row resize → custom
+> handle) → table RELOCATE → row-split → AutoFit; OR the FRAMES-OVERLAY (faithful image reposition +
+> render z-stacking + floating shapes, LAYOUT_ENGINE.md §3); OR 4e headers/footers. deferrals §A.1d/§A.1e.
+>
+> <details><summary>Prior 4c.3 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4c.3 z-order DONE + MERGED** (PR #44 `66d691e`): `WC.PM.setImageZOrder(forward|backward|toFront|
 > toBack)` mutates the floating image's `relativeHeight` (forward/backward use `>=`/`<=` for tied
 > peers); ribbon Bring/Send wired. EXPORT faithful (oracle `read-shapes` → distinct ZOrderPositions).
@@ -38,6 +50,8 @@
 > objects as absolutely-positioned frames with text-exclusion — LAYOUT_ENGINE.md §3) — a substantial
 > piece, not a clean slice. Next session: build the frames-overlay, OR pivot to **4d (tables)** /
 > **4e (headers-footers)** which may be cleaner wins. Confirm priority first (deferrals.md §A.1d).
+>
+> </details>
 >
 > <details><summary>Prior 4c.1 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -369,6 +383,24 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4d.1 — table column resize, `/loop`)
+- [x] **Investigated the table subsystem** — prosemirror-tables `columnResizing` already loaded but
+  `handleWidth: 0` (disabled for a never-built custom overlay); `colwidth` (px) → `w:gridCol`/`w:tcW`.
+- [x] **Enable column resize** (`handleWidth` 0→5) + **grid-sync appendTransaction** (PR #46, merge
+  `52d88dd`, `feat`/`fix`): drag a border → colwidth; grid-sync rebuilds the table `grid` (twips) from
+  the change so the resize round-trips (exporter emits w:gridCol from `grid` — an IMPORTED-table resize
+  was else dropped on save). New oracle verb `read-table`. +2 `[4d]` tests.
+- [x] **Headless validation hurdles** (recorded): synthetic full-drag doesn't trigger the PM pointer
+  plugin, and the caret won't stay in an HTML-inserted table — so validated via (a) the plugin ARMS on
+  border-hover (`activeHandle` set), and (b) `colwidth` set directly → export → oracle read-table.
+- [x] **Oracle-validated**: 180px column → `w:gridCol=2700` → Word 135pt, for new AND imported
+  (stale-grid) tables.
+- [x] **`/code-review` + re-review**: caught the imported-table data-loss bug (grid not synced — the
+  whole point of the grid-sync) + a per-keystroke deep-walk perf issue (switched to `doc.forEach`);
+  re-review clean (2 low/by-design notes). Gates: **PM 422 / smoke 9 / roundtrip 27**.
+- [x] **4d.1 COMPLETE + merged.** NEXT (pick one): 4d.2 row-resize (+fix setRowHeight px/twips bug) /
+  frames-overlay / 4e headers-footers.
 
 ### 2026-06-16 (Phase 4c.3 — image z-order, `/loop`)
 - [x] **Investigated reposition vs z-order** — found the fork's float-based render can't free-position
