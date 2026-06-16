@@ -7,7 +7,43 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Phase 4d.2 row-height export fix DONE; 4d.3 row-resize UI / frames-overlay / 4e next)
+## 2026-06-16 (RESUME HERE — Phase 4d.3 Row/Column size ribbon controls DONE; table RELOCATE / frames-overlay / 4e next)
+
+> **Branch:** `main` (4d.3 merged via PR #50 `3c1b527`; branch deleted). **Phase:** 4 (layout
+> engine). DONE so far: 4a pagination, 4b image resize, 4c.1 wrap, 4c.3 z-order, 4d.1 column resize,
+> 4d.2 row-height export, **4d.3 row/column size ribbon UI**. All oracle-validated.
+> Gates: **PM 425 / smoke 9 / roundtrip 27.**
+>
+> **4d.3 done (PR #50):** the row-resize UI affordance (deferred §A.1e) is now built — as the faithful
+> Word **ribbon** controls rather than a drag overlay. Added **Row Height** + **Column Width** `dropdown`
+> controls to the Table Layout contextual tab's "Cell Size" group (`table-tools-pm.js`). Each opens a
+> shared `tblSizeFly` flyout (`commands.js` — an inches number input + presets) → `H.tblRowHeight`
+> applies `tableSetRowHeight(px,'atLeast')`, `H.tblColWidth` applies `tableSetCellWidth(px)` (inches×96=px;
+> model/exporter convert px→twips). Both cmds added to the dropdown-dispatcher allow-list (was returning
+> "no options"). Oracle `read-table`: Row Height 0.5" → row 1 = 36pt heightRule=atLeast; Column Width
+> 1.5" → col 0 = 108pt. 2 regression tests (full ribbon path: `WC.Commands.dropdown` → flyout preset →
+> assert model attr + exported OOXML). `/code-review` (xhigh, 3 finder passes incl. test false-pass
+> sweep): **zero findings** (confirmed: all `WC.fly*` helpers exist, `flyItem` auto-closes via util.js:89,
+> bridge signatures match, 2160-twip clicked column distinguishable from the 4680-twip default).
+>
+> **NEXT — pick one** (deferrals.md §A.1d frames-overlay, §A.1e tables remaining):
+>   1. **Table RELOCATE / row-split / AutoFit** — the remaining 4d table-layout items. RELOCATE needs a
+>      move handle (+ anchor for floating); row-split needs the pagination engine to split a table at a
+>      row boundary (currently moves it wholesale) via the fork's `splitTableAtRow` + repeat header rows;
+>      AutoFit (contents/window/fixed) needs the layout pass.
+>   2. **The FRAMES-OVERLAY** (bigger 4c piece) — absolutely-positioned floating frames + text-exclusion;
+>      unblocks faithful image reposition (4c.2) + render z-stacking + floating Shapes/TextBox.
+>   3. **4e (headers/footers + fields)** — currently fully blocked (toast). High value.
+> Branch off `main`. **NOTE the session is now VERY long** — a fresh session is strongly recommended.
+>
+> GOTCHAS for tables (carry forward): caret won't stay in an HTML-`insertContent`ed table (use
+> `insertTable`); synthetic full-drag doesn't drive PM pointer plugins headlessly (validate via
+> plugin-arm + direct attr write + oracle); `read-table` oracle verb reports col widths + row heights
+> (auto rows = 9999999 pt); a default 2-col Letter table is 312px/col = 4680 twips.
+
+---
+
+## 2026-06-16 (Phase 4d.2 row-height export fix DONE; 4d.3 row-resize UI / frames-overlay / 4e next)
 
 > **Branch:** `main` (4d.2 merged via PR #48 `8849c4e`; branch deleted). **Phase:** 4 (layout
 > engine). DONE so far: 4a pagination, 4b image resize, 4c.1 wrap, 4c.3 z-order, 4d.1 column resize,
