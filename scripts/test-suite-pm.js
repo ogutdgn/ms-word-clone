@@ -2329,6 +2329,24 @@
     return !/<w:tblW[^>]*w:type="pct"/.test(xml) || 'Contents left the Window pct stretch in place';
   });
 
+  await t('[4d] AutoFit Contents shrinks each column to fit its content (short col < long col)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(200);
+    // Caret in the FIRST cell → short word; Tab to the next cell → long content (cell navigation
+    // is the reliable way to target a specific cell). AutoFit Contents must size col 0 < col 1.
+    let firstCell = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && firstCell == null) firstCell = pos; });
+    window.WC.editor.commands.setTextSelection(firstCell + 2);
+    window.WC.editor.commands.insertContent('Hi');
+    window.WC.editor.commands.goToNextCell(1);
+    window.WC.editor.commands.insertContent('Supercalifragilistic expialidocious lengthy column content here');
+    await sleep(250);
+    PM().tableAutoFit('contents'); await sleep(250);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<w:tblLayout[^>]*w:type="autofit"/.test(xml)) return 'no w:tblLayout autofit';
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    if (gridCols.length !== 2) return 'expected 2 gridCols, got ' + JSON.stringify(gridCols);
+    return gridCols[0] < gridCols[1] || 'AutoFit Contents did not shrink the short column below the long one: ' + JSON.stringify(gridCols);
+  });
+
   await t('[4d] ribbon AutoFit Window fills the table (full flyout path)', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
     setCols([100, 100]); await sleep(120);

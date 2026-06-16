@@ -2198,7 +2198,7 @@ export const Table = Node.create({
        * editor.commands.autoFitTable('window', 624)
        */
       autoFitTable:
-        (mode, targetWidthPx) =>
+        (mode, targetWidthPx, contentWidths) =>
         ({ state, tr, dispatch }) => {
           if (!isInTable(state)) return false;
           if (!['fixed', 'contents', 'window'].includes(mode)) return false;
@@ -2225,55 +2225,62 @@ export const Table = Node.create({
               tableProperties: nextProps,
             });
 
-            // AutoFit Window GEOMETRY: scale every column proportionally so they fill the
-            // page text width (`targetWidthPx`, supplied by the bridge from getPageStyles()).
-            // Writing the real per-cell `colwidth` (px) makes the in-app table fill the column
-            // immediately, and the tableColwidthGridSync plugin rebuilds the twips `grid` so the
-            // export (w:gridCol / w:tcW) is faithful — no Phase-7 layout pass needed for Window.
-            // (AutoFit Contents needs Word-equivalent text metrics to size columns to content,
-            // so its in-app reflow stays a layout-pass deferral; the layout/width intent above is
-            // enough for Word to autofit-to-contents when it opens the exported file.)
+            // GEOMETRY: compute a per-column target width (px) to write, then push it to every
+            // cell's `colwidth` (the tableColwidthGridSync plugin rebuilds the twips `grid`, so
+            // the in-app render AND the export — w:gridCol / w:tcW — both reflect it; no Phase-7
+            // layout pass needed). The target comes from:
+            //   'window'   → scale the current columns PROPORTIONALLY to fill the page text width
+            //                (`targetWidthPx`, from getPageStyles()).
+            //   'contents' → the bridge's MEASURED per-column content widths (`contentWidths`,
+            //                from a content-sized DOM reflow), so columns shrink to their content.
+            //   'fixed'    → no geometry write (keep the current column widths).
+            const map = TableMap.get(table.node);
+            const cols = map.width;
+            const tableStart = table.pos + 1;
+            let colTarget = null;
             const total = Math.round(Number(targetWidthPx) || 0);
-            if (mode === 'window' && total > 0) {
-              const map = TableMap.get(table.node);
-              const cols = map.width;
-              if (cols > 0) {
-                const tableStart = table.pos + 1;
-                // Current per-column widths (from whichever cell defines each column).
-                const cur = new Array(cols).fill(0);
-                for (let c = 0; c < cols; c++) {
-                  const cellIndex = map.map[c]; // row 0, column c
+            if (cols > 0 && mode === 'window' && total > 0) {
+              // Current per-column widths (from whichever cell defines each column).
+              const cur = new Array(cols).fill(0);
+              for (let c = 0; c < cols; c++) {
+                const cellIndex = map.map[c]; // row 0, column c
+                const cell = tr.doc.nodeAt(tableStart + cellIndex);
+                const rect = map.findCell(cellIndex);
+                const w = cell?.attrs?.colwidth?.[c - rect.left];
+                cur[c] = typeof w === 'number' && w > 0 ? w : 0;
+              }
+              // Proportional targets that sum EXACTLY to `total` (even split when unknown).
+              const curTotal = cur.reduce((a, b) => a + b, 0);
+              colTarget = new Array(cols);
+              let acc = 0;
+              for (let c = 0; c < cols; c++) {
+                colTarget[c] =
+                  curTotal > 0
+                    ? Math.max(1, Math.round((cur[c] / curTotal) * total))
+                    : Math.max(1, Math.floor(total / cols));
+                acc += colTarget[c];
+              }
+              colTarget[cols - 1] = Math.max(1, colTarget[cols - 1] + (total - acc)); // absorb rounding drift
+            } else if (cols > 0 && mode === 'contents' && Array.isArray(contentWidths) && contentWidths.length === cols) {
+              // Measured content widths (one per column; lengths align only for the no-colspan
+              // case — a mismatch falls through to intent-only, which Word still autofits on open).
+              colTarget = contentWidths.map((w) => Math.max(1, Math.round(Number(w) || 0)));
+            }
+
+            // Shared writer: set each cell's colwidth to the slice of colTarget its columns span.
+            if (colTarget) {
+              const seen = new Set();
+              for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < map.height; r++) {
+                  const cellIndex = map.map[r * cols + c];
+                  if (seen.has(cellIndex)) continue;
+                  seen.add(cellIndex);
                   const cell = tr.doc.nodeAt(tableStart + cellIndex);
+                  if (!cell) continue;
                   const rect = map.findCell(cellIndex);
-                  const w = cell?.attrs?.colwidth?.[c - rect.left];
-                  cur[c] = typeof w === 'number' && w > 0 ? w : 0;
-                }
-                // Proportional targets that sum EXACTLY to `total` (even split when unknown).
-                const curTotal = cur.reduce((a, b) => a + b, 0);
-                const colTarget = new Array(cols);
-                let acc = 0;
-                for (let c = 0; c < cols; c++) {
-                  colTarget[c] =
-                    curTotal > 0
-                      ? Math.max(1, Math.round((cur[c] / curTotal) * total))
-                      : Math.max(1, Math.floor(total / cols));
-                  acc += colTarget[c];
-                }
-                colTarget[cols - 1] = Math.max(1, colTarget[cols - 1] + (total - acc)); // absorb rounding drift
-                // Write each cell's colwidth as the slice of colTarget its columns span.
-                const seen = new Set();
-                for (let c = 0; c < cols; c++) {
-                  for (let r = 0; r < map.height; r++) {
-                    const cellIndex = map.map[r * cols + c];
-                    if (seen.has(cellIndex)) continue;
-                    seen.add(cellIndex);
-                    const cell = tr.doc.nodeAt(tableStart + cellIndex);
-                    if (!cell) continue;
-                    const rect = map.findCell(cellIndex);
-                    const next = [];
-                    for (let k = rect.left; k < rect.right; k++) next.push(colTarget[k]);
-                    tr.setNodeMarkup(tableStart + cellIndex, undefined, { ...cell.attrs, colwidth: next });
-                  }
+                  const next = [];
+                  for (let k = rect.left; k < rect.right; k++) next.push(colTarget[k]);
+                  tr.setNodeMarkup(tableStart + cellIndex, undefined, { ...cell.attrs, colwidth: next });
                 }
               }
             }
