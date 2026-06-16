@@ -15,7 +15,10 @@ export function translateAnchorNode(params) {
 
   const hasSimplePos = attrs.simplePos !== undefined || attrs.originalAttributes?.simplePos !== undefined;
 
-  if (!useOriginalChildren && hasSimplePos) {
+  // CT_Anchor requires a <wp:simplePos> child (minOccurs=1) even when simple positioning
+  // is off. The original-children path already carries it; for a GENERATED anchor (e.g. an
+  // inline image toggled to floating) we must emit it or Word rejects the .docx.
+  if (!useOriginalChildren) {
     anchorElements.push({
       name: 'wp:simplePos',
       attributes: {
@@ -86,6 +89,19 @@ export function translateAnchorNode(params) {
 
   if (attrs.originalAttributes?.simplePos === undefined && hasSimplePos) {
     inlineAttrs.simplePos = '1';
+  }
+
+  // CT_Anchor (ECMA-376 §20.4.2.3) REQUIRES simplePos/behindDoc/locked/layoutInCell/
+  // allowOverlap (+ distT/B/L/R default 0). An anchor generated from a fresh inline→
+  // floating toggle has none of these (no originalAttributes), and Word refuses to open a
+  // .docx whose wp:anchor omits them. Fill any that are missing with Word's defaults;
+  // imported anchors already carry them via originalAttributes, so they're untouched.
+  const anchorAttrDefaults = { distT: 0, distB: 0, distL: 0, distR: 0, simplePos: '0', locked: '0', layoutInCell: '1', allowOverlap: '1' };
+  for (const k in anchorAttrDefaults) {
+    if (inlineAttrs[k] === undefined || inlineAttrs[k] === null) inlineAttrs[k] = anchorAttrDefaults[k];
+  }
+  if (inlineAttrs.behindDoc === undefined || inlineAttrs.behindDoc === null) {
+    inlineAttrs.behindDoc = attrs.wrap?.attrs?.behindDoc ? '1' : '0';
   }
 
   const wrapElement = {
