@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Size group DONE (PR #65); Picture Format tab now has H/W + lock; frames-overlay is the keystone next)
+## 2026-06-16 (RESUME HERE — Picture Alt Text DONE (PR #67); IMAGE AREA COMPLETE; frames-overlay keystone is next, needs a FRESH session)
+
+> **Branch:** `main` (Alt Text merged PR #67 `e27ec79`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 441 / smoke 9 / roundtrip 27.**
+>
+> **Picture Alt Text — DONE (PR #67):** Word's Picture Format → Alt Text pane on the Picture Format
+> tab (new Accessibility group). New bridge verb `setImageAltText({title?,decorative?})`
+> (`bridge/insert.ts`): the description is the node's `title` attr (→ `wp:docPr/@descr`); `decorative`
+> sets the flag (→ `adec:decorative` ext) and clears the description (matching Word's pane). `H.imgAltText`
+> is a flyout with a description textarea (prefilled) + "Mark as decorative" checkbox. `/code-review`
+> clean — notably confirmed the description is XML-escaped by the exporter's `#replaceSpecialCharacters`,
+> so special chars can't corrupt the docx. 1 `[4b]` test (descr round-trips; decorative omits @descr +
+> emits the ext).
+>
+> **🏁 THE IMAGE AREA IS COMPLETE.** The Picture Format contextual tab now mirrors Word: **Size**
+> (Height / Width / Lock Aspect Ratio) + **Arrange** (Wrap Text / Bring Forward / Send Backward) +
+> **Accessibility** (Alt Text). Insert, resize (drag + numeric), wrap/float, z-order, free-stretch,
+> dimensionless sizing, lock-aspect, alt-text — all faithful + ribbon-reachable + round-tripping.
+>
+> **This session ran THREE slices (PRs #63/#65/#67 + docs #64/#66) and is now EXTREMELY long.**
+> **NEXT — the remaining Phase-4 work each needs a FRESH, FOCUSED session (do NOT start in a long one):**
+>   1. **The FRAMES-OVERLAY / paged-layout rework (THE KEYSTONE, deferrals §A.1b/d/e)** — unblocks
+>      line-split coords-safe render, table row-split (tall-table overflow reproduced), faithful
+>      floating image/shape REPOSITION (4c.2) + render z-stacking, AND the still-undefined `WC.Layout.*`
+>      Layout-tab Arrange cmds (position presets / align / group / rotate / selectionPane). Highest leverage.
+>   2. **4e headers/footers + fields** (`header-footer` AREA still DEFERRED) — its own subsystem.
+>   3. Smaller image polish: **Crop** (overlay + `a:srcRect` OOXML), Reset Size, Change Picture.
+> Branch off `main`.
+
+---
+
+## 2026-06-16 (Picture Size group DONE (PR #65); Picture Format tab now has H/W + lock; frames-overlay is the keystone next)
 
 > **Branch:** `main` (Picture Size group merged PR #65 `361fb53`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 440 / smoke 9 / roundtrip 27.**
