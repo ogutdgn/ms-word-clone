@@ -58,6 +58,7 @@ interface Layout {
   topMargin: number
   breaks: Break[]
   tail: number // bottom spacer height (fills last sheet + bottom margin)
+  tailBands: number[] // gap-band offsets within the tail (trailing blank pages from a doc-final break)
   pageCount: number
   signature: string
 }
@@ -334,17 +335,37 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
     const h = target - actualTop + precSpacer
     if (h > 1) breaks.push({ pos, height: h, bands: [h - GAP - g.marginTop] })
   }
-  // Move a SHORT straddling block wholesale to the next page (a seam BEFORE b).
-  const placeSeamBefore = (b: BlockMeasure) => {
-    emitSeam(b.pos, b.actualTop, b.precSpacer)
+  // Emit ONE BLOCK-BOUNDARY seam before block b that advances `k` pages (k>=1), with one gray
+  // gap band per page boundary it spans. Anchoring at b.pos (a top-level block edge) is
+  // COORDS-SAFE: the spacer renders as a block sibling of the paragraphs, never injected into
+  // a paragraph's inline flow. (A block <div> inside inline content corrupts PM's posAtCoords
+  // hit-testing — its full-width rect becomes the "closest" child for any x — so clicking the
+  // next page mislands the caret.) Used for forced page breaks that END a block, section
+  // breaks, and wholesale orphan moves.
+  const emitSeamBefore = (b: BlockMeasure, k: number) => {
+    pagesDone += k
+    const target = pagesDone * g.pitch + g.marginTop
+    const h = target - b.actualTop + b.precSpacer
+    if (h > 1) {
+      const bands: number[] = []
+      for (let j = 0; j < k; j++) {
+        const bt = h - GAP - g.marginTop - j * g.pitch
+        if (bt >= 0) bands.push(bt)
+      }
+      breaks.push({ pos: b.pos, height: h, bands })
+    }
     pageStartNat = b.natTop
   }
-  // Place a forced seam AT an inline page-break position P inside block b: pushes the
-  // content AFTER P to the next page's content-top. This single mechanism covers
-  // mid-paragraph, end-of-paragraph AND trailing (doc-final) breaks — and two adjacent
-  // breaks (insertBlankPage) naturally make a blank page (two seams). pageStartNat
-  // advances to P's natural Y so the auto-overflow below measures b's remainder from the
-  // right baseline. `precSpacer` = the intra-block seam height already above P's line.
+  // Move a SHORT straddling block wholesale to the next page (a seam BEFORE b).
+  const placeSeamBefore = (b: BlockMeasure) => emitSeamBefore(b, 1)
+  // Place a forced seam AT an inline page-break position P inside block b: pushes the content
+  // AFTER P to the next page's content-top. Used ONLY for MID-paragraph breaks now (a break
+  // that splits one paragraph across the boundary, so there is no block edge to anchor to) —
+  // end-of-paragraph / trailing / blank-page breaks are handled coords-safely as block-boundary
+  // seams before the next block (see emitSeamBefore + trailingForcedCount). This is the one
+  // remaining in-`<p>` spacer; making it coords-safe is the line-split/mid-paragraph follow-up.
+  // pageStartNat advances to P's natural Y so the auto-overflow below measures b's remainder
+  // from the right baseline. `precSpacer` = the intra-block seam height already above P's line.
   const placeForcedSeam = (b: BlockMeasure, P: number) => {
     let c: any = null
     try { c = view.coordsAtPos(P) } catch { c = null }
@@ -358,19 +379,67 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
     const naturalLocalTop = (lineScreenTop - b.el.getBoundingClientRect().top) / zoom - innerAbove
     pageStartNat = b.natTop + Math.max(0, naturalLocalTop)
   }
+  // Count the page-break hardBreaks that TRAIL a block — those with nothing after them but
+  // empty/whitespace runs. They are equivalent to "k page breaks BEFORE the next block" →
+  // emitted as block-boundary seams (coords-safe), not as inline in-paragraph spacers. The
+  // SuperDoc model wraps inline content in `run` nodes, so a trailing break is rarely at a
+  // fixed bEnd offset; walk the block's inline LEAVES in document order instead of guessing.
+  const trailingForcedCount = (node: any) => {
+    if (!node) return 0
+    const leaves: Array<{ brk: boolean; blank: boolean }> = []
+    node.descendants((child: any) => {
+      // A nested table is real content + paginates internally (mirror the `forced` collector,
+      // which skips table-internal breaks): count it as non-blank and do NOT descend, so a
+      // page break inside a cell never registers as the container's trailing break.
+      if (child.type?.name === 'table') {
+        leaves.push({ brk: false, blank: false })
+        return false
+      }
+      if (child.isText) leaves.push({ brk: false, blank: !child.text || !child.text.trim() })
+      else if (child.type?.name === 'hardBreak') leaves.push({ brk: child.attrs?.pageBreakType === 'page' || child.attrs?.lineBreakType === 'page', blank: true })
+      else if (child.isLeaf) leaves.push({ brk: false, blank: false })
+      return undefined
+    })
+    let k = 0
+    for (let i = leaves.length - 1; i >= 0; i--) {
+      if (leaves[i].brk) {
+        k += 1
+        continue
+      }
+      if (leaves[i].blank) continue // empty/whitespace inline after the break — still trailing
+      break // real content after the break → not trailing
+    }
+    return k
+  }
   let prev: BlockMeasure | null = null
-  for (const b of blocks) {
-    // 0. A page-type section break ENDED the previous block → b starts a fresh page.
-    //    Keyed on the ender's position (a paragraph, mapped cleanly); the following block
-    //    is whatever the measured order puts next (paragraph, table, …).
-    if (prev && sectionBreakAfter.has(prev.pos)) placeSeamBefore(b)
-    prev = b
-    // 1. Manual page breaks INSIDE b → a forced seam AT each one (in document order).
+  let prevTrailing = 0
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const b = blocks[bi]
+    // 0. Page breaks BEFORE b: a page-type section break that ended prev, PLUS prev's TRAILING
+    //    forced page breaks. One block-boundary multi-band seam covers them all (coords-safe).
+    //    (Section break keyed on the ender's position — a paragraph mapped cleanly; the
+    //    following block is whatever the measured order puts next: paragraph, table, …)
+    const kBefore = (prev && sectionBreakAfter.has(prev.pos) ? 1 : 0) + prevTrailing
+    if (kBefore > 0) emitSeamBefore(b, kBefore)
+    // 1. Manual page breaks INSIDE b. The TRAILING run is handled before the NEXT block (above,
+    //    via prevTrailing); only NON-trailing (mid-paragraph) breaks seam inline here — they
+    //    split one paragraph across a page, so there is no block boundary to anchor to (rare).
     const node = view?.state?.doc?.nodeAt ? view.state.doc.nodeAt(b.pos) : null
     const bEnd = b.pos + (node ? node.nodeSize : 1)
     const fb = forced.filter((P) => P >= b.pos && P < bEnd).sort((x, y) => x - y)
-    for (const P of fb) {
-      if (b === blocks[0] && P <= b.pos + 1) continue // a break at the very document start has no content before it
+    // Only walk the block's inline leaves when it actually contains a forced break (the common
+    // break-free block stays O(1) — keystroke pagination re-solves every block every frame).
+    let trailing = fb.length ? Math.min(trailingForcedCount(node), fb.length) : 0
+    if (bi === 0 && trailing > 0) {
+      // A leading page break at the very document START has no content before it → it must not
+      // create a blank first page. The original doc-start guard lived in the inline loop below;
+      // demote such breaks out of the trailing run so that guard (P <= b.pos + 1) skips them.
+      const docStart = fb.slice(fb.length - trailing).filter((P) => P <= b.pos + 1).length
+      trailing -= docStart
+    }
+    const midForced = trailing > 0 ? fb.slice(0, fb.length - trailing) : fb
+    for (const P of midForced) {
+      if (bi === 0 && P <= b.pos + 1) continue // a break at the very document start has no content before it
       placeForcedSeam(b, P)
     }
     // 2. Auto overflow for b's content (after any forced break), relative to pageStartNat.
@@ -396,7 +465,14 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
       pagesDone++
       pageStartNat += g.contentH
     }
+    prev = b
+    prevTrailing = trailing
   }
+  // The LAST block's trailing forced breaks have no following block to seam before — they
+  // append blank pages at the very end of the document. The tail spacer fills them and carries
+  // a gap band at each appended page boundary (computed below alongside the tail height).
+  const tailPages = prevTrailing
+  if (tailPages > 0) pagesDone += tailPages
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
   // the first line of each page at the top margin; this also removes the first
@@ -410,11 +486,18 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
   const contentVisualBottom = last ? last.actualBottom + last.marginBottom : 0
   const desiredBottom = (pageCount - 1) * g.pitch + g.pageH
   const tail = last ? Math.max(g.marginBottom, desiredBottom - contentVisualBottom) : g.pageH
+  // Gap bands inside the tail, one per appended trailing blank page (the boundary below each
+  // of the content's last page through pageCount-1). Empty unless a doc-final break exists.
+  const tailBands: number[] = []
+  for (let p = pageCount - tailPages; p <= pageCount - 1; p++) {
+    const off = (p - 1) * g.pitch + g.pageH - contentVisualBottom
+    if (off >= 0) tailBands.push(off)
+  }
   const signature =
     `${g.pageH}|${Math.round(g.marginTop)}|${Math.round(g.marginBottom)}|top${Math.round(topMargin)}|` +
     breaks.map((b) => `${b.pos}:${Math.round(b.height)}:${b.bands.length}`).join(',') +
-    `|tail${Math.round(tail)}|n${pageCount}`
-  return { geometry: g, topMargin, breaks, tail, pageCount, signature }
+    `|tail${Math.round(tail)}:${tailBands.length}|n${pageCount}`
+  return { geometry: g, topMargin, breaks, tail, tailBands, pageCount, signature }
 }
 
 function buildDecorations(view: any, layout: Layout): DecorationSet {
@@ -445,11 +528,13 @@ function buildDecorations(view: any, layout: Layout): DecorationSet {
       }),
     )
   }
-  // Tail: full-height last sheet + bottom margin (no bands — the last sheet's bottom).
+  // Tail: full-height last sheet + bottom margin. Bands appear only for trailing blank pages
+  // appended by a document-final page break (one gap line per appended page boundary).
+  const tailBands = layout.tailBands
   decos.push(
-    Decoration.widget(docSize, () => makeSpacer(layout.tail, [], lb, rb), {
+    Decoration.widget(docSize, () => makeSpacer(layout.tail, tailBands, lb, rb), {
       side: 1,
-      key: `pm-tail-${Math.round(layout.tail)}`,
+      key: `pm-tail-${Math.round(layout.tail)}-${tailBands.length}`,
       ignoreSelection: true,
     }),
   )
@@ -573,7 +658,10 @@ class PaginationView {
             pageCount: layout.pageCount,
             // Every seam advances exactly one sheet (a blank page = two adjacent seams),
             // so the status bar counts seams above the caret rather than weighting them.
-            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height) })),
+            // `pages` = how many sheets a seam advances (its band count) — a single seam may
+            // span multiple page boundaries (a blank page = one seam, two bands), so the status
+            // bar must WEIGHT seams by `pages`, not count them.
+            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height), pages: b.bands.length || 1 })),
             geometry: layout.geometry,
           }
         : { pageCount: 1, breaks: [], geometry: readGeometry(this.editor) }

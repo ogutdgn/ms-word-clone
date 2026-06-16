@@ -58,6 +58,21 @@
 
 #### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
 
+> **UPDATE 2026-06-16 (caret/click fix — Fix A, PARTIAL):** page breaks + blank pages were
+> corrupting the caret/click position because their seam was a block `<div>` injected at the
+> INLINE hardBreak position inside a paragraph (block-in-inline → PM's `posAtCoords` hit-testing
+> picks the full-width spacer rect as "closest", mislanding the caret). FIXED for forced breaks
+> that END a block + blank pages + section breaks: they now emit a coords-safe BLOCK-BOUNDARY
+> seam before the next block (`emitSeamBefore`/`trailingForcedCount`, pagination.ts). **STILL
+> BLOCK-IN-INLINE (the same caret-misland bug remains for these two sites — the Fix B/C/D
+> follow-ups in the [[pagination-caret-rootcause]] memory):** (1) a MID-paragraph forced break (a
+> break that splits one paragraph, so there is no block edge to anchor to — `placeForcedSeam`);
+> (2) an AUTO line-split across a page boundary (a tall paragraph — `findLineSplit`+`emitSeam`,
+> the in-`<p>` spacer the test-suite-pm.js line-split test still asserts). Also still pending:
+> `focus.ts` is multi-page-unaware (margin/gap clicks on pages 1..N-1 clamp to one tall box —
+> Fix C), and the rAF height-keyed widget recreation can jump the caret while typing near a
+> boundary (Fix D).
+>
 > The 4a pagination engine matches Word for the common cases (oracle-validated). These edges
 > are deliberately deferred. (High-value review findings FIXED: imported run-level
 > `<w:br w:type="page">` breaks, the MID-document blank page + its status-bar weighting, the table

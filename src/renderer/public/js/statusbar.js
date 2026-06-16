@@ -62,12 +62,12 @@
       if (!(WC.PM && WC.PM.active)) return;
       const c = WC.PM.counts();
       // Phase 4a: real "Page X of Y" from the pagination engine — total page count
-      // + the caret's page (number of seams above the caret + 1).
+      // + the caret's page (sheets advanced by the seams above the caret + 1).
       const pg = WC.PM.__pagination || { pageCount: c.pages || 1, breaks: [] };
       let cur = 1;
-      // Each seam (page break / line split) advances exactly one sheet — a blank page is
-      // TWO adjacent seams — so the caret's page = the seams above the caret + 1.
-      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).length + 1; } catch (e) {}
+      // Each seam advances `pages` sheets (its band count) — a blank page is ONE seam that
+      // spans TWO boundaries — so the caret's page = the sheets advanced above it + 1.
+      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).reduce((a, b) => a + (b.pages || 1), 0) + 1; } catch (e) {}
       this.pageEl.textContent = 'Page ' + Math.min(cur, pg.pageCount || 1) + ' of ' + (pg.pageCount || 1);
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
