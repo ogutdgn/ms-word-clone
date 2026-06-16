@@ -2083,6 +2083,9 @@
     // float both, then order them
     selAlt('zoA'); PM().setImageWrap('front'); await sleep(120);
     selAlt('zoB'); PM().setImageWrap('front'); await sleep(120);
+    // Bring Forward on the DEFAULT tie (both at base) must move zoA above zoB, not no-op.
+    selAlt('zoA'); if (!PM().setImageZOrder('forward')) return 'forward returned false'; await sleep(140);
+    if (!(relOf('zoA') > relOf('zoB'))) return 'Bring Forward on a tie did not raise zoA above zoB (no-op bug): ' + relOf('zoA') + ' vs ' + relOf('zoB');
     selAlt('zoA'); if (!PM().setImageZOrder('toFront')) return 'toFront returned false'; await sleep(140);
     if (!(relOf('zoA') > relOf('zoB'))) return 'after toFront, zoA relativeHeight not above zoB: ' + relOf('zoA') + ' vs ' + relOf('zoB');
     if (relOf('zoA') < Z_BASE) return 'relativeHeight not Word-sane (>= base): ' + relOf('zoA');

@@ -291,8 +291,11 @@ export function installInsert(editor: AnyEditor) {
     let next = cur
     if (dir === 'toFront') next = others.length ? Math.max(...others) + 1 : cur
     else if (dir === 'toBack') next = others.length ? Math.min(...others) - 1 : cur
-    else if (dir === 'forward') { const hi = others.filter((r) => r > cur); next = hi.length ? Math.min(...hi) + 1 : cur }
-    else if (dir === 'backward') { const lo = others.filter((r) => r < cur); next = lo.length ? Math.max(...lo) - 1 : cur }
+    // forward/backward use >=/<= so a TIED peer (the default state: two freshly-floated
+    // images both at Z_BASE) is included — move ONE step above/below the nearest peer at
+    // or beyond `cur`. Strict >/< would no-op on a tie (and over-shoot past a tie with 3+).
+    else if (dir === 'forward') { const hi = others.filter((r) => r >= cur); next = hi.length ? Math.min(...hi) + 1 : cur }
+    else if (dir === 'backward') { const lo = others.filter((r) => r <= cur); next = lo.length ? Math.max(...lo) - 1 : cur }
     else return false
     if (next === cur) { refocus(); return true } // already front/back, or the only floating object — no-op
     try {

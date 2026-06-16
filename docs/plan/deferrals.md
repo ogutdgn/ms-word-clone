@@ -180,7 +180,10 @@
   (a negative z-index when `relativeHeight` is null) with inter-object stacking (`≥0`). So in-app
   z-stacking is partial; full render fidelity needs all floating objects rendered as absolutely-
   positioned frames with a managed z-index (the §3 frames-overlay). The "in front of / behind TEXT"
-  toggle is the separate `behindDoc` (handled by `setImageWrap('front'|'behind')`).
+  toggle is the separate `behindDoc` (handled by `setImageWrap('front'|'behind')`). Also: for an
+  IMPORTED floating image, `setImageZOrder` updates the top-level `relativeHeight` (EXPORT prefers it,
+  so the .docx is correct) but `anchorData.renderDOM` still emits a z-index from the stale
+  `originalAttributes.relativeHeight`, so the in-app re-stack may not show — another frames-overlay item.
 - **Faithful free-RELOCATE + render z-stacking both need the frames-overlay (the big remaining 4c).**
   The current render positions floating images via CSS float (Square/Tight/Through) or absolute
   left/top (None only), and z-orders via z-index (positioned elements only). Faithful free-positioning
