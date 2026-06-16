@@ -2068,6 +2068,31 @@
     return /<wp:anchor[^>]*simplePos=/.test(tb) && /<wp:simplePos/.test(tb) || 'topbottom anchor missing required simplePos';
   });
 
+  await t('[4c] z-order: Bring to Front / Send to Back set a Word-sane relativeHeight ordering', async () => {
+    if (typeof PM().setImageZOrder !== 'function') return 'PM.setImageZOrder missing (red)';
+    const Z_BASE = 251658240;
+    const relOf = (alt) => { let v; doc().descendants((n) => { if (n.type.name === 'image' && n.attrs.alt === alt) v = n.attrs.relativeHeight; }); return v == null ? Z_BASE : Number(v); };
+    const posOf = (alt) => { let p = null; doc().descendants((n, pos) => { if (n.type.name === 'image' && n.attrs.alt === alt) p = pos; }); return p; };
+    const selAlt = (alt) => { const p = posOf(alt); if (p == null) return false; v().dispatch(v().state.tr.setSelection(window.__PM_NodeSelection.create(doc(), p))); return true; };
+    setDoc('zo: ');
+    PM().insertImage({ src: mkImg(80, 60), alt: 'zoA', width: 80, height: 60 }); await sleep(220);
+    PM().insertImage({ src: mkImg(80, 60), alt: 'zoB', width: 80, height: 60 }); await sleep(240);
+    // guard: inline image (not floating) → z-order is a no-op false
+    selAlt('zoA');
+    if (PM().setImageZOrder('toFront')) return 'z-order should refuse a non-floating (inline) image';
+    // float both, then order them
+    selAlt('zoA'); PM().setImageWrap('front'); await sleep(120);
+    selAlt('zoB'); PM().setImageWrap('front'); await sleep(120);
+    selAlt('zoA'); if (!PM().setImageZOrder('toFront')) return 'toFront returned false'; await sleep(140);
+    if (!(relOf('zoA') > relOf('zoB'))) return 'after toFront, zoA relativeHeight not above zoB: ' + relOf('zoA') + ' vs ' + relOf('zoB');
+    if (relOf('zoA') < Z_BASE) return 'relativeHeight not Word-sane (>= base): ' + relOf('zoA');
+    selAlt('zoA'); PM().setImageZOrder('toBack'); await sleep(140);
+    if (!(relOf('zoA') < relOf('zoB'))) return 'after toBack, zoA not below zoB: ' + relOf('zoA') + ' vs ' + relOf('zoB');
+    // export round-trips a relativeHeight on the anchor
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return /<wp:anchor[^>]*relativeHeight=/.test(xml) || 'exported wp:anchor missing relativeHeight';
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');
