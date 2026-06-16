@@ -406,11 +406,35 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Set the selected picture's alt text (Word's Picture Format → Alt Text pane). In the fork's
+  // model the accessibility DESCRIPTION is the node's `title` attr (→ wp:docPr/@descr), and
+  // `decorative` marks the picture decorative (→ adec:decorative ext; the exporter then omits
+  // @descr). Pass `title` to set the description, `decorative` to toggle the decorative flag —
+  // marking decorative also clears the description (matching Word's pane, which disables it).
+  function setImageAltText(opts: { title?: string; decorative?: boolean }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then add alt text.'); return false }
+    const next: Record<string, any> = { ...sel.node.attrs }
+    if (opts.decorative != null) next.decorative = !!opts.decorative
+    if (next.decorative) next.title = null // Word disables the description for a decorative image
+    else if (opts.title != null) next.title = opts.title || null
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, next, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
     setImageLockAspect,
     setImageSize,
+    setImageAltText,
     insertLink,
     removeLink,
     insertImage,

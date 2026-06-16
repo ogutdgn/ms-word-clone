@@ -2147,6 +2147,29 @@
     return (s && s.height === 4000 && s.width === 180) || 'height not capped at MAX_DIM=4000: ' + JSON.stringify(s);
   });
 
+  await t('[4b] Picture Format Alt Text: description → wp:docPr/@descr; "decorative" clears it + adds the decorative ext', async () => {
+    if (typeof PM().setImageAltText !== 'function') return 'PM.setImageAltText missing (red)';
+    if (PM().isBlocked('imgAltText') !== false) return 'imgAltText should not be blocked';
+    const imgAttrs = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = n.attrs; }); return a || {}; };
+    setDoc('alt: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 90), 'alt.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    // Set a description → node.title (the fork's accessibility descr).
+    PM().setImageAltText({ title: 'A red square logo' }); await sleep(60); selectImage();
+    if (imgAttrs().title !== 'A red square logo') return 'description not stored on node.title: ' + JSON.stringify(imgAttrs().title);
+    let xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    let dp = xml.match(/<wp:docPr\b[^>]*\/?>/);
+    if (!dp || !/descr="A red square logo"/.test(dp[0])) return 'wp:docPr missing descr="A red square logo": ' + (dp && dp[0]);
+    // Mark decorative → description cleared (Word disables it) + the decorative flag set.
+    PM().setImageAltText({ decorative: true }); await sleep(60); selectImage();
+    if (imgAttrs().decorative !== true || imgAttrs().title !== null) return 'decorative did not set flag + clear title: ' + JSON.stringify({ d: imgAttrs().decorative, t: imgAttrs().title });
+    xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    dp = xml.match(/<wp:docPr\b[^>]*>/);
+    if (dp && /descr=/.test(dp[0])) return 'decorative image still exports @descr: ' + dp[0];
+    return /adec:decorative/.test(xml) || 'decorative ext (adec:decorative) not exported';
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
