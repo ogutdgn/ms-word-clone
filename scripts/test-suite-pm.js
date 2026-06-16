@@ -515,6 +515,27 @@
     const el2 = paraEl('border');
     return !!b && b.bottom && b.bottom.val === 'single' && !!el2 && el2.style.borderBottom !== '';
   });
+  await t('[2] EXPORT: bottom border → <w:pBdr><w:bottom w:val="single" w:sz="4"> (Word: LineStyle=1, LineWidth=0.5pt)', async () => {
+    // The tests above cover the model attr + DOM paint; this guards the docx EXPORT and the
+    // eighths-of-a-point → Word half-point mapping (size:4 eighths = 0.5pt = wdLineWidth050pt(4)).
+    // Word COM-validated separately: Paragraphs(1).Borders(-3).LineStyle=1, .LineWidth=4 —
+    // scripts/oracle-probe-2-paraborder.js + scripts/oracle/validate-paraborder-win.ps1.
+    setDoc('para border export'); selectText('border'); run('borders'); await sleep(60);
+    const b = paraAttrs('border').paragraphProperties?.borders;
+    if (!b || !b.bottom || b.bottom.val !== 'single') return 'bottom border attr not set: ' + JSON.stringify(b);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const pbdr = (xml.match(/<w:pBdr\b[\s\S]*?<\/w:pBdr>/) || [])[0];
+    if (!pbdr) return 'no <w:pBdr> in export';
+    const bottom = pbdr.match(/<w:bottom\b[^>]*\/?>/);
+    if (!bottom) return 'no <w:bottom> in <w:pBdr>: ' + pbdr.slice(0, 160);
+    if (!/w:val="single"/.test(bottom[0])) return 'bottom border w:val not single: ' + bottom[0];
+    const sz = bottom[0].match(/w:sz="(\d+)"/);
+    if (!sz || sz[1] !== '4') return 'bottom border w:sz not 4 (eighths = 0.5pt): ' + bottom[0];
+    // Full Word-default border: auto color + 1pt offset (guards the whole CT_Border, not just val+sz).
+    if (!/w:color="auto"/.test(bottom[0])) return 'bottom border w:color not auto: ' + bottom[0];
+    if (!/w:space="1"/.test(bottom[0])) return 'bottom border w:space not 1 (Word-default 1pt offset): ' + bottom[0];
+    return true;
+  });
   await t('[2] bordersMenu All then No Border round-trips', async () => {
     selectText('border');
     window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body);
