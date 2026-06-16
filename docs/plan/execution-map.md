@@ -450,6 +450,16 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Crop + clipPath→a:srcRect export, `/loop` "keep go")
+- [x] **Picture Crop (PR #69 `ce1b31e`)** — Word's Picture Format → Crop (manual L/T/R/B %) on the
+  Size group + closed a real export gap: a user crop was dropped on save. New `buildSrcRectFromClipPath`
+  (`decode-image-node-helpers.js`) = exact inverse of the importer; blipFill emits `rawSrcRect || derived`
+  (imports byte-identical, user crops round-trip). Bridge `setImageCrop({l,t,r,b}|{remove})`; `H.imgCrop`
+  = an L/T/R/B % flyout + Remove Crop.
+- [x] **`/code-review` clean** (no axis transposition across crop→clipPath→srcRect→clipPath; no
+  roundtrip-gate regression — imports keep verbatim rawSrcRect). 1 `[4b]` test (set/export-thousandths/
+  zero-omit/too-large-guard/remove/XML-boundary round-trip). Gates: **PM 442 / smoke 9 / roundtrip 27**.
+
 ### 2026-06-16 (Picture Alt Text — IMAGE AREA COMPLETE, `/loop` "keep go")
 - [x] **Picture Alt Text (PR #67 `e27ec79`)** — Word's Picture Format → Alt Text pane on the Picture
   Format tab (new Accessibility group). New bridge verb `setImageAltText({title?,decorative?})`: the
