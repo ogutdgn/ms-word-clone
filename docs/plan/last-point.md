@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Rotate/Flip DONE (PR #71); Picture Format tab is Word-complete; frames-overlay keystone / 4e headers next)
+## 2026-06-16 (RESUME HERE — Picture Position 4c.2 DONE + simplePos fix (PR #73); first keystone reposition step, oracle-validated)
+
+> **Branch:** `main` (Position merged PR #73 `cc566cb`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 444 / smoke 9 / roundtrip 27.** Validation: Word COM read-shapes.
+>
+> **Picture absolute Position (4c.2) — DONE (PR #73):** the FIRST floating-object reposition step.
+> `WC.PM.setImagePosition({horizontal,top,relative?})` (`bridge/insert.ts`) sets the selected floating
+> picture's `marginOffset` (px; horizontal = right of column, top = below paragraph); the Picture Format
+> → Arrange "Position" flyout (inches H/V) drives it. Render places a `wrap=None` picture at left/top
+> from marginOffset; exporter writes `wp:positionH/V` → `wp:posOffset` (EMU). Guarded against silent
+> save-drop on IMPORTED anchors (refused with a toast).
+>
+> **🔬 ORACLE CAUGHT A LATENT BUG (this is why we validate vs Word):** a 1"/0.5" positioned picture
+> rendered in Word at Left/Top = **−1"/−1"**. Root cause: a GENERATED complex-positioned anchor still
+> exported `wp:anchor/@simplePos="1"`, so Word used SIMPLE positioning (`wp:simplePos x=0/y=0` = page
+> origin) and IGNORED positionH/V. **Latent since 4c.1** (harmless at offset {0,0}). Fix
+> (`translate-anchor-node.js`): force `@simplePos="0"` when positionH/V are emitted
+> (`!useOriginalChildren && anchorData`). **Re-oracle: Word reads Left=72pt / Top=36pt — exact.** New
+> `scripts/oracle-probe-4c2-position.js` is the reusable fixture.
+>
+> **NEXT — still the big architectural items, plus 4c.2 follow-ons:**
+>   1. **FRAMES-OVERLAY keystone** (deferrals §A.1b/d/e) — line-split coords-safe render, table row-split,
+>      faithful Square/Tight RENDER position + render z-stacking. Multi-PR; reposition render spans ~10 branches.
+>   2. **4c.2 follow-ons (bounded):** a DRAG overlay (mirror the 4b resize overlay; the numeric flyout is
+>      the affordance now), + faithful reposition of IMPORTED floating pictures (patch the preserved
+>      `wp:positionH/V` instead of refusing).
+>   3. **4e headers/footers + fields** (`header-footer` AREA DEFERRED) — its own subsystem.
+> Branch off `main`.
+
+---
+
+## 2026-06-16 (Picture Rotate/Flip DONE (PR #71); Picture Format tab is Word-complete; frames-overlay keystone / 4e headers next)
 
 > **Branch:** `main` (Rotate/Flip merged PR #71 `6dd541c`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 443 / smoke 9 / roundtrip 27.**

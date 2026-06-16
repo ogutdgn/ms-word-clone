@@ -183,13 +183,19 @@
 > 4c.1 (text-wrap wiring) is DONE + oracle-validated (all 6 floating modes open in Word as
 > floatingShapes; the exporter now emits a schema-valid CT_Anchor). These edges remain.
 
-- **Drag-to-RELOCATE is not built (4c.2).** `setImageWrap` floats the image and seeds a
-  column/paragraph-relative anchor at offset {0,0}; there is no overlay yet to drag a floating
-  image to an arbitrary position (which would write `marginOffset` → `wp:posOffset`). So a freshly
-  wrapped image sits at its paragraph/column origin rather than wherever Word would keep it; the
-  user can't reposition it. Mirror the 4b resize overlay. (Latent: once 4c.2 writes a custom
-  `marginOffset`, toggling to inline and back re-uses the stale offset — `setImageWrap`'s re-seed
-  guard only fires when horizontal/top are null, not 0; reset it when 4c.2 lands.)
+- ~~**Drag-to-RELOCATE is not built (4c.2).**~~ **Numeric absolute Position BUILT 2026-06-16 (4c.2, PR #73).**
+  `WC.PM.setImagePosition({horizontal,top,relative?})` sets the selected floating picture's `marginOffset`
+  (px; horizontal = right of column, top = below paragraph); the Picture Format → Arrange "Position" flyout
+  drives it. The render places a `wrap=None` picture at left/top from `marginOffset`; the exporter writes
+  `wp:positionH/V` → `wp:posOffset`. **Oracle-validated:** a 1"/0.5" offset reads in Word at Left=72pt/
+  Top=36pt (RelHPos=Column/RelVPos=Paragraph). **This also fixed a latent simplePos bug** (a generated
+  complex-positioned anchor exported `@simplePos="1"` → Word ignored positionH/V and pinned to page origin;
+  forced `simplePos="0"` when positionH/V are emitted). **STILL deferred:** (a) a DRAG overlay (the numeric
+  flyout is the affordance for now — mirror the 4b resize overlay for drag); (b) faithful reposition of an
+  IMPORTED floating picture (refused with a toast — the exporter keeps the verbatim `originalDrawingChildren`
+  posOffset; would need to patch the preserved `wp:positionH/V`); (c) faithful Square/Tight RENDER position
+  (the render approximates via margins; absolute fidelity needs the frames-overlay). Re-seed/inline-toggle
+  stale-offset latent (below) still applies.
 - ~~**Z-order Bring Forward / Send Backward is not wired (4c.3).**~~ **WIRED 2026-06-16 (4c.3).**
   `WC.PM.setImageZOrder(forward|backward|toFront|toBack)` mutates the floating image's
   `relativeHeight` relative to the other floating images (Word-sane values near the OOXML base);
