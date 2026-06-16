@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (2+-table Word-corruption — root-caused, NOT shipped, `/loop` "keep go")
+- [x] **Root-caused the 2+-table Word-corrupt export** (the flagged bug). OOXML CT_Tc: a `w:tbl` can't be the
+  LAST child of a cell — needs a trailing `<w:p/>`. The natural "insert table, then insert table" nests the
+  2nd in the 1st cell → no trailing p → Word rejects. Manual-patch confirmed (add `<w:p/>` → Word opens).
+- [x] **Fix logic confirmed** (translateTableCell append trailing p; `type:'element'` required) — `exportXmlOnly`
+  + `getUpdatedDocs` both gain the p. **NOT SHIPPED:** couldn't get a clean end-to-end Word-validation of the
+  real `exportDocxBytes` save (env: `saveBytes` started failing, likely a hung WINWORD lock). REVERTED to keep
+  main clean; re-flagged with full findings (spawn_task `task_0e043993`).
+- [x] **LESSON re-confirmed:** `exportDocx({exportXmlOnly})` + `test:roundtrip` both MISS Word-corruption →
+  validate the real save (exportDocxBytes → saveBytes → Word COM Documents.Open). Gates unchanged: PM 447/smoke 9/rt 27.
+
 ### 2026-06-16 (Table positioning — first NON-image slice, `/loop` "keep go")
 - [x] **Table Indent + Alignment coverage + w:tblPr-order fix (PR #77 `1fa57cd`)** — wired the unwired
   `tableSetIndent` (Indent flyout in the Table Design Alignment group) + tested the existing-but-untested
