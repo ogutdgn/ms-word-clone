@@ -92,7 +92,22 @@
   paragraph spanning 2 pages, matching Word).
 - **A single block taller than one page that can't be line-split** (an image > 1 page, or a <4-line
   block taller than the content area) overflows the sheet without a seam and the page count is
-  best-effort. True image/object pagination is sub-phase 4b/4d territory.
+  best-effort. True image/object pagination is sub-phase 4b/4d territory. (Corollary: the status bar
+  counts seams above the caret, so a caret BELOW such an over-tall block reads a page number that is
+  one-or-more too low — the over-tall block advanced `pageCount` without a seam entry. Resolves with
+  the same sub-phase.)
+- **Widow/orphan on the remainder of a mid-paragraph-broken paragraph that ALSO overflows a full
+  page.** When a `Ctrl+Enter` sits inside a paragraph AND the after-break remainder is itself taller
+  than one page, the auto line-split's ≥2-lines-each-side check (`findLineSplit`) counts lines from
+  the BLOCK top, not from the forced break's page start, so it can strand a 1-line orphan on the
+  forced-break page (or pull the split back to the break line). MED severity / RARE (needs a manual
+  break mid-paragraph followed by >1 page of the same paragraph). Common mid-paragraph breaks (the
+  remainder fits on the next page) are correct + oracle-validated. Confirmed by the 4a2 `/code-review`.
+- **Forced break inside a block that `measureBlocks` skipped** (its `posAtDOM` threw) is dropped — no
+  seam, page count short — whereas the pre-4a2 `prevPos` filter attributed it to the next block. LOW /
+  EXOTIC: a top-level `#pm-editor` child whose `posAtDOM(el,0)` throws requires foreign DOM injected at
+  the editor's top level (not produced by this codebase; the engine's own spacers are class-filtered
+  first). Defensive-path divergence only. Confirmed by the 4a2 `/code-review`.
 - **Pre-first-measure page count.** `counts().pages` / the status bar can show a one-frame "of 1"
   for a multi-page doc immediately on boot/Open, before the first rAF pagination measure publishes;
   it self-corrects on the next tick.

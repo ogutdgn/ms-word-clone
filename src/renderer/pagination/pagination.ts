@@ -269,35 +269,39 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
   let pageStartNat = 0 // natural top where the current page's content begins
   const boxTop = view?.dom ? view.dom.getBoundingClientRect().top : 0
   const zoom = (window as any).WC?.PM?.zoom || 1
-  // Move a SHORT straddling block wholesale to the next page (a seam BEFORE b). One band.
-  const placeSeamBefore = (b: BlockMeasure) => {
+  // The ONE seam-emit primitive, shared by all three seam sites (wholesale-move,
+  // forced-break, line-split). Advances to the next page and emits a one-band seam at
+  // `pos`. The height is the measure-and-nudge `target - actualTop + precSpacer`: it
+  // drives the line currently at `actualTop` down to the new page's content-top, and
+  // adding back `precSpacer` (the seam height already above that line) keeps it stable
+  // at the fixed point, where the seam's own height equals h. Callers set pageStartNat.
+  const emitSeam = (pos: number, actualTop: number, precSpacer: number) => {
     pagesDone += 1
     const target = pagesDone * g.pitch + g.marginTop
-    const h = target - b.actualTop + b.precSpacer
-    if (h > 1) breaks.push({ pos: b.pos, height: h, bands: [h - GAP - g.marginTop] })
+    const h = target - actualTop + precSpacer
+    if (h > 1) breaks.push({ pos, height: h, bands: [h - GAP - g.marginTop] })
+  }
+  // Move a SHORT straddling block wholesale to the next page (a seam BEFORE b).
+  const placeSeamBefore = (b: BlockMeasure) => {
+    emitSeam(b.pos, b.actualTop, b.precSpacer)
     pageStartNat = b.natTop
   }
   // Place a forced seam AT an inline page-break position P inside block b: pushes the
   // content AFTER P to the next page's content-top. This single mechanism covers
   // mid-paragraph, end-of-paragraph AND trailing (doc-final) breaks — and two adjacent
-  // breaks (insertBlankPage) naturally make a blank page (two seams). The seam height is
-  // the measure-and-nudge (target - actualTop(P's line) + the intra-block seam already
-  // above P), stable at the fixed point. pageStartNat advances to P's natural Y so the
-  // auto-overflow below measures b's remainder from the right baseline.
+  // breaks (insertBlankPage) naturally make a blank page (two seams). pageStartNat
+  // advances to P's natural Y so the auto-overflow below measures b's remainder from the
+  // right baseline. `precSpacer` = the intra-block seam height already above P's line.
   const placeForcedSeam = (b: BlockMeasure, P: number) => {
-    pagesDone += 1
-    const target = pagesDone * g.pitch + g.marginTop
     let c: any = null
     try { c = view.coordsAtPos(P) } catch { c = null }
-    if (!c) { pageStartNat += g.contentH; return } // unaddressable → still advance a page
+    if (!c) { pagesDone += 1; pageStartNat += g.contentH; return } // unaddressable → still advance a page
     const lineScreenTop = c.top
     const innerAbove = Array.from(b.el.querySelectorAll('.pm-page-spacer')).reduce((a: number, s: Element) => {
       const r = (s as HTMLElement).getBoundingClientRect()
       return r.top < lineScreenTop - 1 ? a + r.height / zoom : a
     }, 0)
-    const actualTop = (lineScreenTop - boxTop) / zoom
-    const h = target - actualTop + innerAbove
-    if (h > 1) breaks.push({ pos: P, height: h, bands: [h - GAP - g.marginTop] })
+    emitSeam(P, (lineScreenTop - boxTop) / zoom, innerAbove)
     const naturalLocalTop = (lineScreenTop - b.el.getBoundingClientRect().top) / zoom - innerAbove
     pageStartNat = b.natTop + Math.max(0, naturalLocalTop)
   }
@@ -321,10 +325,7 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
           ? findLineSplit(b, localBoundary, zoom, boxTop, view)
           : null
       if (split) {
-        pagesDone++
-        const target = pagesDone * g.pitch + g.marginTop
-        const h = target - split.actualTop + split.precSpacer
-        if (h > 1) breaks.push({ pos: split.pos, height: h, bands: [h - GAP - g.marginTop] })
+        emitSeam(split.pos, split.actualTop, split.precSpacer)
         pageStartNat = b.natTop + split.localTop
         continue
       }
