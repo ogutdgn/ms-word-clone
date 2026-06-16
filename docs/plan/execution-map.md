@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Rotate/Flip — Picture Format tab Word-complete, `/loop` "keep go")
+- [x] **Picture Rotate/Flip (PR #71 `6dd541c`)** — wired Word's Picture Format → Arrange → Rotate
+  (Rotate Right/Left 90° / Flip V/H / Reset) onto the fork's already-complete `transformData` pipeline
+  (render `transform: rotate/scaleX/scaleY`, export `a:xfrm` rot/flipH/flipV, import reads back). New
+  `setImageTransform({rotate?,flipH?,flipV?,reset?})` (relative rotate delta normalized 0..359, flips
+  toggle, transformData kept minimal); `H.imgRotate` flyout. `/code-review` clean (no production bugs).
+  1 `[4b]` test. Gates: **PM 443 / smoke 9 / roundtrip 27**.
+- [x] **🏁 Picture Format tab is Word-complete** — Size (Crop/H/W/Lock) + Arrange (Wrap/Bring/Send/
+  Rotate) + Accessibility (Alt Text). NEXT = frames-overlay keystone (NOT a clean single-PR slice —
+  reposition render spans ~10 branches) OR 4e headers/footers; each needs a dedicated push.
+
 ### 2026-06-16 (Picture Crop + clipPath→a:srcRect export, `/loop` "keep go")
 - [x] **Picture Crop (PR #69 `ce1b31e`)** — Word's Picture Format → Crop (manual L/T/R/B %) on the
   Size group + closed a real export gap: a user crop was dropped on save. New `buildSrcRectFromClipPath`
