@@ -509,6 +509,15 @@ export function installInsert(editor: AnyEditor) {
     const sel = selectedImage()
     if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then set its position.'); return false }
     if (!sel.node.attrs.isAnchor) { (window as any).WC?.toast?.('Position needs a floating picture', 'Use Wrap Text (e.g. Behind Text or Square) first — an in-line picture flows with the text.'); return false }
+    // GUARD: an imported anchor exports its verbatim originalDrawingChildren (translateAnchorNode
+    // prefers them), so a new marginOffset would move the picture on screen but be DROPPED on save.
+    // Refuse rather than silently diverge — faithful imported reposition (patching the preserved
+    // wp:positionH/V) is a deferred follow-up. Session-inserted floating pictures have no original
+    // children and reposition fully.
+    if (Array.isArray(sel.node.attrs.originalDrawingChildren) && sel.node.attrs.originalDrawingChildren.length) {
+      ;(window as any).WC?.toast?.('Position not yet editable for this picture', 'Pictures opened from a .docx keep their saved position for now. Insert a new picture to position it freely.')
+      return false
+    }
     const mo = sel.node.attrs.marginOffset || {}
     const curH = Number(mo.horizontal) || 0
     const curT = Number(mo.top) || 0

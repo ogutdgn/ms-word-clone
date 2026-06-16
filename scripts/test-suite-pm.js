@@ -2276,6 +2276,19 @@
     const vOff = xml.match(/<wp:positionV[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
     if (!hOff || +hOff[1] !== 914400) return 'wp:positionH posOffset not 914400 (1"): ' + (hOff && hOff[1]);
     if (!vOff || +vOff[1] !== 457200) return 'wp:positionV posOffset not 457200 (0.5"): ' + (vOff && vOff[1]);
+    // Imported-anchor guard: a picture carrying originalDrawingChildren (its verbatim imported anchor)
+    // refuses reposition — the export would keep the original posOffset, so moving it would silently
+    // drop on save. Stamp the attr to simulate an import, then assert the verb refuses (no node change).
+    const ipos = selectImage();
+    v().dispatch(v().state.tr.setNodeMarkup(ipos, undefined, { ...doc().nodeAt(ipos).attrs, originalDrawingChildren: [{ name: 'wp:positionH', elements: [] }] }));
+    await sleep(40); selectImage();
+    if (PM().setImagePosition({ horizontal: 300, top: 300 }) !== false) return 'setImagePosition should refuse an imported picture (originalDrawingChildren present)';
+    await sleep(40);
+    if (moOf().horizontal === 300) return 'refused reposition must not change marginOffset';
+    // Clear the simulated import so the round-trip below uses the clean generated anchor.
+    const ip2 = selectImage();
+    v().dispatch(v().state.tr.setNodeMarkup(ip2, undefined, { ...doc().nodeAt(ip2).attrs, originalDrawingChildren: null }));
+    await sleep(40);
     // Full open+save round-trip preserves the position (XML boundary).
     const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
     const rt = await window.WC.editor.exportDocx({ exportXmlOnly: true });
