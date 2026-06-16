@@ -450,6 +450,14 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (paragraph border export test, `/loop` 5-min cadence)
+- [x] **Paragraph bottom-border export test (PR #92 `dc86aca`)** — scout-v2 #3. New `[2]` test:
+  `<w:pBdr><w:bottom w:val="single" w:sz="4" w:color="auto" w:space="1">` + probe + reusable
+  `validate-paraborder-win.ps1`. **Word COM-validated:** `Paragraphs(1).Borders(-3).LineStyle=1` (single),
+  `.LineWidth=4` (0.5pt) — the eighths→half-point mapping is correct. Test-only. `/code-review` clean.
+  Gates: **PM 454 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** scout-v2 #2 (paragraph shading export+COM — recommended) or #5 (distribute geometry).
+
 ### 2026-06-16 (merged-cell gridSpan export test, `/loop` 5-min cadence)
 - [x] **Merged-cell gridSpan export test (PR #90 `efdaf1e`)** — scout-v2 #1. Horizontal `tableMerge` → new
   `[6b]` test: `<w:gridSpan w:val="2">` + `<w:tblGrid>` keeps all 3 `<w:gridCol>` + probe + reusable

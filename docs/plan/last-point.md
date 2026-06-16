@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — merged-cell gridSpan export test DONE (PR #90); scout-v2 #1 shipped; next = #2/#3)
+## 2026-06-16 (RESUME HERE — paragraph border export test DONE (PR #92); scout-v2 #3 shipped; next = #2/#5/#4)
+
+> **Branch:** `main` (paraborder test merged PR #92 `dc86aca`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 454 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Paragraph bottom-border export test — DONE (PR #92):** took **scout-v2 #3**. Paragraph borders were
+> wired (apply + DOM-paint tested) but had no export regression + the eighths→half-point unit mapping was
+> unvalidated. Added a `[2]` test: a bottom border emits `<w:pBdr><w:bottom w:val="single" w:sz="4"
+> w:color="auto" w:space="1">` (full Word-default CT_Border) + `oracle-probe-2-paraborder.js` + reusable
+> `validate-paraborder-win.ps1`. **🔬 Word COM-validated:** opens clean, `Paragraphs(1).Borders(-3).LineStyle
+> = 1` (single), `.LineWidth = 4` (wdLineWidth050pt = 0.5pt) — the `w:sz=4` eighths → 0.5pt mapping is
+> CORRECT (no fidelity bug). Test-only. `/code-review` clean (applied the one note: also assert color/space).
+>
+> **🗂️ SCOUT BACKLOG v2 (updated — pick next):**
+>   1. ~~Merged-cell gridSpan export~~ **DONE (PR #90).**
+>   2. **Paragraph SHADING export + COM (rec 0.95) — RECOMMENDED NEXT.** Wired (commands.js ~1810,
+>      `{val:'clear',fill}`), no COM-validated export test. Assert `<w:pPr><w:shd w:val="clear" w:fill="FF0000">`;
+>      COM `Selection.ParagraphFormat.Shading.BackgroundPatternColor=255`. Mirror cell-shading (PR #86) +
+>      paraborder (PR #92) recipe — reuse the validate-*-win.ps1 + oracle-probe pattern. Highest confidence.
+>   3. ~~Paragraph borders export~~ **DONE (PR #92).**
+>   4. **OOXML child-ORDER sweep: w:rPr / w:pPr / w:trPr / w:numPr** — spec-compliance (Word tolerates), mirrors
+>      PR #77/#82; rPr highest-reachability; multi-file, lower real value. Proposed xmlOrder arrays in scout output.
+>      NOTE: `w:pBdr` itself also lacks an xmlOrder (CT_PBdr: top,left,bottom,right,between,bar) — fold in if doing the sweep.
+>   5. **distributeColumns/Rows geometry export tests (rec 0.7)** — table layout; assert even `<w:gridCol>`/
+>      `<w:trHeight>` actually export. Bounded.
+>   - **Bigger (defer):** line-spacing rule dropdown, special-indent (first-line/hanging) dropdown, Tabs dialog;
+>     picture effects via a14 (deferred from the earlier session).
+>
+> **NEXT:** scout-v2 #2 (paragraph shading — recommended, highest confidence) or #5 (distribute geometry —
+> table layout). After v2 is down to #4 (order sweep, low real value) + #5, consider re-scouting or tackling a
+> bigger item. 2+-table corruption (`task_0e043993`) + CUA vAlign (`task_c62b4d4c`) stay spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (merged-cell gridSpan export test DONE (PR #90); scout-v2 #1 shipped; next = #2/#3)
 
 > **Branch:** `main` (gridSpan test merged PR #90 `efdaf1e`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 453 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
