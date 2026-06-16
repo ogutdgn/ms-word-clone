@@ -495,6 +495,37 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Phase 4c.2 — reposition a FLOATING picture (Word's Layout → Position → absolute position). Sets the
+  // node's `marginOffset` (px offsets: horizontal = "to the right of" the column, top = "below" the
+  // paragraph — matching the anchor's hRelativeFrom='column'/vRelativeFrom='paragraph' that setImageWrap
+  // seeds). The fork's render places a wrap=None picture at left/top from marginOffset, and the exporter
+  // writes wp:positionH/V → wp:posOffset (EMU). `relative` ADDS to the current offset (nudge); otherwise
+  // the values are absolute. Floating-only (an in-line picture flows with the text and has no offset).
+  // NOTE: an IMPORTED anchor with stashed originalDrawingChildren still EXPORTS its original posOffset
+  // (translateAnchorNode prefers them) — reposition is faithful for freshly-wrapped pictures; relocating
+  // an imported floating picture's saved position is a deferred edge (would require patching/clearing
+  // originalDrawingChildren, which risks losing other imported anchor data).
+  function setImagePosition(opts: { horizontal?: number; top?: number; relative?: boolean }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then set its position.'); return false }
+    if (!sel.node.attrs.isAnchor) { (window as any).WC?.toast?.('Position needs a floating picture', 'Use Wrap Text (e.g. Behind Text or Square) first — an in-line picture flows with the text.'); return false }
+    const mo = sel.node.attrs.marginOffset || {}
+    const curH = Number(mo.horizontal) || 0
+    const curT = Number(mo.top) || 0
+    const h = opts.horizontal != null ? (opts.relative ? curH + opts.horizontal : opts.horizontal) : curH
+    const t = opts.top != null ? (opts.relative ? curT + opts.top : opts.top) : curT
+    const anchorData = sel.node.attrs.anchorData || { hRelativeFrom: 'column', vRelativeFrom: 'paragraph' }
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, marginOffset: { horizontal: Math.round(h), top: Math.round(t) }, anchorData }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
@@ -502,6 +533,7 @@ export function installInsert(editor: AnyEditor) {
     setImageSize,
     setImageAltText,
     setImageCrop,
+    setImagePosition,
     setImageTransform,
     insertLink,
     removeLink,

@@ -7,8 +7,9 @@
        inches → setImageSize, honors the aspect lock) + "Lock Aspect Ratio" (toggles
        node.attrs.lockAspectRatio; when UNLOCKED the resize overlay's edge handles free-stretch one
        axis — see bridge/insert.ts setImageLockAspect/setImageSize/setImageCrop).
-     • Arrange — Wrap Text / Bring Forward / Send Backward (re-pointing the existing image cmds) +
-       "Rotate" (Rotate Right/Left 90° / Flip H/V / Reset → transformData; setImageTransform).
+     • Arrange — "Position" (absolute Horizontal/Vertical offset → marginOffset/wp:posOffset;
+       setImagePosition, 4c.2), Wrap Text / Bring Forward / Send Backward (re-pointing the existing
+       image cmds) + "Rotate" (Rotate Right/Left 90° / Flip H/V / Reset → transformData).
      • Accessibility — "Alt Text" (description → wp:docPr/@descr + mark-as-decorative; setImageAltText).
    CRITICAL (same as table-tools-pm.js): the ribbon dispatches { cmd, label, type } →
    WC.Commands.run/dropdown({cmd}) → H[cmd] (commands.js); inline onClick is ignored.
@@ -38,6 +39,7 @@
           id: 'pf-arrange',
           name: 'Arrange',
           controls: [
+            { cmd: 'imgPosition', label: 'Position', type: 'dropdown' },
             { cmd: 'wrapText', label: 'Wrap Text', type: 'dropdown' },
             { cmd: 'bringForward', label: 'Bring Forward', type: 'split' },
             { cmd: 'sendBackward', label: 'Send Backward', type: 'split' },

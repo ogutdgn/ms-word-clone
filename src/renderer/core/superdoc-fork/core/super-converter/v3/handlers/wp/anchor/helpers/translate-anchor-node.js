@@ -91,6 +91,15 @@ export function translateAnchorNode(params) {
     inlineAttrs.simplePos = '1';
   }
 
+  // A GENERATED anchor that emits wp:positionH/V (same condition as above) uses COMPLEX
+  // positioning, so @simplePos MUST be '0' — otherwise Word ignores positionH/V and pins the
+  // object to the simple-position origin (wp:simplePos x=0/y=0 = page top-left). Latent since
+  // 4c.1 (harmless at offset {0,0}); exposed + oracle-confirmed by 4c.2 reposition (a 1"/0.5"
+  // offset rendered in Word at -1"/-1" until @simplePos was forced to 0).
+  if (!useOriginalChildren && attrs.anchorData) {
+    inlineAttrs.simplePos = '0';
+  }
+
   // CT_Anchor (ECMA-376 §20.4.2.3) REQUIRES simplePos/behindDoc/locked/layoutInCell/
   // allowOverlap (+ distT/B/L/R default 0). An anchor generated from a fresh inline→
   // floating toggle has none of these (no originalAttributes), and Word refuses to open a
