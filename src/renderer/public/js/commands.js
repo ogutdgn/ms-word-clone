@@ -138,11 +138,21 @@
   // (top/bottom 0", left/right 0.08").
   H.tblCellMargins = (c, node) => {
     const p = TPM();
-    if (!p || !p.tableSetCellMargins) { WC.toast('Click inside a table cell to set its margins.'); return; }
+    if (!p || !p.tableSetCellMargins || !p.tableInfo || !p.tableInfo().inTable) { WC.toast('Click inside a table cell to set its margins.'); return; }
+    // Prefill the cell's CURRENT margins (Word's Cell Options pre-reads them) so editing one side
+    // doesn't clobber the others. Bridge returns px; show inches. No explicit margins → Word's stock
+    // defaults (top/bottom 0", left/right 0.08").
+    const cur = (p.tableGetCellMargins && p.tableGetCellMargins()) || null;
+    const inch = (px, dflt) => (cur && Number.isFinite(px) ? Math.round((px / 96) * 100) / 100 : dflt);
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Cell Margins (in)'));
       const mk = (v) => el('input', { type: 'number', step: '0.01', min: '0', value: String(v), style: { width: '56px' } });
-      const inputs = { top: mk(0), bottom: mk(0), left: mk(0.08), right: mk(0.08) };
+      const inputs = {
+        top: mk(inch(cur && cur.top, 0)),
+        bottom: mk(inch(cur && cur.bottom, 0)),
+        left: mk(inch(cur && cur.left, 0.08)),
+        right: mk(inch(cur && cur.right, 0.08)),
+      };
       const sideRow = (label, key) => {
         const r = el('div', { style: { padding: '2px 8px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' } });
         r.appendChild(el('span', { text: label, style: { fontSize: '12px' } }));
