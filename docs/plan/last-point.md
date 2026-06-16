@@ -7,7 +7,32 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — image stretch/render+export fix DONE; pagination + AutoFit trio + image-fidelity all solid)
+## 2026-06-16 (RESUME HERE — image free-stretch DONE (PR #61); image area complete; frames-overlay is the keystone next)
+
+> **Branch:** `main` (free-stretch merged PR #61 `110347f`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 437 / smoke 9 / roundtrip 27.**
+>
+> **Image free-stretch (interaction half of §A.1c) — DONE (PR #61):** the resize overlay reads the
+> image's `lockAspectRatio` (default true = Word's lock); when UNLOCKED, edge handles free-stretch one
+> axis, corners distort (height clamped). Bridge `setImageLockAspect(bool)`. `/code-review` caught a
+> REGRESSION (the importer set lockAspectRatio=false for `picLocks`-absent pictures → normal imported
+> photos would free-stretch) — root-fixed: a picture without `a:picLocks` now imports as LOCKED (Word
+> UI default; real Word writes `noChangeAspect="1"` so fixtures + roundtrip unaffected). Re-review +
+> a stale-vendored-test fix. 3 `[4b]` tests. **STILL deferred (§A.1c):** the in-app Lock-Aspect-Ratio
+> UI control — there is NO Picture Format ribbon group; a contextual tab to host it is the remaining piece.
+>
+> **The IMAGE area is now complete** (insert, resize, wrap/float, z-order, stretch, dimensionless sizing).
+> **NEXT — the big remaining layout work all converges on ONE keystone (deferrals §A.1b/d/e):**
+>   1. **The FRAMES-OVERLAY / paged-layout rework** — unblocks line-split coords-safe render, table
+>      row-split (a tall table overflows the inter-sheet gap — reproduced), AND faithful floating
+>      image/shape reposition (4c.2) + render z-stacking. **Highest leverage; needs a focused/fresh session.**
+>   2. **4e headers/footers + fields** (currently blocked).
+>   3. Smaller: a Picture Format contextual tab (would host the Lock-Aspect toggle + crop + alt-text + size).
+> Branch off `main`. **Session is EXTREMELY long — a fresh session is strongly recommended.**
+
+---
+
+## 2026-06-16 (image stretch/render+export fix DONE; pagination + AutoFit trio + image-fidelity all solid)
 
 > **Branch:** `main` (image fix merged PR #59 `cbb7725`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 434 / smoke 9 / roundtrip 27.**
