@@ -1984,6 +1984,57 @@
       || ('aspect drift on E-drag: ' + JSON.stringify(after));
   });
 
+  const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
+
+  await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
+    if (typeof PM().setImageWrap !== 'function') return 'PM.setImageWrap missing (red)';
+    setDoc('wrap1: '); // clean text doc first → the next call exercises the no-image-selected path
+    if (PM().setImageWrap('square')) return 'setImageWrap should return false with no image selected';
+    PM().insertImage({ src: mkImg(120, 90), alt: 'w1', width: 120, height: 90 }); // stable insert (rId bypasses async registration)
+    await sleep(250);
+    if (selectImage() == null) return 'no image node';
+    if (!PM().setImageWrap('square')) return 'setImageWrap("square") returned false';
+    await sleep(200);
+    const a = imgWrapAttr();
+    if (!a || !a.wrap || a.wrap.type !== 'Square' || a.isAnchor !== true) return 'wrap not Square/anchor: ' + JSON.stringify(a);
+    if (!a.anchorData || !a.anchorData.hRelativeFrom) return 'no anchorData seeded (export would lack positionH/V): ' + JSON.stringify(a);
+    const style = (document.querySelector('#pm-editor .ProseMirror img') || {}).getAttribute ? document.querySelector('#pm-editor .ProseMirror img').getAttribute('style') : '';
+    return (/float\s*:/.test(style) && /shape-outside\s*:/.test(style)) || ('img style lacks float/shape-outside: ' + style);
+  });
+
+  await t('[4c] a wrapped image exports a schema-valid wp:anchor (required CT_Anchor attrs)', async () => {
+    setDoc('wrap2: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'w2', width: 120, height: 90 });
+    await sleep(250);
+    if (selectImage() == null) return 'no image node';
+    PM().setImageWrap('square');
+    await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<wp:anchor/.test(xml)) return 'no <wp:anchor> in export';
+    if (!/<wp:simplePos/.test(xml)) return 'missing required <wp:simplePos> child (Word rejects the file)';
+    if (!/<wp:positionH/.test(xml) || !/<wp:positionV/.test(xml)) return 'missing positionH/positionV';
+    if (!/<wp:wrapSquare/.test(xml)) return 'missing <wp:wrapSquare>';
+    // The CT_Anchor required boolean attrs — omitting any makes Word refuse to open the docx.
+    const anchorTag = (xml.match(/<wp:anchor[^>]*>/) || [''])[0];
+    for (const attr of ['simplePos=', 'behindDoc=', 'locked=', 'layoutInCell=', 'allowOverlap=', 'relativeHeight=']) {
+      if (!anchorTag.includes(attr)) return 'wp:anchor missing required attr ' + attr + ' → ' + anchorTag;
+    }
+    return true;
+  });
+
+  await t('[4c] setImageWrap("inline") returns to in-line with text (wp:inline, no anchor)', async () => {
+    setDoc('wrap3: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'w3', width: 120, height: 90 });
+    await sleep(250);
+    if (selectImage() == null) return 'no image node';
+    PM().setImageWrap('square'); await sleep(120);
+    selectImage(); PM().setImageWrap('inline'); await sleep(160);
+    const a = imgWrapAttr();
+    if (!a || !a.wrap || a.wrap.type !== 'Inline' || a.isAnchor !== false) return 'not back to inline: ' + JSON.stringify(a);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return (/<wp:inline/.test(xml) && !/<wp:anchor/.test(xml)) || 'inline export wrong (anchor=' + /<wp:anchor/.test(xml) + ')';
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');
