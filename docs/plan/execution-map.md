@@ -450,6 +450,14 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (font-color export test, `/loop` 5-min cadence)
+- [x] **Font-color export test (PR #106 `577bf07`)** — char-format matrix 4c. `setColor` → `<w:color
+  w:val="FF0000">` (whole paragraph) + probe + reusable `validate-fontcolor-win.ps1` (text-only range).
+  **Word COM-validated:** Font.Color=255 (no BGR swap). `/code-review` note applied (read text-only range,
+  excludes the pilcrow). Gates: **PM 461 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** char-format matrix 4b font size (half-points / Font.Size) → 4d rFonts (Font.Name) → 4e
+  sub-sup. #3 highlight over-exposure = real bug, UX-fix judgment (steer). LESSON: read TEXT-ONLY COM ranges.
+
 ### 2026-06-16 (underline-style export test, `/loop` 5-min cadence)
 - [x] **Underline-style export test (PR #104 `dfa82fc`)** — scout-v3 #4a (char-format matrix). New `[1]` test
   driving the real underline menu (CSS→OOXML map) across 5 whole paragraphs → `<w:u w:val>`

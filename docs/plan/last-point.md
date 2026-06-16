@@ -7,7 +7,36 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — underline-style export test DONE (PR #104); char-format matrix started; next = font size/color/rFonts/sub-sup)
+## 2026-06-16 (RESUME HERE — font-color export test DONE (PR #106); char-format matrix 4a+4c done; next = 4b size / 4d rFonts / 4e sub-sup)
+
+> **Branch:** `main` (font-color test merged PR #106 `577bf07`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 461 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Font-color export test — DONE (PR #106):** char-format matrix **4c**. `setColor` → `<w:color
+> w:val="FF0000">` (bare hex), applied to a whole paragraph. **🔬 Word COM-validated:** `Font.Color = 255`
+> (RGB long for FF0000; BGR swap would be 16711680) — no swap. `oracle-probe-1-fontcolor.js` + reusable
+> `validate-fontcolor-win.ps1` (reads a TEXT-ONLY range — excludes the pilcrow, per a `/code-review` note).
+>
+> **🗂️ SCOUT BACKLOG v3 (char-format matrix #4 in progress):**
+>   1. ~~Hyperlink~~ (PR #100). 2. ~~Bookmark~~ (PR #102). 4a. ~~Underline-style~~ (PR #104). 4c. ~~Font color~~ **DONE (PR #106).**
+>   3. **HIGHLIGHT over-exposure (REAL bug)** — non-keyword swatches export as `w:shd` not `w:highlight` →
+>      Word `wdNoHighlight`. Fix = restrict picker to 15 ST_HighlightColor keywords (UX judgment — steer).
+>   4b. **Font SIZE export+COM** — `w:sz` HALF-points (20pt→40); COM `Font.Size==20`. Clean, high-use, unit check.
+>   4d. **rFonts export+COM** (`<w:rFonts w:ascii=..>`; COM `Font.Name`).  4e. **sub/superscript**
+>       (`<w:vertAlign>`; COM `Font.Subscript`/`Superscript`). Clean lock-ins.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness.
+>
+> **LESSON (carry forward for char-format COM checks):** apply formatting to a WHOLE paragraph AND read a
+> TEXT-ONLY COM range (exclude the trailing pilcrow) — a full Paragraphs(i).Range can read `wdUndefined`
+> (9999999) for a uniform-text color/format because the paragraph mark is unformatted.
+>
+> **NEXT:** 4b font size (clean half-point unit check) → 4d rFonts → 4e sub-sup. #3 highlight = real bug w/
+> UX-judgment fix (steer). Bigger items (a14 picture effects / frames-overlay / 4e headers) need a STEERED
+> session. spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (underline-style export test DONE (PR #104); char-format matrix started; next = font size/color/rFonts/sub-sup)
 
 > **Branch:** `main` (underline-style test merged PR #104 `dfa82fc`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 460 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
