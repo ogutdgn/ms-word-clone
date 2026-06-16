@@ -2858,6 +2858,29 @@
     let hasHeaderCell = false; doc().descendants((n) => { if (n.type.name === 'tableHeader') hasHeaderCell = true; });
     return hasHeaderCell === true;
   });
+  await t('[6b] EXPORT: Repeat Header Row → <w:tblHeader> in the first row\'s <w:trPr> (Word: Rows(1).HeadingFormat)', async () => {
+    // toggleHeaderRow dual-writes tableRowProperties.repeatHeader → the trPr decode emits <w:tblHeader>
+    // (the "repeat as header row at the top of each page" flag). The prior [6] test only checks the DOM
+    // header-cell conversion; this guards the EXPORT. Word COM-validated separately: row 1 HeadingFormat
+    // = -1 (True), row 2 = 0 — scripts/oracle-probe-6b-repeatheader.js + validate-repeatheader-win.ps1.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    if (!PM().tableToggleHeaderRow()) return 'tableToggleHeaderRow returned false';
+    await sleep(120);
+    let rp = null; doc().descendants((n) => { if (n.type.name === 'tableRow' && rp == null) rp = n.attrs.tableRowProperties?.repeatHeader; });
+    if (rp !== true) return 'first row repeatHeader attr not set: ' + rp;
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const trPrs = xml.match(/<w:trPr\b[\s\S]*?<\/w:trPr>/g) || [];
+    if (!trPrs.length) return 'no <w:trPr> in export';
+    if (!/<w:tblHeader\b/.test(trPrs[0])) return 'first row <w:trPr> missing <w:tblHeader>: ' + trPrs[0].slice(0, 160);
+    // Only the first row repeats — EXACTLY one <w:tblHeader> in the whole doc (non-vacuous count).
+    const tblHeaderCount = (xml.match(/<w:tblHeader\b/g) || []).length;
+    if (tblHeaderCount !== 1) return 'expected exactly one <w:tblHeader>, got ' + tblHeaderCount;
+    // Toggle OFF clears it.
+    PM().tableToggleHeaderRow(); await sleep(120);
+    const xml2 = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (/<w:tblHeader\b/.test(xml2)) return 'toggle OFF left <w:tblHeader> in export';
+    return true;
+  });
   await t('[6] D6 flip: link dialog + table grid open in PM mode', async () => {
     // inverse of the pre-flip D6 block — proves the registry flip reached dispatch.
     window.WC.Commands.run({ cmd: 'link', label: 'Link' }); await sleep(80);
