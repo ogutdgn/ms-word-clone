@@ -2204,6 +2204,46 @@
     return (/\bl="10000"/.test(rtTag) && /\bt="5000"/.test(rtTag)) || 'round-trip changed srcRect: ' + rtTag;
   });
 
+  await t('[4b] Picture Format Rotate/Flip: setImageTransform → transformData → exports a:xfrm rot/flip + round-trips; Reset clears', async () => {
+    if (typeof PM().setImageTransform !== 'function') return 'PM.setImageTransform missing (red)';
+    if (PM().isBlocked('imgRotate') !== false) return 'imgRotate should not be blocked';
+    const tdOf = () => { let td = null; doc().descendants((n) => { if (n.type.name === 'image') td = n.attrs.transformData; }); return td || {}; };
+    const xfrmTag = (xml) => { const m = xml.match(/<a:xfrm\b[^>]*>/); return m && m[0]; };
+    setDoc('rot: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'rot.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    // Rotate right 90° twice → 180 (relative delta, normalized).
+    PM().setImageTransform({ rotate: 90 }); await sleep(50); selectImage();
+    if (tdOf().rotation !== 90) return 'rotation not 90: ' + JSON.stringify(tdOf());
+    PM().setImageTransform({ rotate: 90 }); await sleep(50); selectImage();
+    if (tdOf().rotation !== 180) return 'rotation not 180: ' + JSON.stringify(tdOf());
+    // Flip horizontal toggles on, then off (dropping the key).
+    PM().setImageTransform({ flipH: true }); await sleep(50); selectImage();
+    if (tdOf().horizontalFlip !== true) return 'flipH not set: ' + JSON.stringify(tdOf());
+    PM().setImageTransform({ flipH: true }); await sleep(50); selectImage();
+    if (tdOf().horizontalFlip != null) return 'flipH toggle-off did not drop the key: ' + JSON.stringify(tdOf());
+    // Re-set flipH on; export carries rot (180° → degreesToRot = 10800000) + flipH="1".
+    PM().setImageTransform({ flipH: true }); await sleep(50); selectImage();
+    let tag = xfrmTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!tag) return 'no <a:xfrm> in export';
+    if (!/\brot="10800000"/.test(tag)) return 'rot not 180°(10800000): ' + tag;
+    if (!/\bflipH="1"/.test(tag)) return 'a:xfrm missing flipH="1": ' + tag;
+    // Reset clears all transforms → no a:xfrm rot/flip on export.
+    PM().setImageTransform({ reset: true }); await sleep(50); selectImage();
+    if (tdOf().rotation != null || tdOf().horizontalFlip != null || tdOf().verticalFlip != null) return 'reset did not clear transformData: ' + JSON.stringify(tdOf());
+    tag = xfrmTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (tag && (/\brot=/.test(tag) || /\bflip/.test(tag))) return 'a:xfrm still carries rot/flip after reset: ' + tag;
+    // Re-apply rotate 90° + flipH, then a full open+save round-trip preserves it (XML boundary; the
+    // synthetic image doesn't re-materialize as a node after openDocx — see the Crop test note).
+    PM().setImageTransform({ rotate: 90 }); await sleep(50); selectImage();
+    PM().setImageTransform({ flipH: true }); await sleep(50); selectImage();
+    const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
+    const rt = xfrmTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!rt) return 'a:xfrm lost on open+save round-trip';
+    return (/\brot="5400000"/.test(rt) && /\bflipH="1"/.test(rt)) || 'round-trip changed rot/flip (expected 90°=5400000 + flipH): ' + rt;
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

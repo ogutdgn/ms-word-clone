@@ -458,6 +458,43 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Rotate / flip the selected picture (Word's Picture Format → Arrange → Rotate). Drives the node's
+  // `transformData` (rotation degrees / horizontalFlip / verticalFlip) — the fork's render already
+  // applies `transform: rotate()/scaleX(-1)/scaleY(-1)` and the exporter writes a:xfrm rot/flipH/flipV
+  // (round-trips). `rotate` is a RELATIVE delta (90 / -90 / 180), normalized to 0..359; `flipH/flipV`
+  // TOGGLE; `reset` clears all transforms. transformData is kept minimal (falsy keys dropped) so the
+  // export stays clean (the exporter only emits non-zero rot / truthy flips).
+  function setImageTransform(opts: { rotate?: number; flipH?: boolean; flipV?: boolean; reset?: boolean }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then rotate or flip it.'); return false }
+    const cur = sel.node.attrs.transformData || {}
+    let td: Record<string, any>
+    if (opts.reset) {
+      td = {}
+    } else {
+      td = { ...cur }
+      if (opts.rotate) {
+        const base = Number(td.rotation) || 0
+        const norm = (((base + opts.rotate) % 360) + 360) % 360
+        if (norm === 0) delete td.rotation
+        else td.rotation = norm
+      }
+      if (opts.flipH) td.horizontalFlip = !td.horizontalFlip
+      if (opts.flipV) td.verticalFlip = !td.verticalFlip
+      if (!td.horizontalFlip) delete td.horizontalFlip // keep minimal (export only emits truthy flips)
+      if (!td.verticalFlip) delete td.verticalFlip
+    }
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, transformData: td }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
@@ -465,6 +502,7 @@ export function installInsert(editor: AnyEditor) {
     setImageSize,
     setImageAltText,
     setImageCrop,
+    setImageTransform,
     insertLink,
     removeLink,
     insertImage,
