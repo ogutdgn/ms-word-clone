@@ -15,11 +15,13 @@
 // internal state rebuild + Open/New) and stays OUT of the fork. Wired in
 // bridge/create-editor.ts via `getStarterExtensions().concat(Pagination)`.
 //
-// Scope so far: top/bottom page margins (the fork sets paddingTop/Bottom=0 for the
-// docx editor), block-level page seams on overflow, full-height last sheet, live
-// page count, and MANUAL page breaks (hardBreak[pageBreakType='page']) incl. blank
-// pages (two consecutive breaks → a skipped sheet). Line-level intra-paragraph
-// splitting (PAGINATION.md §7 binary search) is the remaining 4a item.
+// Scope: top/bottom page margins (the fork sets paddingTop/Bottom=0 for the docx
+// editor), block-level page seams on overflow, line-level intra-paragraph splitting
+// (widow/orphan), full-height last sheet, live page count, and MANUAL page breaks
+// (hardBreak[pageBreakType='page']) — a seam placed AT the break position handles
+// mid-paragraph, end-of-paragraph and trailing breaks uniformly, and two adjacent
+// breaks (insertBlankPage) make a blank sheet. Section breaks (w:sectPr) and table
+// row-split across pages are later sub-phases (4f / 4d); see deferrals.md §A.1b.
 
 import { Plugin, PluginKey, Decoration, DecorationSet } from '@/pm'
 // @ts-ignore - vendored fork JS module (no types)
@@ -45,8 +47,8 @@ interface Geometry {
 interface Break {
   pos: number // PM position the spacer sits before
   height: number // spacer height in layout px
-  bands: number[] // gray gap-band offsets within the spacer (1 per sheet boundary it spans;
-  // a blank page = a forced break that skips a sheet → 2 bands)
+  bands: number[] // gray gap-band offsets within the spacer (one per sheet boundary it spans;
+  // every seam in the unified model spans exactly one boundary → a single band)
 }
 
 interface Layout {
@@ -74,8 +76,8 @@ function readGeometry(editor: any): Geometry {
 
 // A full-bleed transparent spacer (the white sheet shows through as page margins).
 // `bands` = the offsets (px from the spacer top) at which to paint a gray inter-sheet
-// gap + the two sheet-edge shadows; [] = no band (top-margin + tail spacers). A
-// normal seam has one band; a blank page (a forced break skipping a sheet) has two.
+// gap + the two sheet-edge shadows; [] = no band (top-margin + tail spacers). Every
+// seam spans one boundary → one band (a blank page is two adjacent one-band seams).
 function makeSpacer(height: number, bands: number[], leftBleed: number, rightBleed: number): HTMLElement {
   const el = document.createElement('div')
   el.className = 'pm-page-spacer'
@@ -247,12 +249,12 @@ function findLineSplit(b: BlockMeasure, localBoundary: number, zoom: number, box
 // the fixed point (newHeight == currentSpacerHeight). Margin collapsing is handled
 // automatically — we never model it, we measure the result.
 //
-// `forced` = positions of `hardBreak[pageBreakType='page']` nodes (manual page
-// breaks). A forced break in block X pushes the NEXT block onto a new page
-// regardless of fill; two consecutive forced breaks = a blank page (skip a sheet).
-// Because a forced break leaves the prior page partly empty, overflow is measured
-// against a PAGE-RELATIVE baseline `pageStartNat` (the natural top where the current
-// page's content began) rather than an absolute contentH grid.
+// `forced` = absolute positions of inline page-break nodes (hardBreak with
+// pageBreakType/lineBreakType = 'page'). Each places a seam AT its position (pushing
+// the content after it to a new page) — see placeForcedSeam below. Because a forced
+// break leaves the prior page partly empty, auto-overflow is measured against a
+// PAGE-RELATIVE baseline `pageStartNat` (the natural top where the current page's
+// content began) rather than an absolute contentH grid.
 // Only true text blocks (paragraphs, headings, list items, quotes) are split at the
 // line. Tables/figures/other block widgets are NOT — their getClientRects are
 // cell/row boxes, not text lines, so line-splitting would inject a seam mid-cell and
@@ -265,69 +267,77 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
   const breaks: Break[] = []
   let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
   let pageStartNat = 0 // natural top where the current page's content begins
-  let prevPos = -1
   const boxTop = view?.dom ? view.dom.getBoundingClientRect().top : 0
   const zoom = (window as any).WC?.PM?.zoom || 1
-  // Place a seam before block b that skips `skip` sheets (1 = normal/single break,
-  // 2 = blank page). Nudges b's border-top to the content-top of its new page and
-  // paints one gap band per skipped sheet boundary.
-  const placeSeam = (b: BlockMeasure, skip: number) => {
-    pagesDone += skip
+  // The ONE seam-emit primitive, shared by all three seam sites (wholesale-move,
+  // forced-break, line-split). Advances to the next page and emits a one-band seam at
+  // `pos`. The height is the measure-and-nudge `target - actualTop + precSpacer`: it
+  // drives the line currently at `actualTop` down to the new page's content-top, and
+  // adding back `precSpacer` (the seam height already above that line) keeps it stable
+  // at the fixed point, where the seam's own height equals h. Callers set pageStartNat.
+  const emitSeam = (pos: number, actualTop: number, precSpacer: number) => {
+    pagesDone += 1
     const target = pagesDone * g.pitch + g.marginTop
-    const h = target - b.actualTop + b.precSpacer
-    if (h > 1) {
-      const bands: number[] = []
-      // bottom band at the sheet boundary just above b; each earlier (skipped) sheet
-      // boundary is one pitch higher up the spacer.
-      for (let j = 0; j < skip; j++) bands.push(h - GAP - g.marginTop - j * g.pitch)
-      breaks.push({ pos: b.pos, height: h, bands })
-    }
+    const h = target - actualTop + precSpacer
+    if (h > 1) breaks.push({ pos, height: h, bands: [h - GAP - g.marginTop] })
+  }
+  // Move a SHORT straddling block wholesale to the next page (a seam BEFORE b).
+  const placeSeamBefore = (b: BlockMeasure) => {
+    emitSeam(b.pos, b.actualTop, b.precSpacer)
     pageStartNat = b.natTop
   }
-  for (const b of blocks) {
-    // A page break in the PREVIOUS block forces b onto a new page regardless of fill;
-    // two such breaks = a blank page in between.
-    const forcedCount = b === blocks[0] ? 0 : forced.filter((P) => P > prevPos && P < b.pos).length
-    if (forcedCount > 0) {
-      placeSeam(b, forcedCount)
-    } else {
-      let guard = 0
-      while (b.natBottom - pageStartNat > g.contentH + EPS && guard++ < PAGE_GUARD) {
-        // Try to SPLIT b at the line where it crosses the page boundary (Word splits
-        // a straddling paragraph at the line, keeping >=2 lines each side). Only true
-        // text blocks are splittable — a table is moved wholesale (row-split = 4d).
-        const localBoundary = pageStartNat + g.contentH - b.natTop // b-local Y of the page bottom
-        const split =
-          isLineSplittable(b.el) && localBoundary > 0 && localBoundary < b.natBottom - b.natTop
-            ? findLineSplit(b, localBoundary, zoom, boxTop, view)
-            : null
-        if (split) {
-          pagesDone++
-          const target = pagesDone * g.pitch + g.marginTop
-          // Add back the seam currently above this line (split.precSpacer) so the
-          // seam is stable at the fixed point (h == precSpacer), not collapsed to 0.
-          const h = target - split.actualTop + split.precSpacer
-          if (h > 1) breaks.push({ pos: split.pos, height: h, bands: [h - GAP - g.marginTop] })
-          pageStartNat = b.natTop + split.localTop // the rest of b begins the new page here
-          continue // b may cross more page boundaries (very tall) → re-check
-        }
-        if (b.natTop - pageStartNat > EPS) {
-          placeSeam(b, 1) // short block / orphan: move it wholesale to the next page
-          break
-        }
-        // Starts at the page top, overflows, and can't be split (e.g. a <4-line block
-        // somehow taller than a page) → advance the baseline to avoid an infinite loop.
-        pagesDone++
-        pageStartNat += g.contentH
-      }
-    }
-    prevPos = b.pos
+  // Place a forced seam AT an inline page-break position P inside block b: pushes the
+  // content AFTER P to the next page's content-top. This single mechanism covers
+  // mid-paragraph, end-of-paragraph AND trailing (doc-final) breaks — and two adjacent
+  // breaks (insertBlankPage) naturally make a blank page (two seams). pageStartNat
+  // advances to P's natural Y so the auto-overflow below measures b's remainder from the
+  // right baseline. `precSpacer` = the intra-block seam height already above P's line.
+  const placeForcedSeam = (b: BlockMeasure, P: number) => {
+    let c: any = null
+    try { c = view.coordsAtPos(P) } catch { c = null }
+    if (!c) { pagesDone += 1; pageStartNat += g.contentH; return } // unaddressable → still advance a page
+    const lineScreenTop = c.top
+    const innerAbove = Array.from(b.el.querySelectorAll('.pm-page-spacer')).reduce((a: number, s: Element) => {
+      const r = (s as HTMLElement).getBoundingClientRect()
+      return r.top < lineScreenTop - 1 ? a + r.height / zoom : a
+    }, 0)
+    emitSeam(P, (lineScreenTop - boxTop) / zoom, innerAbove)
+    const naturalLocalTop = (lineScreenTop - b.el.getBoundingClientRect().top) / zoom - innerAbove
+    pageStartNat = b.natTop + Math.max(0, naturalLocalTop)
   }
-  // NOTE: a TRAILING page break (a doc-final Ctrl+Enter with no following block) is
-  // intentionally NOT paginated in 4a — Word would add a blank sheet, but supporting it
-  // grew a long edge-case tail (non-text content after the break, caret-at-break-pos page
-  // counting, deadband/signature staleness) for a minor feature, so it is deferred with
-  // mid-paragraph + section breaks. See deferrals.md §A.1b.
+  for (const b of blocks) {
+    // 1. Manual page breaks INSIDE b → a forced seam AT each one (in document order).
+    const node = view?.state?.doc?.nodeAt ? view.state.doc.nodeAt(b.pos) : null
+    const bEnd = b.pos + (node ? node.nodeSize : 1)
+    const fb = forced.filter((P) => P >= b.pos && P < bEnd).sort((x, y) => x - y)
+    for (const P of fb) {
+      if (b === blocks[0] && P <= b.pos + 1) continue // a break at the very document start has no content before it
+      placeForcedSeam(b, P)
+    }
+    // 2. Auto overflow for b's content (after any forced break), relative to pageStartNat.
+    let guard = 0
+    while (b.natBottom - pageStartNat > g.contentH + EPS && guard++ < PAGE_GUARD) {
+      // Split b at the line where it crosses the page boundary (Word keeps >=2 lines each
+      // side). Only true text blocks are splittable — a table is moved wholesale (4d).
+      const localBoundary = pageStartNat + g.contentH - b.natTop
+      const split =
+        isLineSplittable(b.el) && localBoundary > 0 && localBoundary < b.natBottom - b.natTop
+          ? findLineSplit(b, localBoundary, zoom, boxTop, view)
+          : null
+      if (split) {
+        emitSeam(split.pos, split.actualTop, split.precSpacer)
+        pageStartNat = b.natTop + split.localTop
+        continue
+      }
+      if (b.natTop - pageStartNat > EPS) {
+        placeSeamBefore(b) // short block / orphan: move it wholesale to the next page
+        break
+      }
+      // Starts at the page top, overflows, can't be split → advance to avoid an infinite loop.
+      pagesDone++
+      pageStartNat += g.contentH
+    }
+  }
   const pageCount = Math.min(PAGE_GUARD, pagesDone + 1)
   // Top margin: nudge the first block's border-top to the margin line (Word renders
   // the first line of each page at the top margin; this also removes the first
@@ -502,9 +512,9 @@ class PaginationView {
       PM.__pagination = layout
         ? {
             pageCount: layout.pageCount,
-            // `skip` = sheets this seam advances (1 normal, 2 a blank page) — the status
-            // bar weights the caret's page by skip, not by seam count.
-            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height), skip: b.bands.length || 1 })),
+            // Every seam advances exactly one sheet (a blank page = two adjacent seams),
+            // so the status bar counts seams above the caret rather than weighting them.
+            breaks: layout.breaks.map((b) => ({ pos: b.pos, height: Math.round(b.height) })),
             geometry: layout.geometry,
           }
         : { pageCount: 1, breaks: [], geometry: readGeometry(this.editor) }

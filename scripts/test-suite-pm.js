@@ -5160,17 +5160,24 @@
     const s = v().state.selection;
     v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), s.to, s.to)));
   };
-  const firstParaAfterSeam = (needle) => {
+  // Y (px from box top) of the first paragraph/text-node containing `needle`, and the
+  // content-top of a given 1-based page — used to assert which page content lands on
+  // (a forced seam can be INSIDE a paragraph, so DOM-child position isn't reliable).
+  const textY = (needle) => {
     const pm = document.querySelector('#pm-editor .ProseMirror');
-    let sawSeam = false;
-    for (const el of Array.from(pm.children)) {
-      if (el.classList.contains('pm-page-spacer')) { if (el.querySelector('.pm-gap-band')) sawSeam = true; }
-      else if (sawSeam && el.tagName === 'P' && el.textContent.includes(needle)) return true;
+    const z = PM().zoom || 1, boxTop = pm.getBoundingClientRect().top;
+    const w = document.createTreeWalker(pm, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      const i = n.textContent.indexOf(needle);
+      if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + needle.length); return (r.getBoundingClientRect().top - boxTop) / z; }
     }
-    return false;
+    return null;
   };
+  const pageContentTop = (pageIdx) => { const g = PM().__pagination.geometry; return (pageIdx - 1) * (g.pageH + 14) + g.marginTop; };
+  const bandCount = () => document.querySelectorAll('#pm-editor .ProseMirror .pm-gap-band').length;
 
-  await t('[4a] manual page break forces the next content onto a new page', async () => {
+  await t('[4a] manual page break forces the following content onto a new page', async () => {
     setDocs(['Mpb alpha line', 'Mpb bravo line', 'Mpb charlie line']);
     await sleep(300);
     const before = PM().__pagination.pageCount;
@@ -5179,10 +5186,37 @@
     let pc = before;
     for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
     if (pc <= before) return 'pageCount did not increase (' + before + ' -> ' + pc + ')';
-    return firstParaAfterSeam('charlie') || 'charlie not on the new page after the seam';
+    const y = textY('charlie');
+    return (y != null && y >= pageContentTop(2) - 30) || 'charlie Y=' + Math.round(y) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
   });
 
-  await t('[4a] blank page (two breaks) skips a sheet with two gap bands', async () => {
+  await t('[4a] mid-paragraph break splits the paragraph (after-text on the next page)', async () => {
+    window.WC.editor.commands.selectAll();
+    window.WC.editor.commands.insertContent('<p>MidBefore part of the paragraph here</p>');
+    await sleep(250);
+    // caret after "here" (end) — then type after-break text so the paragraph has content on both sides
+    caretToEndOf('here');
+    PM().insertPageBreak();
+    window.WC.editor.commands.insertContent('MidAfter text');
+    await sleep(500);
+    if (PM().__pagination.pageCount < 2) return 'pageCount ' + PM().__pagination.pageCount;
+    const yb = textY('MidBefore'), ya = textY('MidAfter');
+    if (yb == null || ya == null) return 'text not found (b=' + yb + ' a=' + ya + ')';
+    return (yb < pageContentTop(2) - 30 && ya >= pageContentTop(2) - 30) || 'before Y=' + Math.round(yb) + ' after Y=' + Math.round(ya);
+  });
+
+  await t('[4a] trailing manual page break adds a blank page', async () => {
+    setDocs(['TrA alpha', 'TrA omega']); // omega = unique last word of the last block
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('omega');
+    PM().insertPageBreak();
+    let pc = before;
+    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    return pc === before + 1 || 'trailing break: pageCount ' + before + ' -> ' + pc + ' (expected +1)';
+  });
+
+  await t('[4a] blank page (two breaks) adds a blank sheet (two seams)', async () => {
     setDocs(['Bp alpha line', 'Bp bravo line', 'Bp charlie line']);
     await sleep(300);
     const before = PM().__pagination.pageCount;
@@ -5191,10 +5225,8 @@
     let pc = before;
     for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
     if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
-    const pm = document.querySelector('#pm-editor .ProseMirror');
-    const seam = Array.from(pm.querySelectorAll(':scope > .pm-page-spacer')).find((s) => s.querySelector('.pm-gap-band'));
-    const bands = seam ? seam.querySelectorAll('.pm-gap-band').length : 0;
-    return bands === 2 || 'expected 2 gap bands on the blank-page seam, got ' + bands;
+    // a blank page = two forced seams (each one gap band); content after lands 2 pages down
+    return bandCount() >= 2 || 'expected >=2 gap bands for the blank page, got ' + bandCount();
   });
 
   await t('[4a] manual page break exports as <w:br w:type="page">', async () => {
@@ -5227,7 +5259,7 @@
     return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
   });
 
-  await t('[4a] status bar weights the caret page by a blank-page seam (skip=2)', async () => {
+  await t('[4a] status bar reports the caret page across a blank-page (two seams)', async () => {
     setDocs(['Sbp alpha', 'Sbp bravo', 'Sbp gamma']);
     await sleep(300);
     caretToEndOf('bravo');
@@ -5235,8 +5267,9 @@
     let pc = 1;
     for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 3) break; }
     if (pc < 3) return 'blank page pageCount=' + pc + ' (expected 3)';
-    const skips = (PM().__pagination.breaks || []).map((b) => b.skip);
-    if (!skips.includes(2)) return 'no skip=2 seam exposed: ' + JSON.stringify(skips);
+    // A blank page is TWO forced seams (each advances one sheet); the status bar counts
+    // the seams above the caret, so gamma — after both seams — is on sheet 3.
+    if ((PM().__pagination.breaks || []).length < 2) return 'expected >=2 seams for a blank page, got ' + (PM().__pagination.breaks || []).length;
     caretToEndOf('gamma'); // caret on the 3rd sheet (sheet 2 is the blank page)
     await sleep(300);
     const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
