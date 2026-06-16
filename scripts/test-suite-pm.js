@@ -3370,6 +3370,22 @@
     if (shaded(c2)) return 'unselected third cell was shaded too';
     return true;
   });
+  await t('[6b] EXPORT: cell shading → <w:shd w:fill> in document.xml (hex preserved; Word reads BackgroundPatternColor)', async () => {
+    // The model attr was covered above; this guards the docx EXPORT (the prior gap). A caret-cell
+    // shade must emit <w:shd w:fill="FF0000"> verbatim. Word COM-validated separately: a pure-red
+    // (FF0000) fill reads Cells(1).Shading.BackgroundPatternColor = 255 (no BGR/RGB swap) —
+    // scripts/oracle-probe-6b-cellshading.js + scripts/oracle/validate-cellshading-win.ps1.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
+    if (!PM().tableSetCellShading('FF0000')) return 'tableSetCellShading returned false';
+    await sleep(100);
+    const bg = firstCellAttr('background');
+    if (!bg || !/^ff0000$/i.test(bg.color || '')) return 'background attr not set: ' + JSON.stringify(bg);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<w:shd\b[^>]*w:fill="([^"]*)"/);
+    if (!m) return 'no <w:shd w:fill=...> in export';
+    if (!/^ff0000$/i.test(m[1])) return 'w:shd fill not FF0000 (hex must round-trip verbatim): ' + m[1];
+    return true;
+  });
 
   // ---- Table Layout + Table Design contextual ribbon tabs (Task 10) ----
   await t('[6b] contextual Table tabs appear when caret is in a table', async () => {
