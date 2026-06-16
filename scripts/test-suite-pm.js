@@ -3008,6 +3008,31 @@
     doc().descendants((n) => { if (n.type.name === 'tableCell' && n.attrs.colwidth) widths.push(n.attrs.colwidth[0]); });
     return widths.length >= 3 && widths.every((w) => w === widths[0] && w > 0);
   });
+  await t('[6b] EXPORT: distributeColumnsEvenly → 3 equal <w:gridCol> in <w:tblGrid> (from uneven; Word: even columns)', async () => {
+    // The test above asserts the MODEL colwidth; this guards the EXPORT geometry. Start UNEVEN (widen
+    // col 0), distribute, and <w:tblGrid> must emit 3 EQUAL <w:gridCol> (the px→twips grid projection;
+    // a unit bug would land even-in-model but odd/lopsided twips here). Word COM-validated: opens clean,
+    // Columns(i).Width all ~equal — scripts/oracle-probe-6b-distribute.js + validate-distribute-win.ps1.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    if (typeof PM().tableSetCellWidth !== 'function') return 'tableSetCellWidth missing (red)';
+    if (PM().tableSetCellWidth(260) === false) return 'tableSetCellWidth returned false (caret not in a cell?)';
+    await sleep(100); // caret is in col 0 → widen it → uneven grid
+    // Precondition (makes the test NON-vacuous): the grid must actually be UNEVEN now — proves the widen
+    // took effect, so the even-after assertion genuinely proves distribute did the work (not that a fresh
+    // table was already even).
+    const colw = () => { const w = []; doc().descendants((n) => { if (n.type.name === 'tableRow' && w.length === 0) n.forEach((c) => { if (c.attrs.colwidth) w.push(c.attrs.colwidth[0]); }); }); return w; };
+    const cwBefore = colw();
+    if (cwBefore.length !== 3 || cwBefore.every((w) => w === cwBefore[0])) return 'precondition failed: grid not uneven before distribute (widen no-op): ' + JSON.stringify(cwBefore);
+    if (!PM().tableDistributeColumns()) return 'tableDistributeColumns returned false';
+    await sleep(150);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const grid = (xml.match(/<w:tblGrid\b[\s\S]*?<\/w:tblGrid>/) || [])[0];
+    if (!grid) return 'no <w:tblGrid> in export';
+    const cols = (grid.match(/<w:gridCol\b[^>]*w:w="(\d+)"/g) || []).map((m) => Number(m.match(/w:w="(\d+)"/)[1]));
+    if (cols.length !== 3) return 'expected 3 <w:gridCol>, got ' + cols.length + ': ' + grid.slice(0, 200);
+    if (!cols.every((w) => w === cols[0] && w > 0)) return '<w:gridCol> not all equal after distribute (uneven ' + JSON.stringify(cwBefore) + ' → ' + JSON.stringify(cols) + ')';
+    return true;
+  });
   await t('[6b] distributeRowsEvenly writes a rowHeight on the rows', async () => {
     setDoc('x'); PM().insertTable({ rows: 3, cols: 2 }); await sleep(150);
     ecmd('distributeRowsEvenly'); await sleep(80);
