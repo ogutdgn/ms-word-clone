@@ -1901,6 +1901,28 @@
     selectText('linked word'); PM().removeLink(); await sleep(80);
     return !hasMark('link');
   });
+  await t('[6] EXPORT: insertLink → <w:hyperlink r:id> + External Relationship (Word: Hyperlinks.Address)', async () => {
+    // The tests above cover the live link MARK; this guards the EXPORT — a <w:hyperlink> whose r:id
+    // resolves to an External Relationship (Target=url) in word/_rels/document.xml.rels, else Word can't
+    // resolve the address. Word COM-validated: Hyperlinks.Count=1, .Address="https://example.com/",
+    // .TextToDisplay="click here" (oracle-probe-6-hyperlink.js + scripts/oracle/validate-hyperlink-win.ps1).
+    setDoc('click here please'); selectText('click here'); await sleep(60);
+    PM().insertLink({ href: 'https://example.com/', text: 'click here' }); await sleep(120);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const hl = (xml.match(/<w:hyperlink\b[^>]*>/) || [])[0];
+    if (!hl) return 'no <w:hyperlink> in export';
+    const rId = (hl.match(/r:id="([^"]+)"/) || [])[1];
+    if (!rId) return 'no r:id on <w:hyperlink>: ' + hl;
+    const rels = window.WC.editor.converter?.convertedXml?.['word/_rels/document.xml.rels'];
+    if (!rels) return 'no word/_rels/document.xml.rels generated';
+    const relsRoot = (rels.elements || []).find((e) => e.name === 'Relationships');
+    const els = (relsRoot && relsRoot.elements) || [];
+    const rel = els.find((e) => e.name === 'Relationship' && e.attributes && e.attributes.Id === rId);
+    if (!rel) return 'no Relationship for ' + rId + ' (Word cannot resolve the link address)';
+    if (rel.attributes.Target !== 'https://example.com/') return 'Relationship Target wrong: ' + rel.attributes.Target;
+    if (rel.attributes.TargetMode !== 'External') return 'Relationship TargetMode not External: ' + rel.attributes.TargetMode;
+    return true;
+  });
   await t('[6] insertImage inserts an image node with the data-url src', async () => {
     setDoc('photo: ');
     const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
