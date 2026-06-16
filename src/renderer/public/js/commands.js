@@ -717,6 +717,21 @@
   H.position = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('In Line with Text')); fly.appendChild(WC.flyItem('In Line with Text', { onClick: () => WC.PM.setImageWrap('inline') })); fly.appendChild(WC.flyHeader('With Text Wrapping')); [['Top Left', 'tl'], ['Top Center', 'tc'], ['Top Right', 'tr'], ['Middle Left', 'ml'], ['Middle Center', 'mc'], ['Middle Right', 'mr'], ['Bottom Left', 'bl'], ['Bottom Center', 'bc'], ['Bottom Right', 'br']].forEach(([l, p]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.Layout.position(p) }))); });
   H.wrapText = (c, node) => WC.flyout(node, (fly) => { [['In Line with Text', 'inline'], ['Square', 'square'], ['Tight', 'tight'], ['Through', 'through'], ['Top and Bottom', 'topbottom'], ['Behind Text', 'behind'], ['In Front of Text', 'front']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.PM.setImageWrap(m) }))); });
   H.bringForward = () => WC.PM.setImageZOrder('forward');
+  // Picture Format → Size: toggle the selected picture's aspect-ratio lock. When UNLOCKED the
+  // resize overlay's edge handles free-stretch a single axis (render/export honor the box).
+  H.imgLockAspect = () => {
+    const sel = window.WC.view && window.WC.view.state && window.WC.view.state.selection;
+    if (!sel || !sel.node || sel.node.type.name !== 'image') {
+      WC.toast && WC.toast('Select a picture first', 'Click a picture to lock or unlock its aspect ratio.');
+      return;
+    }
+    const next = sel.node.attrs.lockAspectRatio === false; // currently unlocked → lock; else unlock
+    WC.PM.setImageLockAspect(next);
+    WC.toast && WC.toast(
+      next ? 'Aspect ratio locked' : 'Aspect ratio unlocked',
+      next ? 'Resizing keeps the picture’s proportions.' : 'Edge handles now free-stretch one axis.',
+    );
+  };
   H.sendBackward = () => WC.PM.setImageZOrder('backward');
   H.selectionPane = () => WC.Layout.selectionPane();
   H.align = (c, node) => WC.flyout(node, (fly) => {

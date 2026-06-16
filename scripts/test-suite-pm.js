@@ -2064,6 +2064,50 @@
     return Math.abs(after.width / after.height - before.width / before.height) < 0.06 || ('locked image distorted on E-drag: ' + JSON.stringify(after));
   });
 
+  await t('[4b] Picture Format tab: Lock Aspect Ratio toggles the picture lockAspectRatio attr', async () => {
+    if (!window.WC.PictureToolsPM || typeof window.WC.PictureToolsPM.syncContextualTab !== 'function') return 'PictureToolsPM.syncContextualTab missing (red)';
+    setDoc('pf: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'pf.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(350); // let state-sync drive the contextual tab + the ribbon render
+    // the Picture Format contextual tab must appear when a picture is selected.
+    const pfShown = () => Array.from(document.querySelectorAll('#tabstrip *')).some((e) => /Picture Format/.test(e.textContent || ''));
+    if (!pfShown()) return 'Picture Format contextual tab did not appear on image selection';
+    const lockOf = () => { let a; doc().descendants((n) => { if (n.type.name === 'image') a = n.attrs.lockAspectRatio; }); return a !== false; };
+    const before = lockOf(); // default = locked
+    WC.Commands.run({ cmd: 'imgLockAspect', type: 'button' }, document.body); // dispatch the ribbon control
+    await sleep(150); selectImage();
+    if (lockOf() === before) return 'Lock Aspect Ratio did not toggle (was ' + before + ', still ' + lockOf() + ')';
+    WC.Commands.run({ cmd: 'imgLockAspect', type: 'button' }, document.body); // toggle back
+    await sleep(150); selectImage();
+    return lockOf() === before || 'Lock Aspect Ratio did not toggle back';
+  });
+
+  await t('[4b] Picture Format Arrange cmds are un-blocked (shipped engine) + reach the bridge', async () => {
+    // Regression for the stale-DEFERRED bug: wrapText/bringForward/sendBackward ship engine
+    // support (4c.1 wrap / 4c.3 z-order) but were gated by the coarse layout-arrange DEFERRED
+    // flag, so the ribbon path toasted "not available" instead of acting. ENGINE_READY un-blocks
+    // exactly those three; the still-undefined cmds (align/group/rotate/position) stay blocked.
+    if (PM().isBlocked('wrapText') !== false) return 'wrapText still blocked';
+    if (PM().isBlocked('bringForward') !== false) return 'bringForward still blocked';
+    if (PM().isBlocked('sendBackward') !== false) return 'sendBackward still blocked';
+    if (PM().isBlocked('align') !== true) return 'align should STAY blocked (WC.Layout.align is undefined)';
+    if (PM().isBlocked('rotate') !== true) return 'rotate should STAY blocked';
+    // End-to-end: dispatching the ribbon control reaches the bridge verb (was notifyBlocked before).
+    setDoc('arr: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 90), 'arr.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    const origZ = PM().setImageZOrder; let zHit = null;
+    PM().setImageZOrder = (dir) => { zHit = dir; return origZ.call(PM(), dir); };
+    try {
+      WC.Commands.run({ cmd: 'bringForward', type: 'split', label: 'Bring Forward' }, document.body);
+      await sleep(60);
+    } finally { PM().setImageZOrder = origZ; }
+    return zHit === 'forward' || 'bringForward dispatch did not reach setImageZOrder (got ' + zHit + ')';
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

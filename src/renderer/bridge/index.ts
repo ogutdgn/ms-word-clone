@@ -144,7 +144,15 @@ const AREA: Record<string, string> = {
   docInfo: 'header-footer', differentFirstPage: 'header-footer', differentOddEven: 'header-footer',
   showDocText: 'header-footer', dateAndTime: 'header-footer', linkToPrevious: 'header-footer',
 }
-function isBlocked(cmd: string) { const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
+// Commands whose engine support has SHIPPED even though their AREA is still
+// broadly deferred — un-blocked individually so the ribbon path reaches the
+// (already-working) bridge verbs. Image wrap = Phase 4c.1 (setImageWrap, wp:anchor
+// export), image z-order = Phase 4c.3 (setImageZOrder). The other layout-arrange
+// cmds (position presets, align, group, rotate, selectionPane) still call the
+// undefined WC.Layout.* and MUST stay blocked. Per-command granularity keeps the
+// coarse AREA flag honest without re-exposing genuinely-unimplemented controls.
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward'])
+function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
 // SAFETY: validate + PARSE before any teardown — a corrupt file must leave the
@@ -272,7 +280,7 @@ export function preinstallBridge() {
     ready: false,
     notifyBlocked,
     isBlocked,   // D6 §7.1a — consulted by the WC.Commands dispatch heads (Task 4B)
-    AREA, DEFERRED, // exposed for tests/audit
+    AREA, DEFERRED, ENGINE_READY, // exposed for tests/audit
     cmd: () => false,
     chain: () => false,
     getState: () => null,
