@@ -244,7 +244,12 @@ export const translateImageNode = (params) => {
 
   // Scale box size to match intrinsic PNG aspect ratio (legacy behavior).
   // Only applies to PNG data URIs — the old getPngDimensions only supported PNG.
-  if (src?.startsWith('data:image/png')) {
+  // NOTICE (WC): SKIP this when the model carries an EXPLICIT box (both width AND height set) —
+  // that is the user's intentional size (a free-stretched picture, or one whose aspect diverges
+  // from the intrinsic), so honor it verbatim instead of aspect-forcing it (which collapsed a
+  // stretched 240x60 box to 60x60). The scaling still corrects boxes that lack an explicit aspect.
+  const hasExplicitBox = attrs.size?.width > 0 && attrs.size?.height > 0;
+  if (src?.startsWith('data:image/png') && !hasExplicitBox) {
     const intrinsicDims = readImageDimensionsFromDataUri(src);
     if (intrinsicDims) {
       const boxWidthPx = emuToPixels(size.w);
