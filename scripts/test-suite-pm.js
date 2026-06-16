@@ -5623,6 +5623,51 @@
     return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
   });
 
+  // ---- Phase 4a caret/click integrity (regression for the inline-block-spacer bug) ----
+  // A forced/blank-page seam MUST be a BLOCK-boundary widget, never a block <div> injected
+  // INSIDE a paragraph's inline flow (that corrupts PM's posAtCoords hit-testing → clicking
+  // the next page lands the caret on the wrong page). Helpers:
+  const inlineSpacerCount = () => document.querySelectorAll('#pm-editor .ProseMirror p .pm-page-spacer, #pm-editor .ProseMirror h1 .pm-page-spacer, #pm-editor .ProseMirror h2 .pm-page-spacer, #pm-editor .ProseMirror li .pm-page-spacer').length;
+  // Click the page-2 top margin (just above `needle`'s rendered line) and return the text of
+  // the paragraph the caret lands in — Word puts the caret on the line you clicked toward.
+  const marginClickParentText = (needle) => {
+    const pm = document.querySelector('#pm-editor .ProseMirror');
+    const w = document.createTreeWalker(pm, NodeFilter.SHOW_TEXT);
+    let n, rect = null;
+    while ((n = w.nextNode())) { const i = n.textContent.indexOf(needle); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + needle.length); rect = r.getBoundingClientRect(); break; } }
+    if (!rect) return null;
+    const hit = v().posAtCoords({ left: rect.left + 2, top: rect.top - 18 });
+    if (!hit) return '';
+    const $p = doc().resolve(Math.min(doc().content.size, Math.max(0, hit.pos)));
+    return $p.parent.textContent || '';
+  };
+
+  await t('[4a] manual page break is a BLOCK-boundary seam (no block-in-inline; page-2 click maps right)', async () => {
+    setDocs(['MbiAlpha first paragraph', 'MbiBravo second paragraph', 'MbiCharlie third paragraph word']);
+    await sleep(300);
+    caretToEndOf('MbiBravo second paragraph'); // caret at end of block 2 → break pushes block 3 to page 2
+    PM().insertPageBreak();
+    let pc = 1; for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 2) break; }
+    if (pc < 2) return 'did not paginate to 2 pages';
+    const inl = inlineSpacerCount();
+    if (inl > 0) return 'block-in-inline: ' + inl + ' page-spacer(s) injected inside a <p> (corrupts posAtCoords)';
+    // Clicking page-2's top margin must land on page-2 content (MbiCharlie), not a stale page-1 pos.
+    const landed = marginClickParentText('MbiCharlie');
+    return (landed != null && /MbiCharlie/.test(landed)) || 'page-2 margin click landed in "' + (landed || '').slice(0, 30) + '" (not the page-2 paragraph)';
+  });
+
+  await t('[4a] blank page uses BLOCK-boundary seams (no block-in-inline spacer)', async () => {
+    setDocs(['BbiAlpha first', 'BbiBravo middle', 'BbiCharlie last word']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('BbiAlpha first');
+    PM().insertBlankPage();
+    let pc = before; for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
+    if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
+    const inl = inlineSpacerCount();
+    return inl === 0 || 'block-in-inline: ' + inl + ' page-spacer(s) inside a <p> for the blank page';
+  });
+
   await t('[4a] section break (w:sectPr) forces the next content onto a new page', async () => {
     if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
     setDocs(['Scb alpha line', 'Scb bravo line', 'Scb gamma line']);
@@ -5736,9 +5781,10 @@
     let pc = 1;
     for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 3) break; }
     if (pc < 3) return 'blank page pageCount=' + pc + ' (expected 3)';
-    // A blank page is TWO forced seams (each advances one sheet); the status bar counts
-    // the seams above the caret, so gamma — after both seams — is on sheet 3.
-    if ((PM().__pagination.breaks || []).length < 2) return 'expected >=2 seams for a blank page, got ' + (PM().__pagination.breaks || []).length;
+    // A blank page is ONE block-boundary seam that advances TWO sheets (two bands); the status
+    // bar weights seams by their page span, so gamma — after the seam — is on sheet 3.
+    const advanced = (PM().__pagination.breaks || []).reduce((a, b) => a + (b.pages || 1), 0);
+    if (advanced < 2) return 'expected the blank-page seam(s) to advance >=2 sheets, got ' + advanced;
     caretToEndOf('gamma'); // caret on the 3rd sheet (sheet 2 is the blank page)
     await sleep(300);
     const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
