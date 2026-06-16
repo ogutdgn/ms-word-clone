@@ -7,7 +7,39 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — image free-stretch DONE (PR #61); image area complete; frames-overlay is the keystone next)
+## 2026-06-16 (RESUME HERE — Picture Format tab + Arrange un-block DONE (PR #63); image area fully wired to ribbon; frames-overlay is the keystone next)
+
+> **Branch:** `main` (Picture Format tab merged PR #63 `c914f66`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 439 / smoke 9 / roundtrip 27.**
+>
+> **Picture Format contextual tab — DONE (PR #63, commit `4064a71`):** closes the last §A.1c gap (the
+> in-app Lock-Aspect UI). New `src/renderer/public/js/picture-tools-pm.js` injects a "Picture Format"
+> tab (mirrors `table-tools-pm.js`) shown on an image `NodeSelection`, hidden on deselect — **Size**
+> group (Lock Aspect Ratio → `H.imgLockAspect` → `setImageLockAspect`) + **Arrange** group (Wrap Text /
+> Bring Forward / Send Backward). `state-sync.ts` drives `WC.PictureToolsPM.syncContextualTab`.
+>
+> **Dead-control root-cause fix (PR #63, commit `4e13be8`) — caught by `/code-review`:** `wrapText` /
+> `bringForward` / `sendBackward` were DEAD ON CLICK from the ribbon (new tab AND the existing Layout
+> tab) — they dispatch through `isBlocked()` first and all map to the coarse `layout-arrange` AREA still
+> in the Phase-7 `DEFERRED` set, so the ribbon toasted "not available" and never reached their already-
+> shipped bridge verbs (`setImageWrap` = 4c.1, `setImageZOrder` = 4c.3). Fix: an **`ENGINE_READY`**
+> allow-set in `bridge/index.ts` un-blocks exactly those three; the still-unimplemented `layout-arrange`
+> cmds (`position` presets / `align` / `group` / `rotate` / `selectionPane` → undefined `WC.Layout.*`)
+> STAY blocked. Per-command granularity, re-reviewed clean. 2 new `[4b]` tests.
+>
+> **The IMAGE area is now fully wired** (insert, resize, wrap/float, z-order, stretch, dimensionless
+> sizing, lock-aspect — all reachable from the ribbon). **NEXT — same keystone as before (deferrals
+> §A.1b/d/e):**
+>   1. **The FRAMES-OVERLAY / paged-layout rework** — unblocks line-split coords-safe render, table
+>      row-split (tall-table overflow reproduced), AND faithful floating image/shape reposition (4c.2)
+>      + render z-stacking. **Highest leverage; needs a focused/fresh session.**
+>   2. **4e headers/footers + fields** (currently `header-footer` DEFERRED).
+>   3. Smaller: extend the Picture Format tab (crop + alt-text + a numeric size group).
+> Branch off `main`. **Session is EXTREMELY long — a fresh session is strongly recommended.**
+
+---
+
+## 2026-06-16 (image free-stretch DONE (PR #61); image area complete; frames-overlay is the keystone next)
 
 > **Branch:** `main` (free-stretch merged PR #61 `110347f`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 437 / smoke 9 / roundtrip 27.**
