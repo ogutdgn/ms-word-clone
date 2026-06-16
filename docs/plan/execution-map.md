@@ -450,6 +450,13 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (hyperlink export test, `/loop` 5-min cadence)
+- [x] **Hyperlink export test (PR #100 `6cd1647`)** — scout-v3 #1. New `[6]` test: `<w:hyperlink r:id>` +
+  External `<Relationship>` (Target=url, TargetMode=External) in document.xml.rels + probe + reusable
+  `validate-hyperlink-win.ps1`. **Word COM-validated:** Hyperlinks.Count=1, .Address="https://example.com/",
+  .TextToDisplay="click here". `/code-review` clean (hardened rels lookup). Gates: **PM 458 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** v3 #2 (bookmark export+COM — mirrors the hyperlink recipe) then #4 (char-format matrix).
+
 ### 2026-06-16 (RE-SCOUT v3 + bullet-list export test + found a real bug, `/loop` 5-min cadence)
 - [x] **#4-rPr SKIPPED** (judgment): low value (Word tolerates), CUA-adjacent (near reserved task_c62b4d4c),
   not cleanly testable via test:pm. Pivoted to re-scout.
