@@ -3359,6 +3359,26 @@
       return String(e);
     }
   });
+  await t('[6b] EXPORT: merged cell → <w:gridSpan w:val="2"> + grid keeps all columns (Word opens without repair)', async () => {
+    // The B3 test above asserts the MODEL (cell count); this guards the EXPORT — a horizontal merge
+    // must emit <w:gridSpan w:val="2"> on the surviving cell while <w:tblGrid> keeps all 3 <w:gridCol>
+    // (a gridSpan/grid mismatch is exactly what makes Word repair-prompt). Word COM-validated
+    // separately: the saved doc OPENS WITHOUT REPAIR, Rows(1).Cells.Count=2, Rows(2)=3 —
+    // scripts/oracle-probe-6b-gridspan.js + scripts/oracle/validate-gridspan-win.ps1.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(150);
+    if (!PM().tableSelectFirstRowPair()) return 'tableSelectFirstRowPair returned false';
+    await sleep(80);
+    if (!PM().tableMerge()) return 'tableMerge returned false';
+    await sleep(120);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const gs = xml.match(/<w:gridSpan\b[^>]*w:val="(\d+)"/);
+    if (!gs) return 'no <w:gridSpan> in export after horizontal merge';
+    if (gs[1] !== '2') return 'gridSpan should be 2 (merged 2 cells), got ' + gs[1];
+    // The grid must still describe all 3 columns the span covers (else Word repairs the table).
+    const gridCols = (xml.match(/<w:gridCol\b/g) || []).length;
+    if (gridCols !== 3) return 'expected 3 <w:gridCol> (grid must keep all columns), got ' + gridCols;
+    return true;
+  });
   await t('[6b] cell shading works with a plain caret (Word parity)', async () => {
     // T3 defect A: Word shades the CARET cell when no cells are selected; the bridge
     // used to refuse ('Select cells first' toast + false). setCellAttr is caret-safe
