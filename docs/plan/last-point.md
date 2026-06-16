@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — PAGINATION CARET BUG root-caused + primary fix merged; line-split rework remains)
+## 2026-06-16 (RESUME HERE — pagination caret fix + AutoFit Contents (4d.5) DONE; AutoFit trio complete)
+
+> **Branch:** `main` (caret Fix A merged PR #54 `11909cd`; AutoFit Contents merged PR #56 `c70c1fb`;
+> branches deleted). **Phase:** 4 (layout engine). Gates: **PM 432 / smoke 9 / roundtrip 27.**
+>
+> **This session (user `/loop` "keep going, fix the broken pagination + keep the cycle"):**
+> 1. **Pagination caret bug — FIXED + thoroughly validated** (see the entry below + the
+>    [[pagination-caret-rootcause]] memory). Root cause: forced/blank-page seams were block `<div>`s
+>    injected at INLINE positions → corrupted PM `posAtCoords`. Fix A made them coords-safe
+>    block-boundary seams. **Then audited pagination exhaustively via probes — ALL behaviors clean
+>    post-fix:** auto-overflow (70 paras → break at line 45, matches the oracle), manual breaks, blank
+>    pages, clicking at zoom 1.0/1.5/0.75, selecting across a break, typing-after-break, deleting a
+>    break (model + re-paginate), export. `focus.ts` confirmed FINE (only clamps X; Fix A un-poisoned
+>    posAtCoords). The line-split/mid-paragraph in-`<p>` spacer remains the one structural blemish but is
+>    RARE (only a paragraph >1 page tall) + BENIGN (word round-trips clean; gap clicks land at the split)
+>    — documented, deferred (a custom split-paragraph NodeView / frames-overlay).
+> 2. **AutoFit Contents (Phase 4d.5) — DONE + MERGED** (PR #56 `c70c1fb`): completes the AutoFit trio
+>    (Window + Fixed were 4d.4). The bridge (`tableAutoFit`) measures each column's content width by
+>    reflowing the selected table's DOM at `table-layout:auto` (capped at the page text width, restore in
+>    a `finally`), passes the widths to `autoFitTable`, which now UNIFIES window+contents into one
+>    TableMap colwidth writer (the unify cleanup the 4d.4 review flagged). Oracle `read-table`: a 2-col
+>    table (short "Hi" vs a long string) → Word renders 22.15pt + 332.25pt (short ≪ long; col 1 exact).
+>    `/code-review high` → 2 actionable fixes (finally-restore + a stronger shrink assertion); rest refuted.
+>
+> **AutoFit trio COMPLETE** (Window/Fixed/Contents). **NEXT (pick one):**
+>   1. **Table RELOCATE** (move handle + floating anchor — needs the frames-overlay) OR **row-split across
+>      pages** (a table taller than a page still overflows; pagination + `splitTableAtRow` + repeat header
+>      rows — oracle-validatable, complex).
+>   2. **The FRAMES-OVERLAY** — would also unblock the line-split coords-safe rendering + image reposition.
+>   3. **4e headers/footers + fields** (currently blocked).
+> Branch off `main`. **Session is VERY long — a fresh session is strongly recommended.**
+
+---
+
+## 2026-06-16 (PAGINATION CARET BUG root-caused + primary fix merged; line-split rework remains)
 
 > **Branch:** `main` (caret Fix A merged via PR #54 `11909cd`; branch deleted). **Phase:** 4 (layout
 > engine) — a USER-REPORTED REGRESSION pass: "page breaks, blank pages break normal text-editor

@@ -29,7 +29,18 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a..4d.4 DONE + a PAGINATION CARET-BUG fix; line-split rework / 4d / frames-overlay / 4e NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a..4d.5 DONE (AutoFit trio complete) + a PAGINATION CARET fix; RELOCATE / row-split / frames-overlay / 4e NEXT
+> **AutoFit Contents (Phase 4d.5) DONE + MERGED** (PR #56 `c70c1fb`): completes the AutoFit trio
+> (Window+Fixed were 4d.4). The bridge measures each column's content width (reflow the selected table
+> at `table-layout:auto`, capped at the page text width, restore in `finally`) and passes it to
+> `autoFitTable`, which UNIFIES window+contents into one TableMap colwidth writer (the unify cleanup the
+> 4d.4 review flagged). Oracle: short "Hi" col vs a long col → Word 22.15pt + 332.25pt (short ≪ long,
+> col 1 exact). `/code-review high` → finally-restore + a stronger shrink assertion; rest refuted.
+> Gates: **PM 432 / smoke 9 / roundtrip 27**. **NEXT:** table RELOCATE / row-split-across-pages; OR the
+> FRAMES-OVERLAY (also unblocks the line-split coords-safe render); OR 4e headers/footers.
+>
+> <details><summary>Prior PAGINATION CARET-BUG CURRENT-PHASE note (kept for context)</summary>
+>
 > **PAGINATION CARET BUG (user-reported) — root-caused + PRIMARY fix MERGED** (PR #54 `11909cd`):
 > page breaks + blank pages were breaking editing + the caret/click position because their seam was a
 > block `<div>` injected at the INLINE hardBreak position inside a paragraph (block-in-inline corrupts
@@ -40,6 +51,8 @@
 > (low-severity, deferrals §A.1b):** line-split + mid-paragraph in-`<p>` spacers still misland a click in
 > the narrow GAP of a page-overflowing paragraph (word round-trips stay clean) — a hard coords-safe
 > rework (custom split-paragraph NodeView / frames-overlay). Full writeup: [[pagination-caret-rootcause]].
+>
+> </details>
 >
 > <details><summary>Prior 4d.4 CURRENT-PHASE note (kept for context)</summary>
 >
@@ -436,6 +449,22 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (AutoFit Contents 4d.5 + exhaustive pagination audit, `/loop` "keep going")
+- [x] **Audited pagination exhaustively** (post Fix A) via headless probes — ALL behaviors clean:
+  auto-overflow (70 paras → break at line 45 = the oracle), manual breaks, blank pages, clicking at
+  zoom 1.0/1.5/0.75, selecting across a break, typing-after-break, deleting a break, export.
+  `focus.ts` confirmed FINE (only clamps X; Fix A un-poisoned posAtCoords). The line-split in-`<p>`
+  spacer is the one rare+benign structural blemish → documented, deferred.
+- [x] **AutoFit Contents (Phase 4d.5)** — completes the AutoFit trio. Bridge measures each column's
+  content width (reflow the selected table at `table-layout:auto`, cap at page text width, restore in
+  `finally`); `autoFitTable` UNIFIES window+contents into one TableMap colwidth writer.
+- [x] **Oracle-validated** (`read-table`): short "Hi" col vs a long col → Word 22.15pt + 332.25pt
+  (short ≪ long; col 1 exact). +1 `[4d]` test (asserts the short col shrank well below the default
+  equal split) + oracle probe. Gates: **PM 432 / smoke 9 / roundtrip 27**.
+- [x] **`/code-review high` + fixes**: finally-guarded style restore + a stronger shrink assertion;
+  most candidates refuted (colspan trips the guard; rowspans don't shift the row-0 origin; auto-layout
+  captures the cross-row per-column max). **4d.5 COMPLETE + merged** (PR #56 `c70c1fb`).
 
 ### 2026-06-16 (Pagination CARET BUG — root-cause + primary fix, `/loop` redirected by the user)
 - [x] **User redirected the loop** to fix pagination: "page breaks, blank pages break normal editing +
