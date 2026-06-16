@@ -2344,7 +2344,11 @@
     if (!/<w:tblLayout[^>]*w:type="autofit"/.test(xml)) return 'no w:tblLayout autofit';
     const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
     if (gridCols.length !== 2) return 'expected 2 gridCols, got ' + JSON.stringify(gridCols);
-    return gridCols[0] < gridCols[1] || 'AutoFit Contents did not shrink the short column below the long one: ' + JSON.stringify(gridCols);
+    // Verify it actually CONTENT-FIT: the short column must be narrower than the long one AND
+    // well below the default equal split (a 2-col Letter table starts at 312px/col = 4680 twips),
+    // so a regression that leaves columns large-but-ordered can't pass.
+    return (gridCols[0] < gridCols[1] && gridCols[0] < 2000) ||
+      'AutoFit Contents did not shrink the short column to fit (default ~4680 twips/col): ' + JSON.stringify(gridCols);
   });
 
   await t('[4d] ribbon AutoFit Window fills the table (full flyout path)', async () => {

@@ -230,6 +230,9 @@ export function installTable(editor: AnyEditor) {
   // is synchronous (no await), so the fork's TableView never re-renders mid-measure, and the
   // styles are restored before the colwidth transaction re-renders from the model.
   function measureColumnContentWidths(): number[] | undefined {
+    let table: HTMLElement | null = null
+    let firstRow: Element | null = null
+    let cols: HTMLElement[] = []
     try {
       const $from = editor.state.selection.$from
       let tablePos = -1
@@ -238,27 +241,34 @@ export function installTable(editor: AnyEditor) {
       }
       if (tablePos < 0) return undefined
       const dom: any = editor.view.nodeDOM(tablePos)
-      const table: HTMLElement | null = dom && dom.tagName === 'TABLE' ? dom : dom?.querySelector?.('table') ?? null
-      const firstRow = table?.querySelector('tr')
-      if (!table || !firstRow) return undefined
-      const cols = Array.from(table.querySelector('colgroup')?.children ?? []) as HTMLElement[]
-      const savedLayout = table.style.tableLayout
-      const savedW = table.style.width
-      const savedMax = table.style.maxWidth
-      const savedColW = cols.map((c) => c.style.width)
+      table = dom && dom.tagName === 'TABLE' ? dom : dom?.querySelector?.('table') ?? null
+      firstRow = table?.querySelector('tr') ?? null
+      cols = Array.from(table?.querySelector('colgroup')?.children ?? []) as HTMLElement[]
+    } catch {
+      return undefined
+    }
+    if (!table || !firstRow) return undefined
+    // Mutate the live table to content-sizing, read, and ALWAYS restore (finally) so a throw
+    // mid-measure can never leave the table visually mis-sized.
+    const savedLayout = table.style.tableLayout
+    const savedW = table.style.width
+    const savedMax = table.style.maxWidth
+    const savedColW = cols.map((c) => c.style.width)
+    try {
       table.style.tableLayout = 'auto'
       table.style.width = 'auto'
+      // Cap at the page text column — Word's AutoFit Contents never grows the table past the page.
       table.style.maxWidth = pageTextWidthPx() + 'px'
       cols.forEach((c) => { c.style.width = 'auto' })
-      // getBoundingClientRect forces the sync reflow under the temporary auto layout.
-      const widths = (Array.from(firstRow.children) as HTMLElement[]).map((cell) => Math.max(16, Math.ceil(cell.getBoundingClientRect().width)))
+      // Under table-layout:auto each COLUMN is sized to its widest cell across ALL rows, so reading
+      // row 0's per-cell widths yields the per-column content-fit width. getBoundingClientRect
+      // forces the synchronous reflow. (Empty columns floor to 16px — Word likewise enforces a min.)
+      return (Array.from(firstRow.children) as HTMLElement[]).map((cell) => Math.max(16, Math.ceil(cell.getBoundingClientRect().width)))
+    } finally {
       table.style.tableLayout = savedLayout
       table.style.width = savedW
       table.style.maxWidth = savedMax
       cols.forEach((c, i) => { c.style.width = savedColW[i] })
-      return widths
-    } catch {
-      return undefined
     }
   }
 
