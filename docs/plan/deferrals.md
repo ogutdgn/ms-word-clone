@@ -54,7 +54,7 @@
 | ~~Insert → Pages~~ | ~~**Page Break vertical geometry**~~ | **RESOLVED 2026-06-15 (Phase 4a)**: the pagination engine (`src/renderer/pagination/pagination.ts`) renders manual page breaks (`hardBreak[pageBreakType='page']`) and blank pages (two consecutive breaks) as real page boundaries, plus auto multi-page flow + line-level intra-paragraph splitting. Oracle-validated vs Word for Windows 16.0 (`word-oracle-win.ps1 read-layout`): break paragraph + page count match exactly. | ~~2026-06-15~~ |
 | ~~Insert → Picture / object selection~~ | ~~**Image RESIZE** (drag handles)~~ | **RESOLVED 2026-06-15 (Phase 4b)**: live resize via an owned 8-handle overlay (`src/renderer/imageresize/image-resize.ts`) — drag writes the image `size` attr (px), which the exporter turns into `wp:extent`/`a:ext` (EMU). Aspect-locked (Word's default). Oracle-validated (`read-shapes`): 200×100→260×130 px renders in Word as 195pt×97.5pt = 2476500×1238250 EMU. See §A.1c for the remaining 4b edges. | ~~2026-06-15~~ |
 | Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE** (floating) + ~~text-wrap~~ | **text-wrap RESOLVED 2026-06-15 (Phase 4c.1)**: `WC.PM.setImageWrap(mode)` wires the ribbon Wrap Text (inline/square/tight/through/top&bottom/behind/in-front) to the image `wrap`+`isAnchor` attrs → renders (float/shape-outside/absolute, real reflow) + exports a schema-valid `wp:anchor`; oracle-validated (all 6 floating modes open as floatingShapes). **Still deferred**: drag-to-RELOCATE (4c.2), z-order Bring/Send (4c.3), and the §A.1d edges. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
-| Insert / Table Tools → Table | **Column/row RESIZE, table RELOCATE, row-split across pages** | Tables render but the grid is fixed: dragging column/row borders (`w:gridCol`/`w:trHeight`), moving a table, and splitting a tall table's rows across a page boundary all need the table layout pass. LAYOUT_ENGINE.md §2 #4–6 / sub-phase 4d. | 2026-06-15 |
+| Insert / Table Tools → Table | ~~**Column RESIZE**~~ + **row RESIZE, table RELOCATE, row-split** | **Column RESIZE RESOLVED 2026-06-16 (Phase 4d.1)**: enabled prosemirror-tables `columnResizing` (was `handleWidth: 0` → re-armed at 5) — drag a column border → live `colwidth` write → exports `w:gridCol`/`w:tcW`; oracle-validated (180px → Word 135pt). **Still deferred**: row RESIZE (`w:trHeight` — + a known px-vs-twips export-unit bug, §A.1e), table RELOCATE, row-split across pages, AutoFit. LAYOUT_ENGINE.md §2 #4–6 / 4d.2+. | 2026-06-16 |
 
 #### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
 
@@ -199,6 +199,37 @@
 - **No automated Word-open gate.** The `[4c]` tests assert the export carries the required
   CT_Anchor attrs + wrap element (string match) — they'd catch a missing `simplePos`/`wrapPolygon` —
   but "does Word actually open it" is the manual `word-oracle-win.ps1 read-shapes` step.
+
+#### A.1e — Phase-4d tables: status + remaining (column resize done 2026-06-16)
+
+> Column RESIZE is DONE (4d.1): prosemirror-tables `columnResizing` re-enabled (`handleWidth` 0→5);
+> drag a column border → `colwidth` (px). A grid-sync `appendTransaction` (table.js) rebuilds the
+> table's `grid` attr (twips) from the changed colwidths, because the EXPORTER emits `w:gridCol`
+> verbatim from `grid` — without the sync a resize on an IMPORTED table (which carries a `grid`)
+> was silently DROPPED on save (caught by `/code-review`). Validated: border-hover arms the handle
+> (`activeHandle` ≥ 0); oracle `read-table` reads a 180px resize as 135pt for BOTH a new table and an
+> imported (stale-grid) table. These remain:
+
+- **Row RESIZE is not built, AND `setRowHeight` has a px-vs-twips export-unit bug.** `setRowHeight(px,
+  rule)` stores px in `tableRowProperties.rowHeight.value`, but the exporter writes that straight into
+  `w:trHeight w:val`, which Word reads as TWIPS — so an explicit row height exports ~15× too small.
+  4d.2: add a row-resize affordance (prosemirror-tables has no built-in row resize — needs a custom
+  handle/overlay) AND fix the export to `pixelsToTwips(px)`. (Unexercised until now — row heights were
+  Phase-7-gated.)
+- **Table RELOCATE (drag the table) is not built.** Needs a move handle + (for a floating table) an
+  anchor; mirror the image frames-overlay. 4d.
+- **Row-split across a page boundary is not done.** The pagination engine still moves a table wholesale
+  (skips it at any depth — pagination.ts). Row-split needs: measure row heights, find the boundary row,
+  split via the fork's `splitTableAtRow`, seam before the continuation, repeat header rows. 4d.
+- **AutoFit (contents/window/fixed) geometry is not wired** beyond the existing distribute-rows/cols
+  commands; the ribbon AutoFit dropdown needs the layout pass. 4d.
+- **Column-resize UX is prosemirror-tables' built-in** (thin drag indicator + col-resize cursor), not a
+  Word-styled handle overlay. Faithful behaviour (drag the border); a fancier overlay is optional polish.
+- **Grid-sync colspan edge (low).** The grid-sync rebuilds `grid` by pushing one entry per first-row
+  `colwidth` array element. If a first-row merged cell's `colwidth` array is SHORTER than its colspan
+  (the codebase normally keeps them equal), the rebuilt grid has fewer entries than columns; the export
+  count stays right (`max(cellCount, gridLen)`) but a trailing sub-column falls back to a computed
+  width. Rare; not padded defensively. (Per /code-review re-review.)
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 

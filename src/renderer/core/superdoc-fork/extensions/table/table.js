@@ -2250,11 +2250,13 @@ export const Table = Node.create({
       ...(resizable
         ? [
             columnResizing({
-              // Disable PM's visual handles (custom overlay handles resizing)
-              // Set to 0 to prevent PM from rendering its own resize handles
-              // while keeping transaction helpers and constraint logic
+              // Phase 4d: enable prosemirror-tables' built-in column resize — hover a column
+              // border → col-resize cursor → drag updates the cells' `colwidth` (px) live, and
+              // on release it persists (the exporter writes it back as w:gridCol + w:tcW). This
+              // is Word's drag-the-border behaviour. (Was 0, which disabled the hit-zone for a
+              // custom overlay that was never built, so resize didn't work at all.)
               // @ts-expect-error - Options types will be fixed in TS migration
-              handleWidth: 0,
+              handleWidth: 5,
               // @ts-expect-error - Options types will be fixed in TS migration
               cellMinWidth: this.options.cellMinWidth,
               // @ts-expect-error - Options types will be fixed in TS migration
@@ -2271,6 +2273,51 @@ export const Table = Node.create({
       tableEditing({
         // @ts-expect-error - Options types will be fixed in TS migration
         allowTableNodeSelection: this.options.allowTableNodeSelection,
+      }),
+
+      // Phase 4d.1: the interactive columnResizing drag writes each cell's `colwidth` (px) but
+      // leaves the table's `grid` attr (twips) stale — and the EXPORTER emits w:gridCol straight
+      // from `grid`, so a drag-resize on an imported table is DROPPED on save. When a table's
+      // first-row column widths change, rebuild `grid` from the new colwidths (+ mark userEdited)
+      // so the resize round-trips. (The programmatic setCellWidth path already sets userEdited;
+      // this also re-syncs the grid, covering both the drag and any colwidth write.)
+      new Plugin({
+        key: new PluginKey('tableColwidthGridSync'),
+        appendTransaction(transactions, oldState, newState) {
+          if (!transactions.some((t) => t.docChanged)) return null;
+          // Only top-level tables (doc.forEach, NOT descendants — the latter would walk every
+          // paragraph's inline content on every keystroke). A table nested in a container is rare
+          // and intentionally out of scope here. `offset` is the table's doc position.
+          const sig = (doc) => {
+            const out = [];
+            doc.forEach((node, offset) => {
+              if (node.type.name !== 'table') return;
+              let cw = '';
+              node.firstChild?.forEach((cell) => {
+                cw += (cell.attrs.colwidth || []).join(',') + '|';
+              });
+              out.push({ pos: offset, cw });
+            });
+            return out;
+          };
+          const before = sig(oldState.doc);
+          const after = sig(newState.doc);
+          if (before.length !== after.length) return null; // a table was added/removed, not a resize
+          let tr = null;
+          for (let i = 0; i < after.length; i += 1) {
+            if (after[i].cw === before[i].cw) continue; // this table's columns didn't change
+            const node = newState.doc.nodeAt(after[i].pos);
+            if (!node) continue;
+            // Rebuild the grid (twips) from the first row's colwidths (px) so the export matches.
+            const newGrid = [];
+            node.firstChild?.forEach((cell) => {
+              (cell.attrs.colwidth || []).forEach((w) => newGrid.push({ col: pixelsToTwips(Math.max(1, Math.round(Number(w) || 0))) }));
+            });
+            if (!newGrid.length) continue;
+            tr = (tr || newState.tr).setNodeMarkup(after[i].pos, undefined, { ...node.attrs, userEdited: true, grid: newGrid });
+          }
+          return tr;
+        },
       }),
 
       createTableBoundaryNavigationPlugin(),
