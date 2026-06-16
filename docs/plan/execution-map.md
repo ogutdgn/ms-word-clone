@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (cell-shading export test + picture-effects investigation, `/loop` 5-min cadence)
+- [x] **Cell shading export test (PR #86 `7587365`)** — scout-backlog #4. New `[6b]` test (caret-cell shade
+  → `<w:shd w:fill="FF0000">` verbatim) + probe + reusable `validate-cellshading-win.ps1`. **Word
+  COM-validated:** FF0000 → `BackgroundPatternColor = 255` (no BGR swap). Test-only. `/code-review` clean.
+  Gates: **PM 451 / smoke 9 / roundtrip 27**.
+- [x] **🔬 Picture effects (#2) investigated → DEFERRED.** Built grayscale end-to-end (render filter +
+  setImageColorAdjust + Color UI) on the fork's a:grayscl path, but **Word COM showed it's not faithful:
+  Word uses the a14 (Office 2010) extension for recolor, not `<a:grayscl>`; Word reads our a:grayscl as
+  ColorType=2 (BlackAndWhite).** Reverted (never committed). True fidelity needs a14 import/export (bigger
+  fork change). LESSON: COM-validate caught a non-faithful representation pre-merge.
+- [x] **SCOUT BACKLOG EXHAUSTED** (all 5 items DONE or deferred). NEXT loop step: **RE-SCOUT** for new
+  bounded slices, or take a bigger item (frames-overlay keystone / 4e headers / picture-effects-via-a14).
+
 ### 2026-06-16 (Table Cell Margins flyout, `/loop` 5-min cadence)
 - [x] **Table Cell Margins flyout (PR #84 `96681ff`)** — scout-backlog #3. Wired the dead `H.tblCellMargins`
   stub to an inches flyout (Top/Bottom/Left/Right + Apply) → `WC.PM.tableSetCellMargins` (px=in×96). Bridge +
