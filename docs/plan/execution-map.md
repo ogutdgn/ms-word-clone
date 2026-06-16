@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Position 4c.2 + oracle-caught simplePos fix, `/loop` "keep go")
+- [x] **Picture absolute Position (4c.2, PR #73 `cc566cb`)** — first floating reposition step.
+  `setImagePosition({horizontal,top,relative?})` → `marginOffset` → render left/top + `wp:positionH/V`
+  posOffset export. "Position" flyout in the Arrange group. Guarded vs silent save-drop on imported anchors.
+- [x] **🔬 ORACLE caught a latent simplePos bug** — a generated complex-positioned anchor exported
+  `@simplePos="1"`, so Word IGNORED positionH/V (read a 1"/0.5" picture at −1"/−1"). Fixed
+  (`translate-anchor-node.js`: force `simplePos="0"` when positionH/V emitted). Latent since 4c.1.
+  Re-oracle: Word reads Left=72pt / Top=36pt — exact. New `oracle-probe-4c2-position.js`.
+- [x] **`/code-review` (+ re-review) clean.** 1 `[4c]` test (inline-guard / marginOffset / relative nudge /
+  posOffset EMU / simplePos="0" / imported-refusal / round-trip). Gates: **PM 444 / smoke 9 / roundtrip 27**.
+
 ### 2026-06-16 (Picture Rotate/Flip — Picture Format tab Word-complete, `/loop` "keep go")
 - [x] **Picture Rotate/Flip (PR #71 `6dd541c`)** — wired Word's Picture Format → Arrange → Rotate
   (Rotate Right/Left 90° / Flip V/H / Reset) onto the fork's already-complete `transformData` pipeline
