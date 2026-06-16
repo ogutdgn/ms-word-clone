@@ -7,7 +7,47 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — 2+-table Word-corruption ROOT-CAUSED (not shipped; reverted, re-flagged); env blocked clean validation)
+## 2026-06-16 (RESUME HERE — table cell "Align Middle" w:vAlign fix DONE (PR #80, oracle-validated); scout backlog recorded)
+
+> **Branch:** `main` (cell-vAlign fix merged PR #80 `7fdf431`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 448 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode iteration.**
+>
+> **Table cell vertical-alignment fix — DONE (PR #80):** found via an ultracode parallel-SCOUT
+> workflow (6 agents assessing wired-but-untested table/image features for latent Word-bugs). The
+> "Align Middle" control set `verticalAlign="middle"` (correct CSS — the cell renderDOM emits
+> `vertical-align: middle`) but passed it STRAIGHT to OOXML `w:vAlign/@w:val` — and "middle" is NOT a
+> valid `ST_VerticalJc` value (enum: top|center|both|bottom) → **Word IGNORED it (cell not centered).**
+> Mirror bug on import (`w:vAlign="center"` → invalid CSS `vertical-align: center`). FIX: map CSS
+> `middle` ↔ OOXML `center` at both converter boundaries (`translate-table-cell.js` export +
+> `legacy-handle-table-cell-node.js` import); model attr stays the CSS value. **Re-oracle: Word reads
+> `Cells(1).VerticalAlignment = 1` (Center).** `/code-review` clean (core fix sound; round-trip byte-stable).
+> 1 `[4d]` test + `scripts/oracle-probe-4d-cellvalign.js`. Review flagged the document-api/CUA adapters
+> use the OOXML enum directly (pre-existing, separate layer) → **spawn_task `task_c62b4d4c`.**
+>
+> **🗂️ SCOUT BACKLOG (candidate bounded slices for next iterations — ranked, from the scout workflow):**
+>   1. ~~Cell vertical-align (rec 5)~~ **DONE (PR #80).**
+>   2. **Picture effects: grayscale / brightness-contrast (rec 4.5)** — engine IMPORTS/EXPORTS (a:grayscl,
+>      a:lum in decode-image-node-helpers.js) but NOT rendered (rendered:false) + NO bridge setter/UI.
+>      Bigger (render CSS filter + setImageColorAdjust bridge + Picture Format→Adjust group + handlers).
+>      Oracle: InlineShape.PictureFormat.Brightness/Contrast/ColorType.
+>   3. **Table cell margins (rec 4)** — `H.tblCellMargins` is a STUB (commands.js: toast "not implemented");
+>      bridge `tableSetCellMargins` + export (w:tcMar) WORK. Wire the inches flyout (4 spinners) + test +
+>      oracle (Cells(1).TopPadding/LeftPadding...). Bounded.
+>   4. **Table cell shading (rec 4)** — wired + works, NO export test. Add a `[6b]` w:shd export test +
+>      oracle (Cells(1).Shading.BackgroundPatternColor). Smallest.
+>   5. **Table borders (rec 2, NOT bounded BUT latent corruption)** — `tcBorders` is MISSING its XML_ORDER
+>      in tcPr-translator.js (the EXACT class of bug as the tblPr-order Word-corruption I fixed in PR #77!).
+>      A cell with borders + other tcPr props may export out-of-CT_TcPr-order → Word corrupt. Adding the
+>      tcBorders XML_ORDER (mirror the tblPr fix) could be a bounded high-value corruption-prevention slice.
+>      Validate via Word-open (NOT just gates — roundtrip misses corruption).
+>
+> **NEXT:** pick from the scout backlog (#3 cell margins or #4 shading = smallest/cleanest; #5 tcBorders-order
+> = highest corruption-prevention value). The 2+-table corruption (`task_0e043993`) + the CUA vAlign
+> (`task_c62b4d4c`) stay as focused-session spawn_tasks (NOT loop work). Branch off `main`.
+
+---
+
+## 2026-06-16 (2+-table Word-corruption ROOT-CAUSED (not shipped; reverted, re-flagged); env blocked clean validation)
 
 > **Branch:** `main` (clean; the fix was REVERTED, not merged). **Phase:** 4. Gates unchanged: **PM 447 /
 > smoke 9 / roundtrip 27.** Investigation iteration — no PR this round.

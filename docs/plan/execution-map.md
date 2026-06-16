@@ -450,6 +450,16 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Table cell vAlign fix via ultracode scout, `/loop`)
+- [x] **Ultracode parallel-SCOUT workflow** (6 agents) ranked wired-but-untested table/image features by
+  latent-Word-bug risk. Top hit → fixed; backlog recorded in last-point.md (picture effects, cell margins
+  stub, shading test, tcBorders XML_ORDER).
+- [x] **Table cell "Align Middle" w:vAlign fix (PR #80 `7fdf431`)** — "middle" is valid CSS but invalid
+  OOXML ST_VerticalJc → Word ignored it (cell not centered). Mapped CSS middle ↔ OOXML center at both
+  converter boundaries. **Word COM-validated: Cells(1).VerticalAlignment=1 (Center).** `/code-review` clean.
+  1 `[4d]` test + oracle-probe-4d-cellvalign.js. Gates: **PM 448 / smoke 9 / roundtrip 27**.
+- [x] **Flagged** the document-api/CUA adapters (use OOXML enum directly; pre-existing) → spawn_task `task_c62b4d4c`.
+
 ### 2026-06-16 (2+-table Word-corruption — root-caused, NOT shipped, `/loop` "keep go")
 - [x] **Root-caused the 2+-table Word-corrupt export** (the flagged bug). OOXML CT_Tc: a `w:tbl` can't be the
   LAST child of a cell — needs a trailing `<w:p/>`. The natural "insert table, then insert table" nests the
