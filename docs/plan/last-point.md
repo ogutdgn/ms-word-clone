@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — paragraph shading export test DONE (PR #94); scout-v2 winding down → DECISION POINT)
+## 2026-06-16 (RESUME HERE — distribute-columns geometry export test DONE (PR #96); scout-v2 ≈ done → #4 then RE-SCOUT v3)
+
+> **Branch:** `main` (distribute test merged PR #96 `701a4a9`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 456 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Distribute-columns geometry export test — DONE (PR #96):** took **scout-v2 #5**. Added a `[6b]` test:
+> start UNEVEN (widen col 0), assert the grid is uneven (non-vacuous precondition — proves the widen took
+> effect), distribute, then `<w:tblGrid>` must emit 3 EQUAL `<w:gridCol>` + `oracle-probe-6b-distribute.js`
+> + reusable `validate-distribute-win.ps1`. **🔬 Word COM-validated:** uneven [260,208,208]px → even
+> [225,225,225]px → 3× `<w:gridCol w:w="3375">` → opens clean, `Columns.Width=[155.8,155.85,155.85]pt` (even;
+> the ~13pt gap vs gridCol is Word subtracting cell margins). `/code-review` caught a VACUOUS assertion
+> (equal-gridCol passes regardless of an uneven start) → fixed with the uneven-before precondition.
+>
+> **🗂️ SCOUT BACKLOG v2 — DONE except #4:** #1 gridSpan (PR #90), #2 para shading (PR #94), #3 para borders
+> (PR #92), #5 distribute (PR #96) DONE. Remaining: **#4 OOXML child-ORDER sweep** (rPr/pPr/trPr/numPr/pBdr —
+> production fix, but Word TOLERATES it → value = strict-consumer portability only; rPr highest-reachability).
+>
+> **📊 SESSION TALLY:** 6 consecutive Word-COM-validated export-regression slices shipped (PR #86 cell shading,
+> #88 repeat-header, #90 gridSpan, #92 para border, #94 para shading, #96 distribute) + the earlier real fixes
+> (PR #80 vAlign, #82 tcPr-order, #84 cell-margins). The docx EXPORT surface is now broadly COM-hardened. A
+> reusable `scripts/oracle/validate-*-win.ps1` family + `oracle-probe-*` pattern is established for any feature.
+>
+> **NEXT (forward plan):**
+>   1. **#4-rPr** (last v2 item) — add `RPR_XML_ORDER` to rpr-translator.js (mirror PR #77/#82), regression test
+>      asserting rPr child order for a programmatically-mutated run. Bounded; pPr/trPr/numPr/pBdr as follow-ups.
+>   2. **RE-SCOUT v3** — areas NOT yet scouted: **lists/numbering** (w:numPr/numbering.xml), **fields/references**
+>      (TOC/SEQ/CITATION export), **hyperlinks/bookmarks** (w:hyperlink/bookmarkStart), **image remnants**
+>      (change-picture, reset-size), **section geometry that is NOT Phase-7-deferred**. Build a v3 queue.
+>   3. **ESCALATE (needs a steered focused session, NOT the 5-min loop):** a14 picture effects (deferred),
+>      FRAMES-OVERLAY keystone, 4e headers/footers — multi-PR architectural. Surface to the user.
+> 2+-table corruption (`task_0e043993`) + CUA vAlign (`task_c62b4d4c`) stay focused-session spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (paragraph shading export test DONE (PR #94); scout-v2 winding down → DECISION POINT)
 
 > **Branch:** `main` (parashading test merged PR #94 `ce86522`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 455 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**

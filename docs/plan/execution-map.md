@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (distribute-columns geometry export test, `/loop` 5-min cadence)
+- [x] **Distribute-columns geometry export test (PR #96 `701a4a9`)** — scout-v2 #5. New `[6b]` test:
+  uneven (widen col 0) → assert uneven (non-vacuous) → distribute → 3 EQUAL `<w:gridCol>` + probe +
+  reusable `validate-distribute-win.ps1`. **Word COM-validated:** [260,208,208]→[225,225,225]px →
+  3× gridCol 3375 → Columns even. `/code-review` caught a vacuous assertion → fixed (uneven-before
+  precondition). Test-only. Gates: **PM 456 / smoke 9 / roundtrip 27**.
+- [x] **SCOUT BACKLOG v2 ≈ DONE** (#1/#2/#3/#5 shipped; only #4 order-sweep remains, Word-tolerant). 6
+  consecutive COM-validated export-regression slices this session — docx export surface broadly hardened.
+- [ ] **NEXT:** #4-rPr (last v2 item, portability fix) → RE-SCOUT v3 (lists/numbering, fields, hyperlinks,
+  image remnants) → or ESCALATE a bigger item (a14 picture effects / frames-overlay / 4e headers, steered session).
+
 ### 2026-06-16 (paragraph shading export test, `/loop` 5-min cadence)
 - [x] **Paragraph shading export test (PR #94 `ce86522`)** — scout-v2 #2. New `[2]` test:
   `<w:pPr><w:shd w:val="clear" w:fill="..." w:color="auto">` (guards `val="clear"` + hex + CT_Shd) + probe
