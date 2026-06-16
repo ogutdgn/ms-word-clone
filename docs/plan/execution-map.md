@@ -29,7 +29,18 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a + 4b + 4c.1 (text-wrap) COMPLETE; 4c.2 (reposition) NEXT
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a + 4b + 4c.1 wrap + 4c.3 z-order DONE; FRAMES-OVERLAY or 4d/4e NEXT
+> **4c.3 z-order DONE + MERGED** (PR #44 `66d691e`): `WC.PM.setImageZOrder(forward|backward|toFront|
+> toBack)` mutates the floating image's `relativeHeight` (forward/backward use `>=`/`<=` for tied
+> peers); ribbon Bring/Send wired. EXPORT faithful (oracle `read-shapes` → distinct ZOrderPositions).
+> Gates: **PM 420 / smoke 9 / roundtrip 27**. **DECISION POINT:** the remaining 4c work (faithful
+> free-REPOSITION 4c.2 + render-faithful z-stacking) needs the **frames-overlay** (all floating
+> objects as absolutely-positioned frames with text-exclusion — LAYOUT_ENGINE.md §3) — a substantial
+> piece, not a clean slice. Next session: build the frames-overlay, OR pivot to **4d (tables)** /
+> **4e (headers-footers)** which may be cleaner wins. Confirm priority first (deferrals.md §A.1d).
+>
+> <details><summary>Prior 4c.1 CURRENT-PHASE note (kept for context)</summary>
+>
 > **4c.1 text-wrap DONE + MERGED** (PR #42 `4bbdb51`): `WC.PM.setImageWrap(mode)` wires the ribbon
 > Wrap Text (7 modes) to the image `wrap`+`isAnchor` attrs — the fork already renders (float/shape-
 > outside/absolute) + round-trips; the gap was a phantom `WC.Layout` stub. Key fix: the anchor
@@ -39,6 +50,8 @@
 > deferrals.md §A.1d. **NEXT: 4c.2 drag-to-reposition** (frames overlay mirroring the 4b resize
 > overlay → writes `marginOffset`/`wp:posOffset`), then **4c.3 z-order** (Bring/Send →
 > `relativeHeight`). Branch `build/phase-4c2-reposition` off `main`. Then 4d tables → 4e → 4f.
+>
+> </details>
 >
 > <details><summary>Prior 4b CURRENT-PHASE note (kept for context)</summary>
 >
@@ -356,6 +369,20 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-16 (Phase 4c.3 — image z-order, `/loop`)
+- [x] **Investigated reposition vs z-order** — found the fork's float-based render can't free-position
+  Square images, and the z-index scheme can't faithfully inter-stack (conflates behind-text with
+  order; floats aren't positioned). So faithful free-reposition + render-z-stacking both need the
+  frames-overlay. Chose z-order (export-faithful, self-contained) as the clean slice.
+- [x] **`WC.PM.setImageZOrder`** (PR #44, merge `66d691e`, `feat(layout)`): Bring Forward/Backward/
+  toFront/toBack → mutate floating image `relativeHeight` (Word-sane; forward/backward `>=`/`<=` for
+  tied peers); ribbon wired off the phantom `WC.Layout`. Oracle `read-shapes` extended (leftPt/topPt/
+  zOrder). Validated: two floating images export distinct ZOrderPositions.
+- [x] **`/code-review` + re-review**: caught a tie no-op bug (strict `>` → Bring Forward did nothing
+  on two equal-height images, the default state); fixed to `>=`/`<=`; re-review clean. +1 `[4c]` test.
+- [x] **4c.3 COMPLETE + merged.** Gates: **PM 420 / smoke 9 / roundtrip 27**. DECISION POINT: remaining
+  4c (frames-overlay for free-reposition + render z-stacking) is a big piece — or pivot to 4d/4e.
 
 ### 2026-06-16 (Phase 4c.1 — image text wrap, `/loop`)
 - [x] **Investigated the floating subsystem** — found the fork already RENDERS wrap (float/shape-
