@@ -52,7 +52,7 @@
 | Insert → Header & Footer | **Header / Footer / Page Number** | Need the on-page header/footer region + page geometry. `isBlocked` today → honest deferral toast (no crash). | 2026-06-15 |
 | Insert → Illustrations / Text | **Floating-object position + text-wrap** (Pictures/Shapes/Text Box/WordArt placed off-flow) | Insertion + .docx export are real (slice-10 anchors); absolute positioning + shape-aware wrap need the layout engine — renders inline today. | 2026-06-15 |
 | ~~Insert → Pages~~ | ~~**Page Break vertical geometry**~~ | **RESOLVED 2026-06-15 (Phase 4a)**: the pagination engine (`src/renderer/pagination/pagination.ts`) renders manual page breaks (`hardBreak[pageBreakType='page']`) and blank pages (two consecutive breaks) as real page boundaries, plus auto multi-page flow + line-level intra-paragraph splitting. Oracle-validated vs Word for Windows 16.0 (`word-oracle-win.ps1 read-layout`): break paragraph + page count match exactly. | ~~2026-06-15~~ |
-| Insert → Picture / object selection | **Image RESIZE** (drag handles) | The selection frame + handles render (`2dca2e4`) but are **decorative**. Live resize needs an image **NodeView** whose handle-drag writes `w:extent` (EMU) back to the model. LAYOUT_ENGINE.md §2.2 / sub-phase 4b. | 2026-06-15 |
+| ~~Insert → Picture / object selection~~ | ~~**Image RESIZE** (drag handles)~~ | **RESOLVED 2026-06-15 (Phase 4b)**: live resize via an owned 8-handle overlay (`src/renderer/imageresize/image-resize.ts`) — drag writes the image `size` attr (px), which the exporter turns into `wp:extent`/`a:ext` (EMU). Aspect-locked (Word's default). Oracle-validated (`read-shapes`): 200×100→260×130 px renders in Word as 195pt×97.5pt = 2476500×1238250 EMU. See §A.1c for the remaining 4b edges. | ~~2026-06-15~~ |
 | Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE + text-wrap** (floating) | Insert is **inline only**; drag-to-reposition + inline⇄floating + wrap (square/tight/through/top&bottom/behind/in-front) need the frames overlay + `w:anchor`/`posH`/`posV`. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
 | Insert / Table Tools → Table | **Column/row RESIZE, table RELOCATE, row-split across pages** | Tables render but the grid is fixed: dragging column/row borders (`w:gridCol`/`w:trHeight`), moving a table, and splitting a tall table's rows across a page boundary all need the table layout pass. LAYOUT_ENGINE.md §2 #4–6 / sub-phase 4d. | 2026-06-15 |
 
@@ -133,6 +133,29 @@
   via the `word-oracle-win.ps1 read-layout` verb as a manual/PowerShell step (it needs a live Word),
   recorded in `docs/superpowers/plans/notes/2026-06-15-phase4a-pagination-oracle.json`. A future
   CI-friendly oracle harness could automate it.
+
+#### A.1c — Phase-4b image resize: recorded limitations (from the `/code-review` pass, 2026-06-15)
+
+> The 4b overlay does live, aspect-locked, oracle-validated image resize. These edges are
+> deferred (none affect the common corner-drag-resize-a-picture path).
+
+- **Free (one-axis) stretch is not supported; `lockAspectRatio` is not read.** All 8 handles
+  resize PROPORTIONALLY (height = width / aspect), which is Word's default
+  (`a:picLocks/@noChangeAspect`). Word lets the user UNCHECK "Lock aspect ratio" and stretch a
+  single axis with an edge handle — the clone always locks, and the `node.attrs.lockAspectRatio`
+  attr is currently ignored. Free-stretch also needs the fork's image `size` renderDOM to honor an
+  explicit height (it emits `height: auto` today), and the exporter to emit the model height for a
+  data-URI image even when it diverges from the intrinsic aspect. → a 4b follow-up.
+- **Inline images are TOP-LEFT (flow) anchored, not opposite-corner anchored.** An inline image
+  resizes from its text-flow position, so the SE / E / S handles feel natural (grow down-right) while
+  the NW / N / W handles are size-only (the top-left stays pinned, matching the inline box). True
+  opposite-corner anchoring + drag-to-reposition belongs to floating objects (4c).
+- **A ROTATED image resizes from its axis-aligned bounding box.** `getBoundingClientRect` returns the
+  enlarged AABB for an image with `transformData.rotation`, so the start size / aspect are the AABB's,
+  not the image's own — resizing a rotated picture distorts it. Rotation handling is later layout work.
+- **No automated oracle gate for image geometry in `test:pm`.** The `[4b]` tests assert
+  self-consistent geometry (size grows, aspect locked, `wp:extent` EMU = px × 9525) + handle
+  alignment; the Word-side parity is the manual `word-oracle-win.ps1 read-shapes` step.
 
 ### A.2 — Text Effects quartet docx export (stage 2 — NOT layout-gated)
 

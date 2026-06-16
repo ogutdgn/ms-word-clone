@@ -5,6 +5,9 @@ import { getStarterExtensions } from '@extensions/index.js'
 // the normal plugin pipeline as an extension so it survives every internal state
 // rebuild + Open/New and stays out of the fork. See src/renderer/pagination/.
 import { Pagination } from '@/pagination/pagination'
+// Phase 4b: live image resize — an owned NodeSelection-driven handle overlay over the
+// fork (same out-of-fork philosophy as Pagination). See src/renderer/imageresize/.
+import { ImageResize } from '@/imageresize/image-resize'
 
 // Real shapes: docx → DocxFileEntry[] | Record<string,unknown> (EditorOptions.content),
 // mediaFiles → Record<string,unknown> (EditorOptions.mediaFiles),
@@ -44,7 +47,7 @@ export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extr
     // converter keeps the (blank-template) docx context — the doc stays docx-exportable.
     ...(extra?.html ? { html: extra.html } : {}),
     ...(extra?.onContentError ? { onContentError: extra.onContentError } : {}),
-    extensions: [...getStarterExtensions(), Pagination],
+    extensions: [...getStarterExtensions(), Pagination, ImageResize],
     // slice 8 (A2): a REAL display identity — stamped as w:author/w:initials on tracked
     // changes and as creatorName on comment cards (legacy parity: review-tools/comments
     // used "Word User"). The oracle compares the author FLOW (stamp → card → docx →
