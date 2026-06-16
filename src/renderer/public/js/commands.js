@@ -254,6 +254,18 @@
       fly.appendChild(WC.flyItem('Remove Crop', { onClick: () => { if (WC.PM && WC.PM.setImageCrop) WC.PM.setImageCrop({ remove: true }); } }));
     });
   };
+  // Picture Rotate / Flip (Word's Picture Format → Arrange → Rotate) → WC.PM.setImageTransform. A
+  // flyout matching Word's menu; each item drives the node's transformData (render + a:xfrm export).
+  H.imgRotate = (c, node) => WC.flyout(node, (fly) => {
+    const tx = (o) => { if (WC.PM && WC.PM.setImageTransform) WC.PM.setImageTransform(o); };
+    fly.appendChild(WC.flyItem('Rotate Right 90°', { onClick: () => tx({ rotate: 90 }) }));
+    fly.appendChild(WC.flyItem('Rotate Left 90°', { onClick: () => tx({ rotate: -90 }) }));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Flip Vertical', { onClick: () => tx({ flipV: true }) }));
+    fly.appendChild(WC.flyItem('Flip Horizontal', { onClick: () => tx({ flipH: true }) }));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Reset Rotation', { onClick: () => tx({ reset: true }) }));
+  });
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1506,9 +1518,9 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.PM.setImageZOrder('forward') })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.PM.setImageZOrder('toFront') })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.PM.setImageWrap('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.PM.setImageZOrder('backward') })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.PM.setImageZOrder('toBack') })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.PM.setImageWrap('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
-      // Picture Format → Size group (4b numeric Height/Width) + Crop + Alt Text. Redundant with
-      // Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
-      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop') return H[cmd](control, node);
+      // Picture Format → Size group (4b numeric Height/Width) + Crop + Rotate + Alt Text. Redundant
+      // with Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
+      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop' || cmd === 'imgRotate') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.
