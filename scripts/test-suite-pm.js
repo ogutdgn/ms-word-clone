@@ -2807,6 +2807,37 @@
     const ordered = seq.every((v, i) => i === 0 || v > seq[i - 1]);
     return ordered || ('w:tcPr children OUT OF CT_TcPr ORDER (want tcW<tcBorders<shd<vAlign): ' + JSON.stringify(idx) + ' :: ' + tcPr.slice(0, 200));
   });
+  await t('[4d] cell margins: tblCellMargins ribbon flyout (4 spinners) → setCellMargins + <w:tcMar> twips (0.5"=720)', async () => {
+    // Drives the REAL ribbon path: H.tblCellMargins opens an inches flyout; set all four sides to
+    // 0.5" and Apply → caret cell gains cellMargins (px) → export emits <w:tcMar> in twips
+    // (0.5in = 48px = 720 twips = 36pt). Guards the wired stub from regressing back to a toast.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    const caretInCell0 = () => { let cp = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cp == null) cp = pos; }); if (cp != null) window.WC.editor.commands.setTextSelection(cp + 2); };
+    caretInCell0();
+    if (WC.closeFlyouts) WC.closeFlyouts();
+    WC.Commands.run({ cmd: 'tblCellMargins', label: 'Cell Margins', type: 'button' }, document.body); await sleep(80);
+    const fly = document.querySelector('.flyout');
+    if (!fly) return 'tblCellMargins opened no flyout (regressed to a stub?)';
+    const inputs = Array.from(fly.querySelectorAll('input[type="number"]'));
+    if (inputs.length < 4) return 'cell-margins flyout missing the 4 side spinners (got ' + inputs.length + ')';
+    inputs.forEach((inp) => { inp.value = '0.5'; });
+    const applyBtn = Array.from(fly.querySelectorAll('button')).find((b) => /Apply|Set/i.test(b.textContent));
+    if (!applyBtn) return 'cell-margins flyout missing Apply button';
+    applyBtn.click(); await sleep(140);
+    let cm = null; doc().descendants((n) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cm == null) cm = n.attrs.cellMargins; });
+    if (!cm || cm.top == null) return 'cellMargins attr not set on caret cell after Apply: ' + JSON.stringify(cm);
+    if (!(cm.top === 48 && cm.left === 48)) return 'cellMargins px wrong (want 48 for 0.5"): ' + JSON.stringify(cm);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<w:tcMar\b[\s\S]*?<\/w:tcMar>/);
+    if (!m) return 'no <w:tcMar> in export after setting cell margins';
+    const mar = m[0];
+    const sideTwips = (re) => { const mm = mar.match(re); return mm && mm[1]; };
+    const top = sideTwips(/<w:top\b[^>]*w:w="(\d+)"/);
+    const left = sideTwips(/<w:(?:left|start)\b[^>]*w:w="(\d+)"/);
+    if (top !== '720') return 'w:tcMar top twips != 720 (0.5"): ' + mar.slice(0, 220);
+    if (left !== '720') return 'w:tcMar left/start twips != 720 (0.5"): ' + mar.slice(0, 220);
+    return true;
+  });
   // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table
