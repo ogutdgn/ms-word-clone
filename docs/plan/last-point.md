@@ -7,7 +7,49 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — Phase 4a MERGED to main (3 review rounds); 4b (image resize) next)
+## 2026-06-15 (RESUME HERE — Phase 4a pagination page-break family COMPLETE (4a2 + 4a3 merged); 4b next)
+
+> **Branch:** `main` (4a2 merged via PR #37 `7779c53`; 4a3 merged via PR #38 `0e0f29f`; both feature
+> branches deleted). **Phase:** 4 (layout engine); **4a pagination is now FULLY COMPLETE** for the
+> page-break family — all oracle-validated vs Word for Windows 16.0. Sub-phase **4b (image resize) is
+> NEXT** — branch off `main`.
+>
+> **What this session finished (continuing the `/loop` "finish pagination things, all of them"):**
+> - **4a2 — unified forced-seam redesign (PR #37):** manual page breaks now place a seam AT the break
+>   position `P` (one mechanism for mid-paragraph, end-of-paragraph, trailing, and blank-page breaks),
+>   replacing the buggy "push the next block" model. This RESOLVED the previously-deferred
+>   mid-paragraph + trailing breaks. Folded the three seam-emit sites into one `emitSeam` primitive.
+>   Oracle: mid-para = 1 paragraph across 2 pages; trailing = +1 page; blank = content on page 3.
+> - **4a3 — section breaks (PR #38):** the next-page `w:sectPr` page boundary is paginated
+>   (`sectionBoundaries` in `pagination.ts`). Diagnosed by oracle experiment the semantic the prior 4f
+>   spike got backwards: a sectPr's `w:type` governs how ITS OWN section BEGINS, so the break AFTER a
+>   section-ending paragraph is governed by the NEXT section's type (next ender's sectPr, or the body
+>   sectPr — default nextPage). Oracle-validated: single break, explicit-continuous-ender (still
+>   breaks), continuous-MIDDLE section (stays on page → 2 pages not 3), and section-break-before-table.
+>
+> **Gates on main: PM 410/410, smoke 9/9, roundtrip 27/0.** Each increment ran the execute→test→fix→
+> /code-review cycle; review findings were fixed + re-validated (table position-match, multi-section
+> validation gap, nextColumn) or documented as exotic edges.
+>
+> **Pagination DONE (the page-break family):** auto multi-page overflow, line-level intra-paragraph
+> split (widow/orphan), manual breaks (mid/end/trailing/blank), section breaks (next-page/multi-
+> section/before-table), live "Page X of Y", page margins, full-height last sheet.
+>
+> **Still deferred (NOT page-break pagination — distinct sub-phases; deferrals.md §A.1b):** per-section
+> GEOMETRY (different margins/orientation/size per section) + even/odd parity blank pages → 4f; a block
+> taller than one page that can't be line-split → 4b/4d; table row-split across pages → 4d; the two
+> 4a2-review deep edges (widow/orphan-relative-to-block-start on a re-overflowing mid-broken paragraph;
+> forced break in a measureBlocks-skipped block); pre-first-measure page-count flash; no automated
+> oracle gate in `test:pm` (the read-layout parity is a manual PowerShell step).
+>
+> **NEXT — sub-phase 4b (image resize)** (LAYOUT_ENGINE.md §4 / acceptance #2): branch
+> `build/phase-4b-image-resize` off `main`. Image NodeView + 8 live resize handles whose drag writes
+> `w:extent` (EMU) + aspect-lock, replacing the DECORATIVE handles (`2dca2e4`). Then 4c floating → 4d
+> tables → 4e headers/footers → 4f page-bg/columns/section-geometry.
+
+---
+
+## 2026-06-15 (Phase 4a MERGED to main (3 review rounds); 4b (image resize) next)
 
 > **Branch:** `main` (Phase 4a merged via PR #36, merge commit `1c00252`; the
 > `build/phase-4a-pagination` branch is deleted). **Phase:** 4 (layout engine); 4a (pagination

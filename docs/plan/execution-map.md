@@ -29,14 +29,19 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — sub-phase 4a MERGED; 4b (image resize) NEXT
-> **4a DONE + MERGED to `main`** (PR #36, merge `1c00252`), oracle-validated vs real Word, and hardened
-> through **three `/code-review` rounds** (engine = `src/renderer/pagination/pagination.ts`: auto multi-page,
-> margins, page count, manual breaks + mid-doc blank pages, line-split; section/trailing/mid-paragraph breaks
-> deferred — deferrals.md §A.1b). Gates on main: PM 404 / smoke 9 / roundtrip 27. **NEXT:** **sub-phase 4b
-> (image resize)** — branch `build/phase-4b-image-resize` off `main`; image NodeView + 8 live handles writing
-> `w:extent` (EMU) + aspect-lock (LAYOUT_ENGINE.md §4). Then 4c floating → 4d tables → 4e headers/footers →
-> 4f page-bg/columns/sections.
+## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — 4a page-break family COMPLETE; 4b (image resize) NEXT
+> **4a pagination is now FULLY COMPLETE** for the page-break family, all oracle-validated vs Word for Windows
+> 16.0 and merged to `main`: core (PR #36 `1c00252`), the unified forced-seam redesign that finished
+> mid-paragraph + trailing + blank breaks (**4a2**, PR #37 `7779c53`), and next-page **section breaks**
+> incl. multi-section + before-a-table (**4a3**, PR #38 `0e0f29f`). Engine =
+> `src/renderer/pagination/pagination.ts`: auto multi-page, margins, live page count, manual breaks
+> (mid/end/trailing/blank via one `emitSeam` at the break position), line-split (widow/orphan), and section
+> breaks (`sectionBoundaries` — break governed by the NEXT section's type). Gates on main: **PM 410 / smoke 9
+> / roundtrip 27.** Still deferred (NOT page-break pagination): per-section GEOMETRY + even/odd parity → 4f;
+> over-tall-block + table row-split → 4b/4d; two 4a2-review deep edges; see deferrals.md §A.1b. **NEXT:**
+> **sub-phase 4b (image resize)** — branch `build/phase-4b-image-resize` off `main`; image NodeView + 8 live
+> handles writing `w:extent` (EMU) + aspect-lock (LAYOUT_ENGINE.md §4). Then 4c floating → 4d tables → 4e
+> headers/footers → 4f page-bg/columns/section-geometry.
 >
 > **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
 > ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
@@ -324,6 +329,29 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-15 (Phase 4a2 + 4a3 — finish the pagination page-break family, `/loop`)
+- [x] **4a2 unified forced-seam** (PR #37, merge `7779c53`): redesigned manual page breaks to place a seam
+  AT the break position `P` (one mechanism for mid-paragraph / end-of-paragraph / trailing / blank-page),
+  replacing the "push the next block" model — RESOLVED the deferred mid-paragraph + trailing breaks. Folded
+  the 3 seam-emit sites into one `emitSeam`. Status bar counts seams (dropped the dead `skip`). +4 `[4a]`
+  tests. Oracle: mid-para = 1 para across 2 pages; trailing = +1 page; blank = content on page 3.
+- [x] **4a2 `/code-review`**: extracted `emitSeam` (the strongest finding — triplicated load-bearing
+  formula); documented two CONFIRMED deep edges (widow/orphan-relative-to-block-start on a re-overflowing
+  mid-broken paragraph; forced break in a measureBlocks-skipped block).
+- [x] **4a3 section breaks** (PR #38, merge `0e0f29f`): next-page `w:sectPr` page boundary
+  (`sectionBoundaries`). Diagnosed by oracle experiment the semantic the prior 4f spike got backwards — the
+  break after a section-ending paragraph is governed by the NEXT section's type (next ender's sectPr, else
+  body sectPr / default nextPage), NOT the ender's own type. +4 tests incl. the DISCRIMINATING continuous-
+  middle multi-section case. Oracle-validated: single / continuous-ender / nextPage / multi-section /
+  before-table all match Word for Windows 16.0.
+- [x] **4a3 `/code-review`**: keyed the boundary off the ENDER paragraph (fixes section-break-before-a-table
+  position match) + took the following block from measured order; `nextColumn` treated as a page break
+  (single-column render); added the discriminating multi-section test; documented the fork insert command's
+  first-paragraph (`paraPos<=0`) refusal as a UI (not engine) limitation.
+- [x] **Pagination page-break family COMPLETE** — auto-overflow, line-split, manual breaks
+  (mid/end/trailing/blank), section breaks (next-page/multi-section/before-table), all oracle-validated.
+  Gates on main: **PM 410 / smoke 9 / roundtrip 27.** Remaining Phase-4 work = 4b–4f (distinct subsystems).
 
 ### 2026-06-15 (Phase 4a — pagination core, `build/phase-4a-pagination`)
 - [x] **Windows headless-rAF fix** (`0f144b9`, `fix(main)`): paint the headless probe window
