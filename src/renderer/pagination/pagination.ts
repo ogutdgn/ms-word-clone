@@ -388,6 +388,13 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
     if (!node) return 0
     const leaves: Array<{ brk: boolean; blank: boolean }> = []
     node.descendants((child: any) => {
+      // A nested table is real content + paginates internally (mirror the `forced` collector,
+      // which skips table-internal breaks): count it as non-blank and do NOT descend, so a
+      // page break inside a cell never registers as the container's trailing break.
+      if (child.type?.name === 'table') {
+        leaves.push({ brk: false, blank: false })
+        return false
+      }
       if (child.isText) leaves.push({ brk: false, blank: !child.text || !child.text.trim() })
       else if (child.type?.name === 'hardBreak') leaves.push({ brk: child.attrs?.pageBreakType === 'page' || child.attrs?.lineBreakType === 'page', blank: true })
       else if (child.isLeaf) leaves.push({ brk: false, blank: false })
@@ -420,7 +427,16 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBre
     const node = view?.state?.doc?.nodeAt ? view.state.doc.nodeAt(b.pos) : null
     const bEnd = b.pos + (node ? node.nodeSize : 1)
     const fb = forced.filter((P) => P >= b.pos && P < bEnd).sort((x, y) => x - y)
-    const trailing = Math.min(trailingForcedCount(node), fb.length)
+    // Only walk the block's inline leaves when it actually contains a forced break (the common
+    // break-free block stays O(1) — keystroke pagination re-solves every block every frame).
+    let trailing = fb.length ? Math.min(trailingForcedCount(node), fb.length) : 0
+    if (bi === 0 && trailing > 0) {
+      // A leading page break at the very document START has no content before it → it must not
+      // create a blank first page. The original doc-start guard lived in the inline loop below;
+      // demote such breaks out of the trailing run so that guard (P <= b.pos + 1) skips them.
+      const docStart = fb.slice(fb.length - trailing).filter((P) => P <= b.pos + 1).length
+      trailing -= docStart
+    }
     const midForced = trailing > 0 ? fb.slice(0, fb.length - trailing) : fb
     for (const P of midForced) {
       if (bi === 0 && P <= b.pos + 1) continue // a break at the very document start has no content before it

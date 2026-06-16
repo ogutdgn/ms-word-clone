@@ -5627,20 +5627,22 @@
   // A forced/blank-page seam MUST be a BLOCK-boundary widget, never a block <div> injected
   // INSIDE a paragraph's inline flow (that corrupts PM's posAtCoords hit-testing → clicking
   // the next page lands the caret on the wrong page). Helpers:
-  const inlineSpacerCount = () => document.querySelectorAll('#pm-editor .ProseMirror p .pm-page-spacer, #pm-editor .ProseMirror h1 .pm-page-spacer, #pm-editor .ProseMirror h2 .pm-page-spacer, #pm-editor .ProseMirror li .pm-page-spacer').length;
-  // Click the page-2 top margin (just above `needle`'s rendered line) and return the text of
-  // the paragraph the caret lands in — Word puts the caret on the line you clicked toward.
-  const marginClickParentText = (needle) => {
+  const inlineSpacerCount = () => ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre']
+    .reduce((a, tag) => a + document.querySelectorAll('#pm-editor .ProseMirror ' + tag + ' .pm-page-spacer').length, 0);
+  // posAtCoords for a click in the page-2 top margin (just above `needle`'s rendered line).
+  // Returns the PM position, or null. Word drops the caret on the nearest line of the page you
+  // clicked toward; the inline-spacer bug instead hijacked posAtCoords deep into a page-1 pos.
+  const marginClickPos = (needle) => {
     const pm = document.querySelector('#pm-editor .ProseMirror');
     const w = document.createTreeWalker(pm, NodeFilter.SHOW_TEXT);
     let n, rect = null;
     while ((n = w.nextNode())) { const i = n.textContent.indexOf(needle); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + needle.length); rect = r.getBoundingClientRect(); break; } }
     if (!rect) return null;
     const hit = v().posAtCoords({ left: rect.left + 2, top: rect.top - 18 });
-    if (!hit) return '';
-    const $p = doc().resolve(Math.min(doc().content.size, Math.max(0, hit.pos)));
-    return $p.parent.textContent || '';
+    return hit ? hit.pos : null;
   };
+  // Document position where the top-level block containing `needle` begins.
+  const blockStartOf = (needle) => { let p = null; doc().forEach((n, off) => { if (p == null && (n.textContent || '').indexOf(needle) >= 0) p = off; }); return p; };
 
   await t('[4a] manual page break is a BLOCK-boundary seam (no block-in-inline; page-2 click maps right)', async () => {
     setDocs(['MbiAlpha first paragraph', 'MbiBravo second paragraph', 'MbiCharlie third paragraph word']);
@@ -5651,9 +5653,12 @@
     if (pc < 2) return 'did not paginate to 2 pages';
     const inl = inlineSpacerCount();
     if (inl > 0) return 'block-in-inline: ' + inl + ' page-spacer(s) injected inside a <p> (corrupts posAtCoords)';
-    // Clicking page-2's top margin must land on page-2 content (MbiCharlie), not a stale page-1 pos.
-    const landed = marginClickParentText('MbiCharlie');
-    return (landed != null && /MbiCharlie/.test(landed)) || 'page-2 margin click landed in "' + (landed || '').slice(0, 30) + '" (not the page-2 paragraph)';
+    // Clicking page-2's top margin must NOT misland deep in page-1 content. The inline-spacer
+    // bug hijacked posAtCoords to a page-1 position (well before the page-2 block); the fix
+    // makes it resolve at/after the page-2 block boundary (MbiCharlie's block start).
+    const pos = marginClickPos('MbiCharlie'), p2 = blockStartOf('MbiCharlie');
+    if (pos == null || p2 == null) return 'could not hit-test the page-2 margin (pos=' + pos + ' p2=' + p2 + ')';
+    return pos >= p2 || 'page-2 margin click mislanded at pos ' + pos + ' (before the page-2 block at ' + p2 + ')';
   });
 
   await t('[4a] blank page uses BLOCK-boundary seams (no block-in-inline spacer)', async () => {
