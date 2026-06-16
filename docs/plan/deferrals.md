@@ -190,12 +190,16 @@
   `wp:positionH/V` → `wp:posOffset`. **Oracle-validated:** a 1"/0.5" offset reads in Word at Left=72pt/
   Top=36pt (RelHPos=Column/RelVPos=Paragraph). **This also fixed a latent simplePos bug** (a generated
   complex-positioned anchor exported `@simplePos="1"` → Word ignored positionH/V and pinned to page origin;
-  forced `simplePos="0"` when positionH/V are emitted). **STILL deferred:** (a) a DRAG overlay (the numeric
-  flyout is the affordance for now — mirror the 4b resize overlay for drag); (b) faithful reposition of an
-  IMPORTED floating picture (refused with a toast — the exporter keeps the verbatim `originalDrawingChildren`
-  posOffset; would need to patch the preserved `wp:positionH/V`); (c) faithful Square/Tight RENDER position
-  (the render approximates via margins; absolute fidelity needs the frames-overlay). Re-seed/inline-toggle
-  stale-offset latent (below) still applies.
+  forced `simplePos="0"` when positionH/V are emitted). **ARROW-KEY NUDGE added 2026-06-16 (PR #75):** a
+  floating-image NodeSelection + arrow → `setImagePosition({±step, relative:true})` (plain=8px, Shift=1px)
+  via the `wcImageResize` plugin's `handleKeyDown` (priority bumped to 200 to win over the keymap). So 4c.2
+  has BOTH a numeric flyout + keyboard nudge. **STILL deferred:** (a) a DRAG overlay (mirror the 4b resize
+  overlay — needs a move-region, live preview, and to avoid clobbering the rotation `transform`); (b) faithful
+  reposition of an IMPORTED floating picture (refused with a toast — the exporter keeps the verbatim
+  `originalDrawingChildren` posOffset; would need to patch the preserved `wp:positionH/V` in the
+  `{index,xml}[]` array — fiddly merge-plumbing); (c) faithful Square/Tight RENDER position (the render
+  approximates via margins; absolute fidelity needs the frames-overlay). Re-seed/inline-toggle stale-offset
+  latent (below) still applies.
 - ~~**Z-order Bring Forward / Send Backward is not wired (4c.3).**~~ **WIRED 2026-06-16 (4c.3).**
   `WC.PM.setImageZOrder(forward|backward|toFront|toBack)` mutates the floating image's
   `relativeHeight` relative to the other floating images (Word-sane values near the OOXML base);
