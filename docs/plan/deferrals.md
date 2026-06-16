@@ -54,7 +54,7 @@
 | ~~Insert → Pages~~ | ~~**Page Break vertical geometry**~~ | **RESOLVED 2026-06-15 (Phase 4a)**: the pagination engine (`src/renderer/pagination/pagination.ts`) renders manual page breaks (`hardBreak[pageBreakType='page']`) and blank pages (two consecutive breaks) as real page boundaries, plus auto multi-page flow + line-level intra-paragraph splitting. Oracle-validated vs Word for Windows 16.0 (`word-oracle-win.ps1 read-layout`): break paragraph + page count match exactly. | ~~2026-06-15~~ |
 | ~~Insert → Picture / object selection~~ | ~~**Image RESIZE** (drag handles)~~ | **RESOLVED 2026-06-15 (Phase 4b)**: live resize via an owned 8-handle overlay (`src/renderer/imageresize/image-resize.ts`) — drag writes the image `size` attr (px), which the exporter turns into `wp:extent`/`a:ext` (EMU). Aspect-locked (Word's default). Oracle-validated (`read-shapes`): 200×100→260×130 px renders in Word as 195pt×97.5pt = 2476500×1238250 EMU. See §A.1c for the remaining 4b edges. | ~~2026-06-15~~ |
 | Insert → Picture / Shapes / Text Box / WordArt | **Object RELOCATE** (floating) + ~~text-wrap~~ | **text-wrap RESOLVED 2026-06-15 (Phase 4c.1)**: `WC.PM.setImageWrap(mode)` wires the ribbon Wrap Text (inline/square/tight/through/top&bottom/behind/in-front) to the image `wrap`+`isAnchor` attrs → renders (float/shape-outside/absolute, real reflow) + exports a schema-valid `wp:anchor`; oracle-validated (all 6 floating modes open as floatingShapes). **Still deferred**: drag-to-RELOCATE (4c.2), z-order Bring/Send (4c.3), and the §A.1d edges. LAYOUT_ENGINE.md §2.3 / 4c. | 2026-06-15 |
-| Insert / Table Tools → Table | ~~**Column RESIZE**~~ + **row RESIZE, table RELOCATE, row-split** | **Column RESIZE RESOLVED 2026-06-16 (Phase 4d.1)**: enabled prosemirror-tables `columnResizing` (was `handleWidth: 0` → re-armed at 5) — drag a column border → live `colwidth` write → exports `w:gridCol`/`w:tcW`; oracle-validated (180px → Word 135pt). **Row-height EXPORT fixed (4d.2)** — `w:trHeight` round-trips (oracle: 60px→45pt). **Still deferred**: a row-resize UI affordance (drag/spinner — §A.1e), table RELOCATE, row-split across pages, AutoFit. LAYOUT_ENGINE.md §2 #4–6 / 4d.3+. | 2026-06-16 |
+| Insert / Table Tools → Table | ~~**Column RESIZE**~~ + **row RESIZE, table RELOCATE, row-split** | **Column RESIZE RESOLVED 2026-06-16 (Phase 4d.1)**: enabled prosemirror-tables `columnResizing` (was `handleWidth: 0` → re-armed at 5) — drag a column border → live `colwidth` write → exports `w:gridCol`/`w:tcW`; oracle-validated (180px → Word 135pt). **Row-height EXPORT fixed (4d.2)** — `w:trHeight` round-trips (oracle: 60px→45pt). **Row + Column size ribbon controls (4d.3)** — Table Layout "Cell Size" Row Height / Column Width flyouts set the row/col and export `w:trHeight`/`w:gridCol` (oracle: 0.5"→36pt, 1.5"→108pt). **Still deferred**: table RELOCATE, row-split across pages, AutoFit. LAYOUT_ENGINE.md §2 #4–6 / 4d+. | 2026-06-16 |
 
 #### A.1b — Phase-4a pagination: recorded limitations (from the `/code-review max` pass, 2026-06-15)
 
@@ -216,13 +216,18 @@
   height produced NO `<w:trHeight>` at all (not a px-vs-twips bug as first thought; px→twips was
   already reconciled — the regression was the string cast + it also dropped the `rule`). Now writes a
   number + preserves the rule. Oracle-validated: 60px → `w:trHeight w:val="900" w:hRule="atLeast"` →
-  Word reads 45pt atLeast. **Row-resize UI affordance is still deferred** (next bullet).
-- **Row-resize UI is not built (4d.3).** Row heights now round-trip, but there's no way to SET one
-  from the UI: prosemirror-tables has NO built-in row resize, so a drag needs a custom handle/overlay,
-  and there's no ribbon "Row Height" spinner wired (only Distribute Rows + AutoFit). `setRowHeight` /
-  `tableSetRowHeight` exist programmatically. Add a drag overlay (mirror the image overlay) or a
-  ribbon Row Height control. (Note the caret won't stay in a freshly-`insertContent`ed HTML table —
-  use `insertTable`; and synthetic drags don't drive PM pointer plugins headlessly.)
+  Word reads 45pt atLeast. **Row-resize UI affordance RESOLVED via ribbon controls** (next bullet).
+- ~~**Row-resize UI is not built (4d.3)**~~ **RESOLVED 2026-06-16 (4d.3): ribbon Row Height + Column
+  Width controls.** Added two `dropdown` controls to the Table Layout "Cell Size" group
+  (`table-tools-pm.js`) wired to `H.tblRowHeight` / `H.tblColWidth` flyouts (`commands.js` — a shared
+  `tblSizeFly` helper: an inches number input + presets, applying `tableSetRowHeight(px,'atLeast')` /
+  `tableSetCellWidth(px)`); the two cmds were also added to the dropdown-dispatcher allow-list. Oracle-
+  validated the full ribbon path: Row Height 0.5" → Word reads row 1 at 36pt heightRule=atLeast;
+  Column Width 1.5" → Word reads col 0 at 108pt. Regression-tested (`[4d] ribbon Row Height/Column
+  Width control …`). **Still optional polish:** a drag handle/overlay for row resize (prosemirror-tables
+  has no built-in; would mirror the image overlay) — the ribbon control is the faithful Word affordance
+  and is sufficient. (Note the caret won't stay in a freshly-`insertContent`ed HTML table — use
+  `insertTable`; and synthetic drags don't drive PM pointer plugins headlessly.)
 - **Table RELOCATE (drag the table) is not built.** Needs a move handle + (for a floating table) an
   anchor; mirror the image frames-overlay. 4d.
 - **Row-split across a page boundary is not done.** The pagination engine still moves a table wholesale

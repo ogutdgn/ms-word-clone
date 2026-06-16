@@ -2231,6 +2231,37 @@
     return (val === '900' && rule === 'atLeast') || 'w:trHeight wrong: ' + m[0] + ' (want w:val="900" w:hRule="atLeast")';
   });
 
+  await t('[4d] ribbon Row Height control sets the row + exports w:trHeight (via flyout preset)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    let cellPos = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cellPos == null) cellPos = pos; });
+    if (cellPos == null) return 'no table cell';
+    window.WC.editor.commands.setTextSelection(cellPos + 2); // caret in the cell
+    WC.Commands.dropdown({ cmd: 'tblRowHeight', type: 'dropdown' }, document.body);
+    await sleep(60);
+    if (!document.querySelector('.flyout input[type="number"]')) return 'Row Height flyout has no number input';
+    flyClick(/^0\.5"$/); // 0.5in = 48px
+    await sleep(160);
+    let rh = null; doc().descendants((n) => { if (n.type.name === 'tableRow' && rh == null) rh = n.attrs.rowHeight; });
+    if (rh !== 48) return 'row height not 48px after preset, got ' + rh;
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<w:trHeight\b[^>]*\/?>/);
+    return (m && /w:val="720"/.test(m[0])) || 'export w:trHeight not 720 twips (48px): ' + (m ? m[0] : 'missing');
+  });
+
+  await t('[4d] ribbon Column Width control sets the column + exports w:gridCol (via flyout preset)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    let cellPos = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cellPos == null) cellPos = pos; });
+    if (cellPos == null) return 'no table cell';
+    window.WC.editor.commands.setTextSelection(cellPos + 2);
+    WC.Commands.dropdown({ cmd: 'tblColWidth', type: 'dropdown' }, document.body);
+    await sleep(60);
+    flyClick(/^1\.5"$/); // 1.5in = 144px → 2160 twips
+    await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    return gridCols.includes(2160) || 'expected a 2160-twip column (1.5in), got ' + JSON.stringify(gridCols);
+  });
+
   // ---- migrate the legacy 9 table ops (caret-in-table) ----
   await t('[6] table addRow below grows the row count', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
