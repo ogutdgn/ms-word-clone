@@ -232,9 +232,19 @@ export function installInsert(editor: AnyEditor) {
     }
     const spec = SPECS[mode]
     if (!spec) return false
+    const wrapAttrs: Record<string, any> = { ...spec.attrs }
+    // CT_WrapTight/CT_WrapThrough REQUIRE a <wp:wrapPolygon> — without one Word refuses to
+    // open the file. For a plain rectangular image, default to the bounding-box polygon (px
+    // corners; objToPolygon closes it), exactly as Word does until the user edits the points.
+    if (spec.type === 'Tight' || spec.type === 'Through') {
+      const sz = sel.node.attrs.size || {}
+      const w = sz.width > 0 ? sz.width : 100
+      const h = sz.height > 0 ? sz.height : 100
+      wrapAttrs.polygon = [[0, 0], [w, 0], [w, h], [0, h]]
+    }
     const next: Record<string, any> = {
       ...sel.node.attrs,
-      wrap: { type: spec.type, attrs: spec.attrs },
+      wrap: { type: spec.type, attrs: wrapAttrs },
       isAnchor: spec.type !== 'Inline',
     }
     if (spec.type === 'Inline') {

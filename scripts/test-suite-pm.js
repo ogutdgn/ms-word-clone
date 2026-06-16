@@ -2035,6 +2035,20 @@
     return (/<wp:inline/.test(xml) && !/<wp:anchor/.test(xml)) || 'inline export wrong (anchor=' + /<wp:anchor/.test(xml) + ')';
   });
 
+  await t('[4c] tight wrap exports a wp:wrapPolygon (CT_WrapTight requires it — else Word rejects)', async () => {
+    setDoc('wrap4: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'w4', width: 120, height: 90 });
+    await sleep(250);
+    if (selectImage() == null) return 'no image node';
+    PM().setImageWrap('tight'); await sleep(160);
+    const a = imgWrapAttr();
+    if (!a || !a.wrap || a.wrap.type !== 'Tight') return 'wrap not Tight: ' + JSON.stringify(a && a.wrap);
+    if (!a.wrap.attrs || !Array.isArray(a.wrap.attrs.polygon) || a.wrap.attrs.polygon.length < 3) return 'no default polygon seeded for Tight: ' + JSON.stringify(a.wrap.attrs);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return (/<wp:wrapTight/.test(xml) && /<wp:wrapPolygon/.test(xml) && /<wp:start\b/.test(xml))
+      || 'tight export missing wrapTight/wrapPolygon (Word would reject)';
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');
