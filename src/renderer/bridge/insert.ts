@@ -360,10 +360,52 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Set the selected picture's explicit box in px (Word's Picture Format → Size group).
+  // Honors the aspect lock: a LOCKED picture (lockAspectRatio !== false, Word's default)
+  // preserves its ratio — the single dim you pass drives the other; pass both to set them
+  // independently (what the unlocked resize overlay does). Width is clamped to the editable
+  // content column (an in-line picture can't usefully exceed it in this single-column engine,
+  // matching the resize overlay's maxWidth). Mirrors the overlay's single `size`-attr
+  // setNodeMarkup; the fork exporter already turns `size` into wp:extent + a:ext (EMU).
+  function setImageSize(opts: { width?: number; height?: number }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then set its height or width.'); return false }
+    const cur = sel.node.attrs.size || {}
+    const curW = Math.round(Number(cur.width)) || 0
+    const curH = Math.round(Number(cur.height)) || 0
+    const aspect = curW > 0 && curH > 0 ? curW / curH : 1
+    const locked = sel.node.attrs.lockAspectRatio !== false
+    const givenW = opts.width != null && opts.width > 0
+    const givenH = opts.height != null && opts.height > 0
+    let w = givenW ? Math.round(opts.width as number) : curW
+    let h = givenH ? Math.round(opts.height as number) : curH
+    if (locked) {
+      // The edited dim drives its partner so the ratio is preserved. When both are given on a
+      // locked picture, width wins (the user can't make a locked box diverge).
+      if (givenW) h = Math.round(w / aspect)
+      else if (givenH) w = Math.round(h * aspect)
+    }
+    // Clamp width to the editable content column (mirrors the resize overlay's upper bound).
+    const maxW = (editor.view?.dom as HTMLElement)?.clientWidth || 0
+    if (maxW > 1 && w > maxW) { w = Math.round(maxW); if (locked && aspect > 0) h = Math.round(w / aspect) }
+    w = Math.max(1, w); h = Math.max(1, h)
+    if (w === curW && h === curH) { refocus(); return true } // no change
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, size: { ...cur, width: w, height: h } }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
     setImageLockAspect,
+    setImageSize,
     insertLink,
     removeLink,
     insertImage,

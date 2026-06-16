@@ -2108,6 +2108,41 @@
     return zHit === 'forward' || 'bringForward dispatch did not reach setImageZOrder (got ' + zHit + ')';
   });
 
+  await t('[4b] Picture Format Size group: numeric H/W set the box (aspect-lock + divergent when unlocked) + export wp:extent', async () => {
+    if (typeof PM().setImageSize !== 'function') return 'PM.setImageSize missing (red)';
+    // imgHeight/imgWidth are not AREA-mapped → the ribbon never blocks them.
+    if (PM().isBlocked('imgHeight') !== false || PM().isBlocked('imgWidth') !== false) return 'imgHeight/imgWidth should not be blocked';
+    setDoc('size: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'sz.png'); // 2:1 natural, default LOCKED
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    const before = imgSize();
+    if (!before || !before.width || !before.height) return 'no size attr after insert';
+    const aspect0 = before.width / before.height;
+    // LOCKED: setting WIDTH derives HEIGHT to preserve the ratio.
+    PM().setImageSize({ width: 144 }); await sleep(60); selectImage();
+    let s = imgSize();
+    let expH = Math.round(144 / aspect0);
+    if (!s || s.width !== 144 || Math.abs(s.height - expH) > 1) return 'locked width-set did not derive height: ' + JSON.stringify(s) + ' (exp h≈' + expH + ')';
+    // LOCKED: setting HEIGHT derives WIDTH (ratio preserved at ~aspect0).
+    PM().setImageSize({ height: 50 }); await sleep(60); selectImage();
+    s = imgSize();
+    let expW = Math.round(50 * aspect0);
+    if (!s || s.height !== 50 || Math.abs(s.width - expW) > 1) return 'locked height-set did not derive width: ' + JSON.stringify(s) + ' (exp w≈' + expW + ')';
+    // UNLOCK → independent axes: setting WIDTH must NOT touch HEIGHT (divergent box).
+    PM().setImageLockAspect(false); await sleep(60); selectImage();
+    PM().setImageSize({ width: 180 }); await sleep(60); selectImage();
+    s = imgSize();
+    if (!s || s.width !== 180 || s.height !== 50) return 'unlocked width-set should leave height at 50: ' + JSON.stringify(s);
+    // Export: the explicit box round-trips to wp:extent (EMU = px × 9525).
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<wp:extent[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+    if (!m) return 'no <wp:extent> in exported XML';
+    const okCx = Math.abs(+m[1] - Math.round(180 * 9525)) <= 9525;
+    const okCy = Math.abs(+m[2] - Math.round(50 * 9525)) <= 9525;
+    return (okCx && okCy) || ('extent cx=' + m[1] + ' cy=' + m[2] + ' vs 180x50');
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
