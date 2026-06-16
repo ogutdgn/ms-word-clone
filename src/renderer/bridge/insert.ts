@@ -66,15 +66,27 @@ export function installInsert(editor: AnyEditor) {
     let w = opts.width && opts.width > 0 ? opts.width : 0
     let h = opts.height && opts.height > 0 ? opts.height : 0
     if (!w || !h) {
-      // No explicit dims (e.g. Insert → Screenshot/Icon calls insertImage directly): size to the
-      // image's NATURAL dimensions clamped to the content column — NOT a 100×100 placeholder,
-      // which squashed non-square images. (The exporter's intrinsic-aspect correction used to
-      // mask this; now that we honor explicit boxes, the placeholder must be a real size.)
+      // No (full) explicit box — e.g. Insert → Screenshot/Icon calls insertImage directly. Size to
+      // the image's NATURAL dimensions clamped to the content column, NOT a 100×100 placeholder,
+      // which squashed non-square images. (The exporter's intrinsic-aspect correction used to mask
+      // this; now that we honor explicit boxes, the placeholder must be a real size.) A single
+      // given dimension is honored (the other is derived from the natural aspect).
       let dims: any = null
       try { dims = readImageDimensionsFromDataUri(opts.src) } catch { dims = null }
-      const maxW = (editor.view?.dom?.clientWidth as number) || 600
+      // Content-column width = .ProseMirror box minus its L/R padding (matches the local-picture
+      // path's columnWidthPx); floored so a not-yet-laid-out editor doesn't yield a 0-px image.
+      let maxW = 600
+      const prose = editor.view?.dom as HTMLElement | undefined
+      if (prose) {
+        const cs = getComputedStyle(prose)
+        const cw = prose.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+        if (cw > 16) maxW = cw
+      }
       if (dims && dims.width > 0 && dims.height > 0) {
-        if (dims.width > maxW) { w = Math.round(maxW); h = Math.round(dims.height * (maxW / dims.width)) }
+        const aspect = dims.width / dims.height
+        if (w) h = Math.max(1, Math.round(w / aspect)) // honor a caller-given width
+        else if (h) w = Math.max(1, Math.round(h * aspect)) // honor a caller-given height
+        else if (dims.width > maxW) { w = Math.round(maxW); h = Math.max(1, Math.round(dims.height * (maxW / dims.width))) }
         else { w = dims.width; h = dims.height }
       } else {
         // Undecodable (non-PNG / SVG) → a sensible column-fit default, not the tiny 100×100.
