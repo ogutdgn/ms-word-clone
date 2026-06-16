@@ -2182,18 +2182,23 @@ export const Table = Node.create({
        * Set the table's auto-fit / layout mode.
        * @category Command
        * @param {'fixed' | 'contents' | 'window'} mode - AutoFit mode
+       * @param {number} [targetWidthPx] - For `'window'`: the page text-column width (px)
+       *   the table should fill (supplied by the bridge from getPageStyles()).
        * @returns {Function} Command
        * @note `'fixed'` sets tableLayout:'fixed' AND clears any tableWidth stretch
        * (Word's Fixed Column Width writes w:tblW type "auto" — columns drive the
        * size again; the absent key is the importer's no-explicit-width shape).
-       * `'contents'`/`'window'` need live measurement; the intent attr lands now,
-       * the visual reflow is a Phase-7 paint. `'window'` also marks the table
-       * width to 100% (pct 5000).
+       * `'window'` marks the table width to 100% (pct 5000) AND scales every column
+       * proportionally to fill `targetWidthPx` (real colwidth → w:gridCol via grid-sync,
+       * so the in-app render and the export both fill — no layout pass needed).
+       * `'contents'` clears any prior Window stretch and sets tableLayout:'autofit'; the
+       * in-app column-to-content reflow needs Word-equivalent text metrics (layout-pass
+       * deferred), but the exported autofit table content-fits when Word opens it.
        * @example
-       * editor.commands.autoFitTable('fixed')
+       * editor.commands.autoFitTable('window', 624)
        */
       autoFitTable:
-        (mode) =>
+        (mode, targetWidthPx) =>
         ({ state, tr, dispatch }) => {
           if (!isInTable(state)) return false;
           if (!['fixed', 'contents', 'window'].includes(mode)) return false;
@@ -2204,12 +2209,14 @@ export const Table = Node.create({
             const layout = mode === 'fixed' ? 'fixed' : 'autofit';
             const nextProps = { ...(table.node.attrs.tableProperties || {}), tableLayout: layout };
             if (mode === 'window') {
+              // AutoFit Window marks the table width to 100% (Word's own w:tblW pct 5000).
               nextProps.tableWidth = { value: 5000, type: 'pct' };
-            } else if (mode === 'fixed') {
-              // Undo a previous AutoFit-Window 100% stretch (or any explicit table
-              // width): with the key absent, TableView.updateColumns computes
-              // convertSizeToCSS(null, 'auto') → null and un-sets style.width, so
-              // the table returns to its natural column-width-driven size.
+            } else {
+              // 'fixed' AND 'contents' drop any explicit table width. With the key absent,
+              // TableView.updateColumns computes convertSizeToCSS(null, 'auto') → null and
+              // un-sets style.width, so the table returns to its column-width-driven size.
+              // 'fixed' keeps the current column widths; 'contents' clears a prior
+              // AutoFit-Window 100% stretch so the table can shrink to its natural width.
               delete nextProps.tableWidth;
             }
             tr.setNodeMarkup(table.pos, undefined, {
@@ -2217,6 +2224,59 @@ export const Table = Node.create({
               tableLayout: layout,
               tableProperties: nextProps,
             });
+
+            // AutoFit Window GEOMETRY: scale every column proportionally so they fill the
+            // page text width (`targetWidthPx`, supplied by the bridge from getPageStyles()).
+            // Writing the real per-cell `colwidth` (px) makes the in-app table fill the column
+            // immediately, and the tableColwidthGridSync plugin rebuilds the twips `grid` so the
+            // export (w:gridCol / w:tcW) is faithful — no Phase-7 layout pass needed for Window.
+            // (AutoFit Contents needs Word-equivalent text metrics to size columns to content,
+            // so its in-app reflow stays a layout-pass deferral; the layout/width intent above is
+            // enough for Word to autofit-to-contents when it opens the exported file.)
+            const total = Math.round(Number(targetWidthPx) || 0);
+            if (mode === 'window' && total > 0) {
+              const map = TableMap.get(table.node);
+              const cols = map.width;
+              if (cols > 0) {
+                const tableStart = table.pos + 1;
+                // Current per-column widths (from whichever cell defines each column).
+                const cur = new Array(cols).fill(0);
+                for (let c = 0; c < cols; c++) {
+                  const cellIndex = map.map[c]; // row 0, column c
+                  const cell = tr.doc.nodeAt(tableStart + cellIndex);
+                  const rect = map.findCell(cellIndex);
+                  const w = cell?.attrs?.colwidth?.[c - rect.left];
+                  cur[c] = typeof w === 'number' && w > 0 ? w : 0;
+                }
+                // Proportional targets that sum EXACTLY to `total` (even split when unknown).
+                const curTotal = cur.reduce((a, b) => a + b, 0);
+                const colTarget = new Array(cols);
+                let acc = 0;
+                for (let c = 0; c < cols; c++) {
+                  colTarget[c] =
+                    curTotal > 0
+                      ? Math.max(1, Math.round((cur[c] / curTotal) * total))
+                      : Math.max(1, Math.floor(total / cols));
+                  acc += colTarget[c];
+                }
+                colTarget[cols - 1] = Math.max(1, colTarget[cols - 1] + (total - acc)); // absorb rounding drift
+                // Write each cell's colwidth as the slice of colTarget its columns span.
+                const seen = new Set();
+                for (let c = 0; c < cols; c++) {
+                  for (let r = 0; r < map.height; r++) {
+                    const cellIndex = map.map[r * cols + c];
+                    if (seen.has(cellIndex)) continue;
+                    seen.add(cellIndex);
+                    const cell = tr.doc.nodeAt(tableStart + cellIndex);
+                    if (!cell) continue;
+                    const rect = map.findCell(cellIndex);
+                    const next = [];
+                    for (let k = rect.left; k < rect.right; k++) next.push(colTarget[k]);
+                    tr.setNodeMarkup(tableStart + cellIndex, undefined, { ...cell.attrs, colwidth: next });
+                  }
+                }
+              }
+            }
           }
           return true;
         },
