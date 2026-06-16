@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (RE-SCOUT + Repeat Header Row export test, `/loop` 5-min cadence)
+- [x] **RE-SCOUT** (backlog was exhausted): 4 parallel agents over CSS↔OOXML mapping / table export gaps /
+  latent OOXML-order / paragraph-layout export gaps → fresh **SCOUT BACKLOG v2** in last-point.md (merged-cell
+  gridSpan, paragraph shading/borders export+COM, rPr/pPr/trPr order sweep, distribute geometry).
+- [x] **Repeat Header Row export test (PR #88 `478c8a4`)** — top layout-relevant pick. `tableToggleHeaderRow`
+  → `<w:tblHeader>` (repeat-as-header-row pagination flag). New `[6b]` test (exactly one `<w:tblHeader>` in
+  the first `<w:trPr>`; toggle-off clears) + probe + reusable `validate-repeatheader-win.ps1`. **Word
+  COM-validated:** `Rows(1).HeadingFormat = -1` (True), `Rows(2) = 0`, opens clean. Test-only. `/code-review`
+  clean. Gates: **PM 452 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** scout-v2 #1 (merged-cell gridSpan export) or #2/#3 (paragraph shading/borders export+COM).
+
 ### 2026-06-16 (cell-shading export test + picture-effects investigation, `/loop` 5-min cadence)
 - [x] **Cell shading export test (PR #86 `7587365`)** — scout-backlog #4. New `[6b]` test (caret-cell shade
   → `<w:shd w:fill="FF0000">` verbatim) + probe + reusable `validate-cellshading-win.ps1`. **Word

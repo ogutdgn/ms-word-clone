@@ -7,7 +7,49 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — cell-shading export test DONE (PR #86); SCOUT BACKLOG EXHAUSTED; #2 picture-effects deferred (needs a14))
+## 2026-06-16 (RESUME HERE — Repeat Header Row export test DONE (PR #88) via RE-SCOUT; fresh SCOUT BACKLOG v2 recorded)
+
+> **Branch:** `main` (repeat-header test merged PR #88 `478c8a4`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 452 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Re-scout + Repeat Header Row export test — DONE (PR #88):** the recorded backlog was exhausted, so this
+> iteration RE-SCOUTED (4 parallel agents over CSS↔OOXML mapping bugs / table export gaps / latent
+> OOXML-order / paragraph-layout export gaps) and shipped the top layout-relevant pick. "Repeat Header Row"
+> (`tableToggleHeaderRow` → `tableRowProperties.repeatHeader` → `<w:tblHeader>`) is Word's "repeat as header
+> row at the top of each page" pagination flag — wired but export-untested. Added a `[6b]` test (first row's
+> `<w:trPr>` gets exactly one `<w:tblHeader>`; toggle-off clears it) + `oracle-probe-6b-repeatheader.js` +
+> reusable `validate-repeatheader-win.ps1`. **🔬 Word COM-validated:** opens clean, `Rows(1).HeadingFormat
+> = -1` (True), `Rows(2) = 0`. Test-only. `/code-review` clean (tightened a vacuous assertion → exact count).
+>
+> **🗂️ SCOUT BACKLOG v2 (from this re-scout — ranked; pick next):**
+>   1. **Merged-cell `w:gridSpan` export + COM (rec 0.85)** — `tableMerge` (horizontal) is the only structural
+>      table edit with NO export test; assert `<w:gridSpan w:val="2">` + Word opens-without-repair. Bounded.
+>      (Vertical `w:vMerge` is a separate, bigger item — may surface a real continueMerge covered-cell bug.)
+>   2. **Paragraph SHADING export + COM (rec 0.95)** — wired (commands.js ~1810, `{val:'clear',fill}`), no
+>      COM-validated export test. Assert `<w:pPr><w:shd w:val="clear" w:fill="FF0000">`; COM
+>      `Selection.ParagraphFormat.Shading.BackgroundPatternColor=255`. Mirror the cell-shading recipe (PR #86).
+>      (Design/paragraph, not strictly layout-engine — but bounded + high-confidence.)
+>   3. **Paragraph BORDERS export + COM (rec 0.93)** — wired (commands.js ~207), no COM test. The
+>      eighths-of-a-point → Word half-point (`w:sz=4` → 0.5pt) mapping is a real fidelity risk. COM
+>      `ParagraphFormat.Borders(wdBorderBottom).LineStyle/LineWidth`. Slightly bigger (unit assert).
+>   4. **OOXML child-ORDER sweep: w:rPr / w:pPr / w:trPr / w:numPr (mirror PR #77/#82)** — none pass an
+>      `xmlOrder`; `rPr` is the HIGHEST-reachability (every char-format toggle on pre-formatted text exports
+>      out-of-order children), `pPr` (list-toggle on indented paras), `trPr` (cantSplit+trHeight). **Word
+>      TOLERATES these on read (spec-compliance only, NOT a crash — per the tcPr finding), so lower real
+>      value; multi-file.** Proposed xmlOrder arrays are in the scout output (CT_RPrBase/CT_PPrBase/CT_TrPrBase).
+>   5. **distributeColumns/Rows geometry export tests (rec 0.7)** — model-tested only; assert the even
+>      `<w:gridCol>`/`<w:trHeight>` actually export. Table layout, bounded.
+>   - **Bigger (need UI wiring, defer):** line-spacing rule dropdown (atLeast/exactly), special-indent
+>     (first-line/hanging) dropdown, Tabs dialog — each a real Word feature with export-ready translators but
+>     no UI to SET it. Also: **picture effects via the a14 extension** (the deferred #2).
+>
+> **NEXT:** scout-v2 #1 (merged-cell gridSpan — most layout-relevant + may catch corruption) or #2/#3
+> (paragraph shading/borders — highest confidence). The 2+-table corruption (`task_0e043993`) + CUA vAlign
+> (`task_c62b4d4c`) stay focused-session spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (cell-shading export test DONE (PR #86); SCOUT BACKLOG EXHAUSTED; #2 picture-effects deferred (needs a14))
 
 > **Branch:** `main` (cell-shading test merged PR #86 `7587365`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 451 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
