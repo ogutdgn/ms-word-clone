@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (Picture Alt Text — IMAGE AREA COMPLETE, `/loop` "keep go")
+- [x] **Picture Alt Text (PR #67 `e27ec79`)** — Word's Picture Format → Alt Text pane on the Picture
+  Format tab (new Accessibility group). New bridge verb `setImageAltText({title?,decorative?})`: the
+  description is the node's `title` attr (→ `wp:docPr/@descr`); `decorative` sets the flag (→
+  `adec:decorative` ext) and clears the description. `H.imgAltText` = a textarea + "Mark as decorative"
+  checkbox flyout. `/code-review` clean (confirmed descr is XML-escaped). 1 `[4b]` test. Gates: **PM 441
+  / smoke 9 / roundtrip 27**.
+- [x] **🏁 IMAGE AREA COMPLETE** — Picture Format tab mirrors Word: Size (H/W/Lock) + Arrange
+  (Wrap/Bring/Send) + Accessibility (Alt Text). 3 slices this session (#63/#65/#67). NEXT = frames-overlay
+  keystone OR 4e headers/footers — each needs a FRESH session (this one is extremely long).
+
 ### 2026-06-16 (Picture Size group — numeric Height/Width, `/loop` "keep go")
 - [x] **Picture Size group (PR #65 `361fb53`)** — Word's Picture Format → Size group (numeric Height +
   Width) on the Picture Format tab. New bridge verb `setImageSize({width?,height?})` (`bridge/insert.ts`):
