@@ -7,7 +7,49 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — table cell "Align Middle" w:vAlign fix DONE (PR #80, oracle-validated); scout backlog recorded)
+## 2026-06-16 (RESUME HERE — w:tcPr child-order CT_TcPr fix DONE (PR #82); scout #5 RE-RANKED: Word TOLERATES tcPr reorder)
+
+> **Branch:** `main` (tcPr-order fix merged PR #82 `6d42e34`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 449 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` iteration.**
+>
+> **w:tcPr child-order fix — DONE (PR #82):** took scout-backlog **#5** (the `tcBorders`-missing-XML_ORDER
+> item). `tcPr-translator.js` now passes a `TCPR_XML_ORDER` (CT_TcPr / ECMA-376 §17.4.66 sequence) into
+> `createNestedPropertiesTranslator` so decoded cell-property children stable-sort to schema order on export
+> — the exact mirror of the PR #77 `tblPr` fix. **Reproduced the out-of-order export:** a cell with
+> borders+shading+vAlign exported `<w:tcBorders>` BEFORE `<w:tcW>` (the exporter migrates `attrs.borders` into
+> `tableCellProperties` LAST — `translate-table-cell.js`). Pre-fix idx tcBorders=8 < tcW=164 (`schemaOrdered:
+> false`); post-fix tcW(8) < tcBorders(41) < shd(197) < vAlign(222). 1 `[4d]` test (red pre-fix) +
+> `scripts/oracle-probe-4d-tcorder.js` + a NEW reusable **`scripts/oracle/validate-open-win.ps1`** (PID-safe
+> fresh-Word-COM open validator, alerts-as-errors). `/code-review high` clean (2 finders, zero findings).
+>
+> **🔬 KEY EMPIRICAL FINDING (re-ranks the backlog): live Word 16 TOLERATES the out-of-order `w:tcPr`.** The
+> COM validator opened the PRE-FIX corrupt file CLEAN — `savedOnOpen=true` (no repair, identical to a
+> Word-authored baseline), read `cellVAlign=1`/borders intact; a deliberately-broken control file is correctly
+> rejected (validator is sensitive). So scout #5's "Word corrupt" hypothesis is **FALSE for tcPr** — this
+> shipped as **OOXML spec-compliance + consistency with `w:tblPr`** (strict consumers — Open XML SDK validator,
+> some LibreOffice paths — still reject out-of-sequence children), NOT a Word-crash fix. **LESSON re-confirmed:
+> COM-validate before trusting a corruption hypothesis** (the env note's whole point). Whether Word is genuinely
+> stricter on `tblPr` (PR #77) than `tcPr`, or PR #77's "rejected" was also a strict-consumer effect, is an open
+> question — not re-litigated (PR #77 is shipped + harmless).
+>
+> **🗂️ SCOUT BACKLOG (updated — pick next):**
+>   1. ~~Cell vertical-align (rec 5)~~ **DONE (PR #80).**
+>   2. **Picture effects: grayscale / brightness-contrast (rec 4.5)** — engine imports/exports but NOT rendered
+>      + NO bridge setter/UI. Bigger (render CSS filter + setImageColorAdjust + Picture Format→Adjust group).
+>   3. **Table cell margins (rec 4) — RECOMMENDED NEXT.** `H.tblCellMargins` is a STUB (commands.js toast
+>      "not implemented"); bridge `tableSetCellMargins` + export (w:tcMar) WORK. Wire the inches flyout (4
+>      spinners) + test + oracle (Cells(1).TopPadding/LeftPadding...). Real feature, bounded.
+>   4. **Table cell shading (rec 4)** — wired + works, NO export test. Add a `[6b]` w:shd export test + oracle.
+>      Smallest (test coverage only, no fix).
+>   5. ~~tcBorders XML_ORDER (rec 2)~~ **DONE (PR #82) — and the Word-tolerance finding above re-ranks its premise.**
+>
+> **NEXT:** scout #3 (cell margins — recommended; real bounded feature) or #2 (picture effects — bigger). The
+> 2+-table corruption (`task_0e043993`) + CUA vAlign (`task_c62b4d4c`) stay focused-session spawn_tasks (NOT
+> loop work). Branch off `main`.
+
+---
+
+## 2026-06-16 (table cell "Align Middle" w:vAlign fix DONE (PR #80, oracle-validated); scout backlog recorded)
 
 > **Branch:** `main` (cell-vAlign fix merged PR #80 `7fdf431`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 448 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode iteration.**
