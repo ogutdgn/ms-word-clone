@@ -471,9 +471,11 @@ body.pm-active #pm-editor .pm-page-spacer .pm-gap-band {
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
 
 /* Selected inline object (a picture or a video thumbnail): show a Word-like
-   selection frame + corner handles. ProseMirror flags the node with
-   .ProseMirror-selectednode; without any styling the image looked unselectable,
-   so users couldn't tell it was picked and thought it couldn't be moved/deleted. */
+   selection frame. ProseMirror flags the node with .ProseMirror-selectednode;
+   without any styling the image looked unselectable, so users couldn't tell it was
+   picked. The 8 LIVE resize handles are now drawn by the owned image-resize overlay
+   (src/renderer/imageresize/image-resize.ts, Phase 4b) — see .wc-img-resize below;
+   the old decorative ::before/::after corner pseudo-handles are superseded. */
 body.pm-active #pm-editor .ProseMirror-selectednode,
 body.pm-active #pm-editor .ProseMirror-selectednode img {
   outline: 2px solid var(--word-blue, #2b579a);
@@ -484,20 +486,22 @@ body.pm-active #pm-editor .ProseMirror-selectednode {
   position: relative;
   box-shadow: 0 0 0 1px rgba(43, 87, 154, 0.25);
 }
-/* Four corner handles drawn off the selection's corners (decorative; resize is a
-   future slice — the frame alone makes selection obvious so delete/move work). */
-body.pm-active #pm-editor .ProseMirror-selectednode::before,
-body.pm-active #pm-editor .ProseMirror-selectednode::after {
-  content: '';
-  position: absolute;
-  width: 7px; height: 7px;
+
+/* Phase 4b — live image-resize handle overlay. Mounted in #pages (the zoom-scaled
+   containing block) so it tracks the image through zoom + scroll. The frame box is
+   non-interactive (the image's own outline shows selection); only the 8 handles take
+   pointer events. */
+.wc-img-resize {
+  box-sizing: border-box;
+}
+.wc-img-resize .wc-img-handle {
+  width: 8px;
+  height: 8px;
   background: #fff;
   border: 1px solid var(--word-blue, #2b579a);
   border-radius: 1px;
-  pointer-events: none;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.4);
 }
-body.pm-active #pm-editor .ProseMirror-selectednode::before { top: -5px; left: -5px; }
-body.pm-active #pm-editor .ProseMirror-selectednode::after { bottom: -5px; right: -5px; }
 
 /* Strikethrough on sub/superscript runs (Word parity).
    The strike mark serializes as the OUTER <s>; the vertAlign mark serializes

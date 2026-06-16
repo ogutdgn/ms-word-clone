@@ -1894,6 +1894,63 @@
     return (cs.outlineStyle === 'solid' && parseFloat(cs.outlineWidth) >= 1)
       || ('outline=' + cs.outlineStyle + ' ' + cs.outlineWidth);
   });
+  // Phase 4b — live image resize. Helpers: select an image as a NodeSelection, then
+  // drag a named handle by (dx,dy) screen px via synthetic PointerEvents.
+  const selectImage = () => {
+    let pos = null; doc().descendants((n, p) => { if (n.type.name === 'image' && pos == null) pos = p; });
+    if (pos == null) return null;
+    v().dispatch(v().state.tr.setSelection(window.__PM_NodeSelection.create(doc(), pos)));
+    return pos;
+  };
+  const dragHandle = async (id, dx, dy) => {
+    const h = document.querySelector('.wc-img-resize .wc-img-handle-' + id);
+    if (!h) return false;
+    const r = h.getBoundingClientRect();
+    const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
+    h.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: sx, clientY: sy, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: sx + dx, clientY: sy + dy, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: sx + dx, clientY: sy + dy, pointerId: 1 }));
+    await sleep(200);
+    return true;
+  };
+  const imgSize = () => { let s = null; doc().descendants((n) => { if (n.type.name === 'image') s = n.attrs.size; }); return s; };
+
+  await t('[4b] a selected image shows the 8-handle live-resize overlay', async () => {
+    setDoc('imgr1: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'r1.png');
+    await sleep(140);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    const ov = document.querySelector('.wc-img-resize');
+    if (!ov || getComputedStyle(ov).display === 'none') return 'resize overlay not visible on selection';
+    const handles = ov.querySelectorAll('.wc-img-handle').length;
+    return handles === 8 || ('expected 8 handles, got ' + handles);
+  });
+
+  await t('[4b] dragging a corner handle resizes the image aspect-locked + exports w:extent (EMU)', async () => {
+    setDoc('imgr2: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'r2.png'); // 2:1 natural
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    const before = imgSize();
+    if (!before || !before.width) return 'no size attr before drag';
+    const aspect0 = before.width / before.height;
+    if (!(await dragHandle('se', 60, 30))) return 'SE handle not found';
+    const after = imgSize();
+    if (!after || !(after.width > before.width)) return 'image did not grow (' + JSON.stringify(before) + ' -> ' + JSON.stringify(after) + ')';
+    // Aspect-locked: the ratio is preserved within rounding.
+    if (Math.abs(after.width / after.height - aspect0) > 0.06) return 'aspect not preserved: ' + JSON.stringify(after) + ' (was ' + aspect0.toFixed(2) + ':1)';
+    // Exported wp:extent EMU must equal round(px * 9525).
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<wp:extent[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+    if (!m) return 'no <wp:extent> in exported XML';
+    const cx = +m[1], cy = +m[2];
+    const okCx = Math.abs(cx - Math.round(after.width * 9525)) <= 9525;
+    const okCy = Math.abs(cy - Math.round(after.height * 9525)) <= 9525;
+    return (okCx && okCy) || ('extent cx=' + cx + ' cy=' + cy + ' vs size ' + JSON.stringify(after));
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');
