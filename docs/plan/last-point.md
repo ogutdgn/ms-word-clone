@@ -7,7 +7,40 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Phase 4c.1 TEXT WRAP COMPLETE + merged; 4c.2 drag-reposition next)
+## 2026-06-16 (RESUME HERE — Phase 4c.1 wrap + 4c.3 z-order DONE; the FRAMES-OVERLAY is the remaining 4c)
+
+> **Branch:** `main` (4c.3 z-order merged via PR #44 `66d691e`; branch deleted). **Phase:** 4
+> (layout engine); **4a + 4b + 4c.1 (text wrap) + 4c.3 (z-order export) are DONE**, all
+> oracle-validated. **NEXT = the FRAMES-OVERLAY** (the faithful-render core of floating objects)
+> OR pivot to **4d (tables)** / **4e (headers/footers)** — see "decision" below.
+>
+> **4c.3 done (PR #44):** `WC.PM.setImageZOrder(forward|backward|toFront|toBack)`
+> (`bridge/insert.ts`) mutates the floating image's `relativeHeight` (Word-sane, relative to other
+> floating images; forward/backward use `>=`/`<=` so a tied peer is included — the default state).
+> Ribbon Bring/Send items wired (was the phantom `WC.Layout.*`). EXPORT is faithful — oracle
+> `read-shapes` (now reports leftPt/topPt/zOrder) confirms Word reads distinct `ZOrderPosition`s.
+> Code-reviewed + re-reviewed (caught + fixed a tie no-op bug).
+>
+> **Gates on main: PM 420 / smoke 9 / roundtrip 27.**
+>
+> **DECISION POINT — the remaining 4c work is the FRAMES-OVERLAY, a big architectural piece (not a
+> clean slice).** 4c.1 (wrap) + 4c.3 (z-order) were EXPORT-faithful wins on the fork's existing
+> CSS-based render. But the fork renders floating images via CSS float (Square/Tight/Through) or
+> absolute left/top (None only), and z-orders via z-index (positioned elements only). So **faithful
+> free-REPOSITION (4c.2) AND faithful render z-stacking both require rendering every floating object
+> as an absolutely-positioned frame with text-exclusion** (shape-outside / manual line exclusion) +
+> a drag overlay — LAYOUT_ENGINE.md §3 "frames overlay". This is the substantial remaining
+> floating-objects work (deferrals.md §A.1d). Options for the next session:
+>   1. **Build the frames-overlay** (big, but unblocks faithful reposition + z-stacking + floating
+>      shapes/textboxes #7). Branch `build/phase-4c-frames-overlay` off `main`.
+>   2. **Pivot to 4d (tables)** — column/row resize (`w:gridCol`/`w:trHeight`), table relocate,
+>      row-split across pages. May be cleaner wins than the frames-overlay. LAYOUT_ENGINE.md §2 #4-6.
+>   3. **Pivot to 4e (headers/footers + fields)** — per-page regions + page-number/date fields.
+> Recommend confirming the priority before committing to the frames-overlay's scope.
+
+---
+
+## 2026-06-16 (Phase 4c.1 TEXT WRAP COMPLETE + merged; 4c.2 drag-reposition next)
 
 > **Branch:** `main` (4c.1 merged via PR #42 `4bbdb51`; branch deleted). **Phase:** 4 (layout
 > engine); **4a pagination + 4b image resize + 4c.1 text-wrap are DONE**, all oracle-validated.
