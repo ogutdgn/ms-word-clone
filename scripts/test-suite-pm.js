@@ -2765,6 +2765,26 @@
     if (!tp || !/<w:tblInd\b[^>]*w:w="720"/.test(tp)) return 'no <w:tblInd w:w="720"> in tblPr: ' + (tp && tp.slice(0, 200));
     return true;
   });
+  await t('[4d] table cell vertical-align: tblVAlignMid → CSS attr "middle" but exports OOXML w:vAlign "center"; top/bottom passthrough; round-trips', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    const caretInCell0 = () => { let cp = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cp == null) cp = pos; }); if (cp != null) window.WC.editor.commands.setTextSelection(cp + 2); };
+    const cellVA = () => { let v; doc().descendants((n) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && v == null) v = n.attrs.verticalAlign; }); return v; };
+    const expVAlign = (xml) => { const m = xml.match(/<w:vAlign\b[^>]*w:val="([^"]*)"/); return m && m[1]; };
+    // Align Middle via the ribbon dispatch → CSS-valued attr "middle" (renderDOM uses vertical-align).
+    caretInCell0(); WC.Commands.run({ cmd: 'tblVAlignMid', type: 'button' }, document.body); await sleep(80);
+    if (cellVA() !== 'middle') return 'verticalAlign attr should be CSS "middle": ' + cellVA();
+    // ...but the export MUST be OOXML ST_VerticalJc "center" (NOT the invalid "middle" Word ignores).
+    if (expVAlign(await window.WC.editor.exportDocx({ exportXmlOnly: true })) !== 'center') return 'exported w:vAlign must be OOXML "center", not "middle" (Word ignores invalid)';
+    // top / bottom are valid in BOTH CSS and OOXML — passthrough.
+    caretInCell0(); WC.Commands.run({ cmd: 'tblVAlignTop', type: 'button' }, document.body); await sleep(80);
+    if (expVAlign(await window.WC.editor.exportDocx({ exportXmlOnly: true })) !== 'top') return 'top should export w:vAlign "top"';
+    caretInCell0(); WC.Commands.run({ cmd: 'tblVAlignBottom', type: 'button' }, document.body); await sleep(80);
+    if (expVAlign(await window.WC.editor.exportDocx({ exportXmlOnly: true })) !== 'bottom') return 'bottom should export w:vAlign "bottom"';
+    // Round-trip the MIDDLE case (export "center" → import maps back to CSS "middle").
+    caretInCell0(); WC.Commands.run({ cmd: 'tblVAlignMid', type: 'button' }, document.body); await sleep(80);
+    const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
+    return cellVA() === 'middle' || ('round-trip lost the CSS-valued vertical-align (got ' + cellVA() + ' — import must map OOXML center → CSS middle)');
+  });
   // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table

@@ -166,9 +166,13 @@ export function generateTableCellProperties(node) {
     });
   }
 
+  // The `verticalAlign` attr is the CSS value (the cell renderDOM emits `vertical-align: <value>`),
+  // but OOXML w:vAlign/@w:val is the ST_VerticalJc enum — CSS `middle` must export as `center`, or
+  // Word sees an invalid value and ignores the alignment (the cell is NOT vertically centered).
   const { verticalAlign } = attrs;
-  if (verticalAlign && verticalAlign !== tableCellProperties.vAlign) {
-    tableCellProperties['vAlign'] = verticalAlign;
+  const vAlignOoxml = verticalAlign === 'middle' ? 'center' : verticalAlign;
+  if (vAlignOoxml && vAlignOoxml !== tableCellProperties.vAlign) {
+    tableCellProperties['vAlign'] = vAlignOoxml;
   } else if (!verticalAlign && tableCellProperties?.vAlign) {
     delete tableCellProperties.vAlign;
   }
