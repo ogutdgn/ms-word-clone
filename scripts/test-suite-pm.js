@@ -5239,6 +5239,44 @@
     return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
   });
 
+  await t('[4a] section break (w:sectPr) forces the next content onto a new page', async () => {
+    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
+    setDocs(['Scb alpha line', 'Scb bravo line', 'Scb gamma line']);
+    await sleep(300);
+    const before = PM().__pagination.pageCount;
+    caretToEndOf('bravo');
+    window.WC.editor.commands.insertSectionBreakAtSelection({});
+    let pc = before;
+    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
+    if (pc <= before) return 'section break did not add a page (' + before + ' -> ' + pc + ')';
+    const y = textY('Scb gamma');
+    return (y != null && y >= pageContentTop(2) - 30) || 'gamma Y=' + Math.round(y) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
+  });
+
+  await t('[4a] section break governed by the NEXT section: continuous-typed ender still page-breaks', async () => {
+    // Word semantic (oracle-validated): a sectPr's w:type describes how ITS OWN section
+    // BEGINS, not the break after it. An explicit `continuous` ON the section-ending
+    // paragraph must NOT suppress the break when the following (body) section is nextPage.
+    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
+    setDocs(['Scc alpha line', 'Scc bravo line', 'Scc gamma line']);
+    await sleep(300);
+    caretToEndOf('bravo');
+    window.WC.editor.commands.insertSectionBreakAtSelection({});
+    await sleep(150);
+    // stamp w:type=continuous onto bravo's sectPr
+    let tgt = null;
+    doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes('bravo')) tgt = { node, pos }; return true; });
+    if (!tgt) return 'bravo paragraph not found';
+    const pp = JSON.parse(JSON.stringify(tgt.node.attrs.paragraphProperties || {}));
+    if (!pp.sectPr) return 'bravo has no sectPr after insert (red)';
+    pp.sectPr.elements = (pp.sectPr.elements || []).filter((el) => el.name !== 'w:type');
+    pp.sectPr.elements.unshift({ type: 'element', name: 'w:type', attributes: { 'w:val': 'continuous' }, elements: [] });
+    v().dispatch(v().state.tr.setNodeMarkup(tgt.pos, undefined, { ...tgt.node.attrs, paragraphProperties: pp, pageBreakSource: 'sectPr' }, tgt.node.marks));
+    let pc = 1;
+    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 2) break; }
+    return pc >= 2 || 'continuous-typed ender wrongly suppressed the break (pageCount=' + pc + ', expected 2 — the next/body section is nextPage)';
+  });
+
   await t('[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)', async () => {
     window.WC.editor.commands.selectAll();
     const words = [];
