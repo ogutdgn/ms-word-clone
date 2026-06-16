@@ -79,7 +79,7 @@ $b = if ($argv.Count -gt 2) { $argv[2] } else { $null }
 $c = if ($argv.Count -gt 3) { $argv[3] } else { $null }
 
 function Usage-Exit {
-  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | read-layout <file.docx> [--out r.json] | read-shapes <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
+  [Console]::Error.WriteLine('usage: word-oracle-win.ps1 read-props <file.docx> [--out r.json] | read-word-props <file.docx> <paraIdx> [wordIdx] [--out r.json] | read-para-props <file.docx> [--out r.json] | read-style-props <file.docx> [--out r.json] | read-layout <file.docx> [--out r.json] | read-shapes <file.docx> [--out r.json] | read-table <file.docx> [--out r.json] | roundtrip <in.docx> <out.docx>')
   exit 2
 }
 
@@ -396,6 +396,40 @@ function Read-Shapes([string]$docxPath) {
   return [pscustomobject][ordered]@{ inlineShapes = @($inline); floatingShapes = @($floating) }
 }
 
+# read-table — Word's TABLE geometry ground truth for Phase-4d. Per table: column count,
+# row count, the first row's per-cell widths (points) and each row's height (points) + rule.
+# Compare a clone-resized column's exported w:gridCol/w:tcW against what Word renders.
+# 1 pt = 12700 EMU = 20 twips; 96px = 72pt so 1px = 0.75pt.
+function Read-Table([string]$docxPath) {
+  $doc = Open-Doc $docxPath $true
+  $tables = @()
+  try {
+    $tn = $doc.Tables.Count
+    for ($t = 1; $t -le $tn; $t++) {
+      $tbl = $doc.Tables.Item($t)
+      $rows = [int]$tbl.Rows.Count
+      $cols = [int]$tbl.Columns.Count
+      $colWidths = @()
+      try {
+        $firstRowCells = $tbl.Rows.Item(1).Cells.Count
+        for ($c = 1; $c -le $firstRowCells; $c++) {
+          $w = $null; try { $w = [math]::Round([double]$tbl.Cell(1, $c).Width, 2) } catch {}
+          $colWidths += $w
+        }
+      } catch {}
+      $rowHeights = @()
+      for ($r = 1; $r -le $rows; $r++) {
+        $h = $null; $rule = $null
+        try { $h = [math]::Round([double]$tbl.Rows.Item($r).Height, 2) } catch {}
+        try { $rule = [int]$tbl.Rows.Item($r).HeightRule } catch {}
+        $rowHeights += [pscustomobject][ordered]@{ row = $r; heightPt = $h; heightRule = $rule }
+      }
+      $tables += [pscustomobject][ordered]@{ index = $t; rows = $rows; columns = $cols; firstRowCellWidthsPt = @($colWidths); rowHeights = @($rowHeights) }
+    }
+  } catch {}
+  return [pscustomobject][ordered]@{ tables = @($tables) }
+}
+
 # Resolve a (possibly relative) path against the PowerShell $PWD — NOT the .NET
 # process CWD, which can differ in hosted sessions ([IO.Path]::GetFullPath alone
 # would key off the process CWD while Test-Path/Resolve-Path key off $PWD).
@@ -450,6 +484,9 @@ try {
   } elseif ($cmd -eq 'read-shapes' -and $a) {
     Start-WordInstance
     Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-shapes'; shapes = (Read-Shapes $a) })
+  } elseif ($cmd -eq 'read-table' -and $a) {
+    Start-WordInstance
+    Emit ([pscustomobject][ordered]@{ file = $a; generatedBy = 'word-oracle read-table'; layout = (Read-Table $a) })
   } elseif ($cmd -eq 'roundtrip' -and $a -and $b) {
     Start-WordInstance
     Invoke-Roundtrip $a $b
