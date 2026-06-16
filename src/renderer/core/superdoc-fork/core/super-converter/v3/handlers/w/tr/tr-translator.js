@@ -254,8 +254,14 @@ const decode = (params, decodedAttrs) => {
     if (node.attrs.rowHeight != null) {
       const rowHeightPixels = twipsToPixels(node.attrs.tableRowProperties['rowHeight']?.value);
       if (rowHeightPixels !== node.attrs.rowHeight) {
-        // If the value has changed, update it
-        tableRowProperties['rowHeight'] = { value: String(pixelsToTwips(node.attrs['rowHeight'])) };
+        // Re-sync the nested twips value from the (px) top-level rowHeight. `value` MUST stay a
+        // NUMBER (the trHeight decode guards `typeof value === 'number'` and silently drops a
+        // string → no <w:trHeight> on export), and the existing `rule` (atLeast/exact/auto) must
+        // be preserved (don't replace the whole object).
+        tableRowProperties['rowHeight'] = {
+          ...(node.attrs.tableRowProperties['rowHeight'] || {}),
+          value: pixelsToTwips(node.attrs['rowHeight']),
+        };
       }
     }
     tableRowProperties['cantSplit'] = node.attrs['cantSplit'];
