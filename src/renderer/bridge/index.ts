@@ -335,7 +335,7 @@ export function preinstallBridge() {
     removeBookmark: () => false, renameBookmark: () => false,
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
-    setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, // Phase 4b/4c pre-mount stubs (replaced by installInsert on mount)
+    setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, // Phase 4b/4c pre-mount stubs (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
     insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,
     tableDeleteRow: () => false, tableDeleteColumn: () => false, tableDeleteTable: () => false,

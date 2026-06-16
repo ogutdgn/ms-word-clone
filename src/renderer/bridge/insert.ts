@@ -429,12 +429,42 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Crop the selected picture (Word's Picture Format → Crop). Crop offsets are PERCENTS of each
+  // edge (left/top/right/bottom); they map to the node's `clipPath` (CSS inset, the fork's render
+  // clips + scales the cropped region to fill the same box) and export to a:srcRect (thousandths).
+  // `remove` clears the crop. A user crop supersedes any stashed imported srcRect (cleared here so
+  // the new crop wins on export). The inset string matches the importer's exact format.
+  function setImageCrop(opts: { l?: number; t?: number; r?: number; b?: number; remove?: boolean }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then crop it.'); return false }
+    const next: Record<string, any> = { ...sel.node.attrs }
+    if (opts.remove) {
+      next.clipPath = null
+    } else {
+      const clamp = (v: any) => Math.max(0, Math.min(100, Number(v) || 0))
+      const t = clamp(opts.t), r = clamp(opts.r), b = clamp(opts.b), l = clamp(opts.l)
+      if (l + r >= 100 || t + b >= 100) { (window as any).WC?.toast?.('Crop too large', 'That crop would remove the whole picture.'); return false }
+      next.clipPath = (t === 0 && r === 0 && b === 0 && l === 0) ? null : `inset(${t}% ${r}% ${b}% ${l}%)`
+    }
+    next.rawSrcRect = null // the user's crop supersedes any verbatim imported srcRect
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, next, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
     setImageLockAspect,
     setImageSize,
     setImageAltText,
+    setImageCrop,
     insertLink,
     removeLink,
     insertImage,

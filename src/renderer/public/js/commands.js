@@ -225,6 +225,35 @@
       fly.appendChild(wrap);
     });
   };
+  // Picture Crop (Word's Picture Format → Crop) → WC.PM.setImageCrop. A flyout with Left/Top/Right/
+  // Bottom crop % (prefilled from the selected picture's clipPath inset) + Remove Crop. The bridge
+  // maps these to the `clipPath` attr (render clips + scales to fill the box) → exports a:srcRect.
+  H.imgCrop = (c, node) => {
+    const sel = window.WC.view && window.WC.view.state && window.WC.view.state.selection;
+    const a = (sel && sel.node && sel.node.type.name === 'image') ? sel.node.attrs : {};
+    const m = (typeof a.clipPath === 'string') ? a.clipPath.match(/inset\(\s*([\d.]+)%\s+([\d.]+)%\s+([\d.]+)%\s+([\d.]+)%\s*\)/) : null;
+    const cur = m ? { t: +m[1], r: +m[2], b: +m[3], l: +m[4] } : { t: 0, r: 0, b: 0, l: 0 };
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyHeader('Crop (%)'));
+      const grid = el('div', { style: { padding: '4px 8px', display: 'grid', gridTemplateColumns: 'auto 52px auto 52px', gap: '4px 6px', alignItems: 'center' } });
+      const mk = (val) => el('input', { type: 'number', step: '1', min: '0', max: '100', value: String(val), style: { width: '48px' } });
+      const li = mk(cur.l), ti = mk(cur.t), ri = mk(cur.r), bi = mk(cur.b);
+      const lbl = (txt) => el('span', { text: txt, style: { fontSize: '12px' } });
+      grid.appendChild(lbl('Left')); grid.appendChild(li); grid.appendChild(lbl('Top')); grid.appendChild(ti);
+      grid.appendChild(lbl('Right')); grid.appendChild(ri); grid.appendChild(lbl('Bottom')); grid.appendChild(bi);
+      fly.appendChild(grid);
+      const apply = el('div', { style: { padding: '4px 8px' } });
+      const btn = el('button', { class: 'fly-set-btn', text: 'Apply' });
+      btn.addEventListener('click', () => {
+        if (WC.PM && WC.PM.setImageCrop) WC.PM.setImageCrop({ l: parseFloat(li.value), t: parseFloat(ti.value), r: parseFloat(ri.value), b: parseFloat(bi.value) });
+        WC.closeFlyouts();
+      });
+      apply.appendChild(btn);
+      fly.appendChild(apply);
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Remove Crop', { onClick: () => { if (WC.PM && WC.PM.setImageCrop) WC.PM.setImageCrop({ remove: true }); } }));
+    });
+  };
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1477,9 +1506,9 @@
       if (cmd === 'bringForward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Bring Forward', { onClick: () => WC.PM.setImageZOrder('forward') })); fly.appendChild(WC.flyItem('Bring to Front', { onClick: () => WC.PM.setImageZOrder('toFront') })); fly.appendChild(WC.flyItem('Bring in Front of Text', { onClick: () => WC.PM.setImageWrap('front') })); });
       if (cmd === 'sendBackward') return WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Send Backward', { onClick: () => WC.PM.setImageZOrder('backward') })); fly.appendChild(WC.flyItem('Send to Back', { onClick: () => WC.PM.setImageZOrder('toBack') })); fly.appendChild(WC.flyItem('Send Behind Text', { onClick: () => WC.PM.setImageWrap('behind') })); });
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
-      // Picture Format → Size group (4b numeric Height/Width) + Alt Text. Redundant with
+      // Picture Format → Size group (4b numeric Height/Width) + Crop + Alt Text. Redundant with
       // Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
-      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText') return H[cmd](control, node);
+      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.
