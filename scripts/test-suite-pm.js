@@ -2244,6 +2244,58 @@
     return (/\brot="5400000"/.test(rt) && /\bflipH="1"/.test(rt)) || 'round-trip changed rot/flip (expected 90°=5400000 + flipH): ' + rt;
   });
 
+  await t('[4c] Picture Position (4c.2): setImagePosition → marginOffset → exports wp:posOffset (EMU) + round-trips; inline-guarded', async () => {
+    if (typeof PM().setImagePosition !== 'function') return 'PM.setImagePosition missing (red)';
+    if (PM().isBlocked('imgPosition') !== false) return 'imgPosition should not be blocked';
+    const moOf = () => { let mo = null; doc().descendants((n) => { if (n.type.name === 'image') mo = n.attrs.marginOffset; }); return mo || {}; };
+    setDoc('pos: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'p1', width: 120, height: 90 });
+    await sleep(220);
+    if (selectImage() == null) return 'no image node';
+    // Inline guard: an in-line picture can't be positioned.
+    if (PM().setImagePosition({ horizontal: 96, top: 48 }) !== false) return 'setImagePosition should refuse an inline picture';
+    // Float it (Behind Text = wrap None, absolute), then position it 1" right of column / 0.5" below para.
+    selectImage(); PM().setImageWrap('behind'); await sleep(140); selectImage();
+    if (!PM().setImagePosition({ horizontal: 96, top: 48 })) return 'setImagePosition returned false on a floating picture';
+    await sleep(60); selectImage();
+    let mo = moOf();
+    if (mo.horizontal !== 96 || mo.top !== 48) return 'marginOffset not set: ' + JSON.stringify(mo);
+    // relative:true ADDS to the current offset (nudge).
+    PM().setImagePosition({ horizontal: 10, top: -8, relative: true }); await sleep(60); selectImage();
+    mo = moOf();
+    if (mo.horizontal !== 106 || mo.top !== 40) return 'relative nudge wrong: ' + JSON.stringify(mo);
+    // Reset back to 96/48 for a clean export assertion.
+    PM().setImagePosition({ horizontal: 96, top: 48 }); await sleep(60); selectImage();
+    // Export: wp:positionH/V → wp:posOffset in EMU (96px → 914400, 48px → 457200).
+    let xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<wp:positionH\b[^>]*relativeFrom="column"/.test(xml)) return 'no wp:positionH relativeFrom=column';
+    // The generated anchor MUST be simplePos="0" (complex positioning) — else Word ignores
+    // positionH/V and pins the picture to the page origin (oracle-confirmed: Left/Top = -1"/-1").
+    if (!/<wp:anchor\b[^>]*\bsimplePos="0"/.test(xml)) return 'anchor not simplePos="0" — Word would ignore positionH/V';
+    const hOff = xml.match(/<wp:positionH[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
+    const vOff = xml.match(/<wp:positionV[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
+    if (!hOff || +hOff[1] !== 914400) return 'wp:positionH posOffset not 914400 (1"): ' + (hOff && hOff[1]);
+    if (!vOff || +vOff[1] !== 457200) return 'wp:positionV posOffset not 457200 (0.5"): ' + (vOff && vOff[1]);
+    // Imported-anchor guard: a picture carrying originalDrawingChildren (its verbatim imported anchor)
+    // refuses reposition — the export would keep the original posOffset, so moving it would silently
+    // drop on save. Stamp the attr to simulate an import, then assert the verb refuses (no node change).
+    const ipos = selectImage();
+    v().dispatch(v().state.tr.setNodeMarkup(ipos, undefined, { ...doc().nodeAt(ipos).attrs, originalDrawingChildren: [{ name: 'wp:positionH', elements: [] }] }));
+    await sleep(40); selectImage();
+    if (PM().setImagePosition({ horizontal: 300, top: 300 }) !== false) return 'setImagePosition should refuse an imported picture (originalDrawingChildren present)';
+    await sleep(40);
+    if (moOf().horizontal === 300) return 'refused reposition must not change marginOffset';
+    // Clear the simulated import so the round-trip below uses the clean generated anchor.
+    const ip2 = selectImage();
+    v().dispatch(v().state.tr.setNodeMarkup(ip2, undefined, { ...doc().nodeAt(ip2).attrs, originalDrawingChildren: null }));
+    await sleep(40);
+    // Full open+save round-trip preserves the position (XML boundary).
+    const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
+    const rt = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const rtH = rt.match(/<wp:positionH[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
+    return (rtH && +rtH[1] === 914400) || 'position lost on round-trip: ' + (rtH && rtH[1]);
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

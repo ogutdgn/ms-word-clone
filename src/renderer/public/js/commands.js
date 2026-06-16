@@ -266,6 +266,34 @@
     fly.appendChild(WC.flySep());
     fly.appendChild(WC.flyItem('Reset Rotation', { onClick: () => tx({ reset: true }) }));
   });
+  // Picture Position (Word's Layout → Position → absolute position) → WC.PM.setImagePosition. A flyout
+  // with Horizontal (right of column) + Vertical (below paragraph) offsets in inches, prefilled from the
+  // selected floating picture's marginOffset. Writes marginOffset (render left/top + wp:posOffset export).
+  H.imgPosition = (c, node) => {
+    const sel = window.WC.view && window.WC.view.state && window.WC.view.state.selection;
+    const a = (sel && sel.node && sel.node.type.name === 'image') ? sel.node.attrs : {};
+    const mo = a.marginOffset || {};
+    const toIn = (px) => Math.round(((Number(px) || 0) / 96) * 100) / 100; // px → inches, 2dp
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyHeader('Position (in)'));
+      const grid = el('div', { style: { padding: '4px 8px', display: 'grid', gridTemplateColumns: 'auto 56px', gap: '4px 6px', alignItems: 'center' } });
+      const mk = (val) => el('input', { type: 'number', step: '0.1', value: String(val), style: { width: '52px' } });
+      const hi = mk(toIn(mo.horizontal)), vi = mk(toIn(mo.top));
+      const lbl = (txt) => el('span', { text: txt, style: { fontSize: '12px' } });
+      grid.appendChild(lbl('Horizontal')); grid.appendChild(hi);
+      grid.appendChild(lbl('Vertical')); grid.appendChild(vi);
+      fly.appendChild(grid);
+      const apply = el('div', { style: { padding: '4px 8px' } });
+      const btn = el('button', { class: 'fly-set-btn', text: 'Apply' });
+      btn.addEventListener('click', () => {
+        const hv = parseFloat(hi.value), vv = parseFloat(vi.value);
+        if (WC.PM && WC.PM.setImagePosition) WC.PM.setImagePosition({ horizontal: Math.round((isFinite(hv) ? hv : 0) * 96), top: Math.round((isFinite(vv) ? vv : 0) * 96) });
+        WC.closeFlyouts();
+      });
+      apply.appendChild(btn);
+      fly.appendChild(apply);
+    });
+  };
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1520,7 +1548,7 @@
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
       // Picture Format → Size group (4b numeric Height/Width) + Crop + Rotate + Alt Text. Redundant
       // with Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
-      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop' || cmd === 'imgRotate') return H[cmd](control, node);
+      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop' || cmd === 'imgRotate' || cmd === 'imgPosition') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.
