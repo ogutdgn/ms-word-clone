@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Alt Text DONE (PR #67); IMAGE AREA COMPLETE; frames-overlay keystone is next, needs a FRESH session)
+## 2026-06-16 (RESUME HERE — Picture Crop DONE (PR #69); fixed user-crop export gap; frames-overlay keystone / 4e headers next)
+
+> **Branch:** `main` (Crop merged PR #69 `ce1b31e`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 442 / smoke 9 / roundtrip 27.**
+>
+> **Picture Crop — DONE (PR #69):** Word's Picture Format → Crop (manual Left/Top/Right/Bottom %) on
+> the Picture Format tab's Size group, AND closed a real export-fidelity gap. The fork already
+> IMPORTED `a:srcRect` → the `clipPath` attr (CSS inset; render clips + scales-to-fill the box) but
+> the EXPORTER only re-emitted a stashed verbatim `rawSrcRect` — it never derived `a:srcRect` from a
+> `clipPath`, so a USER crop was lost on save. New `buildSrcRectFromClipPath` (`decode-image-node-helpers.js`)
+> is the exact inverse of the importer's `buildClipPathFromSrcRect` (inset T/R/B/L → srcRect l/t/r/b
+> thousandths, zero edges omitted); blipFill now emits `rawSrcRect || derived` (imports stay byte-identical,
+> user crops round-trip). Bridge `setImageCrop({l,t,r,b}|{remove})` clears rawSrcRect so the user crop
+> wins. `H.imgCrop` = an L/T/R/B % flyout + Remove Crop. `/code-review` clean (verified no axis
+> transposition across the full cycle + no roundtrip-gate regression). 1 `[4b]` test.
+> **Harness note:** synthetic data-URL images don't re-materialize as a queryable node after `openDocx`
+> in `test:pm` (real docx images round-trip fine — `test:roundtrip` covers them); the crop round-trip is
+> asserted at the XML boundary (export → openDocx → re-export keeps the identical `a:srcRect`).
+>
+> **The Picture Format tab now has: Size (Crop / Height / Width / Lock Aspect Ratio) + Arrange
+> (Wrap / Bring Forward / Send Backward) + Accessibility (Alt Text).** The image area is feature-rich.
+> **NEXT — the remaining Phase-4 work each needs a FRESH, FOCUSED session:**
+>   1. **The FRAMES-OVERLAY / paged-layout rework (THE KEYSTONE, deferrals §A.1b/d/e)** — unblocks
+>      line-split coords-safe render, table row-split, faithful floating image/shape REPOSITION (4c.2)
+>      + render z-stacking, AND the still-undefined `WC.Layout.*` Layout-tab cmds. Highest leverage.
+>   2. **4e headers/footers + fields** (`header-footer` AREA still DEFERRED) — its own subsystem.
+>   3. Tiny remaining image polish: Reset Size, Change Picture, a crop drag-overlay (vs the numeric flyout).
+> Branch off `main`.
+
+---
+
+## 2026-06-16 (Picture Alt Text DONE (PR #67); IMAGE AREA COMPLETE; frames-overlay keystone is next, needs a FRESH session)
 
 > **Branch:** `main` (Alt Text merged PR #67 `e27ec79`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 441 / smoke 9 / roundtrip 27.**
