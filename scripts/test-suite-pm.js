@@ -2296,6 +2296,34 @@
     return (rtH && +rtH[1] === 914400) || 'position lost on round-trip: ' + (rtH && rtH[1]);
   });
 
+  await t('[4c] Arrow-key nudge moves a selected floating picture (8px step, Shift=1px) + ignores inline', async () => {
+    const moOf = () => { let mo = null; doc().descendants((n) => { if (n.type.name === 'image') mo = n.attrs.marginOffset; }); return mo || {}; };
+    const arrow = (key, shift) => v().someProp('handleKeyDown', (f) => f(v(), new KeyboardEvent('keydown', { key, shiftKey: !!shift })));
+    setDoc('nudge: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'n1', width: 120, height: 90 });
+    await sleep(220);
+    if (selectImage() == null) return 'no image node';
+    // Inline (not yet floated): arrow keys are NOT consumed (normal caret nav).
+    if (arrow('ArrowRight') === true) return 'arrow nudge should NOT fire on an inline picture';
+    // Float it, then ArrowRight nudges +8px horizontal.
+    selectImage(); PM().setImageWrap('behind'); await sleep(140); selectImage();
+    const start = moOf();
+    const baseH = Number(start.horizontal) || 0, baseT = Number(start.top) || 0;
+    if (arrow('ArrowRight') !== true) return 'ArrowRight should be consumed on a floating picture';
+    await sleep(50); selectImage();
+    if (moOf().horizontal !== baseH + 8) return 'ArrowRight did not nudge +8px: ' + JSON.stringify(moOf());
+    // ArrowUp nudges -8px vertical.
+    if (arrow('ArrowUp') !== true) return 'ArrowUp not consumed';
+    await sleep(50); selectImage();
+    if (moOf().top !== baseT - 8) return 'ArrowUp did not nudge -8px: ' + JSON.stringify(moOf());
+    // Shift+ArrowLeft = 1px fine nudge.
+    if (arrow('ArrowLeft', true) !== true) return 'Shift+ArrowLeft not consumed';
+    await sleep(50); selectImage();
+    if (moOf().horizontal !== baseH + 8 - 1) return 'Shift+ArrowLeft did not fine-nudge -1px: ' + JSON.stringify(moOf());
+    // A non-arrow key is not consumed by the nudge handler.
+    return arrow('KeyA') !== true || 'a non-arrow key should not be consumed by the nudge handler';
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
