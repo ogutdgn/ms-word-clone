@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — paragraph border export test DONE (PR #92); scout-v2 #3 shipped; next = #2/#5/#4)
+## 2026-06-16 (RESUME HERE — paragraph shading export test DONE (PR #94); scout-v2 winding down → DECISION POINT)
+
+> **Branch:** `main` (parashading test merged PR #94 `ce86522`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 455 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Paragraph shading export test — DONE (PR #94):** took **scout-v2 #2**. Added a `[2]` test: paragraph
+> shading emits `<w:pPr><w:shd w:val="clear" w:fill="..." w:color="auto">` (guards the load-bearing
+> `val="clear"` — Word only paints the fill when clear — + verbatim hex + full CT_Shd) +
+> `oracle-probe-2-parashading.js` + reusable `validate-parashading-win.ps1`. **🔬 Word COM-validated:** red
+> FF0000 → `Paragraphs(1).Shading.BackgroundPatternColor = 255` (no swap), opens clean. Test-only. `/code-review` clean.
+>
+> **🗂️ SCOUT BACKLOG v2 — nearly exhausted:** #1 gridSpan (PR #90), #2 para shading (PR #94), #3 para
+> borders (PR #92) DONE. Remaining: **#5 distribute geometry** (table-layout, test-only, bounded) + **#4
+> OOXML order sweep** (rPr/pPr/trPr/numPr — production fix, but Word TOLERATES it so value = strict-consumer
+> portability only; rPr is highest-reachability).
+>
+> **⚖️ DECISION POINT (5 consecutive COM-validated export lock-ins shipped — all confirmed Word fidelity;
+> marginal value now diminishing):** the bounded high-value backlog is essentially done. Options for the loop:
+>   - **#5 distribute geometry** — last clearly-bounded table-LAYOUT test-only slice.
+>   - **#4 order sweep (start with rPr)** — a PRODUCTION fix (change of pace from test-only); real
+>     portability value for strict OOXML consumers (LibreOffice / OpenXML SDK validator / Google Docs import),
+>     even though live Word tolerates it. Mirrors the proven PR #77/#82 recipe. Scope to rPr (1 translator +
+>     test) as a bounded slice; pPr/trPr/numPr/pBdr as follow-ups.
+>   - **RE-SCOUT** for fresh higher-value bounded candidates.
+>   - **ESCALATE to a bigger focused item** — a14 picture effects (deferred), FRAMES-OVERLAY keystone, or 4e
+>     headers/footers. These are MULTI-PR architectural work that fits a focused session better than the 5-min
+>     autonomous loop (the project docs repeatedly say so) — best done when the user can steer.
+>
+> **NEXT (recommended):** #5 (bounded, on-topic) then #4-rPr (substantive portability fix); after that, RE-SCOUT
+> or surface the escalate-to-bigger-item choice to the user. 2+-table corruption (`task_0e043993`) + CUA vAlign
+> (`task_c62b4d4c`) stay focused-session spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (paragraph border export test DONE (PR #92); scout-v2 #3 shipped; next = #2/#5/#4)
 
 > **Branch:** `main` (paraborder test merged PR #92 `dc86aca`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 454 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
