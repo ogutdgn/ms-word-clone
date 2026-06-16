@@ -216,7 +216,18 @@ export function installTable(editor: AnyEditor) {
   }
 
   function tableAutoFit(mode: 'fixed' | 'contents' | 'window'): boolean {
-    const ok = editor.commands.autoFitTable(mode)
+    // AutoFit Window must fill the table to the page TEXT column. Compute that width
+    // (px) from the live page geometry and pass it to the fork command, which scales
+    // the columns proportionally to fill it. 'fixed'/'contents' ignore the width.
+    let targetWidthPx = 0
+    if (mode === 'window') {
+      const ps = (editor.getPageStyles && editor.getPageStyles()) || {}
+      const wIn = ps?.pageSize?.width ?? 8.5
+      const lIn = ps?.pageMargins?.left ?? 1
+      const rIn = ps?.pageMargins?.right ?? 1
+      targetWidthPx = Math.max(1, Math.round((wIn - lIn - rIn) * 96))
+    }
+    const ok = editor.commands.autoFitTable(mode, targetWidthPx)
     refocus()
     return ok !== false
   }

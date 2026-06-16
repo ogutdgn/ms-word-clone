@@ -2262,6 +2262,88 @@
     return gridCols.includes(2160) || 'expected a 2160-twip column (1.5in), got ' + JSON.stringify(gridCols);
   });
 
+  // ---- AutoFit (4d.4): the ribbon AutoFit dropdown now writes real column geometry ----
+  // Helper: read the page text-column width (px) the bridge fills AutoFit Window to.
+  const pageTextPx = () => {
+    const ps = (window.WC.editor.getPageStyles && window.WC.editor.getPageStyles()) || {};
+    const wIn = (ps.pageSize && ps.pageSize.width) || 8.5;
+    const lIn = (ps.pageMargins && ps.pageMargins.left != null) ? ps.pageMargins.left : 1;
+    const rIn = (ps.pageMargins && ps.pageMargins.right != null) ? ps.pageMargins.right : 1;
+    return Math.round((wIn - lIn - rIn) * 96);
+  };
+  // Set the table's per-column widths (px), the way a real column resize leaves it: the
+  // table `grid` (twips, what the exporter emits) + `userEdited:true` + every cell's
+  // `colwidth`. (A bare colwidth write on a fresh table does NOT survive to the export —
+  // mirror the proven [4d] resize test above, which sets grid + userEdited explicitly.)
+  const setCols = (widths) => {
+    let tablePos = null, tableNode = null;
+    doc().descendants((n, pos) => { if (n.type.name === 'table' && tablePos == null) { tablePos = pos; tableNode = n; } });
+    const cells = []; doc().descendants((n, pos) => { if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') cells.push({ pos, node: n }); });
+    let tr = v().state.tr.setNodeMarkup(tablePos, undefined, { ...tableNode.attrs, grid: widths.map((w) => ({ col: w * 15 })), userEdited: true });
+    cells.forEach((c, idx) => { tr = tr.setNodeMarkup(c.pos, undefined, { ...c.node.attrs, colwidth: [widths[idx % widths.length]] }); });
+    v().dispatch(tr);
+  };
+
+  await t('[4d] AutoFit Window scales the columns to fill the page text width (proportional, exact)', async () => {
+    // Window must STRETCH the table to the full text column, keeping column ratios — writing
+    // real colwidth (→ w:gridCol via grid-sync) so the in-app render AND the export both fill.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    setCols([100, 200]); await sleep(120);          // shrink first → 1:2 ratio
+    // Precondition: confirm the unequal 1:2 widths actually took (guards a vacuous pass where
+    // setCols silently no-ops and Window's even-split still happens to sum to the page width).
+    const xml0 = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const g0 = (xml0.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    if (JSON.stringify(g0) !== JSON.stringify([1500, 3000])) return 'precondition: unequal columns not set, pre-autofit gridCols=' + JSON.stringify(g0);
+    PM().tableAutoFit('window'); await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<w:tblLayout[^>]*w:type="autofit"/.test(xml)) return 'no w:tblLayout autofit';
+    if (!/<w:tblW[^>]*w:type="pct"[^>]*w:w="5000"|<w:tblW[^>]*w:w="5000"[^>]*w:type="pct"/.test(xml)) return 'no w:tblW pct 5000';
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    if (gridCols.length !== 2) return 'expected 2 gridCols, got ' + JSON.stringify(gridCols);
+    const sum = gridCols[0] + gridCols[1];
+    const want = pageTextPx() * 15;                      // px → twips
+    if (Math.abs(sum - want) > 6) return 'columns did not fill the page: sum=' + sum + ' want~' + want;
+    // proportional: 100:200 → second column ~2x the first.
+    const ratio = gridCols[1] / gridCols[0];
+    return (ratio > 1.8 && ratio < 2.2) || 'columns not proportional (1:2), got ' + JSON.stringify(gridCols);
+  });
+
+  await t('[4d] AutoFit Fixed exports w:tblLayout fixed and preserves column widths', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    setCols([120, 180]); await sleep(120);           // 1800 / 2700 twips
+    PM().tableAutoFit('fixed'); await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<w:tblLayout[^>]*w:type="fixed"/.test(xml)) return 'no w:tblLayout fixed';
+    if (/<w:tblW[^>]*w:type="pct"/.test(xml)) return 'Fixed must not leave a pct table width';
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    return (gridCols[0] === 1800 && gridCols[1] === 2700) || 'widths not preserved, got ' + JSON.stringify(gridCols);
+  });
+
+  await t('[4d] AutoFit Contents clears a prior Window stretch (autofit, no pct width)', async () => {
+    // window→contents must DROP the 100% stretch so the table can shrink to content.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    PM().tableAutoFit('window'); await sleep(140);
+    PM().tableAutoFit('contents'); await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<w:tblLayout[^>]*w:type="autofit"/.test(xml)) return 'no w:tblLayout autofit';
+    return !/<w:tblW[^>]*w:type="pct"/.test(xml) || 'Contents left the Window pct stretch in place';
+  });
+
+  await t('[4d] ribbon AutoFit Window fills the table (full flyout path)', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    setCols([100, 100]); await sleep(120);
+    let cellPos = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cellPos == null) cellPos = pos; });
+    window.WC.editor.commands.setTextSelection(cellPos + 2);
+    WC.Commands.dropdown({ cmd: 'tblAutoFit', type: 'dropdown' }, document.body);
+    await sleep(60);
+    flyClick(/AutoFit Window/);
+    await sleep(160);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const gridCols = (xml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || []).map((s) => +(s.match(/w:w="(\d+)"/) || [])[1]);
+    const sum = gridCols.reduce((a, b) => a + b, 0);
+    return Math.abs(sum - pageTextPx() * 15) <= 6 || 'ribbon AutoFit Window did not fill: sum=' + sum + ' cols=' + JSON.stringify(gridCols);
+  });
+
   // ---- migrate the legacy 9 table ops (caret-in-table) ----
   await t('[6] table addRow below grows the row count', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(120);
