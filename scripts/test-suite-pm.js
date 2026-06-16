@@ -1951,6 +1951,39 @@
     return (okCx && okCy) || ('extent cx=' + cx + ' cy=' + cy + ' vs size ' + JSON.stringify(after));
   });
 
+  await t('[4b] the resize handles align with the image box (overlay is correctly anchored)', async () => {
+    // Guards the containing-block assumption: the overlay is position:absolute in #pages,
+    // so #pages MUST be position:relative or the handles drift off the image. The SE
+    // handle's screen center must sit at the image's bottom-right corner (± a few px).
+    setDoc('imgr3: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'r3.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    const imgEl = document.querySelector('#pm-editor .ProseMirror img');
+    const se = document.querySelector('.wc-img-resize .wc-img-handle-se');
+    if (!imgEl || !se) return 'image or SE handle missing';
+    const ir = imgEl.getBoundingClientRect(), sr = se.getBoundingClientRect();
+    const hx = sr.left + sr.width / 2, hy = sr.top + sr.height / 2;
+    const dx = Math.abs(hx - ir.right), dy = Math.abs(hy - ir.bottom);
+    return (dx <= 6 && dy <= 6) || ('SE handle off the image corner by dx=' + Math.round(dx) + ' dy=' + Math.round(dy));
+  });
+
+  await t('[4b] an edge handle (E) resizes the image (aspect-locked, single-axis drive)', async () => {
+    setDoc('imgr4: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'r4.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    await sleep(120);
+    const before = imgSize();
+    if (!(await dragHandle('e', 50, 0))) return 'E handle not found';
+    const after = imgSize();
+    if (!after || !(after.width > before.width)) return 'E-drag did not widen (' + JSON.stringify(before) + ' -> ' + JSON.stringify(after) + ')';
+    // Aspect still locked (E handle drives width; height follows).
+    return Math.abs(after.width / after.height - before.width / before.height) < 0.06
+      || ('aspect drift on E-drag: ' + JSON.stringify(after));
+  });
+
   await t('[insert] Online Video inserts a real SVG poster thumbnail (image node, not a bare link)', async () => {
     setDoc('vid: ');
     window.WC.Insert.insertVideoThumbnail('https://www.youtube.com/watch?v=abc123');

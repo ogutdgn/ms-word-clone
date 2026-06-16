@@ -487,10 +487,13 @@ body.pm-active #pm-editor .ProseMirror-selectednode {
   box-shadow: 0 0 0 1px rgba(43, 87, 154, 0.25);
 }
 
-/* Phase 4b — live image-resize handle overlay. Mounted in #pages (the zoom-scaled
-   containing block) so it tracks the image through zoom + scroll. The frame box is
-   non-interactive (the image's own outline shows selection); only the 8 handles take
-   pointer events. */
+/* Phase 4b — live image-resize handle overlay. Mounted in #pages so it shares the
+   image's scaled (zoom) + scrolled space and tracks it for free. The overlay is
+   position:absolute, so #pages MUST be a containing block — assert position:relative
+   here rather than depend on comments-pm.css's rule. (The zoom transform also makes
+   #pages a containing block, but only once setZoom has run.) The frame box is
+   non-interactive (the image's own outline shows selection); only the handles hit-test. */
+body.pm-active #pages { position: relative; }
 .wc-img-resize {
   box-sizing: border-box;
 }

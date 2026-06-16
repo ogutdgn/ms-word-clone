@@ -67,10 +67,19 @@ class ImageResizeView {
   onUp: ((e: PointerEvent) => void) | null = null
   destroyed = false
 
+  onWinResize: (() => void) | null = null
+
   constructor(view: any) {
     this.view = view
+    // The overlay is positioned from the image's measured rect; a window/column reflow
+    // moves the image WITHOUT a PM transaction (so update() wouldn't fire). Re-place on
+    // resize (rAF-coalesced) so the handles don't drift off a selected image.
+    this.onWinResize = () => { if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.update() }) }
+    window.addEventListener('resize', this.onWinResize)
     this.update()
   }
+
+  raf = 0
 
   zoom(): number {
     return (window as any).WC?.PM?.zoom || 1
@@ -158,6 +167,9 @@ class ImageResizeView {
     if (!sel) return
     e.preventDefault()
     e.stopPropagation()
+    // Clear any prior drag's window listeners before re-arming, so a re-entrant
+    // pointerdown (missed pointerup, multi-pointer) can never leak a live listener.
+    this.teardownDragListeners()
     let dom: any = null
     try { dom = this.view.nodeDOM(sel.pos) } catch { dom = null }
     if (!dom) return
@@ -247,6 +259,10 @@ class ImageResizeView {
   destroy() {
     this.destroyed = true
     this.teardownDragListeners()
+    if (this.onWinResize) window.removeEventListener('resize', this.onWinResize)
+    this.onWinResize = null
+    if (this.raf) cancelAnimationFrame(this.raf)
+    this.raf = 0
     if (this.overlay && this.overlay.parentNode) this.overlay.parentNode.removeChild(this.overlay)
     this.overlay = null
     this.handleEls = []
