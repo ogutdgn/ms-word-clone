@@ -159,11 +159,14 @@
   are stored (was `height:auto`), and the exporter honors an explicit divergent box (skips the legacy
   intrinsic-aspect scaling) — so a stretched/divergent-box picture round-trips correctly (oracle:
   240×60 box → Word 180pt×45pt, not aspect-forced). Also fixed the bridge's 100×100 placeholder for
-  dimensionless inserts (Insert→Screenshot now sizes to natural dims). **STILL deferred:** the resize
-  OVERLAY still resizes all 8 handles PROPORTIONALLY (Word's default, `a:picLocks/@noChangeAspect`);
-  to let the user free-stretch a single axis with an edge handle, the overlay must read
-  `node.attrs.lockAspectRatio` (default true) and a Lock-Aspect-Ratio UI control (Word gates
-  free-stretch on that checkbox) must set it. Render/export are ready; this is the interaction half.
+  dimensionless inserts (Insert→Screenshot now sizes to natural dims). **OVERLAY FREE-STRETCH DONE
+  2026-06-16 (PR #61):** the resize overlay reads `node.attrs.lockAspectRatio` at drag-start (default
+  true = Word's lock); when UNLOCKED, edge handles free-stretch one axis + corners distort (height
+  clamped to MAX_DIM). Bridge `setImageLockAspect(bool)` toggles it. The importer now defaults a picture
+  WITHOUT `a:picLocks` to LOCKED (Word's UI default — was spec-false, which would have free-stretched
+  normal imported photos). **STILL deferred — the in-app UI:** there is no Picture Format ribbon group,
+  so the user can only unlock via `setImageLockAspect` (programmatic) or an imported `noChangeAspect="0"`;
+  a Lock-Aspect-Ratio toggle (and a Picture Format contextual tab to host it) is the remaining piece.
 - **Inline images are TOP-LEFT (flow) anchored, not opposite-corner anchored.** An inline image
   resizes from its text-flow position, so the SE / E / S handles feel natural (grow down-right) while
   the NW / N / W handles are size-only (the top-left stays pinned, matching the inline box). True
