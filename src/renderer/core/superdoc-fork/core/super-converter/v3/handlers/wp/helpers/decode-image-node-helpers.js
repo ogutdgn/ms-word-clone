@@ -135,6 +135,29 @@ function buildDocPrElement(attrs, imageName, hlinkRId, drawingId) {
 }
 
 /**
+ * Build an `a:srcRect` element from a CSS `inset()` clipPath (the inverse of the importer's
+ * buildClipPathFromSrcRect). A user crop sets `clipPath` (e.g. "inset(10% 0% 5% 0%)") with no
+ * stashed rawSrcRect; without this the crop would be lost on save. CSS inset order is
+ * top/right/bottom/left; a:srcRect edges are thousandths-of-a-percent (10% → 10000). Only
+ * non-zero edges are emitted (absent = 0, matching Word).
+ * @returns {{name:'a:srcRect', attributes:Object}|null} null when there is no usable crop.
+ */
+function buildSrcRectFromClipPath(clipPath) {
+  if (typeof clipPath !== 'string') return null;
+  const m = clipPath.match(/inset\(\s*([\d.]+)%\s+([\d.]+)%\s+([\d.]+)%\s+([\d.]+)%\s*\)/);
+  if (!m) return null;
+  const [t, r, b, l] = [m[1], m[2], m[3], m[4]].map(Number);
+  const toThou = (p) => Math.round(Math.max(0, Math.min(100, p)) * 1000);
+  const attributes = {};
+  if (t > 0) attributes.t = toThou(t);
+  if (r > 0) attributes.r = toThou(r);
+  if (b > 0) attributes.b = toThou(b);
+  if (l > 0) attributes.l = toThou(l);
+  if (!Object.keys(attributes).length) return null;
+  return { name: 'a:srcRect', attributes };
+}
+
+/**
  * Build the `pic:nvPicPr` element with:
  * - `pic:cNvPr/@name` ← attrs.alt (object name, mirrors wp:docPr/@name)
  * - `a:hlinkClick` child when hyperlink is set (mirrors wp:docPr for compatibility)
@@ -335,7 +358,10 @@ export const translateImageNode = (params) => {
     }
   }
 
-  const rawSrcRect = attrs.rawSrcRect;
+  // Prefer the verbatim imported srcRect (byte-fidelity for untouched docs); otherwise derive one
+  // from a user crop's clipPath (the bridge clears rawSrcRect when the user re-crops, so the new
+  // crop always wins). Without this branch a user crop is silently dropped on save.
+  const srcRectEl = attrs.rawSrcRect || buildSrcRectFromClipPath(attrs.clipPath);
 
   const drawingXmlns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
   const pictureXmlns = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
@@ -409,7 +435,7 @@ export const translateImageNode = (params) => {
                         },
                         ...(blipEffects.length ? { elements: blipEffects } : {}),
                       },
-                      ...(rawSrcRect ? [rawSrcRect] : []),
+                      ...(srcRectEl ? [srcRectEl] : []),
                       {
                         name: 'a:stretch',
                         elements: [{ name: 'a:fillRect' }],

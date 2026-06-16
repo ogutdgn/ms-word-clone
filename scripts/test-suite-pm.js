@@ -2170,6 +2170,40 @@
     return /adec:decorative/.test(xml) || 'decorative ext (adec:decorative) not exported';
   });
 
+  await t('[4b] Picture Format Crop: L/T/R/B % → clipPath → exports a:srcRect (thousandths) + round-trips; Remove clears', async () => {
+    if (typeof PM().setImageCrop !== 'function') return 'PM.setImageCrop missing (red)';
+    if (PM().isBlocked('imgCrop') !== false) return 'imgCrop should not be blocked';
+    const clipOf = () => { let c = null; doc().descendants((n) => { if (n.type.name === 'image') c = n.attrs.clipPath; }); return c; };
+    const srcRectTag = (xml) => { const m = xml.match(/<a:srcRect\b[^>]*>/); return m && m[0]; };
+    setDoc('crop: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'crop.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    // Crop 10% off the left + 5% off the top → CSS inset order is top/right/bottom/left.
+    PM().setImageCrop({ l: 10, t: 5, r: 0, b: 0 }); await sleep(60); selectImage();
+    if (clipOf() !== 'inset(5% 0% 0% 10%)') return 'clipPath not set correctly: ' + clipOf();
+    // Export emits a:srcRect with thousandths (10% → 10000); zero edges are omitted.
+    let tag = srcRectTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!tag) return 'no <a:srcRect> in exported XML';
+    if (!/\bl="10000"/.test(tag) || !/\bt="5000"/.test(tag)) return 'srcRect missing l=10000/t=5000: ' + tag;
+    if (/\br="/.test(tag) || /\bb="/.test(tag)) return 'srcRect emitted zero edges r/b: ' + tag;
+    // Too-large guard: a crop that removes the whole picture is rejected (clipPath unchanged).
+    if (PM().setImageCrop({ l: 60, r: 60 }) !== false) return 'over-100% crop should be rejected';
+    selectImage();
+    if (clipOf() !== 'inset(5% 0% 0% 10%)') return 'rejected crop must not change clipPath: ' + clipOf();
+    // Remove Crop clears clipPath → no a:srcRect on export.
+    PM().setImageCrop({ remove: true }); await sleep(60); selectImage();
+    if (clipOf() != null) return 'Remove Crop did not clear clipPath: ' + clipOf();
+    if (srcRectTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }))) return 'a:srcRect still exported after Remove Crop';
+    // Re-crop, then a full open+save round-trip preserves the crop at the XML boundary (export →
+    // openDocx → re-export keeps the identical a:srcRect; the importer reads it back via clipPath).
+    PM().setImageCrop({ l: 10, t: 5 }); await sleep(60);
+    const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
+    const rtTag = srcRectTag(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!rtTag) return 'crop lost on open+save round-trip (no a:srcRect after reopen)';
+    return (/\bl="10000"/.test(rtTag) && /\bt="5000"/.test(rtTag)) || 'round-trip changed srcRect: ' + rtTag;
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

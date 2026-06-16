@@ -3,9 +3,10 @@
    A runtime-injected contextual ribbon tab (mirrors table-tools-pm.js's contextualTab() +
    WC.Ribbon.showContextualTab(def)) shown when a single PICTURE (an image NodeSelection) is
    selected, hidden when the selection leaves it. Hosts:
-     • Size — "Height"/"Width" (numeric inches → setImageSize, honors the aspect lock) + "Lock
-       Aspect Ratio" (toggles node.attrs.lockAspectRatio; when UNLOCKED the resize overlay's edge
-       handles free-stretch one axis — see bridge/insert.ts setImageLockAspect/setImageSize).
+     • Size — "Crop" (L/T/R/B % → clipPath/a:srcRect; setImageCrop), "Height"/"Width" (numeric
+       inches → setImageSize, honors the aspect lock) + "Lock Aspect Ratio" (toggles
+       node.attrs.lockAspectRatio; when UNLOCKED the resize overlay's edge handles free-stretch one
+       axis — see bridge/insert.ts setImageLockAspect/setImageSize/setImageCrop).
      • Arrange — Wrap Text / Bring Forward / Send Backward, re-pointing the existing image cmds.
      • Accessibility — "Alt Text" (description → wp:docPr/@descr + mark-as-decorative; setImageAltText).
    CRITICAL (same as table-tools-pm.js): the ribbon dispatches { cmd, label, type } →
@@ -26,6 +27,7 @@
           id: 'pf-size',
           name: 'Size',
           controls: [
+            { cmd: 'imgCrop', label: 'Crop', type: 'dropdown' },
             { cmd: 'imgHeight', label: 'Height', type: 'dropdown' },
             { cmd: 'imgWidth', label: 'Width', type: 'dropdown' },
             { cmd: 'imgLockAspect', label: 'Lock Aspect Ratio', type: 'button' },
