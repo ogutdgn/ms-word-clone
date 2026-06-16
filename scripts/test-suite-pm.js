@@ -2785,6 +2785,28 @@
     const bytes = await PM().exportDocxBytes(); await PM().openDocx(bytes); await sleep(240);
     return cellVA() === 'middle' || ('round-trip lost the CSS-valued vertical-align (got ' + cellVA() + ' — import must map OOXML center → CSS middle)');
   });
+  await t('[4d] cell w:tcPr child order: borders+shading+vAlign export in CT_TcPr schema sequence (tcW<tcBorders<shd<vAlign — OOXML §17.4.66 guard)', async () => {
+    // The exporter folds cell props into tableCellProperties in code order: setCellBorders migrates
+    // attrs.borders into the object LAST, so pre-fix <w:tcBorders> exported BEFORE <w:tcW>/<w:shd>/
+    // <w:vAlign> — out of the CT_TcPr xsd:sequence. (Live Word tolerates it on read, but strict OOXML
+    // consumers reject it; mirrors the w:tblPr ordering fix PR #77.) The translator must stable-sort.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    const caretInCell0 = () => { let cp = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cp == null) cp = pos; }); if (cp != null) window.WC.editor.commands.setTextSelection(cp + 2); };
+    caretInCell0(); window.WC.editor.commands.setCellBorders({ top: { val: 'single', color: '000000', size: 4 }, bottom: { val: 'single', color: '000000', size: 4 } }); await sleep(120);
+    caretInCell0(); window.WC.editor.commands.setCellBackground('FFFF00'); await sleep(120);
+    caretInCell0(); window.WC.editor.commands.setCellAttr('verticalAlign', 'middle'); await sleep(120);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const blocks = xml.match(/<w:tcPr\b[\s\S]*?<\/w:tcPr>/g) || [];
+    const tcPr = blocks.find((b) => b.includes('<w:tcBorders'));
+    if (!tcPr) return 'no <w:tcPr> with <w:tcBorders> in export (setCellBorders did not emit borders)';
+    const idx = { tcW: tcPr.indexOf('<w:tcW'), tcBorders: tcPr.indexOf('<w:tcBorders'), shd: tcPr.indexOf('<w:shd'), vAlign: tcPr.indexOf('<w:vAlign') };
+    const present = ['tcW', 'tcBorders', 'shd', 'vAlign'].filter((k) => idx[k] >= 0);
+    if (present.length < 3) return 'too few tcPr children present to assert order: ' + JSON.stringify(idx);
+    // Each present child must appear strictly after the previous one in CT_TcPr order.
+    const seq = present.map((k) => idx[k]);
+    const ordered = seq.every((v, i) => i === 0 || v > seq[i - 1]);
+    return ordered || ('w:tcPr children OUT OF CT_TcPr ORDER (want tcW<tcBorders<shd<vAlign): ' + JSON.stringify(idx) + ' :: ' + tcPr.slice(0, 200));
+  });
   // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table
