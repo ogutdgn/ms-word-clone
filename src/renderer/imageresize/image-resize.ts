@@ -335,7 +335,11 @@ function createImageResizePlugin(): Plugin {
 
 export const ImageResize = Extension.create({
   name: 'wcImageResize',
-  priority: 1,
+  // priority 200 (> the base Keymap's 100) so this plugin's handleKeyDown runs FIRST — the arrow
+  // nudge then wins for a floating-image NodeSelection regardless of what the keymap binds, rather
+  // than relying on the keymap's arrow handlers happening to bail on a NodeSelection. handleNudgeKeyDown
+  // returns false for everything except an arrow on a floating image, so normal navigation is untouched.
+  priority: 200,
   addPmPlugins() {
     return [createImageResizePlugin()]
   },
