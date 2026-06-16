@@ -508,6 +508,27 @@
     noColor.click(); await sleep(50);
     return paraAttrs('shade').paragraphProperties?.shading == null;
   });
+  await t('[2] EXPORT: paragraph shading → <w:pPr><w:shd w:val="clear" w:fill=...> (Word: ParagraphFormat.Shading)', async () => {
+    // The tests above cover the model attr + DOM paint; this guards the docx EXPORT — especially
+    // w:val="clear" (Word only PAINTS the fill when val=clear; dropping it silently breaks shading in
+    // Word) + the hex round-tripping verbatim. Word COM-validated separately with FF0000:
+    // Paragraphs(1).Shading.BackgroundPatternColor=255 — oracle-probe-2-parashading.js + validate-parashading-win.ps1.
+    setDoc('para shade export'); selectText('shade');
+    window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body); await sleep(40);
+    const sw = document.querySelector('.flyout .color-swatch[title="#FFFF00"]') || document.querySelector('.flyout .color-swatch');
+    if (!sw) return 'no shading swatch in flyout';
+    const hex = sw.title.replace(/^#/, '').toUpperCase();
+    sw.click(); await sleep(60);
+    const a = paraAttrs('shade').paragraphProperties?.shading;
+    if (!a || a.fill !== hex) return 'shading attr not set: ' + JSON.stringify(a);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const shd = (xml.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/g) || []).map((p) => (p.match(/<w:shd\b[^>]*\/?>/) || [])[0]).filter(Boolean)[0];
+    if (!shd) return 'no <w:shd> in any <w:pPr> in export';
+    if (!/w:val="clear"/.test(shd)) return 'paragraph shading w:val not "clear" (Word will not paint the fill): ' + shd;
+    if (!new RegExp('w:fill="' + hex + '"', 'i').test(shd)) return 'w:shd fill not ' + hex + ' (hex must round-trip verbatim): ' + shd;
+    if (!/w:color="auto"/.test(shd)) return 'w:shd color not "auto" (full CT_Shd contract): ' + shd;
+    return true;
+  });
   await t('[2] borders face applies Word-default bottom border', async () => {
     setDoc('border probe text'); selectText('border');
     run('borders'); await sleep(50);
