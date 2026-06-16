@@ -215,19 +215,75 @@ export function installTable(editor: AnyEditor) {
     return ok !== false
   }
 
-  function tableAutoFit(mode: 'fixed' | 'contents' | 'window'): boolean {
-    // AutoFit Window must fill the table to the page TEXT column. Compute that width
-    // (px) from the live page geometry and pass it to the fork command, which scales
-    // the columns proportionally to fill it. 'fixed'/'contents' ignore the width.
-    let targetWidthPx = 0
-    if (mode === 'window') {
-      const ps = (editor.getPageStyles && editor.getPageStyles()) || {}
-      const wIn = ps?.pageSize?.width ?? 8.5
-      const lIn = ps?.pageMargins?.left ?? 1
-      const rIn = ps?.pageMargins?.right ?? 1
-      targetWidthPx = Math.max(1, Math.round((wIn - lIn - rIn) * 96))
+  // Page text-column width (px) = page width − L/R margins, the cap for both AutoFit modes.
+  function pageTextWidthPx(): number {
+    const ps = (editor.getPageStyles && editor.getPageStyles()) || {}
+    const wIn = ps?.pageSize?.width ?? 8.5
+    const lIn = ps?.pageMargins?.left ?? 1
+    const rIn = ps?.pageMargins?.right ?? 1
+    return Math.max(40, Math.round((wIn - lIn - rIn) * 96))
+  }
+
+  // AutoFit Contents measurement: reflow the SELECTED table's DOM at `table-layout:auto`
+  // (columns size to content, capped at the text width), read each column's natural width,
+  // then restore. This is the in-app content-fit Word computes from text metrics; the change
+  // is synchronous (no await), so the fork's TableView never re-renders mid-measure, and the
+  // styles are restored before the colwidth transaction re-renders from the model.
+  function measureColumnContentWidths(): number[] | undefined {
+    let table: HTMLElement | null = null
+    let firstRow: Element | null = null
+    let cols: HTMLElement[] = []
+    try {
+      const $from = editor.state.selection.$from
+      let tablePos = -1
+      for (let d = $from.depth; d > 0; d--) {
+        if ($from.node(d).type?.name === 'table') { tablePos = $from.before(d); break }
+      }
+      if (tablePos < 0) return undefined
+      const dom: any = editor.view.nodeDOM(tablePos)
+      table = dom && dom.tagName === 'TABLE' ? dom : dom?.querySelector?.('table') ?? null
+      firstRow = table?.querySelector('tr') ?? null
+      cols = Array.from(table?.querySelector('colgroup')?.children ?? []) as HTMLElement[]
+    } catch {
+      return undefined
     }
-    const ok = editor.commands.autoFitTable(mode, targetWidthPx)
+    if (!table || !firstRow) return undefined
+    // Mutate the live table to content-sizing, read, and ALWAYS restore (finally) so a throw
+    // mid-measure can never leave the table visually mis-sized.
+    const savedLayout = table.style.tableLayout
+    const savedW = table.style.width
+    const savedMax = table.style.maxWidth
+    const savedColW = cols.map((c) => c.style.width)
+    try {
+      table.style.tableLayout = 'auto'
+      table.style.width = 'auto'
+      // Cap at the page text column — Word's AutoFit Contents never grows the table past the page.
+      table.style.maxWidth = pageTextWidthPx() + 'px'
+      cols.forEach((c) => { c.style.width = 'auto' })
+      // Under table-layout:auto each COLUMN is sized to its widest cell across ALL rows, so reading
+      // row 0's per-cell widths yields the per-column content-fit width. getBoundingClientRect
+      // forces the synchronous reflow. (Empty columns floor to 16px — Word likewise enforces a min.)
+      return (Array.from(firstRow.children) as HTMLElement[]).map((cell) => Math.max(16, Math.ceil(cell.getBoundingClientRect().width)))
+    } finally {
+      table.style.tableLayout = savedLayout
+      table.style.width = savedW
+      table.style.maxWidth = savedMax
+      cols.forEach((c, i) => { c.style.width = savedColW[i] })
+    }
+  }
+
+  function tableAutoFit(mode: 'fixed' | 'contents' | 'window'): boolean {
+    // AutoFit Window fills the table to the page text column (proportional scale); AutoFit
+    // Contents shrinks each column to its measured content width. Both pass per-column geometry
+    // to the fork command; 'fixed' just locks the layout.
+    let targetWidthPx = 0
+    let contentWidths: number[] | undefined
+    if (mode === 'window') {
+      targetWidthPx = pageTextWidthPx()
+    } else if (mode === 'contents') {
+      contentWidths = measureColumnContentWidths()
+    }
+    const ok = editor.commands.autoFitTable(mode, targetWidthPx, contentWidths)
     refocus()
     return ok !== false
   }
