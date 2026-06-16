@@ -2084,6 +2084,30 @@
     return lockOf() === before || 'Lock Aspect Ratio did not toggle back';
   });
 
+  await t('[4b] Picture Format Arrange cmds are un-blocked (shipped engine) + reach the bridge', async () => {
+    // Regression for the stale-DEFERRED bug: wrapText/bringForward/sendBackward ship engine
+    // support (4c.1 wrap / 4c.3 z-order) but were gated by the coarse layout-arrange DEFERRED
+    // flag, so the ribbon path toasted "not available" instead of acting. ENGINE_READY un-blocks
+    // exactly those three; the still-undefined cmds (align/group/rotate/position) stay blocked.
+    if (PM().isBlocked('wrapText') !== false) return 'wrapText still blocked';
+    if (PM().isBlocked('bringForward') !== false) return 'bringForward still blocked';
+    if (PM().isBlocked('sendBackward') !== false) return 'sendBackward still blocked';
+    if (PM().isBlocked('align') !== true) return 'align should STAY blocked (WC.Layout.align is undefined)';
+    if (PM().isBlocked('rotate') !== true) return 'rotate should STAY blocked';
+    // End-to-end: dispatching the ribbon control reaches the bridge verb (was notifyBlocked before).
+    setDoc('arr: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 90), 'arr.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    const origZ = PM().setImageZOrder; let zHit = null;
+    PM().setImageZOrder = (dir) => { zHit = dir; return origZ.call(PM(), dir); };
+    try {
+      WC.Commands.run({ cmd: 'bringForward', type: 'split', label: 'Bring Forward' }, document.body);
+      await sleep(60);
+    } finally { PM().setImageZOrder = origZ; }
+    return zHit === 'forward' || 'bringForward dispatch did not reach setImageZOrder (got ' + zHit + ')';
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
