@@ -1984,6 +1984,43 @@
       || ('aspect drift on E-drag: ' + JSON.stringify(after));
   });
 
+  await t('[4b] a stretched (aspect-divergent) image renders + exports its explicit height', async () => {
+    // A picture whose stored box diverges from its intrinsic aspect (a stretched/free-resized
+    // image, or one imported from Word) must render + export the explicit width AND height —
+    // NOT height:auto (render) and NOT the intrinsic-aspect-scaled box (export).
+    setDoc('stretch: ');
+    PM().insertImage({ src: mkImg(100, 100), alt: 'sq', width: 100, height: 100 }); // 1:1 natural
+    await sleep(250);
+    let imgPos = null; doc().descendants((n, pos) => { if (n.type.name === 'image' && imgPos == null) imgPos = pos; });
+    if (imgPos == null) return 'no image node';
+    const node = doc().nodeAt(imgPos);
+    v().dispatch(v().state.tr.setNodeMarkup(imgPos, undefined, { ...node.attrs, size: { width: 240, height: 60 } })); // 4:1 box
+    await sleep(300);
+    const style = (document.querySelector('#pm-editor .ProseMirror img') || {}).getAttribute('style') || '';
+    if (/height:\s*auto/.test(style)) return 'render ignores the explicit height (height:auto): ' + style;
+    if (!/height:\s*60px/.test(style)) return 'render lacks the explicit 60px height: ' + style;
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<wp:extent[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+    if (!m) return 'no wp:extent';
+    const cx = +m[1], cy = +m[2];
+    const okW = Math.abs(cx - Math.round(240 * 9525)) <= 9525;
+    const okH = Math.abs(cy - Math.round(60 * 9525)) <= 9525;
+    return (okW && okH) || ('extent ' + Math.round(cx / 9525) + 'x' + Math.round(cy / 9525) + 'px (want 240x60 — aspect-forced?)');
+  });
+
+  await t('[4b] a dimensionless insertImage sizes to natural dims, not a squashing 100x100 placeholder', async () => {
+    // Insert → Screenshot/Icon call insertImage without dims. The bridge must size to the image's
+    // natural (clamped) box, not 100x100 — else a non-square image is squashed (now that the
+    // exporter honors explicit boxes, a placeholder would ship distorted).
+    setDoc('dimless: ');
+    PM().insertImage({ src: mkImg(200, 80), alt: 'wide' }); // NO width/height → bridge computes natural (2.5:1)
+    await sleep(250);
+    let sz = null; doc().descendants((n) => { if (n.type.name === 'image' && !sz) sz = n.attrs.size; });
+    if (!sz) return 'no image size';
+    if (sz.width === 100 && sz.height === 100) return 'sized to the 100x100 placeholder (squashes non-square images)';
+    return Math.abs(sz.width / sz.height - 2.5) < 0.2 || 'natural aspect 2.5:1 not kept, got ' + JSON.stringify(sz);
+  });
+
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
   await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {

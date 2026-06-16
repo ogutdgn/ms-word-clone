@@ -308,6 +308,12 @@ export const Image = Node.create({
             // scale the image to cover the extent and clip overflow (like MS Word)
             // MS Word anchors to top-left corner, clipping from right/bottom
             style += `height: ${height}px; object-fit: cover; object-position: left top;`;
+          } else if (height && width) {
+            // NOTICE (WC): honor an EXPLICIT box — when both width and height are stored the box
+            // is intentional (a free-stretched / Word-imported picture whose aspect diverges from
+            // the intrinsic), so render the literal height. (Was `height: auto`, which forced the
+            // intrinsic aspect and mis-rendered stretched images.)
+            style += `height: ${height}px;`;
           } else if (height) style += 'height: auto;';
           return { style };
         },
