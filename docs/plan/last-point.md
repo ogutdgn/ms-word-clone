@@ -7,7 +7,43 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Table Cell Margins flyout DONE (PR #84, Word COM-validated); scout #3 shipped)
+## 2026-06-16 (RESUME HERE — cell-shading export test DONE (PR #86); SCOUT BACKLOG EXHAUSTED; #2 picture-effects deferred (needs a14))
+
+> **Branch:** `main` (cell-shading test merged PR #86 `7587365`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 451 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Cell shading export test — DONE (PR #86):** took scout-backlog **#4**. Cell shading was wired + worked
+> but had no EXPORT regression. Added a `[6b]` test (caret-cell shade → `<w:shd w:fill="FF0000">`, hex
+> verbatim) + `oracle-probe-6b-cellshading.js` + reusable `scripts/oracle/validate-cellshading-win.ps1`.
+> **🔬 Word COM-validated:** a pure-red FF0000 fill opens clean + reads `Cells(1).Shading.
+> BackgroundPatternColor = 255` (no BGR/RGB swap). Test-only (no production change). `/code-review` clean.
+>
+> **⚠️ Picture effects (scout #2) — INVESTIGATED + DEFERRED (key finding):** built a full grayscale slice
+> (render `filter: grayscale(1)` + `setImageColorAdjust` bridge + Picture Format → Adjust → Color UI) on
+> the fork's existing a:grayscl import/export. **But Word COM revealed it's NOT faithful: live Word
+> represents grayscale recolor via the a14 (Office 2010) drawing extension, NOT `<a:grayscl>`.** Authoring a
+> Word-native grayscale (`PictureFormat.ColorType=1`) writes a14 (no `a:grayscl`); and Word reads OUR
+> `a:grayscl` back as `ColorType=2` (BlackAndWhite), not 1 (Grayscale). a:grayscl IS valid OOXML Word renders
+> as grayscale, but it doesn't match Word's representation and the COM oracle can't confirm it. **REVERTED
+> the whole slice (never committed; was on the main working tree, discarded).** True picture-recolor fidelity
+> needs **a14 imgEffect import/export** — a bigger fork change, NOT a bounded slice. **LESSON re-confirmed:
+> COM-validate before shipping (the env mandate) — it caught a non-faithful representation pre-merge.**
+>
+> **🗂️ SCOUT BACKLOG — EXHAUSTED.** All 5 recorded items resolved: #1 vAlign (PR #80), #3 cell margins
+> (PR #84), #4 cell shading (PR #86), #5 tcPr order (PR #82) DONE; **#2 picture effects DEFERRED (needs a14).**
+>
+> **NEXT (the loop must RE-SCOUT or take a bigger item):** the recorded bounded backlog is empty. Options:
+>   1. **RE-SCOUT** — run a fresh parallel-scout pass (like the one that built this backlog) over wired-but-
+>      untested / latent-bug table/image/layout features to find new bounded slices. Cheapest next loop step.
+>   2. **Bigger Phase-4 items** (need focused work, not 5-min slices): the **FRAMES-OVERLAY keystone**
+>      (deferrals §A.1b/d/e — line-split render, table row-split, faithful floating reposition + z-stacking),
+>      **4e headers/footers**, or **picture effects via a14** (the deferred #2).
+> The 2+-table corruption (`task_0e043993`) + CUA vAlign (`task_c62b4d4c`) stay focused-session spawn_tasks.
+> Branch off `main`.
+
+---
+
+## 2026-06-16 (Table Cell Margins flyout DONE (PR #84, Word COM-validated); scout #3 shipped)
 
 > **Branch:** `main` (cell-margins merged PR #84 `96681ff`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 450 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
