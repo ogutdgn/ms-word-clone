@@ -29,8 +29,19 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — Pagination / LAYOUT ENGINE — 4a page-break family COMPLETE; 4b (image resize) NEXT
-> **4a pagination is now FULLY COMPLETE** for the page-break family, all oracle-validated vs Word for Windows
+## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a (pagination) + 4b (image resize) COMPLETE; 4c (floating) NEXT
+> **4b image resize DONE + MERGED** (PR #40 `6d8c448`): a live 8-handle resize overlay
+> (`src/renderer/imageresize/image-resize.ts`, owned/out-of-fork) writes the image `size` attr →
+> `wp:extent`/`a:ext` (EMU); aspect-locked (Word default); the overlay rides `#pages` so it tracks the
+> image through zoom+scroll. Oracle-validated via the new `read-shapes` verb (200×100→260×130 px =
+> 195pt×97.5pt). Deferred 4b edges → deferrals.md §A.1c. Gates on main: **PM 414 / smoke 9 / roundtrip
+> 27**. **NEXT: sub-phase 4c (floating anchor/position/wrap)** — branch `build/phase-4c-floating` off
+> `main`; the frames overlay (inline⇄floating, drag-reposition, text-wrap, `w:anchor`/`posH`/`posV`);
+> LAYOUT_ENGINE.md §2.3. Then 4d tables → 4e headers/footers → 4f page-bg/columns/section-geometry.
+>
+> <details><summary>Prior 4a CURRENT-PHASE note (kept for context)</summary>
+>
+> **4a pagination is FULLY COMPLETE** for the page-break family, all oracle-validated vs Word for Windows
 > 16.0 and merged to `main`: core (PR #36 `1c00252`), the unified forced-seam redesign that finished
 > mid-paragraph + trailing + blank breaks (**4a2**, PR #37 `7779c53`), and next-page **section breaks**
 > incl. multi-section + before-a-table (**4a3**, PR #38 `0e0f29f`). Engine =
@@ -42,6 +53,8 @@
 > **sub-phase 4b (image resize)** — branch `build/phase-4b-image-resize` off `main`; image NodeView + 8 live
 > handles writing `w:extent` (EMU) + aspect-lock (LAYOUT_ENGINE.md §4). Then 4c floating → 4d tables → 4e
 > headers/footers → 4f page-bg/columns/section-geometry.
+>
+> </details>
 >
 > **PIVOT (2026-06-15, user decision): build the LAYOUT ENGINE next, then fix the gated bugs.** Phase-3
 > ribbon-hardening did enough (Home/Insert/Design/Editor on `fix/ribbon-home`) and then hit the ceiling:
@@ -329,6 +342,22 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-15 (Phase 4b — image resize, `/loop`)
+- [x] **Oracle `read-shapes` verb** (`307338c`, `test(oracle)`): InlineShapes + floating Shapes
+  Width/Height in pt + EMU — Word's image-geometry ground truth for 4b/4c/4d.
+- [x] **Live image resize** (PR #40, merge `6d8c448`, `feat(insert)`): owned 8-handle overlay
+  (`src/renderer/imageresize/image-resize.ts`) mounted in `#pages` (zoom/scroll-tracking via the
+  `position:relative` containing block + unscaled offset); drag → preview → one `setNodeMarkup`
+  writing the image `size` (px) → exporter emits `wp:extent`/`a:ext` (EMU). Aspect-locked. Replaced
+  the decorative handles from `2dca2e4`. +4 `[4a→4b]` tests.
+- [x] **Oracle-validated**: 200×100 dragged to 260×130 px = Word InlineShape 195pt×97.5pt =
+  2476500×1238250 EMU (exact match to the exported `wp:extent`).
+- [x] **`/code-review` + re-review of the fixes**: fixed a re-entrant pointer-listener leak, the
+  stale-overlay-on-window-resize gap, and a fragile containing-block dependency; added handle-
+  alignment + edge-handle tests; documented the deferred 4b edges (deferrals.md §A.1c). Re-review of
+  the fix commit came back clean. Gates: **PM 414 / smoke 9 / roundtrip 27**.
+- [x] **4b COMPLETE + merged.** NEXT: 4c (floating anchor/position/wrap).
 
 ### 2026-06-15 (Phase 4a2 + 4a3 — finish the pagination page-break family, `/loop`)
 - [x] **4a2 unified forced-seam** (PR #37, merge `7779c53`): redesigned manual page breaks to place a seam

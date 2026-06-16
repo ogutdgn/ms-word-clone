@@ -7,7 +7,37 @@
 
 ---
 
-## 2026-06-15 (RESUME HERE — Phase 4a pagination page-break family COMPLETE (4a2 + 4a3 merged); 4b next)
+## 2026-06-15 (RESUME HERE — Phase 4b IMAGE RESIZE COMPLETE + merged; 4c (floating) next)
+
+> **Branch:** `main` (4b merged via PR #40 `6d8c448`; branch deleted). **Phase:** 4 (layout
+> engine); **4a pagination + 4b image resize are both DONE**, all oracle-validated. Sub-phase
+> **4c (floating anchor/position/wrap) is NEXT** — branch off `main`.
+>
+> **4b done (PR #40):** live image resize via an owned 8-handle overlay
+> (`src/renderer/imageresize/image-resize.ts`, wired in `create-editor.ts` after Pagination —
+> same out-of-fork philosophy). Drag a handle → preview → one `setNodeMarkup` writing the image
+> `size` attr (px); the fork exporter turns it into `wp:extent`/`a:ext` (EMU), zero exporter
+> change. The overlay mounts in `#pages` (the zoom-scaled, `position:relative` containing block),
+> positioned at the image's UNSCALED offset → tracks the image through zoom + scroll with no
+> per-frame repositioning. Aspect-locked (Word default). New oracle verb `read-shapes` (InlineShape
+> Width/Height in pt + EMU). Oracle-validated: 200×100 → 260×130 px = Word 195pt×97.5pt =
+> 2476500×1238250 EMU. Hardened through `/code-review` + a re-review of the fixes (listener leak,
+> window-resize staleness, containing-block dependency). Deferred 4b edges in deferrals.md §A.1c
+> (free one-axis stretch / `lockAspectRatio` not read, inline top-left anchoring, rotated-image AABB).
+>
+> **Gates on main: PM 414 / smoke 9 / roundtrip 27.**
+>
+> **NEXT — sub-phase 4c (floating anchor/position/wrap)** (LAYOUT_ENGINE.md §2.3 / §4, deferrals.md
+> §A.1 "Object RELOCATE + text-wrap"): branch `build/phase-4c-floating` off `main`. The frames
+> overlay — inline ⇄ floating, drag-to-reposition, text-wrap (square/tight/through/top&bottom/
+> behind/in-front), `w:anchor` + `posH`/`posV`. Read the fork's image `anchorData`/`wrap` attrs +
+> the wp anchor import/export helpers; propose the design vs the real code first; validate the
+> exported anchor/position vs the oracle (`read-shapes` floatingShapes + read-props). Then 4d tables
+> → 4e headers/footers → 4f page-bg/columns/section-geometry.
+
+---
+
+## 2026-06-15 (Phase 4a pagination page-break family COMPLETE (4a2 + 4a3 merged); 4b next)
 
 > **Branch:** `main` (4a2 merged via PR #37 `7779c53`; 4a3 merged via PR #38 `0e0f29f`; both feature
 > branches deleted). **Phase:** 4 (layout engine); **4a pagination is now FULLY COMPLETE** for the
