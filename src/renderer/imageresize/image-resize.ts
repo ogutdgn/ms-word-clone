@@ -296,18 +296,50 @@ function handleCursor(s: HandleSpec): string {
   return 'ns-resize'
 }
 
+// Phase 4c.2 — arrow-key NUDGE for a selected FLOATING picture (Word nudges a selected object with
+// the arrow keys). Reuses the guarded WC.PM.setImagePosition({...,relative:true}) so the move writes
+// marginOffset → wp:posOffset and round-trips (and an imported picture is refused there, not here).
+// Plain arrow = 8px step; Shift+arrow = 1px fine nudge. Only fires for an image NodeSelection that is
+// floating (isAnchor) — otherwise it returns false and the arrow does its normal caret navigation.
+const NUDGE_STEP = 8
+function handleNudgeKeyDown(view: any, event: KeyboardEvent): boolean {
+  const sel = view.state.selection
+  if (!(sel instanceof NodeSelection) || sel.node?.type?.name !== 'image' || !sel.node.attrs?.isAnchor) return false
+  if (event.metaKey || event.ctrlKey || event.altKey) return false
+  const step = event.shiftKey ? 1 : NUDGE_STEP
+  let dx = 0
+  let dy = 0
+  if (event.key === 'ArrowLeft') dx = -step
+  else if (event.key === 'ArrowRight') dx = step
+  else if (event.key === 'ArrowUp') dy = -step
+  else if (event.key === 'ArrowDown') dy = step
+  else return false
+  ;(window as any).WC?.PM?.setImagePosition?.({ horizontal: dx, top: dy, relative: true })
+  // Consume the arrow regardless (the picture is selected, not text — the caret must not move/escape).
+  return true
+}
+
 function createImageResizePlugin(): Plugin {
   return new Plugin({
     key: imageResizeKey,
     view(view: any) {
       return new ImageResizeView(view)
     },
+    props: {
+      handleKeyDown(view: any, event: KeyboardEvent) {
+        return handleNudgeKeyDown(view, event)
+      },
+    },
   })
 }
 
 export const ImageResize = Extension.create({
   name: 'wcImageResize',
-  priority: 1,
+  // priority 200 (> the base Keymap's 100) so this plugin's handleKeyDown runs FIRST — the arrow
+  // nudge then wins for a floating-image NodeSelection regardless of what the keymap binds, rather
+  // than relying on the keymap's arrow handlers happening to bail on a NodeSelection. handleNudgeKeyDown
+  // returns false for everything except an arrow on a floating image, so normal navigation is untouched.
+  priority: 200,
   addPmPlugins() {
     return [createImageResizePlugin()]
   },
