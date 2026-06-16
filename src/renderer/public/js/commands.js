@@ -171,6 +171,28 @@
     [['AutoFit Contents', 'contents'], ['AutoFit Window', 'window'], ['Fixed Column Width', 'fixed']]
       .forEach(([label, mode]) => fly.appendChild(WC.flyItem(label, { onClick: () => { const p = TPM(); if (p) p.tableAutoFit(mode); } })));
   });
+  // Cell Size — Row Height / Column Width (4d.3). A flyout with an inches number field +
+  // common presets; routes to the PM bridge (tableSetRowHeight → w:trHeight, tableSetCellWidth
+  // → colwidth/w:gridCol). Both act on the selected row(s)/column(s) (caret is in the table).
+  // px = inches × 96 (the model + exporters convert to twips).
+  function tblSizeFly(node, title, presets, apply) {
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyHeader(title));
+      const row = el('div', { style: { padding: '4px 8px', display: 'flex', gap: '6px', alignItems: 'center' } });
+      const input = el('input', { type: 'number', step: '0.1', min: '0', value: String(presets[1][1]), style: { width: '64px' } });
+      const btn = el('button', { class: 'fly-set-btn', text: 'Set (in)' });
+      btn.addEventListener('click', () => { const v = parseFloat(input.value); if (v > 0) { apply(v); WC.closeFlyouts(); } });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { const v = parseFloat(input.value); if (v > 0) { apply(v); WC.closeFlyouts(); } } });
+      row.appendChild(input); row.appendChild(btn);
+      fly.appendChild(row);
+      fly.appendChild(WC.flySep());
+      presets.forEach(([label, inches]) => fly.appendChild(WC.flyItem(label, { onClick: () => apply(inches) })));
+    });
+  }
+  H.tblRowHeight = (c, node) => tblSizeFly(node, 'Row Height', [['0.2"', 0.2], ['0.3"', 0.3], ['0.5"', 0.5], ['1.0"', 1.0]],
+    (inches) => { const p = TPM(); if (p && p.tableSetRowHeight) p.tableSetRowHeight(Math.round(inches * 96), 'atLeast'); });
+  H.tblColWidth = (c, node) => tblSizeFly(node, 'Column Width', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['2.5"', 2.5]],
+    (inches) => { const p = TPM(); if (p && p.tableSetCellWidth) p.tableSetCellWidth(Math.round(inches * 96)); });
   // Decode the natural pixel size of an image data-URL (resolves null on failure).
   function imageNaturalSize(src) {
     return new Promise((resolve) => {
@@ -1368,8 +1390,8 @@
       // Insert tab dropdowns / split arrows
       if (cmd === 'coverPage') return WC.Insert.coverPageMenu(node);
       if (cmd === 'table') return WC.Insert.tableMenu(node);
-      // Table Tools contextual-tab dropdowns (style gallery / shading / borders / autofit)
-      if (cmd === 'tblStyles' || cmd === 'tblShading' || cmd === 'tblBorders' || cmd === 'tblAutoFit') return H[cmd](control, node);
+      // Table Tools contextual-tab dropdowns (style gallery / shading / borders / autofit / cell size)
+      if (cmd === 'tblStyles' || cmd === 'tblShading' || cmd === 'tblBorders' || cmd === 'tblAutoFit' || cmd === 'tblRowHeight' || cmd === 'tblColWidth') return H[cmd](control, node);
       if (cmd === 'pictures') return picturesMenu(node);
       if (cmd === 'shapes') return WC.Insert.shapesMenu(node);
       if (cmd === 'screenshot') return screenshotMenu(node);

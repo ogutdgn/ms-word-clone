@@ -37,6 +37,8 @@
           { cmd: 'tblSplitTable', label: 'Split Table', type: 'button' },
         ] },
         { id: 'tl-cellsize', name: 'Cell Size', controls: [
+          { cmd: 'tblRowHeight', label: 'Row Height', type: 'dropdown' },
+          { cmd: 'tblColWidth', label: 'Column Width', type: 'dropdown' },
           { cmd: 'tblDistRows', label: 'Distribute Rows', type: 'button' },
           { cmd: 'tblDistCols', label: 'Distribute Columns', type: 'button' },
           { cmd: 'tblAutoFit', label: 'AutoFit', type: 'dropdown' },
