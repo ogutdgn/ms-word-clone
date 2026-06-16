@@ -7,7 +7,54 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Phase 4d.3 Row/Column size ribbon controls DONE; table RELOCATE / frames-overlay / 4e next)
+## 2026-06-16 (RESUME HERE — Phase 4d.4 AutoFit Window/Fixed geometry DONE; table RELOCATE / row-split / frames-overlay / 4e next)
+
+> **Branch:** `main` (4d.4 merged via PR #52 `627cfdf`; branch deleted). **Phase:** 4 (layout
+> engine). DONE so far: 4a pagination, 4b image resize, 4c.1 wrap, 4c.3 z-order, 4d.1 column resize,
+> 4d.2 row-height export, 4d.3 row/col size ribbon UI, **4d.4 AutoFit Window+Fixed geometry**. All
+> oracle-validated. Gates: **PM 429 / smoke 9 / roundtrip 27.**
+>
+> **4d.4 done (PR #52):** AutoFit previously stored only the layout/width INTENT
+> (`tableLayout`/`tblW`) — the column geometry AutoFit visibly produces was never applied, so
+> **Window didn't actually fill the page** and **window→contents stayed stuck-stretched**. Now:
+> `autoFitTable('window', targetWidthPx)` (fork `extensions/table/table.js`) **scales every column
+> proportionally to fill** the page text-column width — writes each cell's `colwidth` (px) via the
+> TableMap; the `tableColwidthGridSync` plugin rebuilds the twips `grid`, so the **in-app render AND
+> the export** (`w:gridCol`/`w:tcW`) both fill (no Phase-7 paint needed). `'contents'` now also
+> clears any prior Window stretch (was a no-op on `tableWidth`). The bridge (`tableAutoFit`,
+> `bridge/table.ts`) computes the text width from `getPageStyles()` (`pageSize − L/R margins`)×96 and
+> passes it down. **Oracle `read-table` (real Word 16):** Window 1:2 cols → **155.85pt + 311.65pt**
+> (sum 467.5pt = 6.5" text column, ratio 2.0); Fixed 120/180px → **90pt + 135pt** preserved; both open
+> WITHOUT repair. 4 `[4d]` regression tests (incl. a precondition guard against a vacuous even-split
+> pass + the full ribbon flyout path). `/code-review` (high): **zero correctness findings**; 5
+> cleanup/altitude findings (all "unify Window + `distributeColumnsEvenly` + `setCellWidth` into one
+> `setColumnsToTotal(total, even|proportional)` primitive") **deferred** — they'd refactor existing
+> tested commands (regression risk on a surgical slice); recorded in deferrals §A.1e.
+>
+> **AutoFit Contents** in-app column-to-content reflow stays a **layout-pass deferral** (needs
+> Word-equivalent text metrics); its EXPORT intent (`tableLayout=autofit`, stretch cleared) is correct
+> so Word content-fits the exported file on open.
+>
+> **NEXT — pick one** (deferrals.md §A.1d frames-overlay, §A.1e tables remaining):
+>   1. **Table RELOCATE / row-split / AutoFit Contents** — the remaining 4d items. RELOCATE needs a
+>      move handle (+ anchor for floating); row-split needs the pagination engine to split a table at
+>      a row boundary (fork's `splitTableAtRow` + repeat header rows); AutoFit Contents needs the
+>      content-measurement layout pass.
+>   2. **The FRAMES-OVERLAY** (bigger 4c piece) — absolutely-positioned floating frames +
+>      text-exclusion; unblocks faithful image reposition (4c.2) + render z-stacking + floating shapes.
+>   3. **4e (headers/footers + fields)** — currently fully blocked (toast). High value.
+> Branch off `main`. **NOTE the session is now VERY long** — a fresh session is strongly recommended.
+>
+> GOTCHAS for tables (carry forward): a bare `colwidth` write on a FRESH table does NOT survive to the
+> export — set the table `grid` (twips) + `userEdited:true` + every cell `colwidth` together (what a
+> real resize leaves; mirror the `[4d]` resize test). Caret won't stay in an HTML-`insertContent`ed
+> table (use `insertTable`); synthetic full-drag doesn't drive PM pointer plugins headlessly;
+> `read-table` reports col widths + row heights (auto rows = 9999999 pt); a default 2-col Letter table
+> is 312px/col = 4680 twips (already fills the 6.5" text column).
+
+---
+
+## 2026-06-16 (Phase 4d.3 Row/Column size ribbon controls DONE; table RELOCATE / frames-overlay / 4e next)
 
 > **Branch:** `main` (4d.3 merged via PR #50 `3c1b527`; branch deleted). **Phase:** 4 (layout
 > engine). DONE so far: 4a pagination, 4b image resize, 4c.1 wrap, 4c.3 z-order, 4d.1 column resize,
