@@ -284,7 +284,7 @@ describe('w:tr translator', () => {
         attrs: {
           rowHeight: 30, // New height in pixels
           tableRowProperties: {
-            rowHeight: { value: '400' }, // Original height in twips (400/20 = 20px)
+            rowHeight: { value: '400' }, // Original height in twips (400/15 ≈ 27px @96dpi)
           },
         },
         content: [],
@@ -293,13 +293,15 @@ describe('w:tr translator', () => {
 
       translator.decode(params, {});
 
+      // Reconciliation re-syncs the nested twips value from the px top-level rowHeight, as a
+      // NUMBER (the trHeight decode guards typeof === 'number'): 30px * 15 = 450 twips.
       expect(trPrTranslator.decode).toHaveBeenCalledWith({
         ...params,
         node: {
           ...mockNode,
           attrs: {
             ...mockNode.attrs,
-            tableRowProperties: { rowHeight: { value: '600' }, cantSplit: undefined },
+            tableRowProperties: { rowHeight: { value: 450 }, cantSplit: undefined },
           },
         },
       });
