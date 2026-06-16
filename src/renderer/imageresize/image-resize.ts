@@ -28,6 +28,7 @@ import { Extension } from '@core/Extension.js'
 export const imageResizeKey = new PluginKey('wcImageResize')
 
 const MIN_W = 16 // px — never let an image collapse to nothing (export guards >0 too)
+const MAX_DIM = 4000 // px — upper bound on a free-stretch axis (a runaway drag can't blow out layout)
 
 // 8 handles. `gx`/`gy` = fractional placement on the box (0=left/top … 1=right/bottom).
 // `dx`/`dy` = which way the handle grows the box (+1 right/down, -1 left/up, 0 fixed axis).
@@ -214,7 +215,7 @@ class ImageResizeView {
       width = d.spec.dx !== 0 ? d.startW + d.spec.dx * dxc : d.startW
       height = d.spec.dy !== 0 ? d.startH + d.spec.dy * dyc : d.startH
       width = Math.max(MIN_W, Math.min(maxW, width))
-      height = Math.max(MIN_W, height)
+      height = Math.max(MIN_W, Math.min(MAX_DIM, height))
     } else {
       // Aspect-locked (Word default): width is the master dimension. Corner + E/W handles drive
       // from the horizontal delta; pure N/S handles drive from the vertical delta scaled by aspect.

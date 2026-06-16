@@ -386,11 +386,14 @@ export function handleImageNode(node, params, isAnchor) {
   const nvPicPr = picture.elements.find((el) => el.name === 'pic:nvPicPr');
   const cNvPicPr = nvPicPr?.elements?.find((el) => el.name === 'pic:cNvPicPr');
   const picLocks = findChildByLocalName(cNvPicPr?.elements, 'picLocks');
-  // Per OOXML §20.1.2.2.31, noChangeAspect defaults to false when not specified.
-  // When a:picLocks is absent entirely, there is no lock → false.
+  // NOTICE (WC): Word's UI treats a picture's aspect as LOCKED by default — although the OOXML
+  // attr noChangeAspect defaults to false (§20.1.2.2.31), a picture WITHOUT a:picLocks must be
+  // treated as locked to match Word (and so the resize overlay does not free-stretch a normal
+  // imported photo). Only an EXPLICIT noChangeAspect="0" (or an a:picLocks lacking the attr) is
+  // unlocked. Real Word writes a:picLocks/@noChangeAspect="1", so real-Word images are unaffected.
   const lockAspectRatio = picLocks
     ? picLocks.attributes?.['noChangeAspect'] === '1' || picLocks.attributes?.['noChangeAspect'] === 1
-    : false;
+    : true;
 
   // Parse image hyperlink from pic:cNvPr > a:hlinkClick, falling back to
   // wp:docPr > a:hlinkClick (Word's canonical placement per §20.4.2.5).
