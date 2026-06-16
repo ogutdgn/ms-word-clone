@@ -2807,6 +2807,45 @@
     const ordered = seq.every((v, i) => i === 0 || v > seq[i - 1]);
     return ordered || ('w:tcPr children OUT OF CT_TcPr ORDER (want tcW<tcBorders<shd<vAlign): ' + JSON.stringify(idx) + ' :: ' + tcPr.slice(0, 200));
   });
+  await t('[4d] cell margins: tblCellMargins ribbon flyout (4 distinct sides) → <w:tcMar> twips + re-open PREFILLS current', async () => {
+    // Drives the REAL ribbon path: H.tblCellMargins opens an inches flyout (spinners in order
+    // top/bottom/left/right + Apply). Set four DISTINCT sides → caret cell gains cellMargins (px) →
+    // export emits <w:tcMar> per-side in twips (px×15). Then RE-OPEN and assert the flyout prefills
+    // the cell's current values (not stock defaults) — guards against the clobber-on-re-edit bug.
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    const caretInCell0 = () => { let cp = null; doc().descendants((n, pos) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cp == null) cp = pos; }); if (cp != null) window.WC.editor.commands.setTextSelection(cp + 2); };
+    const openFly = () => { if (WC.closeFlyouts) WC.closeFlyouts(); WC.Commands.run({ cmd: 'tblCellMargins', label: 'Cell Margins', type: 'button' }, document.body); };
+    caretInCell0(); openFly(); await sleep(80);
+    let fly = document.querySelector('.flyout');
+    if (!fly) return 'tblCellMargins opened no flyout (regressed to a stub?)';
+    let inputs = Array.from(fly.querySelectorAll('input[type="number"]'));
+    if (inputs.length < 4) return 'cell-margins flyout missing the 4 side spinners (got ' + inputs.length + ')';
+    // Inputs are appended top, bottom, left, right. Distinct values, exact at the 0.01" UI step and
+    // px-exact (in×96 ∈ ℤ): 0.25/0.5/0.75/1.0" → 24/48/72/96px → 360/720/1080/1440 twips.
+    const want = ['0.25', '0.5', '0.75', '1.0'];
+    inputs.forEach((inp, i) => { inp.value = want[i]; });
+    const applyBtn = Array.from(fly.querySelectorAll('button')).find((b) => /Apply|Set/i.test(b.textContent));
+    if (!applyBtn) return 'cell-margins flyout missing Apply button';
+    applyBtn.click(); await sleep(140);
+    let cm = null; doc().descendants((n) => { if ((n.type.name === 'tableCell' || n.type.name === 'tableHeader') && cm == null) cm = n.attrs.cellMargins; });
+    if (!cm) return 'cellMargins attr not set on caret cell after Apply';
+    if (!(cm.top === 24 && cm.bottom === 48 && cm.left === 72 && cm.right === 96)) return 'cellMargins px wrong (want 24/48/72/96): ' + JSON.stringify(cm);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const m = xml.match(/<w:tcMar\b[\s\S]*?<\/w:tcMar>/);
+    if (!m) return 'no <w:tcMar> in export after setting cell margins';
+    const mar = m[0];
+    const tw = (re) => { const mm = mar.match(re); return mm && mm[1]; };
+    const exp = { top: tw(/<w:top\b[^>]*w:w="(\d+)"/), bottom: tw(/<w:bottom\b[^>]*w:w="(\d+)"/), left: tw(/<w:(?:left|start)\b[^>]*w:w="(\d+)"/), right: tw(/<w:(?:right|end)\b[^>]*w:w="(\d+)"/) };
+    if (!(exp.top === '360' && exp.bottom === '720' && exp.left === '1080' && exp.right === '1440')) return 'w:tcMar twips wrong (want 360/720/1080/1440): ' + JSON.stringify(exp) + ' :: ' + mar.slice(0, 240);
+    // Re-open: the flyout must PREFILL the cell's current margins (in inches), not the stock defaults.
+    caretInCell0(); openFly(); await sleep(80);
+    fly = document.querySelector('.flyout');
+    inputs = Array.from(fly.querySelectorAll('input[type="number"]'));
+    const got = inputs.map((inp) => parseFloat(inp.value));
+    if (WC.closeFlyouts) WC.closeFlyouts();
+    if (!(got[0] === 0.25 && got[1] === 0.5 && got[2] === 0.75 && got[3] === 1.0)) return 're-open did NOT prefill current margins (got ' + JSON.stringify(got) + ', want [0.25,0.5,0.75,1.0])';
+    return true;
+  });
   // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table

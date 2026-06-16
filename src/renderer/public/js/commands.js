@@ -131,7 +131,49 @@
   H.tblAlignLeft = () => { const p = TPM(); if (p) p.tableSetAlignment('left'); };
   H.tblAlignCenter = () => { const p = TPM(); if (p) p.tableSetAlignment('center'); };
   H.tblAlignRight = () => { const p = TPM(); if (p) p.tableSetAlignment('right'); };
-  H.tblCellMargins = () => { WC.toast('Table cell margins dialog — not implemented in this slice.'); };
+  // Cell Margins (Table Layout → Alignment group). Word's button opens the Cell Options dialog; we
+  // open an inches flyout (4 sides) anchored to the control, mirroring the Row Height / Column Width
+  // size flyouts. px = inches × 96 (the fork clamps ≥0 and the exporter converts px → twips for
+  // <w:tcMar>). Sets the caret cell's margins via the bridge. Defaults to Word's stock cell margins
+  // (top/bottom 0", left/right 0.08").
+  H.tblCellMargins = (c, node) => {
+    const p = TPM();
+    if (!p || !p.tableSetCellMargins || !p.tableInfo || !p.tableInfo().inTable) { WC.toast('Click inside a table cell to set its margins.'); return; }
+    // Prefill the cell's CURRENT margins (Word's Cell Options pre-reads them) so editing one side
+    // doesn't clobber the others. Bridge returns px; show inches. No explicit margins → Word's stock
+    // defaults (top/bottom 0", left/right 0.08").
+    const cur = (p.tableGetCellMargins && p.tableGetCellMargins()) || null;
+    const inch = (px, dflt) => (cur && Number.isFinite(px) ? Math.round((px / 96) * 100) / 100 : dflt);
+    WC.flyout(node, (fly) => {
+      fly.appendChild(WC.flyHeader('Cell Margins (in)'));
+      const mk = (v) => el('input', { type: 'number', step: '0.01', min: '0', value: String(v), style: { width: '56px' } });
+      const inputs = {
+        top: mk(inch(cur && cur.top, 0)),
+        bottom: mk(inch(cur && cur.bottom, 0)),
+        left: mk(inch(cur && cur.left, 0.08)),
+        right: mk(inch(cur && cur.right, 0.08)),
+      };
+      const sideRow = (label, key) => {
+        const r = el('div', { style: { padding: '2px 8px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' } });
+        r.appendChild(el('span', { text: label, style: { fontSize: '12px' } }));
+        r.appendChild(inputs[key]);
+        return r;
+      };
+      [['Top', 'top'], ['Bottom', 'bottom'], ['Left', 'left'], ['Right', 'right']].forEach(([l, k]) => fly.appendChild(sideRow(l, k)));
+      fly.appendChild(WC.flySep());
+      const toPx = (inp) => { const v = parseFloat(inp.value); return v > 0 ? Math.round(v * 96) : 0; };
+      const apply = () => {
+        p.tableSetCellMargins({ top: toPx(inputs.top), bottom: toPx(inputs.bottom), left: toPx(inputs.left), right: toPx(inputs.right) });
+        WC.closeFlyouts();
+      };
+      Object.values(inputs).forEach((inp) => inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); }));
+      const arow = el('div', { style: { padding: '4px 8px' } });
+      const btn = el('button', { class: 'fly-set-btn', text: 'Apply' });
+      btn.addEventListener('click', apply);
+      arow.appendChild(btn);
+      fly.appendChild(arow);
+    });
+  };
   // Dropdown flyouts (style gallery / shading swatches / borders / autofit) — opened
   // from the dropdown dispatch head below; the picked value routes to WC.PM.
   // T4: the gallery is built DYNAMICALLY from the runtime styles catalog

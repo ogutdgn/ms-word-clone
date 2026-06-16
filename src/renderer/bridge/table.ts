@@ -173,6 +173,33 @@ export function installTable(editor: AnyEditor) {
     return ok !== false
   }
 
+  // Returns the caret cell's explicit per-side margins in px ({top,right,bottom,left}) so the Cell
+  // Margins flyout can PREFILL the current values (Word's Cell Options dialog pre-reads them) instead
+  // of seeding stock defaults — otherwise tweaking one side and re-applying would clobber the others.
+  // Returns null when not in a cell or the cell has no explicit margins (inherits the table default).
+  function tableGetCellMargins(): { top: number; right: number; bottom: number; left: number } | null {
+    if (!isInTable()) return null
+    try {
+      const { $from } = editor.state.selection
+      for (let d = $from.depth; d > 0; d--) {
+        const n = $from.node(d)
+        if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') {
+          const cm = n.attrs?.cellMargins
+          if (cm && typeof cm === 'object') {
+            return {
+              top: Number(cm.top) || 0,
+              right: Number(cm.right) || 0,
+              bottom: Number(cm.bottom) || 0,
+              left: Number(cm.left) || 0,
+            }
+          }
+          return null
+        }
+      }
+    } catch { /* fall through */ }
+    return null
+  }
+
   function tableSetCellBorders(b: Record<string, unknown>): boolean {
     const ok = editor.commands.setCellBorders(b)
     refocus()
@@ -407,6 +434,7 @@ export function installTable(editor: AnyEditor) {
     tableSetCellWidth,
     tableSetRowHeight,
     tableSetCellMargins,
+    tableGetCellMargins,
     tableSetCellBorders,
     tableDistributeColumns,
     tableDistributeRows,
