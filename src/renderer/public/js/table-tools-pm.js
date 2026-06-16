@@ -72,6 +72,7 @@
           { cmd: 'tblAlignLeft', label: 'Align Left', type: 'button' },
           { cmd: 'tblAlignCenter', label: 'Align Center', type: 'button' },
           { cmd: 'tblAlignRight', label: 'Align Right', type: 'button' },
+          { cmd: 'tblIndent', label: 'Indent', type: 'dropdown' },
         ] },
       ],
     };

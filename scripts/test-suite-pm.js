@@ -2739,6 +2739,32 @@
     PM().tableDeleteTable(); await sleep(100);
     return !hasNode('table');
   });
+  const firstTblPr = (xml) => { const m = xml.match(/<w:tblPr\b[\s\S]*?<\/w:tblPr>/); return m && m[0]; };
+  const tblJust = () => { let j; doc().descendants((n) => { if (n.type.name === 'table' && j == null) j = n.attrs.justification ?? n.attrs.tableProperties?.justification; }); return j; };
+  await t('[4d] table page-alignment: tblAlignCenter/Right/Left → justification attr + w:tblPr/w:jc export', async () => {
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    // Center via the ribbon dispatch (the real path: WC.Commands.run → H.tblAlignCenter → tableSetAlignment).
+    WC.Commands.run({ cmd: 'tblAlignCenter', type: 'button' }, document.body); await sleep(80);
+    if (tblJust() !== 'center') return 'tblAlignCenter did not set justification=center: ' + tblJust();
+    let tp = firstTblPr(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!tp || !/<w:jc\b[^>]*w:val="center"/.test(tp)) return 'no <w:jc w:val="center"> in tblPr: ' + (tp && tp.slice(0, 160));
+    WC.Commands.run({ cmd: 'tblAlignRight', type: 'button' }, document.body); await sleep(80);
+    if (tblJust() !== 'right') return 'tblAlignRight did not set right: ' + tblJust();
+    WC.Commands.run({ cmd: 'tblAlignLeft', type: 'button' }, document.body); await sleep(80);
+    if (tblJust() !== 'left') return 'tblAlignLeft did not set left: ' + tblJust();
+    return true;
+  });
+  await t('[4d] table Indent: tblIndent(0.5") → tableIndent attr + w:tblPr/w:tblInd export (twips)', async () => {
+    if (typeof PM().tableSetIndent !== 'function') return 'PM.tableSetIndent missing (red)';
+    if (PM().isBlocked('tblIndent') !== false) return 'tblIndent should not be blocked';
+    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(180);
+    PM().tableSetIndent(48); await sleep(80); // 0.5" = 48px → 720 twips
+    const tIndent = () => { let v2; doc().descendants((n) => { if (n.type.name === 'table' && v2 == null) v2 = n.attrs.tableProperties?.tableIndent?.value ?? (n.attrs.tableIndent?.width != null ? n.attrs.tableIndent.width * 15 : null); }); return v2; };
+    if (tIndent() !== 720) return 'tableIndent twips not 720 (0.5"): ' + tIndent();
+    const tp = firstTblPr(await window.WC.editor.exportDocx({ exportXmlOnly: true }));
+    if (!tp || !/<w:tblInd\b[^>]*w:w="720"/.test(tp)) return 'no <w:tblInd w:w="720"> in tblPr: ' + (tp && tp.slice(0, 200));
+    return true;
+  });
   // NOTE (Critique B3): mergeCells needs a CellSelection, whose test helper
   // (tableSelectFirstRowPair) lands in Stage F. The merge test therefore lives in the [6b] block
   // (Task 10.3), NOT here — it would no-op + fail pre-6b. The 6a [6] block covers only the table

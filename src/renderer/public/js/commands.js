@@ -194,6 +194,10 @@
     (inches) => { const p = TPM(); if (p && p.tableSetRowHeight) p.tableSetRowHeight(Math.round(inches * 96), 'atLeast'); });
   H.tblColWidth = (c, node) => sizeFly(node, 'Column Width', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['2.5"', 2.5]],
     (inches) => { const p = TPM(); if (p && p.tableSetCellWidth) p.tableSetCellWidth(Math.round(inches * 96)); });
+  // Table Indent (Word's Table Properties → Indent from left) → tableSetIndent (w:tblInd). Acts on the
+  // whole table; the render offsets it via margin-left (TableView), the exporter writes w:tblPr/w:tblInd.
+  H.tblIndent = (c, node) => sizeFly(node, 'Indent from Left', [['0"', 0], ['0.25"', 0.25], ['0.5"', 0.5], ['1.0"', 1.0]],
+    (inches) => { const p = TPM(); if (p && p.tableSetIndent) p.tableSetIndent(Math.round(inches * 96)); });
   // Picture Size — Height / Width (Word's Picture Format → Size group) → WC.PM.setImageSize, which
   // honors the aspect lock (a locked picture's edited dim drives the other) and writes wp:extent.
   H.imgHeight = (c, node) => sizeFly(node, 'Picture Height', [['1.0"', 1.0], ['1.5"', 1.5], ['2.0"', 2.0], ['3.0"', 3.0]],
@@ -1507,7 +1511,7 @@
       if (cmd === 'coverPage') return WC.Insert.coverPageMenu(node);
       if (cmd === 'table') return WC.Insert.tableMenu(node);
       // Table Tools contextual-tab dropdowns (style gallery / shading / borders / autofit / cell size)
-      if (cmd === 'tblStyles' || cmd === 'tblShading' || cmd === 'tblBorders' || cmd === 'tblAutoFit' || cmd === 'tblRowHeight' || cmd === 'tblColWidth') return H[cmd](control, node);
+      if (cmd === 'tblStyles' || cmd === 'tblShading' || cmd === 'tblBorders' || cmd === 'tblAutoFit' || cmd === 'tblRowHeight' || cmd === 'tblColWidth' || cmd === 'tblIndent') return H[cmd](control, node);
       if (cmd === 'pictures') return picturesMenu(node);
       if (cmd === 'shapes') return WC.Insert.shapesMenu(node);
       if (cmd === 'screenshot') return screenshotMenu(node);

@@ -43,10 +43,20 @@ const propertyTranslators = [
   tblCellMarTranslator,
 ];
 
+// CT_TblPrBase (ECMA-376 §17.4.60) REQUIRES this exact child sequence. The exporter otherwise emits
+// children in tableProperties key-insertion order, so programmatically-added properties (e.g.
+// setTableAlignment → justification, setTableIndent → tableIndent) land after w:tblLook and corrupt the
+// .docx (Word rejects it). Passing this order makes createNestedPropertiesTranslator sort to spec.
+const TBLPR_XML_ORDER = [
+  'w:tblStyle', 'w:tblpPr', 'w:tblOverlap', 'w:bidiVisual', 'w:tblStyleRowBandSize',
+  'w:tblStyleColBandSize', 'w:tblW', 'w:jc', 'w:tblCellSpacing', 'w:tblInd', 'w:tblBorders',
+  'w:shd', 'w:tblLayout', 'w:tblCellMar', 'w:tblLook', 'w:tblCaption', 'w:tblDescription',
+];
+
 /**
  * The NodeTranslator instance for the w:tblPr element.
  * @type {import('@translator').NodeTranslator}
  */
 export const translator = NodeTranslator.from(
-  createNestedPropertiesTranslator('w:tblPr', 'tableProperties', propertyTranslators),
+  createNestedPropertiesTranslator('w:tblPr', 'tableProperties', propertyTranslators, {}, [], TBLPR_XML_ORDER),
 );
