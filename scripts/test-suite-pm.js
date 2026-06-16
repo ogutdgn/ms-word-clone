@@ -237,6 +237,28 @@
     selectText('charfmt'); run('clearAllFormatting'); await sleep(50);
     return markNames('charfmt').length === 0;
   });
+  await t('[1] EXPORT: underline STYLES via the menu → <w:u w:val> (CSS→OOXML map; Word: Font.Underline 1/3/4/7/11)', async () => {
+    // Drives the REAL underline menu (label → UL_TYPE map → setMark) so this guards the CSS→OOXML enum
+    // map — esp. Dashed→"dash" / Wavy→"wave" (the renamed ones, the fidelity risk). Underlines each WHOLE
+    // paragraph (uniform run, same doc shape as the probe). The export must emit <w:u w:val> in order
+    // [single,double,dotted,dash,wave]. Word COM-validated (whole-para): Paragraphs(i).Range.Font.Underline
+    // = [1,3,4,7,11] (Single/Double/Dotted/Dash/Wavy) — oracle-probe-1-underline.js + validate-underline-win.ps1.
+    const labels = [['Single', 'single'], ['Double', 'double'], ['Dotted', 'dotted'], ['Dashed', 'dash'], ['Wavy', 'wave']];
+    setDocs(labels.map((l, i) => 'uline' + i)); await sleep(60);
+    for (let i = 0; i < labels.length; i++) {
+      selectText('uline' + i); await sleep(20); // 'uline'+i is the WHOLE paragraph text → uniform underline
+      if (WC.closeFlyouts) WC.closeFlyouts();
+      WC.Commands.dropdown({ cmd: 'underline', type: 'split' }, document.body); await sleep(40);
+      const item = Array.from(document.querySelectorAll('.flyout .fly-item')).find((it) => { const l = it.querySelector('.fi-label'); return l && l.textContent.trim() === labels[i][0]; });
+      if (!item) return 'underline menu missing item "' + labels[i][0] + '"';
+      item.click(); await sleep(50);
+    }
+    if (WC.closeFlyouts) WC.closeFlyouts();
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const vals = (xml.match(/<w:u\b[^>]*w:val="([^"]*)"/g) || []).map((m) => m.match(/w:val="([^"]*)"/)[1]);
+    const want = labels.map((l) => l[1]);
+    return (vals.join(',') === want.join(',')) || ('w:u vals mismatch (got [' + vals.join(',') + '] want [' + want.join(',') + '])');
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
