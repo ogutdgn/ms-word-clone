@@ -450,6 +450,15 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (underline-style export test, `/loop` 5-min cadence)
+- [x] **Underline-style export test (PR #104 `dfa82fc`)** — scout-v3 #4a (char-format matrix). New `[1]` test
+  driving the real underline menu (CSS→OOXML map) across 5 whole paragraphs → `<w:u w:val>`
+  [single,double,dotted,dash,wave] + probe + reusable `validate-underline-win.ps1`. **Word COM-validated:**
+  Font.Underline = [1,3,4,7,11] (Single/Double/Dotted/Dash/Wavy) — mapping correct. `/code-review` caught
+  2 test-quality issues (probe-vs-test shape mismatch; map-bypass) → both fixed. Gates: **PM 460 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** char-format matrix #4b font size (half-points / Font.Size) or #4c font color (BGR-swap /
+  Font.Color); then rFonts / sub-sup. #3 highlight over-exposure = real bug, UX-fix judgment (steer).
+
 ### 2026-06-16 (bookmark export test, `/loop` 5-min cadence)
 - [x] **Bookmark export test (PR #102 `c3166eb`)** — scout-v3 #2. New `[6]` test: paired `<w:bookmarkStart
   w:name w:id>` + `<w:bookmarkEnd>` (same id) + probe + reusable `validate-bookmark-win.ps1`. **Word

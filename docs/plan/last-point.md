@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — bookmark export test DONE (PR #102); scout-v3 #1+#2 shipped; next = #4 char-format matrix)
+## 2026-06-16 (RESUME HERE — underline-style export test DONE (PR #104); char-format matrix started; next = font size/color/rFonts/sub-sup)
+
+> **Branch:** `main` (underline-style test merged PR #104 `dfa82fc`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 460 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Underline-style export test — DONE (PR #104):** started **scout-v3 #4** (char-format matrix) with the
+> highest-fidelity-risk item. Drives the REAL underline menu (label → `UL_TYPE` map → setMark) across 5
+> whole paragraphs; export emits `<w:u w:val>` in order [single,double,dotted,dash,wave]. **🔬 Word
+> COM-validated:** `Paragraphs(i).Range.Font.Underline = [1,3,4,7,11]` (Single/Double/Dotted/Dash/Wavy) — the
+> CSS→OOXML→Word chain (incl. Dashed→"dash", Wavy→"wave") is CORRECT, no bug. `oracle-probe-1-underline.js` +
+> reusable `validate-underline-win.ps1`. `/code-review` caught 2 real test-quality issues (probe-vs-test
+> doc-shape mismatch + the test bypassing the CSS map by feeding OOXML tokens) → both fixed (drive the menu +
+> whole-paragraph underline).
+>
+> **🗂️ SCOUT BACKLOG v3 (updated — char-format matrix #4 in progress):**
+>   1. ~~Hyperlink~~ (PR #100). 2. ~~Bookmark~~ (PR #102). 4a. ~~Underline-style~~ **DONE (PR #104).**
+>   3. **HIGHLIGHT color over-exposure (REAL fidelity bug)** — non-keyword highlight swatches export as
+>      `w:shd` not `w:highlight` → Word `wdNoHighlight`. Fix = restrict the picker to Word's 15
+>      ST_HighlightColor keywords (UX change — judgment call; steer with user).
+>   4b. **Font SIZE export+COM** — `w:sz` is HALF-points (20pt→w:sz=40); COM `Font.Size==20`. Catches a
+>      half-point unit bug. Clean, high-use.
+>   4c. **Font COLOR export+COM** — `<w:color w:val="FF0000">`; COM `Font.Color` RGB long = 255 (catches a
+>      BGR/RGB swap). Clean, near-clone of validate-cellshading.
+>   4d. **rFonts export+COM** (`<w:rFonts w:ascii=..>`; COM `Font.Name`) + 4e. **sub/superscript**
+>      (`<w:vertAlign>`; COM `Font.Subscript`/`Superscript`). Clean lock-ins.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness.
+>
+> **NEXT:** v3 #4b (font size — clean, high-use, half-point unit check) or #4c (font color — BGR-swap check).
+> Then rFonts / sub-sup. #3 highlight is a real bug w/ a UX-judgment fix (steer). The bigger items (a14
+> picture effects / frames-overlay / 4e headers) still need a STEERED focused session. spawn_tasks (NOT loop):
+> 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (bookmark export test DONE (PR #102); scout-v3 #1+#2 shipped; next = #4 char-format matrix)
 
 > **Branch:** `main` (bookmark test merged PR #102 `c3166eb`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 459 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
