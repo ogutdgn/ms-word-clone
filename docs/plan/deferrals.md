@@ -71,13 +71,30 @@
 > notes below predicted. This RESOLVED both **mid-paragraph breaks** and **trailing (doc-final)
 > breaks** — they are now paginated + oracle-validated (`read-layout`: mid-para = one paragraph split
 > across 2 pages; trailing = +1 blank page; blank page = content lands on page 3, all matching Word
-> for Windows 16.0). The only forced-break edge still deferred is the section break, below.)
-
-- **Section breaks (`w:sectPr` → `pageBreakSource`) are NOT paginated.** A `w:sectPr` lives on a
-  section's LAST paragraph (the break renders AFTER it) and is section-type-dependent (continuous vs
-  next/even/odd-page), so it is left to the section-geometry sub-phase (4f). The COMMON imported manual
-  page break is a run-level `<w:br w:type="page">` (→ `hardBreak[lineBreakType='page']`), which IS
-  paginated. Until 4f, a section break imports as continuous flow.
+> for Windows 16.0).
+>
+> **UPDATE 2026-06-15 (4a3):** the **next-page SECTION-break page boundary** is now paginated
+> (`sectionBoundaries` in `pagination.ts`). The earlier spike's bug was diagnosed by oracle
+> experiment: a `w:sectPr`'s `w:type` describes how ITS OWN section BEGINS (the break BEFORE it),
+> NOT the break after it — so the break after a section-ending paragraph is governed by the NEXT
+> section's type (the next ender's sectPr, or the body sectPr for the final section). Confirmed: a
+> 3-para doc with one section break renders 2 pages in Word REGARDLESS of whether the ending
+> paragraph's own `w:type` is absent, `continuous`, or `nextPage` (all → page break, because the body
+> section defaults to nextPage). The MULTI-section rule is also oracle-validated: a doc whose MIDDLE
+> section is `continuous` renders that middle section on the SAME page (2 pages, not the 3 a naive
+> "break on every sectPr" gives) — Word and the engine agree. A section break before a TABLE also
+> paginates correctly. `nextColumn` is treated as a page break (we render single-column; true columns
+> are 4f). NOTE: the fork's `insertSectionBreakAtSelection` refuses the FIRST paragraph
+> (`paraPos <= 0`) — a UI-command limitation, not an engine one; an IMPORTED first-paragraph sectPr is
+> still handled. Per-section GEOMETRY and even/odd parity remain deferred (next bullet).
+- **Section GEOMETRY + even/odd parity (the rest of section breaks → 4f).** The next-page section-break
+  page BOUNDARY is paginated (4a3, above), but the engine still reads a single document-level
+  `getPageStyles()`, so a section that changes margins / page size / orientation renders the new
+  section with the OLD section's geometry. `evenPage`/`oddPage` section types are paginated as a plain
+  page break (the extra blank page to LAND on an even/odd sheet is not inserted). A continuous section
+  break that ONLY changes geometry (Word forces a page break on orientation/size change even when
+  continuous — see the fork's `shouldRequirePageBoundary`) is not yet detected. All of this needs the
+  per-section geometry pass (4f), which should reuse the fork's `extractSectionData` / section-state.
 - ~~**Trailing (doc-final) page break is NOT paginated.**~~ **RESOLVED 2026-06-15 (4a2).** A
   `Ctrl+Enter` at the very end of the document now adds Word's trailing blank sheet (+1 page). The
   position-based forced seam (placed AT the break) handles it uniformly with mid-document breaks — no

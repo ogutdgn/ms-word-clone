@@ -17,11 +17,13 @@
 //
 // Scope: top/bottom page margins (the fork sets paddingTop/Bottom=0 for the docx
 // editor), block-level page seams on overflow, line-level intra-paragraph splitting
-// (widow/orphan), full-height last sheet, live page count, and MANUAL page breaks
+// (widow/orphan), full-height last sheet, live page count, MANUAL page breaks
 // (hardBreak[pageBreakType='page']) — a seam placed AT the break position handles
 // mid-paragraph, end-of-paragraph and trailing breaks uniformly, and two adjacent
-// breaks (insertBlankPage) make a blank sheet. Section breaks (w:sectPr) and table
-// row-split across pages are later sub-phases (4f / 4d); see deferrals.md §A.1b.
+// breaks (insertBlankPage) make a blank sheet — and the page BOUNDARY of next-page
+// SECTION breaks (w:sectPr; see sectionBoundaries). Per-section geometry (different
+// margins/orientation/size), even/odd parity blank pages, and table row-split across
+// pages remain later sub-phases (4f / 4d); see deferrals.md §A.1b.
 
 import { Plugin, PluginKey, Decoration, DecorationSet } from '@/pm'
 // @ts-ignore - vendored fork JS module (no types)
@@ -263,7 +265,58 @@ function isLineSplittable(el: HTMLElement): boolean {
   return /^(P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(el.tagName)
 }
 
-function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any): Layout {
+// `w:type` of a sectPr, defaulting to OOXML's 'nextPage' when absent.
+function sectPrType(sectPr: any): string {
+  const t = sectPr?.elements?.find((el: any) => el?.name === 'w:type')
+  return (t?.attributes?.['w:val'] as string) || 'nextPage'
+}
+
+// A section type that starts its section on a NEW PAGE. nextPage/even/odd do; `continuous`
+// (same page) does NOT. `nextColumn` IS treated as a page break: we render single-column
+// (multi-column layout is 4f), and in a single-column section Word advances a column break
+// to the next page. Even/odd PARITY (the extra blank page to land on an even/odd sheet) is
+// treated as a plain page break here — the parity refinement is 4f. See deferrals.md §A.1b.
+function sectionTypeBreaksPage(type: string): boolean {
+  return type !== 'continuous'
+}
+
+// SECTION BREAKS. A `w:sectPr` lives on the LAST paragraph of its section
+// (`attrs.paragraphProperties.sectPr` + `pageBreakSource: 'sectPr'`); the LAST section's
+// sectPr is the document-level body sectPr (`doc.attrs.bodySectPr`). ECMA-376 §17.6.17:
+// a sectPr defines the section ENDING at its paragraph, and its `w:type` describes how
+// THAT section BEGINS relative to the previous one — i.e. it governs the break BEFORE its
+// own section, NOT after it. So the page break AFTER a section-ending paragraph is
+// governed by the NEXT section's type (the next section-ending paragraph's sectPr, or the
+// body sectPr for the final section). VALIDATED vs Word for Windows 16.0: an explicit
+// `continuous` type ON the section-ending paragraph does NOT suppress the break, and a
+// 3-section doc with a `continuous` MIDDLE section renders exactly as the next-section
+// rule predicts (the middle section stays on the same page). (This is the exact semantic
+// the earlier 4f spike got backwards.) Returns the set of section-ending paragraph
+// positions that force a page break BEFORE the following block — keyed on the ENDER
+// (always a paragraph, whose position maps cleanly to a measured block) rather than the
+// next block (which may be a table whose DOM/pos mapping differs). solve() takes the
+// following block from the measured block order. Per-section geometry (different margins/
+// orientation/size) and even/odd parity blank pages stay Phase 4f; see deferrals.md §A.1b.
+function sectionBoundaries(view: any): Set<number> {
+  const out = new Set<number>()
+  const doc = view?.state?.doc
+  if (!doc) return out
+  const enders: Array<{ pos: number; type: string }> = []
+  doc.forEach((node: any, offset: number) => {
+    const sectPr = node?.attrs?.paragraphProperties?.sectPr
+    if (node?.attrs?.pageBreakSource === 'sectPr' && sectPr) enders.push({ pos: offset, type: sectPrType(sectPr) })
+  })
+  if (enders.length === 0) return out
+  const bodyType = sectPrType(doc.attrs?.bodySectPr)
+  for (let k = 0; k < enders.length; k++) {
+    // The break after ender k is governed by the NEXT section's type.
+    const nextSectionType = k + 1 < enders.length ? enders[k + 1].type : bodyType
+    if (sectionTypeBreaksPage(nextSectionType)) out.add(enders[k].pos)
+  }
+  return out
+}
+
+function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], sectionBreakAfter: Set<number>, view: any): Layout {
   const breaks: Break[] = []
   let pagesDone = 0 // pages completed (boundaries placed); current page = pagesDone+1
   let pageStartNat = 0 // natural top where the current page's content begins
@@ -305,7 +358,13 @@ function solve(blocks: BlockMeasure[], g: Geometry, forced: number[], view: any)
     const naturalLocalTop = (lineScreenTop - b.el.getBoundingClientRect().top) / zoom - innerAbove
     pageStartNat = b.natTop + Math.max(0, naturalLocalTop)
   }
+  let prev: BlockMeasure | null = null
   for (const b of blocks) {
+    // 0. A page-type section break ENDED the previous block → b starts a fresh page.
+    //    Keyed on the ender's position (a paragraph, mapped cleanly); the following block
+    //    is whatever the measured order puts next (paragraph, table, …).
+    if (prev && sectionBreakAfter.has(prev.pos)) placeSeamBefore(b)
+    prev = b
     // 1. Manual page breaks INSIDE b → a forced seam AT each one (in document order).
     const node = view?.state?.doc?.nodeAt ? view.state.doc.nodeAt(b.pos) : null
     const bEnd = b.pos + (node ? node.nodeSize : 1)
@@ -473,10 +532,7 @@ class PaginationView {
     const blocks = measureBlocks(view)
     // Inline page breaks (absolute positions): our own hardBreak[pageBreakType='page']
     // (Insert → Page Break / Ctrl+Enter) AND the run-level hardBreak[lineBreakType='page']
-    // the importer produces from a real Word <w:br w:type="page"/>. Paragraph/section
-    // breaks (w:sectPr → a pageBreakSource attr) are NOT handled here — sectPr marks the
-    // section's LAST paragraph and is section-type-dependent (continuous vs next-page), so
-    // it belongs to the section-geometry sub-phase (4f); see deferrals.md §A.1b.
+    // the importer produces from a real Word <w:br w:type="page"/>.
     const forced: number[] = []
     view.state.doc.descendants((node: any, pos: number) => {
       // Never descend into a TABLE at any depth (incl. a table nested in a content-control
@@ -489,7 +545,10 @@ class PaginationView {
       }
       return undefined
     })
-    const layout = solve(blocks, g, forced, view)
+    // Section breaks (w:sectPr): section-ending paragraph positions after which the next
+    // block must start a new page.
+    const sectionBreakAfter = sectionBoundaries(view)
+    const layout = solve(blocks, g, forced, sectionBreakAfter, view)
     // Exact match → done. Else, a deadband check absorbs sub-line jitter (line-split
     // geometry) so we settle rather than re-dispatch a near-identical layout forever.
     if (layout.signature === this.lastSignature) return
