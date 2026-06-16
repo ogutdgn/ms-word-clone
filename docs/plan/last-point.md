@@ -7,7 +7,45 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — w:tcPr child-order CT_TcPr fix DONE (PR #82); scout #5 RE-RANKED: Word TOLERATES tcPr reorder)
+## 2026-06-16 (RESUME HERE — Table Cell Margins flyout DONE (PR #84, Word COM-validated); scout #3 shipped)
+
+> **Branch:** `main` (cell-margins merged PR #84 `96681ff`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 450 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Table Cell Margins flyout — DONE (PR #84):** took scout-backlog **#3**. The Table Layout → Alignment →
+> **Cell Margins** control was a dead stub (`H.tblCellMargins` toasted "not implemented"); the bridge
+> `tableSetCellMargins` + the `w:tcMar` export already worked, so only the UI was missing. `H.tblCellMargins`
+> now opens an inches flyout (Top/Bottom/Left/Right spinners + Apply), px = round(in×96) → caret cell. A
+> `/code-review` finding (re-edit clobbered untouched sides because the flyout seeded stock defaults) was
+> fixed by a new **`tableGetCellMargins()`** bridge reader that PREFILLS the cell's current margins
+> (Word's Cell Options behavior). Guard now checks `tableInfo().inTable`. 1 `[4d]` test (full ribbon path:
+> open flyout → 4 distinct sides → Apply → assert px + `<w:tcMar>` twips → re-open asserts prefill) +
+> `oracle-probe-4d-cellmargins.js` + reusable `scripts/oracle/validate-cellmargins-win.ps1`.
+>
+> **🔬 Word COM-validated:** a 0.5" all-sides margin opens CLEAN and reads `Cells(1).Top/Bottom/Left/
+> RightPadding = 36pt` (= 720 twips) — exact. `/code-review high` (2 finders) + a follow-up adversarial
+> re-review: clean. **Deferred:** Word's "Same as whole table" checkbox (inherit-vs-override); Apply always
+> writes explicit per-cell margins. The fresh-cell `inlineKeys` export gate is unchanged (pre-existing).
+>
+> **🗂️ SCOUT BACKLOG (updated — pick next):**
+>   1. ~~Cell vertical-align (rec 5)~~ **DONE (PR #80).**
+>   2. **Picture effects: grayscale / brightness-contrast (rec 4.5) — RECOMMENDED NEXT (now the meatiest).**
+>      Engine IMPORTS/EXPORTS (a:grayscl, a:lum in decode-image-node-helpers.js) but NOT rendered
+>      (rendered:false) + NO bridge setter/UI. Bigger: render CSS filter + setImageColorAdjust bridge +
+>      Picture Format→Adjust group + handlers. Oracle: InlineShape.PictureFormat.Brightness/Contrast/ColorType.
+>   3. ~~Table cell margins (rec 4)~~ **DONE (PR #84).**
+>   4. **Table cell shading (rec 4)** — wired + works, NO export test. Add a `[6b]` w:shd export test + oracle.
+>      Smallest (test coverage only, no fix). Good quick win if #2 feels too big for one slice.
+>   5. ~~tcBorders XML_ORDER (rec 2)~~ **DONE (PR #82).**
+>
+> **NEXT:** scout #2 (picture effects — bigger, the last meaty backlog item) or #4 (shading export test —
+> smallest). After both, the recorded backlog is exhausted → re-scout or move to a bigger Phase-4 item
+> (frames-overlay keystone / 4e headers-footers). 2+-table corruption (`task_0e043993`) + CUA vAlign
+> (`task_c62b4d4c`) stay focused-session spawn_tasks. Branch off `main`.
+
+---
+
+## 2026-06-16 (w:tcPr child-order CT_TcPr fix DONE (PR #82); scout #5 RE-RANKED: Word TOLERATES tcPr reorder)
 
 > **Branch:** `main` (tcPr-order fix merged PR #82 `6d42e34`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 449 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` iteration.**
