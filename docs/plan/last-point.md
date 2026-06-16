@@ -7,7 +7,34 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — Picture Format tab + Arrange un-block DONE (PR #63); image area fully wired to ribbon; frames-overlay is the keystone next)
+## 2026-06-16 (RESUME HERE — Picture Size group DONE (PR #65); Picture Format tab now has H/W + lock; frames-overlay is the keystone next)
+
+> **Branch:** `main` (Picture Size group merged PR #65 `361fb53`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 440 / smoke 9 / roundtrip 27.**
+>
+> **Picture Size group — DONE (PR #65):** added Word's Picture Format → Size group (numeric Height +
+> Width) to the Picture Format tab, wiring the ribbon onto the already-shipped image `size`-attr export
+> path (the 4b resize overlay writes the SAME attr → `wp:extent`/`a:ext` EMU, oracle-proven in 4b). New
+> bridge verb `setImageSize({width?,height?})` (`bridge/insert.ts`): honors the aspect lock (locked =
+> Word default → the edited dim drives the other; pass both to diverge as the unlocked overlay does),
+> clamps width to the content column AND both dims to the overlay's `MAX_DIM=4000` (re-deriving the
+> partner when locked so a cap keeps the ratio). Generalized the table `tblSizeFly` helper → `sizeFly`
+> (was never table-coupled) and reused it for `H.imgHeight`/`H.imgWidth`. `/code-review` clean; the
+> MAX_DIM clamp (a review note) re-reviewed clean with a brute-force simulation. 1 `[4b]` test.
+>
+> **The Picture Format tab now mirrors Word's: Size (Height / Width / Lock Aspect Ratio) + Arrange
+> (Wrap Text / Bring Forward / Send Backward).** The whole IMAGE area is faithful + ribbon-reachable.
+> **NEXT — same keystone (deferrals §A.1b/d/e):**
+>   1. **The FRAMES-OVERLAY / paged-layout rework** — unblocks line-split coords-safe render, table
+>      row-split (tall-table overflow reproduced), AND faithful floating image/shape reposition (4c.2)
+>      + render z-stacking. **Highest leverage; needs a focused/fresh session.**
+>   2. **4e headers/footers + fields** (`header-footer` DEFERRED).
+>   3. Smaller: extend the Picture Format tab further (crop / alt-text / picture-reset).
+> Branch off `main`. **Session is EXTREMELY long — a fresh session is strongly recommended.**
+
+---
+
+## 2026-06-16 (Picture Format tab + Arrange un-block DONE (PR #63); image area fully wired to ribbon; frames-overlay is the keystone next)
 
 > **Branch:** `main` (Picture Format tab merged PR #63 `c914f66`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 439 / smoke 9 / roundtrip 27.**
