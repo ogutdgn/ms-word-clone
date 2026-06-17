@@ -2544,6 +2544,50 @@
     return (rtH && +rtH[1] === 914400) || 'position lost on round-trip: ' + (rtH && rtH[1]);
   });
 
+  await t('[4c] Picture DRAG-to-reposition (4c.2 drag): move-region drag writes marginOffset → wp:posOffset; inline disabled', async () => {
+    // Word COM-validated (oracle-probe-4c2-drag.js + word-oracle read-shapes): dragging a floating
+    // picture's move-region by +160/+80 px makes Word read the floating Shape at Left=120pt/Top=60pt
+    // (160/80 px * 0.75). The drag reuses the proven 4b resize-overlay coordinate math + the guarded
+    // setImagePosition (marginOffset → wp:posOffset). Synthetic pointer events drive the overlay the
+    // same way the [4b] dragHandle helper does.
+    const moOf = () => { let mo = null; doc().descendants((n) => { if (n.type.name === 'image') mo = n.attrs.marginOffset; }); return mo || {}; };
+    const mvRegion = () => document.querySelector('.wc-img-resize .wc-img-move-region');
+    const dragMove = async (dx, dy) => {
+      const mv = mvRegion(); if (!mv) return false;
+      const r = mv.getBoundingClientRect();
+      const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
+      mv.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: sx, clientY: sy, pointerId: 3 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: sx + dx, clientY: sy + dy, pointerId: 3 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: sx + dx, clientY: sy + dy, pointerId: 3 }));
+      await sleep(200);
+      return true;
+    };
+    setDoc('drag: ');
+    PM().insertImage({ src: mkImg(120, 90), alt: 'd1', width: 120, height: 90 });
+    await sleep(220);
+    if (selectImage() == null) return 'no image node';
+    // INLINE guard: the move-region is disabled (pointerEvents:none) for a non-floating picture.
+    if (!mvRegion()) return 'no move-region in the resize overlay';
+    if (getComputedStyle(mvRegion()).pointerEvents !== 'none') return 'move-region should be disabled for an inline picture';
+    // Float it (Behind Text = wrap None, absolute) + baseline offset 0,0; the move-region must now activate.
+    selectImage(); PM().setImageWrap('behind'); await sleep(140); selectImage();
+    PM().setImagePosition({ horizontal: 0, top: 0 }); await sleep(80); selectImage(); await sleep(80);
+    if (getComputedStyle(mvRegion()).pointerEvents !== 'auto') return 'move-region should be ACTIVE for a floating picture';
+    // Drag +160/+80 screen px; delta/zoom = content px → marginOffset (zoom-robust expectation).
+    const z = (window.WC.PM && window.WC.PM.zoom) || 1;
+    const expH = Math.round(160 / z), expT = Math.round(80 / z);
+    if (!(await dragMove(160, 80))) return 'move-region drag failed';
+    selectImage();
+    const mo = moOf();
+    if (mo.horizontal !== expH || mo.top !== expT) return 'drag did not write marginOffset {' + expH + ',' + expT + '}: ' + JSON.stringify(mo);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const h = xml.match(/<wp:positionH[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
+    const v2 = xml.match(/<wp:positionV[\s\S]*?<wp:posOffset>(-?\d+)<\/wp:posOffset>/);
+    if (!h || +h[1] !== expH * 9525) return 'wp:positionH posOffset not ' + (expH * 9525) + ': ' + (h && h[1]);
+    if (!v2 || +v2[1] !== expT * 9525) return 'wp:positionV posOffset not ' + (expT * 9525) + ': ' + (v2 && v2[1]);
+    return true;
+  });
+
   await t('[4c] Arrow-key nudge moves a selected floating picture (8px step, Shift=1px) + ignores inline', async () => {
     const moOf = () => { let mo = null; doc().descendants((n) => { if (n.type.name === 'image') mo = n.attrs.marginOffset; }); return mo || {}; };
     const arrow = (key, shift) => v().someProp('handleKeyDown', (f) => f(v(), new KeyboardEvent('keydown', { key, shiftKey: !!shift })));
