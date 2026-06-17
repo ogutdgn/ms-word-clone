@@ -423,3 +423,47 @@ _Scope verified by reading picture-tools-pm.js (the contextual-tab definition: g
 - (Picture) Dead WC.Layout dependency: H.align (commands.js:915-922), H.position (895), H.rotate (925), H.group (924 toast-only is safe), H.selectionPane (914) all call window.WC.Layout.* (align/distribute/position/rotate/flip/selectionPane). WC.Layout is NEVER defined anywhere in src/renderer (legacy global, removed with the slice-11 legacy retirement). Invoking Align/Position-preset/Rotate(this variant)/Selection-Pane throws TypeError 'Cannot read properties of undefined'. They are NOT the handlers the Picture Format tab wires (the tab uses imgRotate/imgPosition/wrapText), so they're reachable only via the legacy Layout > Arrange ribbon path — but that path is live in ribbon-data and crashes. Dead-code-or-crash bug, distinct from the GAP-A catalog note.
 - (Picture) Picture Format tab omits Align, Group, and Selection Pane entirely from the Arrange group (picture-tools-pm.js:46-55 lists only Position/WrapText/BringForward/SendBackward/Rotate) — real Word's Picture Format Arrange group includes Align, Group, and Selection Pane. Group/Align are genuinely absent from the contextual tab, not just stubbed.
 - (Picture) Picture Format tab omits the entire Picture Styles group (gallery + Picture Border + Picture Effects + Picture Layout) — picture-tools-pm.js has no pf-styles group at all, so a selected picture exposes no styling whatsoever beyond grayscale.
+
+## Remaining contextual tabs / sections not yet complete (round-out)
+
+Beyond Table Layout/Design, table-move, and Picture Format (detailed above), these Word contextual tabs / feature
+sections are absent or minimal in the clone. Bugs â†” improvements: each "improvement" is implementing the feature;
+several already appear as stubs in `BUG-LEDGER.md` GAP-B.
+
+### Header & Footer tab (Word: appears on double-click into a header/footer)
+Clone state: **text-only.** `bridge/header-footer.ts` provides `setHeaderText/setFooterText/getHeaderText/getFooterText`
+(plain one-paragraph text, exports `header1.xml`/`footer1.xml` + `sectPr` refs, round-trips â€” verified clean). Everything
+else on Word's Header & Footer tab is **missing**:
+
+| Word feature (group) | Priority | Clone state | How to implement |
+|---|---|---|---|
+| **Page Number** (Header & Footer) â€” gallery + Top/Bottom/Margins/Current-Position + Format Page Numbers | P1 | **blocked** (`isBlocked('pageNumber')`) | insert a `PAGE`/`NUMPAGES` field into the header/footer story; the FIELD half may ship before on-page render (mirror the header-text lesson). |
+| **Date & Time** (Insert) â€” insert auto-updating date field into H/F | P2 | missing | reuse `xeDateTime` (a `DATE` field) but target the header/footer story editor. |
+| **Document Info / Quick Parts** (Insert) â€” Author/FileName/Title field, Fieldâ€¦ dialog | P2 | missing | field insertion into the H/F story. |
+| **Pictures / Online Pictures** into H/F (Insert) | P3 | missing | image insert targeting the H/F story (e.g. a logo). |
+| **Navigation** â€” Go to Header / Go to Footer / Previous / Next / **Link to Previous** | P2 | missing | needs a live H/F editing surface + per-section linking; today H/F is a headless story write. |
+| **Options** â€” **Different First Page**, **Different Odd & Even Pages**, Show Document Text | P1 | missing | `sectPr titlePg` + `evenAndOddHeaders` (settings) + distinct header parts (`default`/`first`/`even`). Export-side is achievable before render. |
+| **Position** â€” Header from Top / Footer from Bottom (spinners), Insert Alignment Tab | P2 | missing | `sectPr w:headerReference`/`pgMar header`/`footer` distances; alignment tab is a `PTAB` field. |
+| **Built-in Header/Footer galleries** (the design dropdowns) | P3 | partial (the Insert-tab Header/Footer dropdowns exist but are layout-gated) | building-block galleries â†’ insert formatted H/F content. |
+| **On-page per-sheet render** (header/footer shown on every page) | P1 | **keystone-deferred** | the frames-overlay/paged-container render tier (`deferrals Â§A`); export works, on-screen repeat does not. |
+| **Close Header and Footer** | P2 | missing | needs the live H/F edit mode to exit. |
+
+**Top H/F improvements:** (1) Page Number field (unblock + `PAGE` field into the H/F story â€” highest user value);
+(2) Different First Page / Odd-Even (`titlePg` + `evenAndOddHeaders` + the extra header parts) â€” export-achievable;
+(3) a real header/footer editing surface (double-click-to-edit + the contextual tab) â€” gated on the render tier.
+
+### Fully-stubbed feature tabs (the contextual tab never appears because the feature doesn't insert)
+These are catalogued as stubs in `BUG-LEDGER.md` GAP-B; the "improvement" is implementing the feature itself.
+
+- **Shape Format tab** â€” Shapes don't insert (`Insert.insertShape` is a toast), so the Drawing/Shape Format tab (Insert
+  Shapes, Shape Styles, WordArt Styles, Text, Arrange, Size) never appears. **P1** â€” Shapes is a core Insert feature; needs
+  a `wps:sp` auto-shape node + NodeView + the contextual tab.
+- **SmartArt Design + Format tabs** â€” `xeSmartArt` is a no-op toast â†’ no SmartArt object, no tabs. P3 (large feature).
+- **Chart Design + Format tabs** â€” `xeChart` is a no-op toast â†’ no chart, no tabs. P3 (large feature).
+- **Equation tab (Equation Tools)** â€” `insertEquation` inserts Cambria-Math italic TEXT, not an OMML `m:oMath` object, so
+  the Equation contextual tab + structures/symbols palette never appear. **P2** â€” needs a real OMML equation node + the tab.
+- **Drawing Tools / Ink** â€” the Draw tab exists but pen-select/drawing-toggle UI state is broken (BUG-019) and Ink-to-Shape/
+  Math/Replay are ML stubs; eraser point/segment deletes whole strokes (legacy re-triage). P2 polish.
+
+_Catalogued for completeness; the table/picture contextual tabs above are the higher-value, partially-built targets._
+
