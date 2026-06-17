@@ -7,7 +7,44 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — v4 RE-SCOUT found+FIXED a REAL bug: endnote lost on export (PR #116))
+## 2026-06-16 (RESUME HERE — v4 #2 comments export Word-COM-validated CORRECT (PR #118); next = #3 paragraphSpacing)
+
+> **Branch:** `main` (PR #118 merged `8497efc`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 467 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **✅ v4 #2 COMMENTS EXPORT — Word-COM-validated CORRECT (PR #118, NO source bug):** review area got its
+> FIRST Word-COM oracle (`scripts/oracle-probe-comments.js` + `scripts/oracle/validate-comments-win.ps1`).
+> Word reads `doc.Comments.Count==1`, body "CommentBodyXYZ", author "Word User", **Scope "anchor" (exact
+> anchored span)**. Comment export is faithful — no fix needed. New `[8]` regression test gates the FULL
+> set (3 document.xml markers: rangeStart+rangeEnd+reference + `word/comments.xml` body + non-empty
+> `w:author`) — closes the endnote-class blind spot (the old test only checked rangeStart+reference bytes).
+> `/code-review` applied: validator emits a `<scope-error:…>` sentinel instead of silently swallowing a
+> broken-anchor `Scope.Text` throw.
+> **⚠️ NEAR-MISS LESSON:** an initial probe showed Scope `" ancho"` (off by one) — I almost "fixed" a
+> non-bug in the shared Document API address layer. Root cause was the **PROBE's own `selectText`**
+> (`paragraphPos+1+idx` — but the doc wraps blocks in a body node, so the first text node sits at pos 2;
+> anchor off the TEXT NODE's own pos like `test-suite-pm.js` selectText `pos+i`). The COM oracle + a precise
+> `textBetween`/node-layout probe caught it. **Always confirm the probe's own selection before blaming the engine.**
+>
+> **🗂️ SCOUT BACKLOG v4 — progress:**
+>   - ✅ **#1 Footnote+Endnote export+COM — DONE (PR #116, found+fixed the endnote drop).**
+>   - ✅ **#2 Comments export+COM — DONE (PR #118, validated correct).**
+>   - **#3 paragraphSpacing** (design.ts:120 `deParagraphSpacing`; COM `Paragraphs.Item(1).SpaceAfter` /
+>     `.SpaceBefore` clean float; px/pt→twips). Clone the probe+validator pattern. **← NEXT.**
+>   - Then **pageBorders** (`Sections(1).Borders.Item(-3)` / wdBorderTop etc.), **pageColor** (low COM
+>     confidence — `Background`/page-fill reads poorly via COM; may flag as "byte-only acceptable").
+>   - Lower: TOC/caption/citation export COM (refInsertTOC :114 / refInsertCaption :300 / refAddSource :518),
+>     track-changes insert (riskier COM). Re-rank if #3/pageBorders exhaust.
+>
+> **NEXT — continue v4: ship #3 (paragraphSpacing export + COM).** Keep execute→test→COM-validate→
+> /code-review→merge→checkpoint. spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign
+> `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main` (docs checkpoints on a branch + PR too).
+> **Bigger STEERED items still pending the user:** a14 picture effects / FRAMES-OVERLAY keystone /
+> 4e headers-footers / highlight-picker UX. Default to v4 re-scout unless the user names one.
+
+---
+
+## 2026-06-16 (v4 RE-SCOUT found+FIXED a REAL bug: endnote lost on export (PR #116))
 
 > **Branch:** `main` (PR #116 merged `62f100f`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 466 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**

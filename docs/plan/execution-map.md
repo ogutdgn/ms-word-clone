@@ -450,6 +450,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (v4 #2 comments export — Word-COM-validated CORRECT, `/loop` 5-min cadence)
+- [x] **v4 #2 comments export + COM — DONE (PR #118 `8497efc`)** — review area's FIRST Word-COM oracle
+  (`oracle-probe-comments.js` + `validate-comments-win.ps1`). Word reads `Comments.Count==1`, body,
+  author "Word User", **Scope "anchor"** (exact span). Export faithful — NO source bug. New `[8]` test
+  gates the full set (3 document.xml markers + comments.xml body + non-empty author). `/code-review`:
+  validator emits `<scope-error>` sentinel on broken-anchor throw. Gates: **PM 467 / smoke 9 / roundtrip 27**.
+- [x] **NEAR-MISS caught:** initial probe showed Scope " ancho" (off-by-one) → traced to the PROBE's own
+  `selectText` (`paraPos+1+idx` vs the doc's body-wrapped layout), NOT the exporter. Lesson: confirm the
+  probe's selection (`textBetween`) before blaming the engine; anchor off the text node's own pos (`pos+i`).
+- [ ] **NEXT (continue v4):** #3 paragraphSpacing export + COM (`deParagraphSpacing` design.ts:120; COM
+  `Paragraphs.Item(1).SpaceAfter`/`.SpaceBefore`). Then pageBorders, pageColor (low COM confidence).
+
 ### 2026-06-16 (v4 re-scout — endnote-lost-on-export BUG FOUND + FIXED, `/loop` 5-min cadence)
 - [x] **v4 RE-SCOUT (3 parallel agents)** over references / comments / design — ranked bounded
   COM-validatable candidates; #1 footnotes+endnotes, #2 comments, #3 paragraphSpacing.
