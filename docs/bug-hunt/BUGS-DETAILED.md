@@ -895,3 +895,169 @@ Every confirmed bug, uniformly documented: **Where** (file/function/line + ribbo
 : Mirror the Index/ToA replace-in-place pattern in `refInsertTOF`/`refInsertBibliography` (remove existing node of that kind before inserting). Effort: S. Risk: low.
 
 ---
+
+## BUG-034 — Custom Watermark is a CSS-only stand-in and is silently dropped on save
+**Severity:** S2
+
+**Where**
+: Ribbon: Design > Page Background > Watermark > Custom Watermark…. Dialog `dialogs.js:1044-1058` (Text + Color + Diagonal only). On OK → `WC.PM.deWatermark` → `bridge/design.ts:274-290 deWatermark`, which paints `#pm-editor` `style.backgroundImage` with an inline SVG, **skips `markDirty`**, and toasts "preview only; renders in the saved file at Phase 7". The watermark never becomes a node in the ProseMirror model. Bridge exposed at `bridge/index.ts:389`.
+
+**When / repro**
+: 1) Design > Watermark > Custom Watermark, type "CONFIDENTIAL", OK. 2) The diagonal grey text appears on the sheet. 3) Save (.docx) and reopen (or inspect the export) — the watermark is gone.
+
+**Symptom (Word vs clone)**
+: Word's Custom Watermark inserts a real header watermark (`w:pict`/VML) that persists in the file and repeats on every page. The clone shows a CSS background preview only; on save the watermark is **silently lost** (no `w:pict`, no `CONFIDENTIAL` text in the export). The dialog is also materially thinner than Word's (no Picture watermark, no Font/Size, no Semitransparent, no Layout radio).
+
+**Why it happens (root cause)**
+: The authoring path is a presentational CSS stand-in, not a document construct. `deWatermark` only sets `ed.style.backgroundImage` (inline SVG) and deliberately does not dirty the doc or insert a model node. The super-converter v3 *has* watermark export translators (`handlers/w/pict/helpers/translate-text-watermark.js` / `translate-image-watermark.js`), but those serialize a model node carrying `textWatermarkData` (e.g. one round-tripped from an imported docx); the clone's own dialog produces no such node, so `exportDocx` emits nothing.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s2-formatting.js` (`s2-formatting.json` → `watermark`): `applied:true`, `cssApplied:true` (an `#pm-editor` SVG background-image is painted), but `afterHasWatermark:false` and the whole `exportDocx({exportXmlOnly:true})` is 16 chars — no `w:pict`/VML/`CONFIDENTIAL`. `bugConfirmed:true`.
+
+**Solution**
+: On OK, insert a real text/picture watermark node (carrying `textWatermarkData`) into the header story so the existing super-converter translators serialize it to header `w:pict`, and `markDirty`. Then expand the dialog to Word parity (Picture watermark with washout, Font/Size/Color/Semitransparent, Diagonal/Horizontal layout). Effort: M-L (header authoring + dialog rework; export translators already exist). Risk: medium (header XML + per-page repeat is pagination-gated). **Validate the real save via Word COM, not just `exportXmlOnly`.**
+
+---
+
+## BUG-035 — Font dialog (Ctrl+D) accepts Small caps / All caps / Scale / Spacing / Position with live preview but applies NONE on OK
+**Severity:** S2
+
+**Where**
+: Home > Font dialog launcher (Ctrl+D) → `WC.Dialogs.font` (`dialogs.js:376`). OK steps array `dialogs.js:444-459` applies only font/size/bold/italic/color/underline/strike/super/sub; `dialogs.js:460-461` calls `notifyBlocked('Caps and Advanced font effects')` for Small caps / All caps / Character Scale / Character Spacing / Position. Root: the fork `textStyle` mark (`extensions/text-style/text-style.js addAttributes`) exposes no settable `smallCaps`/`caps`/`characterScale` attribute (`textTransform` is parseDOM-read-only) and there is no `setSmallCaps`/`setCaps` command.
+
+**When / repro**
+: 1) Select text, Ctrl+D. 2) Tick **Small caps** and **All caps**, set **Scale 150%** / **Spacing Expanded** — the in-dialog **preview updates**. 3) Click OK. 4) None of those five are applied; only a `notifyBlocked` toast fires. (The font/size/bold/italic/color/underline/strike/super/sub half *does* apply, as one undo step.)
+
+**Symptom (Word vs clone)**
+: Word applies all of these run properties on OK. The clone's dialog visibly accepts the input and previews it, then silently drops the five controls — a false affordance. (Word also offers Double strikethrough, Hidden, Engrave/Emboss/Shadow/Outline, underline color, and Set As Default — all absent.)
+
+**Why it happens (root cause)**
+: The OK handler only builds a steps chain for run properties the editor can author. For the five blocked controls it calls `notifyBlocked` because the schema mark has no model attribute and no command for them. The super-converter *has* caps/smallCaps/letter-spacing/position translators (imported runs round-trip), but there is no editor command to *author* them, so the dialog can't apply them; the live preview misleadingly implies they work.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s2-formatting.js` (`fontDialog`): `hasSmallCapsAttr:false`, `hasCapsAttr:false`, `hasSetSmallCapsCmd:false`, `hasSetCapsCmd:false`; the probe opened the dialog (`dialogOpened:true`), ticked Small caps + All caps (`tickedSmallCaps/tickedAllCaps:true`), set Scale + Spacing, clicked OK (`okClicked:true`) — yet the export has `afterHasSmallCaps:false`, `afterHasCaps:false`, `afterHasCharSpacing:false`. `bugConfirmed:true`. (`textStyleAttrKeys` does include `letterSpacing`, but the dialog's Spacing select still did not author it.)
+
+**Solution**
+: Add settable `textStyle` attrs + commands for caps/smallCaps (font-variant/text-transform) and characterScale/characterSpacing, bridge them to the existing v3 translators, and wire the Font dialog OK to emit those steps instead of `notifyBlocked`; separately add the missing UI (double-strike/hidden, underline color, Set As Default). Effort: M-L (converter side exists; gap is editor attrs+commands+bridge). Risk: medium (new run-property marks touch export ordering — validate via real Word COM save).
+
+---
+
+## BUG-036 — Home Shading on a sub-paragraph selection floods the WHOLE paragraph (paragraph-level shd, not run-level)
+**Severity:** S2
+
+**Where**
+: Home > Paragraph > Shading split button. `commands.js:1838-1842 applyColor` (kind `'shade'`) always dispatches `pm.cmd('updateAttributes','paragraph',{'paragraphProperties.shading':…})`; driven by `H.shading` (`commands.js:93`) and the arrow palette (`commands.js:1849-1861`). The Borders & Shading dialog's "Apply to: Text" option (`shadeApplyTo`, `dialogs.js:1196/1201`) is **ignored** in OK (`dialogs.js:1262-1264` always writes paragraph-level). No run-level shading path exists.
+
+**When / repro**
+: 1) Type "alpha beta gamma delta". 2) Select only "beta gamma". 3) Home > Shading > pick yellow. 4) The **entire paragraph** is shaded yellow, not just the selected words.
+
+**Symptom (Word vs clone)**
+: Word shades only the selected **runs** (`w:rPr/w:shd`) when a sub-paragraph range is selected, and shades the paragraph (`w:pPr/w:shd`) only when the whole paragraph / no text is selected. The clone always applies paragraph-level shading regardless of selection. Distinct from BUG-002 (render flooding across a page seam), BUG-004 (import: para shd → run highlight), and BUG-015 (highlight EXPORT mark mismatch): this is a selection-semantics + apply-level defect on the Shading button itself.
+
+**Why it happens (root cause)**
+: The Shading button (and the B&S dialog Shading tab) unconditionally writes `paragraphProperties.shading` → `w:pPr/w:shd`. The clone has no run-level shading code path at all (its only run-background mark is `highlight`, which Shading never invokes), and the dialog's `shadeApplyTo` value is never read.
+
+**Evidence**
+: **Runtime-confirmed (model level)** — probe `s2-formatting.js` (`shading`): with `paraText:"alpha beta gamma delta"` and a strict sub-range selection (`selectionWasSubRange:true`), after the Shading write the model shows `paraLevelShdPresent:true` (`paragraphProperties.shading.fill==='FFFF00'` on the **whole** paragraph) and `runLevelShdPresent:false` (no run-level bg mark confined to "beta gamma"). `bugConfirmed:true`. (Note: the export-XML `w:shd` regex did not match in `exportXmlOnly` mode — paragraph-shd serialization is a separate detail; the flooding defect is confirmed in the document model.)
+
+**Solution**
+: Make Shading selection-aware: when the live selection is a non-empty sub-paragraph TEXT range, route to a run-level shading mark (export `w:rPr/w:shd`, analogous to highlight but emitting `w:shd`); fall back to paragraph-level only for whole-paragraph / empty selections. Touch `commands.js:1838-1842` + `dialogs.js:1262-1264` (honor `shadeApplyTo`) and add a run-shading extension/command. Effort: M. Risk: medium (must not collide with the BUG-004/BUG-015 highlight-vs-shd mapping; ship a round-trip regression test).
+
+---
+
+## BUG-037 — Layout > Breaks dropdown is fully dead (blocked + dead `E()` code); zero section-break semantics
+**Severity:** S2
+
+**Where**
+: Ribbon: Layout > Page Setup > Breaks. `bridge/index.ts:138` maps `breaks:'layout-page'`; `:52` puts `layout-page` in `DEFERRED`; `:157` ENGINE_READY excludes `breaks`; `:158 isBlocked`. Both dispatch heads — `commands.js:1549` (run) and `:1558` (dropdown) — call `notifyBlocked` and return **before** reaching `H.breaks`/`breaksMenu` (`commands.js:530-544`), which is itself dead code: every item calls `E().insertHTML`, but `E=()=>WC.Editor` (`commands.js:8`) and `WC.Editor` was retired in slice 11 (never assigned), so `E()` is undefined.
+
+**When / repro**
+: 1) Layout > Breaks. 2) Only a generic "not available on the new engine yet" toast appears — the Page/Column/Next Page/Continuous/Even/Odd flyout is unreachable. There is no way to insert a section break.
+
+**Symptom (Word vs clone)**
+: Word's Breaks dropdown inserts page/column/text-wrapping breaks and Next-Page/Continuous/Even/Odd **section** breaks (`w:sectPr`). The clone's Layout Breaks control does nothing. (The only working page break is the Insert-tab control `H.pageBreak → WC.PM.insertPageBreak`, `commands.js:397`, and Ctrl+Enter.)
+
+**Why it happens (root cause)**
+: `breaks` is AREA-mapped to the Phase-7-`DEFERRED` `layout-page` and is not whitelisted in `ENGINE_READY`, so `isBlocked('breaks')` is true and both dispatch heads short-circuit to `notifyBlocked`. Separately, the `breaksMenu` body is dead (`E()` undefined post-slice-11).
+
+**Evidence**
+: **Runtime-confirmed** — probe `s2-formatting.js` (`breaks`): `blocked_breaks:true`, `area_breaks:"layout-page"`, `deferred_has_layoutPage:true`, `engineReady_has_breaks:false`, and driving `WC.Commands.run({cmd:'breaks'})` produced **no** model/XML change (`breaksRunMutated:false`). The underlying page-break verb *does* work — `WC.PM.insertPageBreak()` built a 7-page doc in the BUG-029 probe (`anchor-print-verify.json`, `pageCount:7`) — so the capability exists; only the Layout dropdown is dead.
+
+**Solution**
+: Route Layout > Breaks > Page to `WC.PM.insertPageBreak` (same verb as Insert tab) by not pre-blocking the Page item (add `breaks` to ENGINE_READY for Page, or special-case it before the `isBlocked` head). Section breaks (Next/Continuous/Even/Odd) need the fork's insert-section-break primitive (+ even/odd parity blank page) — genuine Phase-4f section-model work — so a minimal fix wires Page only and keeps section types honestly toasted. Delete the dead `breaksMenu` `E()` calls. Effort: low (Page-only) / medium-high (real `w:sectPr` section breaks). Risk: low for Page-only.
+
+---
+
+## BUG-038 — Insert Link: a bare domain becomes a `file://` path and a bare email gets no `mailto:` (no Word-style scheme inference)
+**Severity:** S2
+
+**Where**
+: Insert > Links > Link. Dialog `dialogs.js:45-63` (Text to display + Address only; OK passes `addr.value.trim()` RAW to `WC.PM.insertLink`). Bridge `insert.ts:31-37 insertLink → editor.chain().setLink({href,text})`; command `extensions/link/link.js:185-277 setLink → sanitizeLinkHref` (`:192`). Sanitizer `_vendor/superdoc/url-validation/index.js:605-707 sanitizeHref` + `isRelativeUrl:807-819` + `sanitizeRelativePath:496-528` — a scheme-less token is treated as relative and resolved via `new URL(token, window.location.href)` to a `file://` path; no `mailto:` inference.
+
+**When / repro**
+: 1) Insert > Link, Address = `example.com`, OK. 2) The link points at `file:///…/example.com` (a broken local path), not `http://example.com`. 3) Address = `a@b.com` → no `mailto:` (broken). (Explicit `https://…`, `mailto:…`, `#anchor` are handled — the last is the separate BUG-012.)
+
+**Symptom (Word vs clone)**
+: Word auto-prefixes `http://` for a bare domain and `mailto:` for a bare email. The clone produces wrong/broken hrefs for the two most common inputs. The dialog is also impoverished vs Word (no Existing File/Web Page · Place in This Document · Create New · E-mail categories, no ScreenTip, no Target Frame).
+
+**Why it happens (root cause)**
+: The address is passed RAW with no scheme inference; downstream `sanitizeHref` is fail-closed sanitization, **not** scheme-completion. For a scheme-less token `isRelativeUrl()` is true (no `:`) → `sanitizeRelativePath()` does `new URL(token, window.location.href)`; in Electron the base is `file://`, so `example.com` resolves under the app dir and `a@b.com` to a relative path.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s2-insert-ui.js` (`s2-insert-ui.json` → `insertLink`): input `example.com` stored as `file:///C:/Users/ogutd/bughunt-wt/out/renderer/example.com` (`bareDomainIsWrong:true`); input `a@b.com` stored as `null` (`bareEmailIsWrong:true`); control input `https://example.com` stored verbatim (`explicitOk:true`). `bugConfirmed:true`.
+
+**Solution**
+: Add Word-style scheme inference before sanitization (in `D.insertLink` OR a normalizer in the bridge `insertLink`): if raw has no scheme and no leading `#`/`/`/`./`/`../`, then if it matches a bare-email pattern prepend `mailto:`, else if it looks like a bare domain prepend `http://`. Effort: ~1-2h incl. a regression test (`insertLink('example.com')→'http://example.com'`, `insertLink('a@b.com')→'mailto:a@b.com'`). Risk: low (purely additive; explicit-scheme and `#anchor` untouched; `sanitizeHref` still the final gate). The richer 4-category dialog is a larger separate UI effort.
+
+---
+
+## BUG-039 — Cross-reference dialog exposes only 2 of Word's 7 reference types and omits the hyperlink / above-below checkboxes
+**Severity:** S3
+
+**Where**
+: References > Captions > Cross-reference. `commands.js:1022-1060 crossRefDialogPM`: Type select hardcoded `['Heading','Bookmark']` (`:1023`), "Insert reference to" select `['Page number','Text','Above/below']` (`:1024`), footer has no checkboxes (`:1051-1059`). Bridge `references.ts:624-637 refCrossReference → d.crossRefs.insert` (`:633`) is generic over `target.kind`/`display`.
+
+**When / repro**
+: 1) References > Cross-reference. 2) The Type dropdown offers only Heading and Bookmark; "Insert reference to" offers only 3 of Word's options; there is no "Insert as hyperlink" and no "Include above/below" checkbox.
+
+**Symptom (Word vs clone)**
+: Word offers 7 reference types (Numbered item, Heading, Bookmark, Footnote, Endnote, Equation, Figure/Table) plus "Insert as hyperlink" and "Include above/below". The clone reaches only 2 types and zero checkboxes; the other types/options are simply unreachable from the UI (the underlying insert works for the 2 supported types).
+
+**Why it happens (root cause)**
+: The dialog hardcodes the enumerated options and builds no checkbox elements; the engine (`d.crossRefs.insert`) is generic, so the limitation is purely the UI's enumerated lists.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s2-insert-ui.js` (`crossRef`): `dialogTitle:"Cross-reference"`, `typeOptions:["Heading","Bookmark"]`, `refOptions:["Page number","Text","Above/below"]`, `checkboxCount:0`. `bugConfirmed:true`.
+
+**Solution**
+: Expand `crossRefDialogPM`: add the missing Type entries (Numbered item, Footnote, Endnote, Equation, Figure, Table) with target-enumeration helpers analogous to `headings()`/`listBookmarks()`, add "Insert as hyperlink" + "Include above/below" checkboxes, and pass them through to `refCrossReference` (extend `d.crossRefs.insert` input). Effort: medium (UI + target enumerators + bridge passthrough; engine insert already generic). Risk: low-medium (verify `d.crossRefs.insert` accepts the extra kinds/display modes, else those options silently no-op).
+
+---
+
+## BUG-040 — Text Box "Draw Text Box" is identical to "Simple Text Box" (no drag) and inserts an INLINE box, not a floating one; gallery + Save-to-Gallery missing
+**Severity:** S3
+
+**Where**
+: Insert > Text > Text Box. `commands.js:473-477 textBoxMenu` renders only "Simple Text Box" + "Draw Text Box", **both** wired to the identical `H.textBox()` (`commands.js:411 → WC.PM.xeTextBox('')`). `insert-exotica.ts:161-162 xeTextBox → editor.commands.insertTextBox`; `extensions/shape-textbox/shape-textbox.js:86-107` does `insertContent` of a `shapeContainer` at the caret with only inline VML attrs `{id,type,style}` — no anchor/wrap. `ribbon-data.js:894-905` declares a built-in gallery + Office.com + Draw + Save to Gallery that the menu doesn't deliver.
+
+**When / repro**
+: 1) Insert > Text Box. 2) The menu shows only two items; "Draw Text Box" does not give a drag-to-place cursor — it immediately inserts the same box as "Simple Text Box". 3) The inserted box is inline (flows with text), not a page-anchored floating box. 4) No styled gallery, no "Save Selection to Text Box Gallery".
+
+**Symptom (Word vs clone)**
+: Word's Text Box offers a styled gallery (~30 presets), "Draw Text Box" (drag to place a **floating** box), and "Save Selection to Text Box Gallery". The clone offers two items wired to the same handler, inserts an inline shape with no positioning, and lacks the gallery/save. (Separately, clone reopen degrades the textbox to `passthroughInline` per `deferrals.md:389`.) Distinct from BUG-029 (page-relative anchoring of already-floating objects).
+
+**Why it happens (root cause)**
+: `textBoxMenu` renders two items both calling `H.textBox()`, which inserts a `shapeContainer>shapeTextbox` at the caret carrying only inline VML attrs — no floating/anchor/wrap — so the box is inline. The advertised gallery/Draw/Save affordances (ribbon-data) are never built.
+
+**Evidence**
+: **Confirmed (model + code)** — probe `s2-insert-ui.js` (`textBox`): after `WC.PM.xeTextBox('')`, `shapeContainerFound:true` with `shapeAttrKeys:["fillcolor","sdBlockId","style","wrapAttributes","attributes"]` and `hasFloatingAnchorAttr:false` (inline, not floating). Both menu items dispatch the same `H.textBox` (`commands.js:473-477`, code). (The probe's VML-export string check did not match in `exportXmlOnly` mode — an export-serialization detail, not the deviation; the inline-not-floating + identical-handlers defect is confirmed.)
+
+**Solution**
+: (1) Shippable now, low risk: complete `textBoxMenu` to match ribbon-data — add a styled-preset gallery submenu (each passing distinct `{text/fill/width/height/style}` to `xeTextBox`) and a "Save Selection to Text Box Gallery" item, and stop wiring "Draw Text Box" to the identical inline handler. (2) Layout-gated, medium risk: make "Draw Text Box" insert a FLOATING/anchored box (add anchor + wrap attrs and a `<wp:anchor>` export path), and fix the reopen `passthroughInline` editability loss — track alongside BUG-029 / Phase-4 floating-objects.
+
+---
+
+## NOT-REPRODUCED note — Track Changes "Reject" skip-adjacent (theorized, not confirmed)
+The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChange` then `nextChange`, unconditional) can skip the next **adjacent** revision because `nextChange` (`review.ts:405-411`) uses a strict `c.from > pos` filter. Probe `C:\tmp\bughunt\probes\s2-trackchanges.js` attempted to build two adjacent tracked deletions but they landed non-adjacent (`A.to=25`, `B.from=27`, `adjacent:false`); rejecting A then advancing left the caret at 24, **before** B (`skippedB:false`) — correct behavior in the non-adjacent case. The skip-adjacent defect requires `B.from === A.to` exactly, which the probe could not construct, so it is **unconfirmed** (neither reproduced nor refuted). Logged transparently rather than promoted to a numbered bug. The audit's *primary* "Accept caret-off-change advances without accepting" framing was separately judged **not-a-bug** (Word parity). If revisited, change `nextChange`'s predicate to `c.from >= pos` (`review.ts:409`) and add an adjacent-changes regression test.
+
+---

@@ -334,6 +334,30 @@ wrong-behavior bugs (now **runtime-verified** — probe `C:\tmp\bughunt\probes\t
   **Picture Format omits Align/Group/Selection Pane**; **Picture Format omits the entire Picture Styles group** — gallery/
   border/effects/layout) are catalogued in `FEATURE-IMPROVEMENTS.md`. Bugs ↔ improvements are connected (fix = complete the feature).
 
+## S2-audit-promoted new bugs (BUG-034…040) — runtime-confirmed 2026-06-17
+A parallel triage of every not-yet-confirmed S2 fidelity-audit item (deduped vs the 33 logged bugs) surfaced 7 genuine
+new bugs, each runtime-confirmed by headless probe (`C:\tmp\bughunt\probes\s2-formatting.js` / `s2-insert-ui.js`).
+Full detail (Where/When/Symptom/Why/Evidence/Solution) in `BUGS-DETAILED.md` § BUG-034…040.
+- **BUG-034 [S2] Custom Watermark is CSS-only and silently dropped on save.** `deWatermark` (design.ts:274) paints an
+  `#pm-editor` SVG background, skips `markDirty`, never inserts a model node → `exportDocx` emits no `w:pict`. Probe: `applied&cssApplied` true, `afterHasWatermark:false`.
+- **BUG-035 [S2] Font dialog (Ctrl+D) accepts Small/All caps, Scale, Spacing, Position with live preview but applies none on OK.**
+  `dialogs.js:460-461 notifyBlocked`; the `textStyle` mark has no smallCaps/caps attr or `setSmallCaps`/`setCaps` command. Probe: dialog ticked+OK'd, export has no `w:smallCaps`/`w:caps`/spacing.
+- **BUG-036 [S2] Home Shading on a sub-paragraph selection floods the whole paragraph (pPr/shd not rPr/shd).**
+  `commands.js:1838-1842` always writes `paragraphProperties.shading`; no run-level path; dialog `shadeApplyTo` ignored. Probe: sub-range selection → whole-paragraph shd in model, no run mark.
+- **BUG-037 [S2] Layout > Breaks dropdown fully dead (blocked + dead `E()` code).** `breaks` AREA-mapped to DEFERRED
+  `layout-page`, both dispatch heads `notifyBlocked` and return; `breaksMenu` calls `E()`=retired `WC.Editor`. Probe: `blocked_breaks:true`, `breaksRunMutated:false` (the page-break verb itself works — Insert tab).
+- **BUG-038 [S2] Insert Link: bare domain → `file://` path, bare email → no `mailto:` (no scheme inference).**
+  Address passed RAW to `setLink`; scheme-less token resolved relative to the Electron `file://` base. Probe: `example.com`→`file:///…/example.com`, `a@b.com`→`null`, `https://example.com` ok.
+- **BUG-039 [S3] Cross-reference dialog exposes only 2 of Word's 7 reference types and no hyperlink/above-below checkboxes.**
+  `commands.js:1023-1024` hardcodes the option lists; engine `d.crossRefs.insert` is generic. Probe: `typeOptions:[Heading,Bookmark]`, `checkboxCount:0`.
+- **BUG-040 [S3] Text Box "Draw Text Box" == "Simple Text Box" (no drag), inserts an INLINE box not floating; gallery/Save missing.**
+  Both menu items → `H.textBox` (commands.js:473-477); `insertTextBox` has no anchor/wrap. Probe: `shapeContainerFound:true`, `hasFloatingAnchorAttr:false`.
+- _Also from this sweep: 1 duplicate (Mailings Rules If/Then/Else → folds into **BUG-008** mail-merge field-code export); 6 not-bugs
+  (Colors gallery, Page Borders dialog, **Track Changes Accept** = Word-parity, Compare/Combine, Screenshot + Save-As-type = real but
+  not headless-confirmable); 8 honest-degrade stubs (Watermark galleries, Borders split, File Info/Open/Options/Protect, Shapes, Equation).
+  One theorized defect — Track Changes **Reject** skip-adjacent — could NOT be reproduced (probe couldn't build adjacency); logged
+  transparently in `BUGS-DETAILED.md`, not numbered._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via

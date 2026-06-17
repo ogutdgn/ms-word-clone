@@ -2127,3 +2127,21 @@ _63 controls audited_
 
 ---
 
+## Resolution log — S2 runtime-triage sweep (2026-06-17)
+A parallel triage drove every not-yet-confirmed **S2** item in this audit through dedup-vs-the-34-bug-catalog + headless probes
+(`C:\tmp\bughunt\probes\s2-formatting.js`, `s2-insert-ui.js`, `s2-trackchanges.js`). Outcomes — these supersede the `_needsRuntime: true_`
+flags on the named entries above:
+
+- **Promoted to numbered, runtime-confirmed bugs:** Watermark ▸ Custom Watermark → **BUG-034**; Font dialog Ctrl+D (5 blocked controls) →
+  **BUG-035**; Shading split (floods paragraph on sub-range) → **BUG-036**; Layout ▸ Breaks (dead dropdown) → **BUG-037**; Insert Link
+  (no scheme inference) → **BUG-038**; Cross-reference (2-of-7 types) → **BUG-039**; Text Box (Draw==Simple, inline-not-floating) → **BUG-040**.
+- **Duplicate:** Mailings Rules ▸ If…Then…Else… folds into **BUG-008** (mail-merge field-code export).
+- **Verdict = not-a-bug (Word-faithful / honest-degrade):** Colors color-scheme gallery; Page Borders dialog; **Accept (split + main)**
+  (the alleged accept-side defects are Word parity / non-reproducing); Compare/Combine/Show Source.
+- **Real but NOT headless-confirmable (need OS dialog / pixels):** Screenshot dropdown; File ▸ Save As ▸ Save as type. Left as `needsRuntime`.
+- **Honest-degrade stubs (already catalogued, not new bugs):** Watermark galleries; Borders split button; File ▸ Info / Open Browse /
+  Options / Info ▸ Protect Document; Shapes dropdown; Equation split.
+- **Theorized, NOT reproduced:** Track Changes ▸ **Reject** skip-adjacent (probe could not construct the required adjacency). See
+  `BUGS-DETAILED.md` → "NOT-REPRODUCED note".
+
+---
