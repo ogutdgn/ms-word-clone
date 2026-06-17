@@ -7,7 +7,44 @@
 
 ---
 
-## 2026-06-17 (RESUME HERE — finish-all loop; ITEM 3 header/footer text DONE (PR #130); NEXT = ITEM 4 frames-overlay KEYSTONE)
+## 2026-06-17 (RESUME HERE — ALL 4 big items have shipped increments; ITEM 4 keystone = drag-reposition DONE (PR #132) + STEERING INFLECTION)
+
+> **Branch:** `main` (PR #132 merged `15aae62`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 475 / smoke 9 / roundtrip 27.** Word COM-validated. Directive: [[phase4-finish-all-directive]].
+>
+> **ALL 4 BIG ITEMS now have shipped, COM-validated increments:** ① page-setup (#126) · ② grayscale (#128)
+> · ③ header/footer text (#130) · ④ frames-overlay keystone — drag-to-reposition carve-out (#132).
+>
+> **✅ ITEM 4 carve-out — IMAGE DRAG-TO-REPOSITION — DONE (PR #132, Word-COM-validated):** a deep
+> scope-workflow audited the layout engine (4a-4f) and found: the MODEL/EXPORT tier is ~90% done; the
+> remaining keystone work is the VISUAL/RENDER tier, which all of 4c/4d/4e/4f converge on (the missing
+> render-overlay/paged-container rework). The ONE COM-validatable carve-out was the drag-to-reposition
+> affordance (4c.2 §A.1d(a)) — shipped: a move-region on the resize overlay (image-resize.ts) writes
+> marginOffset → wp:posOffset; **Word read-shapes Left=120pt/Top=60pt** after a +160/+80px drag. New `[4c]`
+> gate test (synthetic drag) + probe. /code-review fixed a listener cross-contamination I introduced.
+>
+> **🧭 STEERING INFLECTION — the keystone's COM-validatable surface is now EXHAUSTED.** The scope's honest
+> verdict (with which I agree): the keystone REMAINDER is the visual-render tier — (b) render z-stacking of
+> floated images, (c) faithful Square/Tight render position, (d) mid-`<p>` line-split click-misland, (e)
+> table row-split-across-pages render, (f) table relocate drag, (g) on-page header/footer band +
+> page-number field render. These have **no objective Word-COM gate** (they're pixels, not exportable
+> attrs) AND converge on a **design fork**: RENDER MODEL = (A) keep the continuous `#pm-editor` + add a
+> synced absolutely-positioned overlay, vs (B) re-render into real per-page `.page` containers (a deeper
+> rewrite of pagination.ts + line-split + the editor mount). This cascades through 4c/4d/4e/4f and is the
+> kind of decision the prior small slices never needed. **Asked the user to steer (A vs B) + pick the next
+> priority** — see the AskUserQuestion this session.
+>
+> **POSSIBLE next COM-validatable increment IF the user wants to keep the export-loop going:** a
+> **page-number FIELD** in the header/footer (builds on item 3) — a PAGE field code exports + Word renders
+> the number (the FIELD half may be separable from the on-page render, mirroring the header-text lesson
+> "keystone-gated can be PARTIAL"). Verify validatability before committing.
+>
+> spawn_tasks (NOT this loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list
+> `task_eb50ae00`, manualHyphenate `task_a4196ed8`. Branch off `main` (docs checkpoints on a branch + PR).
+
+---
+
+## 2026-06-17 (finish-all loop; ITEM 3 header/footer text DONE (PR #130); NEXT = ITEM 4 frames-overlay KEYSTONE)
 
 > **Branch:** `main` (PR #130 merged `2e6302b`; branch deleted). **Phase:** 4 (layout engine). **Directive:**
 > finish ALL big Phase-4 items, no-stop loop, my order — [[phase4-finish-all-directive]].
