@@ -4701,6 +4701,23 @@
     return /<w:footnoteReference\b/.test(xml) || 'no <w:footnoteReference in document.xml';
   });
 
+  await t('[9] EXPORT: endnote reference MARKER <w:endnoteReference in document.xml (regress: exporter router dropped it -> Word read 0 endnotes)', async () => {
+    // Regression guard for the missing-endnote bug: the exporter router (exporter.js)
+    // mapped footnoteReference -> translator but had NO endnoteReference entry, so the
+    // endnote MARKER was silently dropped from document.xml. The note body still landed
+    // in word/endnotes.xml (so the byte-only body test stayed green), but with no marker
+    // referencing it Word read doc.Endnotes.Count == 0 — the endnote was lost. Only the
+    // Word COM oracle (validate-notes-win.ps1) caught it; exportXmlOnly/roundtrip missed it.
+    setDoc('endmarker anchor text');
+    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
+    caretAfter('anchor');
+    const ok = PM().refInsertEndnote();
+    if (ok !== true) return 'refInsertEndnote returned ' + JSON.stringify(ok) + ' (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml(); // exportXmlOnly -> document.xml (the marker lives here)
+    return /<w:endnoteReference\b/.test(xml) || 'no <w:endnoteReference in document.xml (exporter router dropped the marker — Word reads 0 endnotes)';
+  });
+
   await t('[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads "0" (A1)', async () => {
     setDocs(['Chapter One Intro', 'Chapter Two Body', 'plain trailing paragraph']);
     // Real Heading-styled paragraphs (styleId Heading1 — collected by the default

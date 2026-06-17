@@ -40,6 +40,7 @@ import { translator as pictTranslator } from './v3/handlers/w/pict/pict-translat
 import { translateVectorShape, translateShapeGroup } from '@converter/v3/handlers/wp/helpers/decode-image-node-helpers';
 import { translator as wTextTranslator } from '@converter/v3/handlers/w/t';
 import { translator as wFootnoteReferenceTranslator } from './v3/handlers/w/footnoteReference/footnoteReference-translator.js';
+import { translator as wEndnoteReferenceTranslator } from './v3/handlers/w/endnoteReference/endnoteReference-translator.js';
 import { carbonCopy } from '@core/utilities/carbonCopy.js';
 import { DEFAULT_XML_DECLARATION } from './constants.js';
 
@@ -230,6 +231,7 @@ export function exportSchemaToJson(params) {
     permEndBlock: wPermEndTranslator,
     commentReference: [],
     footnoteReference: wFootnoteReferenceTranslator,
+    endnoteReference: wEndnoteReferenceTranslator,
     shapeContainer: pictTranslator,
     shapeTextbox: pictTranslator,
     contentBlock: pictTranslator,
