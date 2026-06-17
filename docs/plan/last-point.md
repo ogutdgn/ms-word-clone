@@ -7,7 +7,44 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — v4 #3 paragraph spacing Word-COM-validated CORRECT (PR #120); next = pageBorders)
+## 2026-06-16 (RESUME HERE — v4 #4 page borders Word-COM-validated CORRECT (PR #122); next = #5 pageColor (low COM))
+
+> **Branch:** `main` (PR #122 merged `4f2caf3`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 469 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **✅ v4 #4 PAGE BORDERS — Word-COM-validated CORRECT (PR #122, NO source bug):** Design page-border
+> surface got its FIRST Word-COM oracle (`oracle-probe-pageborders.js` + `validate-pageborders-win.ps1`,
+> reads ALL FOUR edges). `dePageBorders({style:'solid',color:'#FF0000',width:3})` → Word reads
+> `Sections(1).Borders.Enable=true`, all edges `LineStyle=1` (single), `LineWidth=24` (wdLineWidth300pt=3pt),
+> `Color=255` (red). Export faithful — no fix. New `[10th]` test gates specific val/sz/color on all 4 edges
+> + `finally{}` teardown (`dePageBordersRemove`, page borders are global section state). `/code-review`
+> hardened the validator to all-4-edges (was top-only) so an asymmetric export can't pass silently.
+>
+> **📊 v4 PATTERN / DIMINISHING RETURNS:** of 4 v4 slices, #1 endnote found a REAL bug (data loss); #2–#4
+> (comments, paraspacing, pageBorders) all came back CORRECT — we are now mostly in **coverage-building
+> mode** (adding committed Word-COM oracles + stronger gates to the export surface for the CUA eval net),
+> not bug-finding. Still valuable, but the bounded export surface is largely faithful. **Consider ESCALATING
+> to a STEERED bigger item soon** (see below) rather than more confirm-correct slices.
+>
+> **🗂️ SCOUT BACKLOG v4 — progress:**
+>   - ✅ #1 Footnote+Endnote (PR #116, FOUND+FIXED endnote drop) · ✅ #2 Comments (PR #118 correct) ·
+>     ✅ #3 paragraphSpacing (PR #120 correct) · ✅ #4 pageBorders (PR #122 correct).
+>   - **#5 pageColor** (`dePageColor` design.ts:201 → `w:background w:color`). **LOW COM confidence:**
+>     `doc.Background.Fill.ForeColor.RGB` / page-fill reads are unreliable via COM; the byte test
+>     (`[10th]` dePageColor) already checks `<w:background w:color>`. **Plan: probe + attempt COM read;
+>     if COM is unreliable, FLAG byte-only-acceptable, keep the byte test, SKIP a COM gate (honest).** ← NEXT.
+>   - Then (more complex, re-rank): TOC/caption/citation export COM (refInsertTOC :114 / refInsertCaption
+>     :300 / refAddSource :518), track-changes insert (riskier COM).
+>
+> **NEXT — ship #5 pageColor (probe + honest COM-or-byte-only verdict).** Then strongly consider ESCALATING.
+> spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`.
+> Branch off `main` (docs checkpoints on a branch + PR too). **Bigger STEERED items still pending the user:**
+> a14 picture effects / FRAMES-OVERLAY keystone / 4e headers-footers / highlight-picker UX. Default to v4
+> unless the user names one.
+
+---
+
+## 2026-06-16 (v4 #3 paragraph spacing Word-COM-validated CORRECT (PR #120); next = pageBorders)
 
 > **Branch:** `main` (PR #120 merged `76bec23`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 468 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**

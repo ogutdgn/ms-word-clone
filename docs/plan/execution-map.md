@@ -450,6 +450,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (v4 #4 page borders — Word-COM-validated CORRECT, `/loop` 5-min cadence)
+- [x] **v4 #4 pageBorders export + COM — DONE (PR #122 `4f2caf3`)** — Design page-border surface's FIRST
+  Word-COM oracle (`oracle-probe-pageborders.js` + `validate-pageborders-win.ps1`, all 4 edges).
+  `dePageBorders({solid,#FF0000,width:3})` → Word reads Borders.Enable=true, all edges LineStyle=1/
+  LineWidth=24 (3pt)/Color=255 (red). Export faithful — NO source bug. New `[10th]` test gates val/sz/color
+  on all 4 edges + `finally{}` teardown (dePageBordersRemove). `/code-review`: validator hardened to all-4
+  edges (was top-only). Gates: **PM 469 / smoke 9 / roundtrip 27**.
+- [x] **DIMINISHING RETURNS noted:** v4 = 1 real bug (#1 endnote) + 3 confirm-correct (#2–#4). Now mostly
+  coverage-building (COM-oracle net), not bug-finding. Consider escalating to a steered bigger item soon.
+- [ ] **NEXT (continue v4):** #5 pageColor (`dePageColor` design.ts:201). LOW COM confidence (doc.Background
+  reads unreliable) → probe + honest COM-or-byte-only verdict; keep byte test, skip COM gate if unreliable.
+
 ### 2026-06-16 (v4 #3 paragraph spacing — Word-COM-validated CORRECT, `/loop` 5-min cadence)
 - [x] **v4 #3 paragraphSpacing export + COM — DONE (PR #120 `76bec23`)** — Design tab's FIRST Word-COM
   oracle (`oracle-probe-paraspacing.js` + `validate-paraspacing-win.ps1`). `deParagraphSpacing({before:12,
