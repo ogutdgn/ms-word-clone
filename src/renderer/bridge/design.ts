@@ -239,6 +239,37 @@ export function installDesign(editor: AnyEditor) {
   }
   function dePageBordersRemove(): boolean { return dePageBorders({ remove: true }) }
 
+  // ---- page setup: margins + size + orientation -> body sectPr (real export) ----
+  // All values in INCHES. The Document API sections adapter owns the sectPr XML write
+  // (setPageMargins/setPageSetup -> writeSectPrPageMargins/writeSectPrPageSetup ->
+  // setDocAttribute('bodySectPr') + converter.pageStyles sync); these are thin wrappers
+  // mirroring dePageBorders. The UI's setPageVar CSS paint is visual-only and NEVER updated
+  // the exported sectPr — these verbs are what make LAYOUT geometry round-trip to .docx.
+  // m: { top?, right?, bottom?, left?, gutter? } (inches).
+  function dePageMargins(m: any): boolean {
+    if (!m || typeof m !== 'object') return false
+    const d = docApi(); if (!d) return false
+    const target = sectionTarget(d); if (!target) return false
+    try {
+      const r = d.sections.setPageMargins({ target, ...m })
+      if (r && r.success !== false) { markDirty(); refocus(); toast('Margins applied.'); return true }
+      return false
+    } catch { return false }
+  }
+  // s: { width?, height? } (inches), orientation?: 'portrait' | 'landscape'. The adapter
+  // auto-swaps w:w/w:h when orientation flips, so passing orientation alone suffices once a
+  // size exists; pass width/height too for robustness on a fresh doc.
+  function dePageSize(s: any): boolean {
+    if (!s || typeof s !== 'object') return false
+    const d = docApi(); if (!d) return false
+    const target = sectionTarget(d); if (!target) return false
+    try {
+      const r = d.sections.setPageSetup({ target, ...s })
+      if (r && r.success !== false) { markDirty(); refocus(); toast('Page size applied.'); return true }
+      return false
+    } catch { return false }
+  }
+
   // ---- watermark (D10t.6 visual stand-in + honest toast; Phase-7 for the real header construct) ----
   function deWatermark(text: string, opts: any): boolean {
     if (!text) return deWatermarkRemove()
@@ -280,6 +311,7 @@ export function installDesign(editor: AnyEditor) {
     deApplyTheme, deApplyColors, deApplyFonts, deApplyStyleSet, deParagraphSpacing,
     dePreviewTheme, dePreviewRestore, dePreviewCommit, dePreviewEnd,
     dePageColor, dePageColorClear, dePageBorders, dePageBordersRemove,
+    dePageMargins, dePageSize,
     deWatermark, deWatermarkRemove, deEffects, deSetAsDefault,
   }
 }

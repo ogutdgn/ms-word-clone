@@ -147,11 +147,13 @@ const AREA: Record<string, string> = {
 // Commands whose engine support has SHIPPED even though their AREA is still
 // broadly deferred — un-blocked individually so the ribbon path reaches the
 // (already-working) bridge verbs. Image wrap = Phase 4c.1 (setImageWrap, wp:anchor
-// export), image z-order = Phase 4c.3 (setImageZOrder). The other layout-arrange
-// cmds (position presets, align, group, rotate, selectionPane) still call the
-// undefined WC.Layout.* and MUST stay blocked. Per-command granularity keeps the
-// coarse AREA flag honest without re-exposing genuinely-unimplemented controls.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward'])
+// export), image z-order = Phase 4c.3 (setImageZOrder). Page setup margins/orientation/
+// size = Phase 4 page-setup export (dePageMargins/dePageSize -> body sectPr w:pgMar/w:pgSz,
+// Word-COM-validated). The other layout-page/arrange cmds (columns, breaks, lineNumbers,
+// hyphenation; position presets, align, group, rotate, selectionPane) still lack engine
+// support and MUST stay blocked. Per-command granularity keeps the coarse AREA flag honest
+// without re-exposing genuinely-unimplemented controls.
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -380,6 +382,7 @@ export function preinstallBridge() {
     dePreviewTheme: () => false, dePreviewRestore: () => false, dePreviewCommit: () => {}, dePreviewEnd: () => {},
     dePageColor: () => false, dePageColorClear: () => false,
     dePageBorders: () => false, dePageBordersRemove: () => false,
+    dePageMargins: () => false, dePageSize: () => false,
     deWatermark: () => false, deWatermarkRemove: () => false,
     deEffects: () => false, deSetAsDefault: () => false,
     // slice 10 PR3: insert-exotica pre-mount stubs (replaced by installInsertExotica on mount)

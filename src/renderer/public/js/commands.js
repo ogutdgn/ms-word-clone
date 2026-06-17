@@ -2038,7 +2038,10 @@
     WC.PM.xeWordArt(txt, {});
   }
   // ---- Layout menus ----
-  function setPageVar(name, value) { document.documentElement.style.setProperty(name, value); E().repaginate(); }
+  // Sets the page-sheet CSS var, then re-measures via the PM paginator. (The legacy E()=WC.Editor
+  // was retired in slice 11, so the old E().repaginate() threw here and aborted the whole LAYOUT
+  // handler BEFORE the export bridge call — guard + use WC.PM.__repaginate instead.)
+  function setPageVar(name, value) { document.documentElement.style.setProperty(name, value); try { if (window.WC.PM && typeof window.WC.PM.__repaginate === 'function') window.WC.PM.__repaginate(); } catch (e) { /* PM not mounted */ } }
   function marginsMenu(node) {
     // [label, top/bottom in", left/right in"]  — clone realizes a single uniform
     // --page-margin, so we apply the left/right value (the visually dominant one).
@@ -2049,7 +2052,7 @@
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Margins'));
       presets.forEach(([label, tb, lr]) => {
-        const it = WC.flyItem(label + '   T/B ' + tb + '"  L/R ' + lr + '"', { onClick: () => setPageVar('--page-margin', Math.round(lr * 96) + 'px') });
+        const it = WC.flyItem(label + '   T/B ' + tb + '"  L/R ' + lr + '"', { onClick: () => { setPageVar('--page-margin', Math.round(lr * 96) + 'px'); if (typeof WC.PM.dePageMargins === 'function') WC.PM.dePageMargins({ top: tb, right: lr, bottom: tb, left: lr }); } });
         fly.appendChild(it);
       });
       fly.appendChild(WC.flySep());
@@ -2060,14 +2063,14 @@
     const cur = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-margin')) || 96) / 96;
     const inp = el('input', { type: 'number', step: '0.1', min: '0', value: String(cur), style: { width: '70px' } });
     WC.dialog({ title: 'Page Setup — Margins', width: '380px', body: el('div', {}, [el('div', { class: 'row' }, [el('label', { text: 'Margin (inches):', style: { width: '120px' } }), inp])]), footer: [
-      { label: 'OK', primary: true, onClick: () => { const v = parseFloat(inp.value); if (v >= 0) setPageVar('--page-margin', Math.round(v * 96) + 'px'); } },
+      { label: 'OK', primary: true, onClick: () => { const v = parseFloat(inp.value); if (v >= 0) { setPageVar('--page-margin', Math.round(v * 96) + 'px'); if (typeof WC.PM.dePageMargins === 'function') WC.PM.dePageMargins({ top: v, right: v, bottom: v, left: v }); } } },
       { label: 'Cancel' },
     ] });
   }
   function orientationMenu(node) {
     WC.flyout(node, (fly) => {
-      fly.appendChild(WC.flyItem('Portrait', { onClick: () => { setPageVar('--page-w', '816px'); setPageVar('--page-h', '1056px'); E().pageH = 1056; E().repaginate(); } }));
-      fly.appendChild(WC.flyItem('Landscape', { onClick: () => { setPageVar('--page-w', '1056px'); setPageVar('--page-h', '816px'); E().pageH = 816; E().repaginate(); } }));
+      fly.appendChild(WC.flyItem('Portrait', { onClick: () => { setPageVar('--page-w', '816px'); setPageVar('--page-h', '1056px'); if (typeof WC.PM.dePageSize === 'function') WC.PM.dePageSize({ width: 8.5, height: 11, orientation: 'portrait' }); } }));
+      fly.appendChild(WC.flyItem('Landscape', { onClick: () => { setPageVar('--page-w', '1056px'); setPageVar('--page-h', '816px'); if (typeof WC.PM.dePageSize === 'function') WC.PM.dePageSize({ width: 11, height: 8.5, orientation: 'landscape' }); } }));
     });
   }
   function pageSizeMenu(node) {
@@ -2078,7 +2081,7 @@
     ];
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Paper Size'));
-      sizes.forEach(([label, w, h, dim]) => fly.appendChild(WC.flyItem(label + '   ' + dim, { onClick: () => { setPageVar('--page-w', w + 'px'); setPageVar('--page-h', h + 'px'); E().pageH = h; E().repaginate(); } })));
+      sizes.forEach(([label, w, h, dim]) => fly.appendChild(WC.flyItem(label + '   ' + dim, { onClick: () => { setPageVar('--page-w', w + 'px'); setPageVar('--page-h', h + 'px'); if (typeof WC.PM.dePageSize === 'function') WC.PM.dePageSize({ width: w / 96, height: h / 96, orientation: 'portrait' }); } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('More Paper Sizes…', { onClick: () => morePaperSizesDialog() }));
     });
@@ -2090,7 +2093,7 @@
       el('div', { class: 'row' }, [el('label', { text: 'Width (in):', style: { width: '90px' } }), w]),
       el('div', { class: 'row' }, [el('label', { text: 'Height (in):', style: { width: '90px' } }), h]),
     ]), footer: [
-      { label: 'OK', primary: true, onClick: () => { const pw = Math.round(parseFloat(w.value) * 96), ph = Math.round(parseFloat(h.value) * 96); if (pw > 0 && ph > 0) { setPageVar('--page-w', pw + 'px'); setPageVar('--page-h', ph + 'px'); E().pageH = ph; E().repaginate(); } } },
+      { label: 'OK', primary: true, onClick: () => { const wi = parseFloat(w.value), hi = parseFloat(h.value); const pw = Math.round(wi * 96), ph = Math.round(hi * 96); if (pw > 0 && ph > 0) { setPageVar('--page-w', pw + 'px'); setPageVar('--page-h', ph + 'px'); if (typeof WC.PM.dePageSize === 'function') WC.PM.dePageSize({ width: wi, height: hi, orientation: wi > hi ? 'landscape' : 'portrait' }); } } },
       { label: 'Cancel' },
     ] });
   }
