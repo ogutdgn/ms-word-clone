@@ -1314,3 +1314,95 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : Resolve the outline color to a real RGB hex before export. Best: in `outlineMenu` (`commands.js:585`) don't store the keyword for width presets — resolve the run's effective text color (fall back to `#000000`) and store that hex, mirroring "Outline Color…". Defense-in-depth: in `styles.js:777` or the translator decode, coerce any non-hex color (`currentColor`, named CSS colors) to a valid 6-hex `srgbClr` (resolve `currentColor` → the run's `w:color`, default `000000`). Effort: S-M. Risk: low. Regression: assert the width-preset Outline export emits a valid `w14:srgbClr`, not `CURRENTCOLOR`. (Same class of "render-fine-but-export-invalid" as a real save defect — always Word-COM-validate.)
 
 ---
+
+## BUG-052 — Font Color theme picks are down-converted to static hex on save (no `w:themeColor`); the advertised Gradient submenu is absent
+**Severity:** S3
+
+**Where**
+: Home > Font > Font Color (split). `commands.js:1819-1861 applyColor/colorMenu → pm.cmd('setColor', literalHex)`; `util.js:109-140 WC.colorPalette` (Theme swatches pass their resolved hex, no theme-slot id; no gradient branch); `core/superdoc-fork/extensions/color/color.js:50-55` (the color mark carries only a `color` hex, no `themeColor` attr); `core/superdoc-fork/core/super-converter/exporter.js:587-602` (run color exports `w:color w:val=<hex>`, never `w:themeColor`); ribbon advertises "Gradient" at `ribbon-data.js:223,230`.
+
+**When / repro**
+: 1) Select text, Font Color > pick a **Theme Color** (e.g. Blue, Accent 1, Lighter 80%). 2) Save .docx. 3) The run is hard-coded to that hex (`w:color w:val="D9E2F3"`), not theme-linked — so changing the document theme doesn't re-color it (Word's theme colors do). Also: the ribbon advertises a "Gradient" text-fill submenu that doesn't exist.
+
+**Symptom (Word vs clone)**
+: Word writes `w:color w:themeColor="accent1" w:themeTint="…"` for theme picks so the run re-themes; the clone writes a raw hex, breaking the theme linkage (a silent fidelity/data-linkage loss). The import side (`color-translator.js`) *does* round-trip `themeColor`, so re-saving a Word doc also loses it. The "Gradient" advertisement is a lying tooltip/item.
+
+**Why it happens (root cause)**
+: The palette has no theme-slot concept — Theme swatches pass a resolved hex into `setColor`, which stores a plain `color` string; the exporter never emits `w:themeColor`. `colorPalette` has no gradient branch at all.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b5-model.js` (`s3b5-model.json` → `fontColorTheme`): after a theme-tint pick, the export contains `<w:color w:val="D9E2F3" />` with `hasThemeColor:false`, `modelMarkHasThemeColor:false`, and `gradientInPalette:false`.
+
+**Solution**
+: Carry theme linkage end-to-end: tag Theme swatches with a stable slot id (accent1..6/text1-2/bg1-2 + tint/shade) and pass `{color, themeColor, themeTint|themeShade}` to `onPick`; extend the color mark schema with `themeColor/themeTint/themeShade`; in `exporter.js` emit `w:themeColor` (+tint/shade) when present (the importer already round-trips these); recompute resolved hex on theme change. Separately, implement a Gradient submenu or stop advertising it. Effort: M. Risk: low-medium. Regression: a theme pick exports `w:themeColor` and survives round-trip.
+
+---
+
+## BUG-053 — "Select All Text With Similar Formatting" selects one contiguous range, sweeping in non-matching text (corruption path)
+**Severity:** S3
+
+**Where**
+: Home > Editing > Select > "Select All Text With Similar Formatting". `bridge/commands.ts:141-168 selectSimilarFormatting` computes only the FIRST and LAST byte positions of matching runs, then issues ONE contiguous `TextSelection {from:first, to:last}` (`:158-167`); wired at `commands.js:1995`.
+
+**When / repro**
+: 1) Type bold "AAAA", plain " plain middle ", bold "BBBB". 2) Caret in the first bold run. 3) Select > Select All Text With Similar Formatting. 4) The selection spans "AAAA plain middle BBBB" — including the non-bold "plain middle". 5) Apply any mark → the previously-plain middle text is corrupted with it.
+
+**Symptom (Word vs clone)**
+: Word selects only the discontiguous matching runs (a multi-range selection). The clone, limited to PM's single-range `TextSelection`, sweeps every intervening non-matching run into one contiguous selection, so "similar formatting" selects dissimilar text too — and any subsequently applied mark/style corrupts the in-between text.
+
+**Why it happens (root cause)**
+: PM `TextSelection` is single-range; `selectSimilarFormatting` collapses matches to `{first, last}` instead of representing the discontiguous set. (An in-code comment calls it a "recorded deviation," but it's a real behavioral defect with a corruption path.)
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b5-model.js` (`selectSimilar`): caret in the first bold run, `selectSimilarFormatting()` → selection `from:2,to:28`, `selectedText:"AAAA plain middle BBBB"`, `includesPlainMiddle:true`.
+
+**Solution**
+: Faithful fix needs multi-range selection (a custom Selection or a decoration-based pseudo-selection set that the format commands iterate). Minimum bar: when matches are discontiguous, select only the run at/nearest the caret (or toast "multi-range select-similar not yet supported") rather than silently over-selecting — so a later mark can't corrupt in-between text. Effort: M-L. Risk: medium. Regression: the applied-mark span excludes the intervening plain run.
+
+---
+
+## BUG-054 — Text Effects ▸ Shadow and Reflection are silently dropped on docx export (no `w14:shadow`/`w14:reflection` translators)
+**Severity:** S3 (data loss on save)
+
+**Where**
+: Home > Font > Text Effects > Shadow / Reflection. Menu `commands.js:590-603 shadowMenu/reflectionMenu` set `textShadowW14`/`textReflection` via `applyTE`; schema `core/superdoc-fork/extensions/text-style/text-style.js:215-221` stores + renders them in-app. But the export switch `core/superdoc-fork/core/super-converter/styles.js:772-784` handles **only** `textOutline` + `textGlow` (explicit comment: "Shadow + reflection are stage-2b … deferrals A.1"); `rpr-translator.js:241-245` re-hydrates only outline/glow. No `w14-shadow`/`w14-reflection` handler dir exists (only `w14-textOutline`, `w14-glow`, `w14-ligatures`, `w14-numForm`, `w14-numSpacing`, `w14-stylisticSets`, `w14-cntxtAlts`). (`handlers/w/shadow/shadow-translator.js` is the legacy boolean emboss prop, not `w14:shadow`.)
+
+**When / repro**
+: 1) Select text, apply Text Effects > Shadow (e.g. Bottom Right) and/or Reflection. 2) The effect shows on screen. 3) Save .docx and reopen → the shadow/reflection are gone.
+
+**Symptom (Word vs clone)**
+: Word persists `w14:shadow`/`w14:reflection`. The clone applies a saved-looking effect that vanishes on save — a lying control. **Distinct from BUG-051** (Outline writes an *invalid* `w14:textOutline` with unresolved `currentColor` — written-but-wrong); here Shadow/Reflection are written **nowhere**.
+
+**Why it happens (root cause)**
+: The export run-properties switch has no case for `textShadowW14`/`textReflection` and no w14 translator is registered, so the model attrs are never serialized (a known stage-2b deferral, but a silent data drop from the user's view).
+
+**Evidence**
+: **Runtime-confirmed via the full .docx package** — probe `C:\tmp\bughunt\probes\s3b5-export.js` (`s3b5-export.json`): the model holds both marks (`modelHasShadow:true`, `modelHasReflection:true`), but unzipping `word/document.xml` from the saved `te-shadow-reflection.docx` finds **zero** `w14:shadow`/`w14:reflection`, while the positive control `te-outline-ctrl.docx` contains `2 × w14:textOutline` (proving the harness/grep work and the absence is real).
+
+**Solution**
+: Add `w14:shadow` + `w14:reflection` translators mirroring the `w14-textOutline`/`w14-glow` pair (shadow: `w14:shadow` with blurRad EMU, dist/dir polar from dx/dy, `w14:srgbClr`+alpha; reflection: `w14:reflection` blurRad/stA/stPos/endA/endPos/dist/dir/fadeDir per preset — oracle-derive the numeric values from live Word), register them in `rpr-translator.js`, and add `textShadowW14`/`textReflection` cases to the `styles.js` export switch (+ import rehydration). Until then, honest-degrade (a "deferred" toast) so the menu doesn't silently drop the effect. Effort: M-L. Risk: medium (validate via Word COM). Regression: `w14:shadow`/`w14:reflection` appear in the exported full-package `document.xml`.
+
+---
+
+## BUG-055 — Line Spacing Options / Paragraph dialog OK silently destroys an exact/at-least line rule (even when only the indent was changed)
+**Severity:** S3 (with an S2-grade data-loss path)
+
+**Where**
+: Home > Paragraph > Line Spacing > Line Spacing Options… (and the Paragraph dialog launcher). `dialogs.js:221-261 D.paragraph`; the line-rule clobber at `dialogs.js:251-252` (always writes `lineRule:'auto'`) + the dropdown limited to 6 multiples at `dialogs.js:232-236` (can't represent exact/atLeast); seed at `state-sync.ts:142-159` (forces `lineSpacing=null` for exact/atLeast imports).
+
+**When / repro**
+: 1) A paragraph with "Exactly 14 pt" line spacing (`lineRule:'exact'`, imported or set). 2) Open the Paragraph dialog to change **only the indent**; the line dropdown sits at its default (1.15) because it can't show "Exactly". 3) Click OK. 4) The exact rule is destroyed — the paragraph becomes "Multiple 1.15" (`lineRule:'auto'`, line 276).
+
+**Symptom (Word vs clone)**
+: Word preserves a line rule it doesn't touch. The clone's OK handler unconditionally writes `spacing.line = round(1.15*240) = 276` and `lineRule:'auto'` regardless of whether the user touched line spacing, silently converting an exact/atLeast rule to Multiple 1.15. (The dialog is also a 6-row subset — no Special indent, no line-rule selector, no Line-and-Page-Breaks tab, no Tabs, no preview — but those are honest reductions; the unconditional clobber is the bug.)
+
+**Why it happens (root cause)**
+: The seed forces `lineSpacing=null` for un-representable rules, so the dropdown defaults to 1.15; the OK handler then writes that default + `lineRule:'auto'` unconditionally. The fork model/converter fully support `lineRule:'exact'/'atLeast'` (round-trip tests exist), so this is a dialog-handler defect, not an engine limit.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b5-model.js` (`lineSpacingClobber`): seeding `{line:280, lineRule:'exact'}` then replaying the dialog's OK writes (indent-only intent) yields `{line:276, lineRule:'auto'}` — the exact rule and its 280-twip value are gone.
+
+**Solution**
+: (1) Stop the clobber: only write `spacing.line`/`lineRule` when the user actually changed the line-spacing control (track the seeded value; skip if unchanged), and never force `lineRule:'auto'` on a paragraph whose existing rule is exact/atLeast. (2) Restore parity: add a line-rule selector (Single/1.5/Double/At least/Exactly/Multiple) + "At" field, a Special indent dropdown (first-line/hanging) + By, and a Line-and-Page-Breaks tab (all already supported by the model/translator). Effort: M. Risk: low-medium. Regression: the dialog's indent-only path preserves a pre-existing `lineRule:'exact'`.
+
+---

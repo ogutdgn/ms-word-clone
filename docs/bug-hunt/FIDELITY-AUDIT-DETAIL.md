@@ -2203,3 +2203,16 @@ Batch-4 of the **S3** tier (16 Proofing/View/Home-font/clipboard items) triaged 
   `#editor` id) — observable only via audio/pixels.
 
 ---
+## Resolution log — S3 batch-5 triage sweep (2026-06-17)
+Batch-5 of the **S3** tier (16 Text-Effects/Font-Size/Arrange/Styles items) triaged + runtime-probed
+(`s3b5-model.js`, `s3b5-export.js` full-package):
+- **Promoted to numbered, runtime-confirmed bugs:** Font Color theme→static-hex → **BUG-052**; Select-Similar over-broad
+  contiguous selection → **BUG-053**; Text Effects Shadow+Reflection dropped on export → **BUG-054**; Paragraph/Line-Spacing
+  dialog clobbers exact line rule → **BUG-055**.
+- **Duplicate:** Text Effects **Glow** → **BUG-051** (same `currentColor`→invalid-OOXML root as Outline).
+- **Verdict = not-a-bug (works / honest reduction):** Styles Gallery apply; Show/Hide ¶ (CSS-class toggle, no marks layer
+  needed); File Save As html/txt (standards-valid minimal HTML by design); Send Backward; Insert Table of Authorities;
+  Number Styles/Ligatures/Stylistic Sets (correct `font-variant` export); Increase/Decrease Font Size (correct Word jump-list
+  walk); Insert Index; Wrap Text; Bring Forward.
+
+---

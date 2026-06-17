@@ -425,6 +425,22 @@ Batch-4 of the S3 tier (16 Proofing/View/Home-font/clipboard items, deduped vs t
   Show-Markup items, Accessibility 4-checks, Language doc-level-only, Read-Mode snapshot, Underline-color unreachable); 2
   needs-runtime-not-headless (Read Aloud TTS, Side-to-Side CSS targets retired #editor)._
 
+## S3-audit-triage new bugs (BUG-052…055) — batch-5, runtime-confirmed 2026-06-17
+Batch-5 of the S3 tier (16 Text-Effects/Font-Size/Arrange/Styles items, deduped vs the 51-bug catalog) surfaced 4 more
+bugs (`s3b5-model.js` / `s3b5-export.js`). Full detail in `BUGS-DETAILED.md` § BUG-052…055.
+- **BUG-052 [S3] Font Color theme picks down-convert to static hex on save** (no `w:themeColor`), so they don't re-theme;
+  Gradient submenu advertised but absent. Probe: export `<w:color w:val="D9E2F3"/>`, `hasThemeColor:false`.
+- **BUG-053 [S3] "Select All Text With Similar Formatting" selects one contiguous range**, sweeping non-matching text in
+  (corruption path when a mark is applied). Probe: selection text = "AAAA plain middle BBBB".
+- **BUG-054 [S3 data loss] Text Effects Shadow + Reflection silently dropped on export** (no `w14:shadow`/`w14:reflection`
+  translators — only outline/glow). Distinct from BUG-051 (written-but-invalid); here written-NOWHERE. Full-package probe:
+  saved .docx has 0 `w14:shadow`/`w14:reflection` while the outline control has `2 w14:textOutline`.
+- **BUG-055 [S3 + S2 data-loss path] Paragraph/Line-Spacing dialog OK destroys an exact/at-least line rule** even on an
+  indent-only edit (unconditionally writes `lineRule:'auto'`, line 276). Probe: `{line:280,exact}` → `{line:276,auto}`.
+- _Batch-5 also: 1 duplicate (Text Effects **Glow** → **BUG-051**, same currentColor root); 11 not-bugs (Styles-Gallery apply,
+  Show/Hide ¶, Save-As html/txt, Send-Backward, Insert-ToA, Number-Styles/Ligatures, Increase/Decrease-Font-Size jump-list
+  correct, Insert-Index, Wrap-Text, Bring-Forward — all honest reductions / verified-correct)._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via
