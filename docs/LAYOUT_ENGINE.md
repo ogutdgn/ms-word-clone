@@ -136,8 +136,10 @@ parity** → update `plan-tracking` → PR.
 
 - **Oracle = Word for Windows 16.0 COM** (`scripts/oracle/word-oracle-win.ps1`) — native on
   Windows, the project's intended ground truth (the macOS AppleScript oracle was a flaky
-  stopgap). Compare: lines/page, page count, object anchor positions (`posH/posV`/`extent`),
-  table grid metrics, and `.docx` round-trips.
+  stopgap). The exact parity target is **LOCKED** in [ADR-0006](decisions/0006-word-parity-target-version.md):
+  Microsoft 365 **Word for Windows**, Current Channel, x64, en-US, build **16.0.20026.20168**
+  (the dev-PC install). Compare: lines/page, page count, object anchor positions
+  (`posH/posV`/`extent`), table grid metrics, and `.docx` round-trips.
 - **Gates** stay green; add layout-specific cases to `test:pm` (geometry/handle write-back) and
   `test:roundtrip` (the `.docx` extent/gridCol/anchor round-trips).
 - **Headless verifiability** (CUA-env requirement): every geometry change is a model

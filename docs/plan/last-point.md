@@ -7,7 +7,27 @@
 
 ---
 
-## 2026-06-17 (RESUME HERE — ALL 4 big items have shipped increments; ITEM 4 keystone = drag-reposition DONE (PR #132) + STEERING INFLECTION)
+## 2026-06-17 (doc maintenance — Word PARITY TARGET LOCKED (ADR-0006); docs verified up-to-date)
+
+> **Branch:** `main`. **Phase:** 4. Docs/plan all current + git clean/synced.
+>
+> **🔒 PARITY TARGET LOCKED — ADR-0006** (read live via COM on the dev PC): the "real Word" oracle is
+> **Microsoft 365 Apps (`O365ProPlusRetail`) — Word for Windows, Current Channel (`Production::CC`), x64,
+> en-US, Version 16.0, build 16.0.20026.20168** (`C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE`).
+> NOT Mac Word, NOT perpetual 2019/2021/2024. Current Channel auto-updates so the BUILD drifts (was
+> `16.0.19929` when Aptos colors + ground-truth JSON were extracted — same install) → lock = the identity,
+> record the build per validation. New `docs/decisions/0006-word-parity-target-version.md`; indexed in
+> decisions/README; pinned in LAYOUT_ENGINE.md §5; memory `dev-machine-windows` updated.
+>
+> **📋 DOC-CURRENCY CHECK:** plan docs current through PR #133; git clean + synced. ⚠️ `docs/BUG_BUST_FINDINGS.md`
+> is STALE (2026-06-01, pre-PM-pivot — its fixes reference retired legacy files `src/renderer/js/*`,
+> `WC.Editor`, `html-to-docx`; all GONE). The 55 bugs need RE-TRIAGE against the current PM codebase before
+> any are actionable (several already addressed in PM: comments/headers/endnote export). User is handling
+> the bug list separately (a concurrent session); flagged for re-triage, not auto-fixed.
+
+---
+
+## 2026-06-17 (ALL 4 big items have shipped increments; ITEM 4 keystone = drag-reposition DONE (PR #132) + STEERING INFLECTION)
 
 > **Branch:** `main` (PR #132 merged `15aae62`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 475 / smoke 9 / roundtrip 27.** Word COM-validated. Directive: [[phase4-finish-all-directive]].
