@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (v4 #3 paragraph spacing — Word-COM-validated CORRECT, `/loop` 5-min cadence)
+- [x] **v4 #3 paragraphSpacing export + COM — DONE (PR #120 `76bec23`)** — Design tab's FIRST Word-COM
+  oracle (`oracle-probe-paraspacing.js` + `validate-paraspacing-win.ps1`). `deParagraphSpacing({before:12,
+  after:18,line:3})` → Word reads SpaceBefore=12, SpaceAfter=18, LineSpacing=36, LineSpacingRule=5
+  (Multiple). Export faithful — NO source bug. New `[10th]` test gates the full chain (docDefaults
+  before+after+line + Normal-style write). Gates: **PM 468 / smoke 9 / roundtrip 27**.
+- [x] **Two lessons:** (1) global-style bridge verbs (`deParagraphSpacing` writes Normal+docDefaults, not
+  reset by setDoc) need a `finally{}` teardown — a non-zero `before` leaked a top-margin into `[4a]`.
+  (2) `/code-review` caught a vacuous `w:line` assertion (prior test leaves line:2→480 in persisted
+  docDefaults) → use a DISTINCT value (line:3→720). Also fixed validator enum comment + `$p`→`$para`.
+- [ ] **NEXT (continue v4):** #4 pageBorders export + COM (`dePageBorders` design.ts:228; COM
+  `Sections(1).Borders`). Then #5 pageColor (LOW COM confidence — likely byte-only acceptable).
+
 ### 2026-06-16 (v4 #2 comments export — Word-COM-validated CORRECT, `/loop` 5-min cadence)
 - [x] **v4 #2 comments export + COM — DONE (PR #118 `8497efc`)** — review area's FIRST Word-COM oracle
   (`oracle-probe-comments.js` + `validate-comments-win.ps1`). Word reads `Comments.Count==1`, body,
