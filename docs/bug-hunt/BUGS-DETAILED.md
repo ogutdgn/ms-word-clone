@@ -1061,3 +1061,72 @@ Every confirmed bug, uniformly documented: **Where** (file/function/line + ribbo
 The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChange` then `nextChange`, unconditional) can skip the next **adjacent** revision because `nextChange` (`review.ts:405-411`) uses a strict `c.from > pos` filter. Probe `C:\tmp\bughunt\probes\s2-trackchanges.js` attempted to build two adjacent tracked deletions but they landed non-adjacent (`A.to=25`, `B.from=27`, `adjacent:false`); rejecting A then advancing left the caret at 24, **before** B (`skippedB:false`) — correct behavior in the non-adjacent case. The skip-adjacent defect requires `B.from === A.to` exactly, which the probe could not construct, so it is **unconfirmed** (neither reproduced nor refuted). Logged transparently rather than promoted to a numbered bug. The audit's *primary* "Accept caret-off-change advances without accepting" framing was separately judged **not-a-bug** (Word parity). If revisited, change `nextChange`'s predicate to `c.from >= pos` (`review.ts:409`) and add an adjacent-changes regression test.
 
 ---
+
+## BUG-041 — Find/Replace "Use wildcards": quantifiers `{n}`, grouping `(..)`, and `@` are escaped to literal characters (wrong/zero matches); Replace backrefs inserted verbatim
+**Severity:** S3
+
+**Where**
+: Home > Editing > Replace / Find > Advanced Find (with "Use wildcards" on). `core/superdoc-fork/extensions/search/SearchIndex.js:466-510 wildcardToRegExp` supports only `? * < > [..] [!..]` and `\`-escape; the final else (`:507`) escapes `{ } ( ) @` to literal. `search.js:690-691` builds the RegExp via `wildcardToRegExp`; `search.js:810 replaceSearchMatch` and `:875 replaceAllSearchMatches` both insert `state.schema.text(replacement)` VERBATIM — no `\1..\9` / `^&` substitution.
+
+**When / repro**
+: With "Use wildcards" checked: 1) Find `te{2}st` → finds nothing (Word matches "teest"). 2) Find `(a)(b)`, Replace `\2\1` → nothing happens (Word swaps to "ba"). Any Word wildcard using `{n}`/`{n,m}`, `@`, or `(..)` grouping returns wrong/zero results.
+
+**Symptom (Word vs clone)**
+: Word's "Use wildcards" honors the full grammar — `{n}`/`{n,m}` repeat, `@` one-or-more, `(..)` grouping, and Replace backrefs `\1..\9` / `^&`. The clone silently treats `{ } ( ) @` as literal characters, so valid Word wildcards match nothing (or the wrong thing) with no error or disclosure — a silently-wrong ("lying") control. (`NOT_IMPLEMENTED.md:82` even marks "support group back-references in replacement" as done, which the code does not do.) Distinct from BUG-018 (Replace pane hiding the options row): this is the wildcard **engine** + replace-substitution gap, reachable from Find/Advanced Find where the options ARE exposed.
+
+**Why it happens (root cause)**
+: `wildcardToRegExp` implements only a subset of the grammar; `{n}`, `@`, and `(..)` fall through to the generic escape branch and become literal RegExp characters, so `te{2}st` becomes a literal-brace search. Separately the Replace path inserts the replacement string literally via `schema.text()`, so backrefs would be written into the document as literal text rather than substituted.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3-search.js` (`s3-search.json`): find `te{2}st` with `useWildcards:true` → `qmatchCount:0` (quantifier treated as literal braces — zero matches where Word finds "teest"); find `(a)(b)` then `replaceAllSearchMatches('\2\1')` → `replacedCount:0`, doc unchanged (`"ab"`) because the grouping parens are also literal, so the pattern matches nothing. (The backref-substitution sub-claim could not be *exercised* at runtime because grouping itself fails first; it remains code-confirmed at `search.js:810/875` — verbatim `schema.text()` insert.)
+
+**Solution**
+: Extend `wildcardToRegExp` to map `{n}`/`{n,m}`→`{n}`/`{n,m}`, `@`→`+`, and `(..)`→capture groups (track group count); and in `replaceSearchMatch`/`replaceAllSearchMatches`, when `useWildcards`, substitute `\1..\9` and `^&` from the match groups instead of inserting verbatim. Effort: medium (~half day incl. tests). Risk: low-medium — keep plain `? * < > [..]` behavior unchanged and preserve "wildcards are always case-sensitive"; add a regression test in `scripts/test-suite-pm.js`.
+
+---
+
+## BUG-042 — Sort Text dialog: Type=Date sorts by the leading number (not chronologically); "Date" silently reuses the numeric path
+**Severity:** S4
+
+**Where**
+: Home > Paragraph > Sort. `commands.js:2007-2028 sortDialog` (Type = Text/Number/Date); the OK handler (`:2021`) sets `numeric = (type.value !== 'Text')` — so **Date shares the Number branch**. `bridge/commands.ts:100-105 sortParagraphs` sorts numeric with `parseFloat(node.textContent)||0` (`:102`); there is no date parsing anywhere.
+
+**When / repro**
+: 1) Type four paragraphs of dates ("March 5, 2024", "January 12, 2024", "December 31, 2023", "February 1, 2024"). 2) Home > Sort, Type = **Date**, Ascending, OK. 3) The order is not chronological — the paragraphs are left effectively unsorted (each date string `parseFloat`s to `NaN→0`).
+
+**Symptom (Word vs clone)**
+: Word's Sort with Type=Date parses the dates and orders chronologically. The clone routes Date through the numeric `parseFloat` path, so date strings sort by any leading number (or, for month-name-first strings, all collapse to `0` and stay in input order). The dialog presents Date as a working type but produces wrong output — a lying control. (The other audit sub-claims — no multi-key, no Options…, no field sort, no case-sensitive toggle — are honest feature-completeness reductions, not bugs.)
+
+**Why it happens (root cause)**
+: The OK handler collapses Date and Number into one `numeric` flag and there is no date comparator; `sortParagraphs` only knows text vs `parseFloat`. Selecting Date runs `parseFloat` over date strings, which is unrelated to chronology.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3-misc.js` (`s3-misc.json` → `sortDate`): `sortParagraphs({ascending:true,numeric:true})` on the four date strings returned `orderedTexts` = input order, `matchesChrono:false` (NOT the chronological `expectedChrono`). (Month-name-first strings all `parseFloat→NaN→0`, so the numeric sort is effectively a no-op rather than chronological.)
+
+**Solution**
+: Route Type=Date through a real date branch (`Date.parse` / a small locale-aware d-m-y parser, fall back to text on unparseable) instead of reusing `numeric parseFloat`; thread a `type`/`dateSort` opt from `sortDialog` (`commands.js:2021`) into `sortParagraphs` and add a date comparator. Effort: small-medium. Risk: low (isolated to the Date branch; Text/Number unchanged). Add a regression test sorting date strings.
+
+---
+
+## BUG-043 — Date & Time: the "Update automatically" checkbox is never read; the clone always inserts an auto-updating DATE field (no static-text option)
+**Severity:** S4
+
+**Where**
+: Insert > Text > Date & Time. `insert-features.js:186-196 Insert.dateTimeDialog` builds the `upd` ("Update automatically") checkbox at `:190`, but the OK handler (`:193`) calls `WC.PM.xeDateTime(format)` and never reads `upd.checked`. `bridge/insert-exotica.ts:118-123 xeDateTime` is hardwired to `insertField('DATE \@ "<fmt>"')` with no static-text branch. H wiring `commands.js:461`/`:1602`.
+
+**When / repro**
+: 1) Insert > Date & Time, pick a format, **uncheck** "Update automatically", OK. 2) The inserted date is still an auto-updating DATE field — unchecking did nothing. (Word inserts a plain static text run when unchecked, a DATE field when checked.)
+
+**Symptom (Word vs clone)**
+: Word toggles between a static text snapshot (unchecked) and a DATE field (checked). The clone offers the choice in the dialog but silently discards it and always inserts a DATE field — a lying control. (Only 6 formats, no Language selector, and no Default button are separate feature-completeness reductions, not bugs.)
+
+**Why it happens (root cause)**
+: `xeDateTime` unconditionally inserts a DATE field; there is no code path that inserts plain text for the unchecked case, and the OK handler never passes the checkbox state.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3-misc.js` (`s3-misc.json` → `dateTimeField`): `WC.PM.xeDateTime('M/d/yyyy')` (exactly what the OK handler runs regardless of the checkbox) → `inserted:true`, `hasDateField:true` (a `DATE \@` field instruction in the export) unconditionally; there is no variant that yields a plain static text run.
+
+**Solution**
+: In the `dateTimeDialog` OK handler read `upd.checked` and, when unchecked, insert the preformatted date string as plain text (e.g. an `xeDateTime(fmt, {field:false})` overload that inserts the rendered text snapshot via `insertContent` when `field===false`). ~10-line additive change, low risk. Optionally widen the format list + add a Language selector for fuller parity (separate, larger effort).
+
+---

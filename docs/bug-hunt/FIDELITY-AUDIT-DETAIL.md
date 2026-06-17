@@ -2145,3 +2145,19 @@ flags on the named entries above:
   `BUGS-DETAILED.md` → "NOT-REPRODUCED note".
 
 ---
+## Resolution log — S3 batch-1 triage sweep (2026-06-17)
+Curated batch-1 of the **S3** tier (16 high-signal items: BUG-tagged + wrong-output-risk) was triaged (dedup vs the 40-bug
+catalog) + runtime-probed (`s3-search.js`, `s3-misc.js`):
+- **Promoted to numbered, runtime-confirmed bugs:** Find/Replace "Use wildcards" engine (`{n}`/`(..)`/`@` literal + verbatim
+  backrefs) → **BUG-041**; Sort Text Type=Date (numeric path, not chronological) → **BUG-042**; Date & Time "Update
+  automatically" never read → **BUG-043**.
+- **Duplicates:** Mailings Rules NEXTIF + SKIPIF → **BUG-008**; Next/Previous Endnote nav (no note-type filter) → **BUG-023**;
+  Convert Text to Table engine (unreachable behind the dead Insert toast) → **BUG-016**.
+- **Verdict = not-a-bug (works / honest reduction):** Format Painter single-click; Insert Table mid-paragraph caret
+  (placement-only, no loss); Inserted table default width/AutoFit (the NULL-width path is dead/unreachable); Replace All
+  count+scope (count is accurate); Paste dropdown options + Paste Special (cosmetic/documented scope); Go To (honest reduced surface).
+- **Known stubs (honest, no data loss):** Find/Replace Special-characters `^`-codes; Drop Cap Options… / Dropped-paint.
+- Remaining S3 items (~129) are predominantly DEVIATION/GAP/STUB feature-completeness; future curated batches sweep the
+  wrong-output-risk subset.
+
+---

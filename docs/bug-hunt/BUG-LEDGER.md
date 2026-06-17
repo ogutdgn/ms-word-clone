@@ -358,6 +358,23 @@ Full detail (Where/When/Symptom/Why/Evidence/Solution) in `BUGS-DETAILED.md` § 
   One theorized defect — Track Changes **Reject** skip-adjacent — could NOT be reproduced (probe couldn't build adjacency); logged
   transparently in `BUGS-DETAILED.md`, not numbered._
 
+## S3-audit-triage new bugs (BUG-041…043) — runtime-confirmed 2026-06-17
+Curated batch-1 of the S3 fidelity-audit tier (16 high-signal items: BUG-tagged + wrong-output-risk, deduped vs the
+40-bug catalog) surfaced 3 genuine new "lying control" bugs (wrong output where the control claims to work), each
+runtime-confirmed by headless probe (`C:\tmp\bughunt\probes\s3-search.js` / `s3-misc.js`). Full detail in
+`BUGS-DETAILED.md` § BUG-041…043.
+- **BUG-041 [S3] Find/Replace "Use wildcards": `{n}` / `(..)` / `@` escaped to literal (wrong/zero matches); Replace
+  backrefs inserted verbatim.** `SearchIndex.js:507` + `search.js:810/875`. Probe: `te{2}st`→0 matches, `(a)(b)`→0 replacements.
+- **BUG-042 [S4] Sort Text Type=Date sorts by leading number, not chronologically** (Date reuses the numeric `parseFloat`
+  path; no date parsing). `commands.js:2021` + `commands.ts:102`. Probe: date strings `matchesChrono:false`.
+- **BUG-043 [S4] Date & Time "Update automatically" checkbox is never read — always inserts an auto-updating DATE field**
+  (no static-text path). `insert-features.js:193` + `insert-exotica.ts:118-123`. Probe: `hasDateField:true` unconditionally.
+- _Also from batch-1: 4 duplicates (Mailings NEXTIF/SKIPIF → **BUG-008**; Next/Prev Endnote nav → **BUG-023**; Convert Text
+  to Table → **BUG-016**); 8 not-bugs (Format Painter single-click, Insert-Table caret placement, table default widths,
+  Replace-All count, Paste options/Paste Special, Go To — all honest reductions / correct); 2 known-stubs (Find/Replace
+  `^`-codes, Drop Cap Options). Remaining S3 items (~129) are predominantly DEVIATION/GAP/STUB feature-completeness — future
+  curated batches will sweep the wrong-output-risk ones._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via
