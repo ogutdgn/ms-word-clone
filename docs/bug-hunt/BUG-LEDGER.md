@@ -315,6 +315,23 @@ Re-checked the pre-PM-pivot `docs/BUG_BUST_FINDINGS.md` (55 bugs, the user's sep
   - **BUG-030 [S3]** — PDF export / Print capture app chrome + inter-page gap bands (no print stylesheet; code-confirmed).
   - **BUG-031 [S4]** — ToF / Bibliography inserted twice stacks a duplicate (Index/ToA replace-in-place; ToF/Bib don't).
 
+## Feature-research-spotted bugs (BUG-032…033 + 11 more in `FEATURE-IMPROVEMENTS.md`)
+The Table/Picture contextual-tab feature research (`FEATURE-IMPROVEMENTS.md`) spotted 13 bugs. The two clearest
+wrong-behavior bugs (code-confirmed via the cited lines):
+- **BUG-032 [S3] Table Text Direction is a one-shot — can't restore horizontal.** `commands.js:130` hardwires the cell
+  text direction to `'tbRl'`; pressing it cannot cycle back to horizontal or to `btLr`, so once pressed the user can't
+  restore horizontal text from the ribbon. Word's button cycles horizontal → 90° → 270°. Fix: read-current-then-advance
+  the cycle + add `btLr`. (S, low risk.)
+- **BUG-033 [S3] Table Indent-from-left is not gated by alignment → silently-ignored dead attribute.** `H.tblIndent`
+  (`commands.js:241`) applies a left indent regardless of justification, but the renderer (`TableView.js:158-167`) only
+  honors indent when alignment is NOT center/right. A user who sets indent then centers gets the indent silently ignored
+  yet still stored (a dead `w:tblInd` Word also ignores under center/right). Fix: gate/clear `tblIndent` on center/right
+  alignment, matching Word (which disables the control). (S.)
+- The other 11 (Header Row/Column mislocated on Layout vs Design tblLook; Table Design tab has a misplaced 'Alignment'
+  group; Row Height has no 'Exactly' rule; no 'Clear table style' on the Design tab; hardcoded 5-swatch shading palette;
+  **Picture Format omits Align/Group/Selection Pane**; **Picture Format omits the entire Picture Styles group** — gallery/
+  border/effects/layout) are catalogued in `FEATURE-IMPROVEMENTS.md`. Bugs ↔ improvements are connected (fix = complete the feature).
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via
