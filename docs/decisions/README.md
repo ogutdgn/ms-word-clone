@@ -23,6 +23,7 @@ ADR that *supersedes* the old one (don't rewrite history).
 | [0003](0003-fork-superdoc-core.md) | Fork SuperDoc's schema + OOXML converter as the document core; own renderer/UI/instrumentation | **Locked — spike GREEN ✅** |
 | [0004](0004-lists-as-paragraph-numid.md) | Model lists as paragraph + `numId`/`ilvl` (Word-native) | **Locked** (satisfied by 0003) |
 | [0005](0005-docx-via-superdoc-converter.md) | `.docx` import+export via SuperDoc's bidirectional converter (forked) | **Locked — spike GREEN ✅** |
+| [0006](0006-word-parity-target-version.md) | Parity target = Microsoft 365 **Word for Windows**, Current Channel, x64, en-US, build 16.0.20026.20168 (the dev-PC oracle) | **Locked** |
 | — | RL env / logger / verifier / MCP / pagination / tooling / repo decisions | **Open → see [OPEN_DECISIONS.md](OPEN_DECISIONS.md)** |
 
 ## The two hard constraints (apply to every decision)
