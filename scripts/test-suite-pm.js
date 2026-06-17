@@ -882,6 +882,34 @@
     if (fmt !== 'bullet') return 'abstractNum level 0 numFmt not "bullet" (Word would render a number, not a •): ' + fmt;
     return true;
   });
+  await t('[2] EXPORT: numbered list → w:numPr linked to a decimal numbering.xml abstractNum (Word renders "1.")', async () => {
+    // Mirrors the bullet export test for an ORDERED list: a session-created numbered list must emit w:numPr
+    // (w:numId=N) AND a numbering.xml whose w:num[N] → w:abstractNum level 0 has numFmt="decimal", else
+    // Word shows no number. Word COM-validated: read-para-props → listType "simple numbering", listString
+    // "1." (oracle-probe-2-lists.js + word-oracle-win.ps1 read-para-props). (Multilevel/outline also
+    // validated in Word via oracle-probe-2-multilevel.js — listType "outline numbering", "1.1." — gated
+    // multilevel test deferred: the in-app level-transition needs careful caret handling.)
+    setDoc('numbered item'); selectText('numbered'); run('numbering'); await sleep(150);
+    if (paraAttrs('numbered').listRendering?.numberingType !== 'decimal') return 'numbered list not applied to model: ' + JSON.stringify(paraAttrs('numbered').listRendering);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const numPr = (xml.match(/<w:numPr\b[\s\S]*?<\/w:numPr>/) || [])[0];
+    if (!numPr) return 'no <w:numPr> in export';
+    const numId = (numPr.match(/<w:numId\b[^>]*w:val="(\d+)"/) || [])[1];
+    if (!numId) return 'no <w:numId> in <w:numPr>: ' + numPr;
+    const numXml = window.WC.editor.converter?.convertedXml?.['word/numbering.xml'];
+    if (!numXml) return 'no word/numbering.xml generated → Word would show no number';
+    const els = (numXml.elements && numXml.elements[0] && numXml.elements[0].elements) || [];
+    const numDef = els.find((e) => e.name === 'w:num' && e.attributes && e.attributes['w:numId'] === numId);
+    if (!numDef) return 'numbering.xml has no <w:num w:numId="' + numId + '"> (dangling list reference)';
+    const absId = ((numDef.elements || []).find((e) => e.name === 'w:abstractNumId') || {}).attributes?.['w:val'];
+    const absDef = els.find((e) => e.name === 'w:abstractNum' && e.attributes && e.attributes['w:abstractNumId'] === absId);
+    if (!absDef) return 'w:num → abstractNumId ' + absId + ' has no matching <w:abstractNum>';
+    const lvls = (absDef.elements || []).filter((e) => e.name === 'w:lvl');
+    const lvl0 = lvls.find((e) => (e.attributes || {})['w:ilvl'] === '0') || lvls[0];
+    const fmt = lvl0 && ((lvl0.elements || []).find((e) => e.name === 'w:numFmt') || {}).attributes?.['w:val'];
+    if (fmt !== 'decimal') return 'abstractNum level 0 numFmt not "decimal" (Word would render a bullet, not "1."): ' + fmt;
+    return true;
+  });
   await t('[2] numbering renders "1." / "2." markers across two paragraphs', async () => {
     setDocs(['Numbered one', 'Numbered two']);
     window.WC.editor.commands.selectAll();
