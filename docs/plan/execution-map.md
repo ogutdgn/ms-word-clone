@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (v4 #5 page color — DONE; bounded design backlog EXHAUSTED, `/loop` 5-min cadence)
+- [x] **v4 #5 pageColor export + COM — DONE (PR #124 `e325b9a`)** — new oracle; Word read page bg CLEANLY
+  (Background.Fill.ForeColor.RGB=65535, Type=1, DisplayBackgrounds=true). New `[10th]` test gates BOTH
+  document.xml `<w:background>` AND settings.xml `<w:displayBackgroundShape>` (K4 render flag the old test
+  missed) — clear-first non-vacuous + teardown. `/code-review`: softened inaccurate "unreliable" framing.
+  Gates: **PM 470 / smoke 9 / roundtrip 27**.
+- [x] **v4 COMPLETE / VERDICT:** 5 slices — #1 endnote FOUND+FIXED a real bug; #2–#5 confirm-correct
+  coverage. Bounded cleanly-COM-validatable export surface now largely covered + faithful.
+- [ ] **NEXT — PATH A:** page-setup geometry (Section.PageSetup margins/size/orientation, clean COM) IF a
+  mutate bridge verb exists (verify in bridge/layout.ts + commands.js); else flag it's a feature.
+  Low-value remainder (TOC/caption/citation COM) is degraded-by-design — SKIP. **PATH B (recommended):**
+  escalate to a STEERED bigger item (a14 picture effects / frames-overlay / 4e headers / highlight UX).
+
 ### 2026-06-16 (v4 #4 page borders — Word-COM-validated CORRECT, `/loop` 5-min cadence)
 - [x] **v4 #4 pageBorders export + COM — DONE (PR #122 `4f2caf3`)** — Design page-border surface's FIRST
   Word-COM oracle (`oracle-probe-pageborders.js` + `validate-pageborders-win.ps1`, all 4 edges).
