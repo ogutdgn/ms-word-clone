@@ -6,6 +6,25 @@ Gap analysis vs **real Microsoft Word for Windows** (ADR-0006: M365 Current Chan
 
 **Gaps to close (missing/stub/partial/wrong), by priority:** P1=9 · P2=37 · P3=18
 
+> **Live-Word verification (computer-use, 2026-06-17):** every "Real Word tab inventory" below was confirmed
+> against the running oracle build **16.0.20026.20168** (M365 Current Channel, x64, en-US) by inserting a real
+> table + picture into a scratch Word doc and reading each contextual ribbon directly — not inferred from docs.
+> Observed groups/buttons, exactly as seen on screen:
+> - **Table Design** — *Table Style Options* (6 checkboxes: Header Row, Total Row, Banded Rows, First Column, Last
+>   Column, Banded Columns) · *Table Styles* (gallery + More) · **Shading** · *Borders* (Border Styles, Line Style,
+>   Line Weight `½ pt`, Pen Color, Borders dropdown, Border Painter).
+> - **Table Layout** — *Table* (Select, View Gridlines, Properties) · *Draw* (Draw Table, Eraser) · *Rows & Columns*
+>   (Delete, Insert Above, Insert Below, Insert Left, Insert Right) · *Merge* (Merge Cells, Split Cells, Split Table)
+>   · *Cell Size* (AutoFit, Height, Width, Distribute Rows, Distribute Columns) · *Alignment* (3×3 align grid, Text
+>   Direction, Cell Margins) · *Data* (Sort, Repeat Header Rows, Convert to Text, Formula).
+> - **Picture Format** — *Remove Background* · *Adjust* (Corrections, Color, Artistic Effects, Transparency, Compress
+>   Pictures, Change Picture, Reset Picture) · *Picture Styles* (gallery + Picture Border, Picture Effects, Picture
+>   Layout) · *Accessibility* (Alt Text) · *Arrange* (Position, Wrap Text, Bring Forward, Send Backward, Selection
+>   Pane, Align, Group, Rotate) · *Size* (Crop, Height, Width).
+> - **Table move handle** — Word shows the four-arrow ⊞ move handle at the table's top-left on hover (drag to relocate);
+>   the clone has no move handle (see the "Table — moving / positioning" section). Every inventory below matched the
+>   live build with **no version-specific deltas** — the gap analysis stands as written.
+
 ---
 
 ## Table — Layout tab (Table Tools contextual)

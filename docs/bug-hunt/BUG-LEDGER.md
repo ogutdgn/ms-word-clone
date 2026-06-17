@@ -317,16 +317,18 @@ Re-checked the pre-PM-pivot `docs/BUG_BUST_FINDINGS.md` (55 bugs, the user's sep
 
 ## Feature-research-spotted bugs (BUG-032…033 + 11 more in `FEATURE-IMPROVEMENTS.md`)
 The Table/Picture contextual-tab feature research (`FEATURE-IMPROVEMENTS.md`) spotted 13 bugs. The two clearest
-wrong-behavior bugs (code-confirmed via the cited lines):
+wrong-behavior bugs (now **runtime-verified** — probe `C:\tmp\bughunt\probes\table-bugs-verify.js`, 2026-06-17):
 - **BUG-032 [S3] Table Text Direction is a one-shot — can't restore horizontal.** `commands.js:130` hardwires the cell
   text direction to `'tbRl'`; pressing it cannot cycle back to horizontal or to `btLr`, so once pressed the user can't
   restore horizontal text from the ribbon. Word's button cycles horizontal → 90° → 270°. Fix: read-current-then-advance
-  the cycle + add `btLr`. (S, low risk.)
+  the cycle + add `btLr`. (S, low risk.) **Runtime evidence:** first press → `tbRl`, second press → `tbRl` (`cycles:false`)
+  — the cell is stuck on `tbRl`, ribbon cannot restore horizontal.
 - **BUG-033 [S3] Table Indent-from-left is not gated by alignment → silently-ignored dead attribute.** `H.tblIndent`
   (`commands.js:241`) applies a left indent regardless of justification, but the renderer (`TableView.js:158-167`) only
   honors indent when alignment is NOT center/right. A user who sets indent then centers gets the indent silently ignored
   yet still stored (a dead `w:tblInd` Word also ignores under center/right). Fix: gate/clear `tblIndent` on center/right
-  alignment, matching Word (which disables the control). (S.)
+  alignment, matching Word (which disables the control). (S.) **Runtime evidence:** indent `720` dxa survives setting
+  alignment=center, and the export contains BOTH `<w:tblInd>` and `<w:jc w:val="center">` (`bothCoexistInExport:true`).
 - The other 11 (Header Row/Column mislocated on Layout vs Design tblLook; Table Design tab has a misplaced 'Alignment'
   group; Row Height has no 'Exactly' rule; no 'Clear table style' on the Design tab; hardcoded 5-swatch shading palette;
   **Picture Format omits Align/Group/Selection Pane**; **Picture Format omits the entire Picture Styles group** — gallery/
