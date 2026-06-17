@@ -7,7 +7,45 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — NEW DIRECTIVE: finish ALL big Phase-4 items in a no-stop loop; ITEM 1 page-setup export DONE (PR #126))
+## 2026-06-16 (RESUME HERE — finish-all loop; ITEM 2 picture grayscale DONE (PR #128) — a14 deferral was an ENUM MISREAD)
+
+> **Branch:** `main` (PR #128 merged `091c737`; branch deleted). **Phase:** 4 (layout engine). **Directive:**
+> finish ALL big Phase-4 items, no-stop loop, my order — see [[phase4-finish-all-directive]].
+> Gates: **PM 473 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode (scope-workflow per item).**
+>
+> **ORDER:** ① page-setup export (DONE PR #126) → ② picture grayscale (DONE PR #128) → ③ headers/footers
+> (NEXT) → ④ frames-overlay keystone.
+>
+> **✅ ITEM 2 — PICTURE GRAYSCALE — DONE (PR #128) + MYTH BUSTED:** Word's OWN grayscale OOXML is plain
+> `<a:grayscl/>` in `a:blip` — NOT the a14 imgEffect extension. **The earlier "grayscale needs a14" deferral
+> was a FALSE NEGATIVE from a 0-based enum misread:** `PictureFormat.ColorType==2` IS grayscale
+> (MsoPictureColorType is **1-based**: Automatic=1, Grayscale=2, BlackAndWhite=3). A scope-workflow agent
+> AUTHORED grayscale in live Word 16.0 via COM and extracted the bytes (plain a:grayscl); the fork converter
+> ALREADY emits/parses it (decode-image-node-helpers.js:369). So the slice was just: `setImageGrayscale`
+> bridge verb (insert.ts) + render the attr as CSS `filter:grayscale(100%)` (image.js renderDOM, single
+> site) + Picture-Format Adjust>Color UI (commands.js H.imgColor + picture-tools-pm.js) — ZERO converter/a14
+> work. **🔬 Word COM-validated** (validate-picteffect-win.ps1): exported pic → `InlineShapes(1).PictureFormat.ColorType==2`.
+> `[4b]` ON/OFF + grayscale-with-rotate coexistence test (the image attrs' renderDOM styles CONCATENATE via
+> Attribute.ts, not last-wins). /code-review ×1 clean.
+> **LESSON (correction):** the old memory "grayscale-needs-a14 [deferred]" was WRONG — a:grayscl is
+> Word-faithful; verify enum base (0 vs 1) before trusting a COM read. Authoring the construct IN Word and
+> diffing the bytes is the definitive ground truth.
+>
+> **✅ ITEM 1 — PAGE-SETUP EXPORT — DONE (PR #126):** LAYOUT margins/size/orientation → body sectPr
+> (COM-validated 36pt/1008/612/landscape). Fixed D6-dispatch block + dead `E()` throw; UI-flyout-click gate test.
+>
+> **NEXT — ITEM 3: headers/footers (4e).** Real header/footer constructs (currently deferred, area
+> `header-footer` is D6-blocked). Scope-workflow first: how the fork models headers/footers (the
+> super-converter header*.xml parts, sectPr headerReference/footerReference, the doc-section/story model),
+> what bridge/insert verbs or sections-adapter support exists, the header/footer ENGINE_READY unblock, and
+> the editing UX (header/footer edit region). Word COM-validate via `doc.Sections(1).Headers(wdHeaderFooterPrimary).Range.Text`.
+> This is the BIGGEST item before the keystone — expect multi-part (edit region + export + COM). spawn_tasks
+> (NOT this loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`,
+> manualHyphenate `task_a4196ed8`. Branch off `main` (docs checkpoints on a branch + PR).
+
+---
+
+## 2026-06-16 (finish-all loop; ITEM 1 page-setup export DONE (PR #126))
 
 > **Branch:** `main` (PR #126 merged `aedf0da`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 472 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
