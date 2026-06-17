@@ -283,6 +283,19 @@
     if (!sz) return 'no <w:sz w:val> in export';
     return (sz === '40') || ('w:sz not 40 (20pt × 2 half-points): ' + sz);
   });
+  await t('[1] EXPORT: font family → <w:rFonts w:ascii="Georgia"> (Word: Font.Name = "Georgia")', async () => {
+    // The font-family MARK is covered above; this guards the EXPORT — setFontFamily must emit
+    // <w:rFonts w:ascii="Georgia"> (+ hAnsi/eastAsia/cs). Applied to the WHOLE paragraph. Word
+    // COM-validated: Paragraphs(1) text-only Range.Font.Name = "Georgia" —
+    // oracle-probe-1-fontname.js + scripts/oracle/validate-fontname-win.ps1.
+    setDoc('named text'); selectText('named text'); await sleep(40);
+    WC.PM.cmd('setFontFamily', 'Georgia'); await sleep(80);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const rf = (xml.match(/<w:rFonts\b[^>]*\/?>/) || [])[0];
+    if (!rf) return 'no <w:rFonts> in export';
+    const ascii = (rf.match(/w:ascii="([^"]*)"/) || [])[1];
+    return (ascii === 'Georgia') || ('w:rFonts w:ascii not "Georgia": ' + rf);
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
