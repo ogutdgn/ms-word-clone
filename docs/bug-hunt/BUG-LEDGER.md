@@ -393,6 +393,22 @@ Full detail in `BUGS-DETAILED.md` § BUG-044…046.
   Paragraph Spacing presets have 6 DISTINCT correct values — unlike the BUG-006 Style-Set gallery); 6 known-stubs (Insert
   Citation source dialog, Bibliography title, Draw Table, Convert-to-Text TAB-hardcoded, Quick Parts, Object/Text-from-File)._
 
+## S3-audit-triage new bugs (BUG-047…048) — batch-3, runtime-confirmed 2026-06-17 (both DATA LOSS)
+Batch-3 of the S3 tier (16 Mailings/lists/footnotes/formatting items, deduped vs the 46-bug catalog) surfaced 2 more
+bugs — both **S2 data-loss** (higher severity than the prior S3 lying-controls), runtime-confirmed (`s3b3-misc.js`).
+Full detail in `BUGS-DETAILED.md` § BUG-047…048.
+- **BUG-047 [S2 data loss] Source Manager ▸ Edit silently destroys authors 2+ on any multi-author source.** `editPrefill`
+  (dialogs.js:1319) reads only `authors[0]`; the Edit round-trip rebuilds `authors:[ONE]` and `Object.assign` overwrites the
+  original array. Probe: a 2-author source, title-only edit → `afterAuthorCount:1`, `DATA_LOSS:true`.
+- **BUG-048 [S2 data loss] Merge/Keep-Source paste silently drops bold/italic/underline on docx export.** Marks live in the
+  PM model but the exporter run-translator doesn't read emphasis off the fork paste-parser's nested run node → bare
+  `<w:r><w:t>`. Probe: model has `[bold,italic,underline]`, export has none (`EMPHASIS_DROPPED:true`); the CONTROL
+  (`insertContent`) exports them correctly; Keep-Source paste reproduces it (shared `view.pasteHTML` route).
+- _Also from batch-3: 6 duplicates (Address Block / Greeting Line / Rules-Ask / Rules-Fill-in field-code export → **BUG-008**;
+  Insert Footnote + Insert Endnote literal-word seed → **BUG-010**); 3 not-bugs (Match Fields, Mark Citation, Page Color —
+  honest functional dialogs / verified-clean); 5 known-stubs (Insert-Merge-Field shape, Edit-Recipient-List alias, Multilevel
+  List, Bullets/Numbering dropdown rows)._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via

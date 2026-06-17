@@ -2176,3 +2176,15 @@ Batch-2 of the **S3** tier (16 wrong-output-risk items: References/Table-insert/
   Object/Text-from-File (OLE needs a host runtime).
 
 ---
+## Resolution log — S3 batch-3 triage sweep (2026-06-17)
+Batch-3 of the **S3** tier (16 Mailings/lists/footnotes/formatting items) triaged + runtime-probed (`s3b3-misc.js`):
+- **Promoted to numbered, runtime-confirmed bugs (both DATA LOSS, S2):** Source Manager ▸ Edit destroys authors 2+ →
+  **BUG-047**; Merge/Keep-Source paste drops bold/italic/underline on export → **BUG-048**.
+- **Duplicates:** Address Block / Greeting Line / Rules ▸ Ask / Rules ▸ Fill-in (switch-less / condition-less field-code
+  export) → **BUG-008**; Insert Footnote + Insert Endnote (literal-word note-body seed) → **BUG-010**.
+- **Verdict = not-a-bug:** Match Fields (honest functional dialog, in-RAM persistence); Mark Citation (works; missing only
+  additive features); Page Color (honest flat-color picker; `w:background` verified-clean; Fill Effects not a dead control).
+- **Known stubs (honest, documented):** Insert Merge Field (flyout of recipient columns); Edit Recipient List (alias to
+  typeNewList); Multilevel List; Bullets dropdown rows; Numbering dropdown rows.
+
+---

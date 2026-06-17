@@ -1199,3 +1199,49 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : Replace the geometry-only mapping with real per-preset templates (header text + sample data + a table style/banding), routed through a content-aware insert (extend `WC.PM.insertTable` to accept `cells[][]`/`styleId`/`withHeaderRow`, or add `WC.PM.insertQuickTable(templateKey)`). Round-trip test per preset asserting header text + `tblStyle` survive export. If full templates are out of scope, honest-degrade (drop the preset names or a "styled Quick Tables not available yet" toast) + a `NOT_IMPLEMENTED.md` entry. Effort: M. Risk: low-medium.
 
 ---
+
+## BUG-047 — Source Manager ▸ Edit silently destroys authors 2+ on any multi-author source (data loss)
+**Severity:** S2 (data loss)
+
+**Where**
+: References > Citations & Bibliography > Manage Sources > Edit. `dialogs.js:1317-1323 editPrefill` reads only `f.authors[0]` into a flat "Last, First" string; `dialogs.js:1333` routes the flat patch to `WC.PM.refUpdateSource`. `bridge/references.ts:553-562 refUpdateSource → buildSourceFields` (`:483-498`) + `personFromString` (`:462-482`) synthesize `authors:[ONE person]` from the flat string; the fork update `core/superdoc-fork/document-api-adapters/plan-engine/citation-wrappers.ts:320` does `Object.assign(source.fields, patch)`, overwriting the original multi-author array.
+
+**When / repro**
+: 1) Add a source with 2 authors (e.g. Smith + Jones). 2) Manage Sources > Edit that source, change **only the title**, OK. 3) The source now has just **one** author (Smith) — Jones is permanently gone.
+
+**Symptom (Word vs clone)**
+: In Word, editing a source's title leaves all authors intact. In the clone, opening Edit on any 2+-author source and saving — even a title-only change — silently collapses the author list to a single author. Permanent data loss in the citation/bibliography data.
+
+**Why it happens (root cause)**
+: `editPrefill` collapses the source to `authors[0]` only; on OK the flat `{author:'Last, First', title, …}` patch is rebuilt by `buildSourceFields → personFromString` into `authors:[ONE]`, and the fork's `Object.assign(source.fields, patch)` overwrites the original 2-author array. (The documented "single Current List / no Master List" reduction is an honest fewer-panes deviation; this data loss is a separate defect surfaced while verifying the cited dialog code — matches none of BUG-001..046/DEV-1 and is not a documented stub.)
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b3-misc.js` (`s3b3-misc.json` → `refSourceMgrMultiAuthor`): a source created with `authors:[Smith, Jones]` (`beforeAuthorCount:2`), then `refUpdateSource(id, {author:'Smith, Alice', title:'…(edited)', …})` → `afterAuthorCount:1`, `afterTitle:"Two Author Book (edited)"`, `DATA_LOSS:true` (the title updates but author 2 is destroyed).
+
+**Solution**
+: Make the Edit round-trip non-destructive for contributors. In `dialogs.js` editPrefill/Edit flow, start the patch from a deep copy of `s.fields` and only overwrite the simple fields the dialog edits; OR make `refUpdateSource` skip overwriting `authors` when the patch carries only a legacy singular `author` string AND the source already has multiple authors; OR have `buildSourceFields` not synthesize a one-element `authors` array in that case. Longer term, a real multi-author editor (the fork's `CitationPerson[]` is already supported). Effort: S-M. Risk: low. Regression test: `refUpdateSource(title-only)` on a 2-author source preserves `authors.length===2`.
+
+---
+
+## BUG-048 — Merge/Keep-Source paste silently drops bold/italic/underline on docx export (save+reopen data loss)
+**Severity:** S2 (data loss on save+reopen)
+
+**Where**
+: Home > Clipboard > Paste > Merge Formatting / Keep Source Formatting. `bridge/clipboard.ts:159-168 pasteMergeHtml/pasteMerge → editor.view.pasteHTML` (the strip logic at `:35-39/:60-70 mergeFormattingHtml` is itself correct); Keep-Source `PM.pasteHTMLString` (`bridge/index.ts:484-488`) goes through the same `editor.view.pasteHTML` route. Root cause is downstream in the exporter run translator (`core/superdoc-fork/core/super-converter/exporter.js`): the fork paste parser emits a doubly-nested `run` node wrapping the mark-bearing text, and the translator does not read text-level emphasis marks off that nested structure, emitting bare `<w:r><w:t>` with no `<w:rPr>`.
+
+**When / repro**
+: 1) Copy text with bold/italic/underline. 2) Paste > Merge Formatting (or Keep Source Formatting). 3) On screen the emphasis is present, but Save as .docx and reopen → the bold/italic/underline are **gone** (exported as plain runs). Merge Formatting is specifically supposed to preserve emphasis while dropping font/size/color — so the one thing it must keep is lost on save.
+
+**Symptom (Word vs clone)**
+: Word's Merge/Keep-Source paste preserves run-level emphasis through save. The clone keeps the marks in the live model but drops them on docx export — data loss that only surfaces on save+reopen, defeating the merge mode. Not merge-specific: Keep-Source paste loses the same marks (shared `view.pasteHTML` route), while `insertContent` of the same HTML exports correctly.
+
+**Why it happens (root cause)**
+: After paste the run-level marks ARE in the PM model (descendants carry `bold`/`italic`/`underline`), but the exporter's run translator doesn't read emphasis off the nested `run`-wrapping-`run` node the fork paste parser produces, so it emits `<w:r><w:t>…</w:t></w:r>` with no `<w:rPr>`. (The `mergeFormattingHtml` strip logic works as designed — the audit's "approximate" note is an honest deviation, not this bug.)
+
+**Evidence**
+: **Runtime-confirmed with a control** — probe `s3b3-misc.js` (`s3b3-misc.json`): Merge-paste of `<p><b>B</b><i>I</i><u>U</u></p>` → model `modelMarks:[textStyle,bold,italic,underline]` but export `xmlHasBold/Italic/Underline:false` (`EMPHASIS_DROPPED:true`). The CONTROL — same HTML via `insertContent` — exports `<w:b/>`/`<w:i/>`/`<w:u/>` (`CONTROL_OK:true`), isolating the defect to the `view.pasteHTML` route. Keep-Source paste (`pasteHTMLString`) reproduces it (`SAME_DEFECT:true`), confirming the shared root cause.
+
+**Solution**
+: In the exporter run translator (`super-converter/exporter.js`), flatten the nested `run`-wrapping-`run` structure the paste parser produces and read text-level emphasis marks (bold/italic/underline/strike/links) when synthesizing `<w:rPr>`; OR normalize the paste output so marked text lands in a single run node whose runProperties reflect the marks (as `insertContent` does). Fixing this one site also repairs Keep-Source paste fidelity. Effort: M. Risk: medium (export run-property path — validate via a real Word COM save). Regression test: merge-paste and keep-source-paste `<b>/<i>/<u>` HTML, export, assert `<w:b/>/<w:i/>/<w:u/>` present.
+
+---
