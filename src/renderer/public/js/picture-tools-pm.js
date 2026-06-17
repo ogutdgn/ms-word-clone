@@ -26,6 +26,13 @@
       contextual: true,
       groups: [
         {
+          id: 'pf-adjust',
+          name: 'Adjust',
+          controls: [
+            { cmd: 'imgColor', label: 'Color', type: 'dropdown' },
+          ],
+        },
+        {
           id: 'pf-size',
           name: 'Size',
           controls: [
