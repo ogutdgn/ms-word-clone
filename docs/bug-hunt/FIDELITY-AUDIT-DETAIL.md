@@ -2161,3 +2161,18 @@ catalog) + runtime-probed (`s3-search.js`, `s3-misc.js`):
   wrong-output-risk subset.
 
 ---
+## Resolution log — S3 batch-2 triage sweep (2026-06-17)
+Batch-2 of the **S3** tier (16 wrong-output-risk items: References/Table-insert/formatting-fields) triaged + runtime-probed
+(`s3b2-references.js`, `s3b2-quicktables-fix.js`):
+- **Promoted to numbered, runtime-confirmed bugs:** TOC Automatic Table 1/2 collapse (caption dropped) → **BUG-044**;
+  Citation Style lost before any bibliography (lying toast) → **BUG-045**; Quick Tables presets all empty grids → **BUG-046**.
+- **Duplicates:** Symbol no-source-font → **DEV-1**; Bookmark duplicate-name → **BUG-027**.
+- **Verdict = not-a-bug (works / honest reduction):** Insert Caption (auto-numbering works; page-number render is the Phase-7
+  gap); Update Table (full-rebuild is correct; only the update-mode modal is missing); Add Text (writes `w:outlineLvl`
+  correctly; Word's extra Heading restyle is cosmetic, TOC still collects it); Insert Table dialog (fewer options, valid
+  output); Paragraph Spacing presets (6 DISTINCT correct exported values — not a BUG-006-style inert gallery).
+- **Known stubs (honest, documented):** Insert Citation source dialog (4-of-12 types); Bibliography title (cosmetic);
+  Draw Table (even-grid approximation); Convert to Text (separator hardcoded to TAB); Quick Parts (6-field subset);
+  Object/Text-from-File (OLE needs a host runtime).
+
+---

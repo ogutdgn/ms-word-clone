@@ -1130,3 +1130,72 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : In the `dateTimeDialog` OK handler read `upd.checked` and, when unchecked, insert the preformatted date string as plain text (e.g. an `xeDateTime(fmt, {field:false})` overload that inserts the rendered text snapshot via `insertContent` when `field===false`). ~10-line additive change, low risk. Optionally widen the format list + add a Language selector for fuller parity (separate, larger effort).
 
 ---
+
+## BUG-044 — Table of Contents "Automatic Table 1" and "Automatic Table 2" collapse to a byte-identical block; the heading caption is silently dropped
+**Severity:** S3
+
+**Where**
+: References > Table of Contents > Automatic Table 1 / Automatic Table 2. `commands.js:930-931` passes `refInsertTOC({title:'Contents'})` vs `refInsertTOC({title:'Table of Contents'})`, but `bridge/references.ts:114-134 refInsertTOC` reads only `showLevels*/hyperlinks/rightAlignPageNumbers/includePageNumbers/tabLeader` — it **never reads `opts.title`**. The fork create path (`core/superdoc-fork/document-api-adapters/plan-engine/toc-wrappers.ts`) has no title concept (`CreateTableOfContentsInput` has no title field; `materializeTocContent` emits only entry paragraphs or the "No table of contents entries found." placeholder).
+
+**When / repro**
+: 1) References > TOC > Automatic Table 1. 2) Undo, then Automatic Table 2. 3) Both produce an identical TOC block — neither shows its Word heading ("Contents" vs "Table of Contents"). The two gallery presets are indistinguishable.
+
+**Symptom (Word vs clone)**
+: Word seeds a visibly different heading caption above the field result — "Contents" (Automatic Table 1) vs "Table of Contents" (Automatic Table 2). The clone drops the title at the bridge and the fork has no caption concept, so both presets are byte-identical generic blocks. Same family as BUG-009 (gallery presets collapsing to one generic block) but a distinct control/code, so not a duplicate.
+
+**Why it happens (root cause)**
+: Two gaps stack — `refInsertTOC` ignores `opts.title`, and even if threaded the fork TOC node has no styled-caption-paragraph path.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b2-references.js` (`s3b2-references.json` → `toc_presets_identical`): after inserting both presets, `snapshotsDeepEqual:true`, `hasContentsCaption:false`, `hasTableOfContentsCaption:false`; both nodes' leading text is "No table of contents entries found." (`bugConfirmed:true`).
+
+**Solution**
+: Thread `opts.title` through `refInsertTOC` into the create input, and extend `CreateTableOfContentsInput`/`prepareTableOfContentsInsertion` to prepend a styled caption paragraph (e.g. `styleId 'TOCHeading'`) carrying the title ahead of the entries, so the two presets differ as in Word. Effort: M. Risk: low. Regression test: the two presets produce different leading captions. (The page-number="0" placeholder is the separate Phase-7 layout gap.)
+
+---
+
+## BUG-045 — Citation Style chosen before any bibliography exists is silently lost; the ribbon toasts success anyway (lying control)
+**Severity:** S3
+
+**Where**
+: References > Citations & Bibliography > Style. `commands.js:999` (`H.style` flyout) fires `WC.toast('Citation style: <X>')` **unconditionally**, ignoring the return of `refSetCitationStyle`. `bridge/references.ts:577-597 refSetCitationStyle` returns `false` when no bibliography node exists (no global persistence); `references.ts:611-619 refInsertBibliography` inserts with `{at:{kind:'documentEnd'}}` only and never reads the chosen style. The selection lives only in cosmetic `references-tools.js:14 WC.Ref.citationStyle`, which the engine never reads (the `references.ts:576` comment falsely claims "refInsertBibliography carries it through").
+
+**When / repro**
+: 1) New doc (no bibliography yet). 2) References > Style > IEEE → toast says "Citation style: IEEE" (success). 3) Insert a bibliography → it renders in the fork default (APA), not IEEE. The chosen style was silently dropped.
+
+**Symptom (Word vs clone)**
+: In Word, citation style is a global document setting — choosing it before any bibliography exists is honored, and any later bibliography + in-text citations render in that style. The clone's control is a no-op on the no-bibliography-yet path yet toasts success — a lying control. (The happy path — bibliography already present — DOES work via `bibliography.configure` + `syncBibliographyStyleToConverter`. The "6 styles vs Word's 12+" sub-claim is fewer-options, not a bug.)
+
+**Why it happens (root cause)**
+: `refSetCitationStyle` bails to `false` with no persistence when no bibliography node is found; the style is never written to global document/converter settings, so a later bibliography is built at the default.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b2-references.js` (`citation_style_no_persist`): `refSetCitationStyle('IEEE')` on a doc with no bibliography → `setReturnedFalse:true` (rejected, not persisted), while `commands.js:999` would toast success. (The downstream "bibliography uses APA" assertion needs seeded sources to render a non-empty bibliography, so the empty-export path is not asserted here; the no-persistence + lying-toast root cause is confirmed.)
+
+**Solution**
+: Persist the citation style globally the moment it is chosen, independent of whether a bibliography node exists: in `refSetCitationStyle`, when no bibliography is found, still call `syncBibliographyStyleToConverter` (or write document settings) and return `true`; make `refInsertBibliography` read that persisted style. Gate the `commands.js:999` toast on the actual return value, and fix the misleading `references.ts:576` comment. Effort: S-M. Risk: low.
+
+---
+
+## BUG-046 — Quick Tables: every named preset (Calendar / Tabular List / Matrix / Double Table) inserts an identical empty grid; the preset name carries no template
+**Severity:** S3
+
+**Where**
+: Insert > Table > Quick Tables. `insert-features.js:88-93 quickTablesMenu` maps each preset to a bare `buildTable(rows,cols)` (Calendar→6×7, Tabular List→4×2, Matrix→4×4, Double Table→5×3); `insert-features.js:40-43 buildTable` forwards only `{rows,cols}` to `WC.PM.insertTable`; `bridge/table.ts:34-40 insertTable` runs `editor.chain().insertTable({rows,cols,withHeaderRow:false})` — no cell content, banding, per-preset style, or quick-table metadata.
+
+**When / repro**
+: 1) Insert > Table > Quick Tables > Calendar (or Matrix, Tabular List, Double Table). 2) The result is an empty grid of the preset's dimensions with the generic TableGrid style — no month layout, no header text, no sample data, no banding. Every named preset is just a plain empty grid of a fixed size.
+
+**Symptom (Word vs clone)**
+: Word's Quick Tables insert fully-styled building-block templates (Calendar with month headers and day cells, Tabular List with headers, Matrix with banding, etc.). The clone collapses every preset to a dimension-only empty grid — the preset identity carries no payload. Same defect *class* as BUG-009 (named gallery designs collapsing to a generic block) but a distinct control/code, so a separate bug, not a literal duplicate. No Quick Tables entry exists in `NOT_IMPLEMENTED.md`/`FEATURE-IMPROVEMENTS.md`, so it is not an honestly-disclosed stub.
+
+**Why it happens (root cause)**
+: The preset→geometry mapping forwards only `{rows,cols}`; there is no per-preset template (header text, sample data, banding/style) and no content-aware insert path.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b2-quicktables-fix.js` (`s3b2-qt-fix.json`): each preset inserts at its expected dimensions (`dimsMatchExpected:true`) but with `nonEmptyCells:0`, `headerCells:0`, `tblStyle:"TableGrid"` for **all** of them (`allPresetsEmptyNoHeaderText:true`); the named "Matrix" preset is structurally identical to a plain `insertTable(4×4)` (`matrixStructurallyIdenticalToPlainGrid:true`). `bugConfirmed:true`.
+
+**Solution**
+: Replace the geometry-only mapping with real per-preset templates (header text + sample data + a table style/banding), routed through a content-aware insert (extend `WC.PM.insertTable` to accept `cells[][]`/`styleId`/`withHeaderRow`, or add `WC.PM.insertQuickTable(templateKey)`). Round-trip test per preset asserting header text + `tblStyle` survive export. If full templates are out of scope, honest-degrade (drop the preset names or a "styled Quick Tables not available yet" toast) + a `NOT_IMPLEMENTED.md` entry. Effort: M. Risk: low-medium.
+
+---

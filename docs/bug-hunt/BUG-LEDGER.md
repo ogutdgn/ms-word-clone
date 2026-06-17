@@ -375,6 +375,24 @@ runtime-confirmed by headless probe (`C:\tmp\bughunt\probes\s3-search.js` / `s3-
   `^`-codes, Drop Cap Options). Remaining S3 items (~129) are predominantly DEVIATION/GAP/STUB feature-completeness — future
   curated batches will sweep the wrong-output-risk ones._
 
+## S3-audit-triage new bugs (BUG-044…046) — batch-2, runtime-confirmed 2026-06-17
+Batch-2 of the S3 tier (16 wrong-output-risk items: References/Table-insert/formatting-fields, deduped vs the 43-bug
+catalog) surfaced 3 more "lying-control" bugs, each runtime-confirmed (`s3b2-references.js` / `s3b2-quicktables-fix.js`).
+Full detail in `BUGS-DETAILED.md` § BUG-044…046.
+- **BUG-044 [S3] TOC "Automatic Table 1" and "Automatic Table 2" collapse to a byte-identical block; the heading caption
+  (Contents / Table of Contents) is silently dropped.** `refInsertTOC` (references.ts:114) never reads `opts.title`; fork
+  has no caption concept. Probe: `snapshotsDeepEqual:true`, neither caption present.
+- **BUG-045 [S3] Citation Style chosen before any bibliography exists is silently lost; ribbon toasts success anyway.**
+  `refSetCitationStyle` (references.ts:577) returns false with no global persistence; `commands.js:999` toasts unconditionally.
+  Probe: `setReturnedFalse:true`.
+- **BUG-046 [S3] Quick Tables presets (Calendar/Tabular List/Matrix/Double Table) all insert an identical empty grid; the
+  preset name carries no template.** `insert-features.js:91` maps each to bare `buildTable(rows,cols)`. Probe: all presets
+  `nonEmptyCells:0`/`headerCells:0`/`tblStyle:TableGrid`; Matrix == plain insertTable(4×4).
+- _Also from batch-2: 2 duplicates (Symbol no-source-font → **DEV-1**; Bookmark dup-name → **BUG-027**); 6 not-bugs (Insert
+  Caption auto-numbering works, Update Table full-rebuild correct, Add Text outlineLvl correct, Insert Table dialog fewer-options,
+  Paragraph Spacing presets have 6 DISTINCT correct values — unlike the BUG-006 Style-Set gallery); 6 known-stubs (Insert
+  Citation source dialog, Bibliography title, Draw Table, Convert-to-Text TAB-hardcoded, Quick Parts, Object/Text-from-File)._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via
