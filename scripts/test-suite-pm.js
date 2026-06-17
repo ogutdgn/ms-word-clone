@@ -143,9 +143,10 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // Repointed slice 10: startMailMerge flips this slice → run-block probe moves to
-    // `margins` (AREA layout-page, Phase-7-gated, stays blocked through slice 11).
-    window.WC.Commands.run({ cmd: 'margins', label: 'Margins' });
+    // Repointed: `margins`/`orientation`/`size` were unblocked once page-setup export shipped
+    // (ENGINE_READY), so the run-block probe moves to `columns` (AREA layout-page, still
+    // Phase-7-gated, NOT in ENGINE_READY — stays blocked).
+    window.WC.Commands.run({ cmd: 'columns', label: 'Columns' });
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
@@ -5999,6 +6000,77 @@
     }
   });
 
+  await t('[10th] EXPORT (Word COM-validated): dePageMargins + dePageSize → body sectPr pgMar/pgSz/orient', async () => {
+    // NEW FEATURE: the LAYOUT margins/size/orientation menus were CSS-only (setPageVar) and NEVER
+    // exported. dePageMargins/dePageSize route to the Document API sections adapter, which writes
+    // w:pgMar/w:pgSz into the body sectPr (inches->twips x1440) and auto-swaps w:w/w:h on an
+    // orientation flip. Word COM (validate-pagesetup-win.ps1, oracle-probe-pagesetup.js) confirmed
+    // Word reads Sections(1).PageSetup margins=36pt (0.5in), PageWidth=1008pt (14in), PageHeight=612pt
+    // (8.5in), Orientation=1 (landscape). NON-VACUOUS: values are distinct from the default Letter/1in
+    // sectPr (720!=1440, landscape!=portrait, 20160/12240!=12240/15840).
+    setDoc('page setup body');
+    if (typeof PM().dePageMargins !== 'function' || typeof PM().dePageSize !== 'function') return 'pagesetup verbs missing (red)';
+    try {
+      if (PM().dePageMargins({ top: 0.5, right: 0.5, bottom: 0.5, left: 0.5 }) !== true) return 'dePageMargins refused (red)';
+      if (PM().dePageSize({ width: 8.5, height: 14, orientation: 'landscape' }) !== true) return 'dePageSize refused (red)';
+      await sleep(120);
+      const xml = await exportDocumentXml();
+      const pgMar = (xml.match(/<w:pgMar\b[^>]*\/?>/) || [''])[0];
+      const pgSz = (xml.match(/<w:pgSz\b[^>]*\/?>/) || [''])[0];
+      if (!pgMar) return 'no <w:pgMar> in document.xml sectPr';
+      // 0.5in -> 720 twips, all four sides.
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        if (!new RegExp('\\bw:' + side + '="720"').test(pgMar)) return 'w:pgMar ' + side + ' != 720 (0.5in): ' + pgMar;
+      }
+      if (!pgSz) return 'no <w:pgSz> in document.xml sectPr';
+      // Legal landscape: after the orientation swap, w:w=14in=20160, w:h=8.5in=12240, w:orient=landscape.
+      if (!/\bw:orient="landscape"/.test(pgSz)) return 'w:pgSz missing w:orient="landscape": ' + pgSz;
+      if (!/\bw:w="20160"/.test(pgSz)) return 'w:pgSz w:w != 20160 (14in landscape): ' + pgSz;
+      if (!/\bw:h="12240"/.test(pgSz)) return 'w:pgSz w:h != 12240 (8.5in landscape): ' + pgSz;
+      return true;
+    } finally {
+      // Teardown: page margins/size are doc-level body sectPr state (NOT reset by setDoc) — restore the
+      // Letter/portrait/1in default so later page-geometry-reading tests are not corrupted.
+      PM().dePageMargins({ top: 1, right: 1, bottom: 1, left: 1 });
+      PM().dePageSize({ width: 8.5, height: 11, orientation: 'portrait' });
+    }
+  });
+
+  await t('[10th] UI: LAYOUT Margins menu (Narrow click) reaches the export bridge (unblocked + no E() throw)', async () => {
+    // Regression guard for the WIRING (not just the bridge): the LAYOUT page-setup cmds were D6-blocked
+    // (isBlocked('margins')===true) so the ribbon dispatch never opened the menu; AND setPageVar called
+    // the retired E()=WC.Editor.repaginate() which THREW before the WC.PM.dePageMargins call. Both made
+    // the feature dead-on-arrival while the bridge-only test stayed green. This drives the REAL flyout
+    // click end-to-end: dispatch must be unblocked, the menu must open, and the click must reach the
+    // bridge + export 0.5in (720) margins.
+    setDoc('ui margins body');
+    if (window.WC.PM.isBlocked && window.WC.PM.isBlocked('margins')) return 'margins still D6-blocked — ribbon dispatch will not open the menu';
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+    try {
+      window.WC.Commands.run({ cmd: 'margins', label: 'Margins' }, anchor);
+      await sleep(60);
+      const items = Array.from(document.querySelectorAll('.flyout .fly-item'));
+      if (!items.length) return 'Margins flyout did not open (dispatch blocked or handler threw)';
+      const narrow = items.find((n) => (n.textContent || '').includes('Narrow'));
+      if (!narrow) return 'no Narrow item in the Margins flyout';
+      narrow.click(); // runs setPageVar (must not throw) + WC.PM.dePageMargins({0.5in all sides})
+      await sleep(140);
+      const xml = await exportDocumentXml();
+      const pgMar = (xml.match(/<w:pgMar\b[^>]*\/?>/) || [''])[0];
+      return /\bw:top="720"/.test(pgMar) || 'Narrow click did not export 0.5in (720) margins — UI->bridge path broken: ' + pgMar;
+    } finally {
+      // Close any still-open flyout (the failure paths above don't click an item, so the flyout
+      // would otherwise leak and could cascade into later .flyout-querying tests — the exact bug
+      // class this slice fixed). The success path already closed it via flyItem's onClick.
+      try { window.WC.closeFlyouts(); } catch (e) { /* no flyout open */ }
+      try { document.body.removeChild(anchor); } catch (e) { /* already gone */ }
+      // Teardown: page geometry is global body sectPr state, not reset by setDoc.
+      PM().dePageMargins({ top: 1, right: 1, bottom: 1, left: 1 });
+      PM().dePageSize({ width: 8.5, height: 11, orientation: 'portrait' });
+    }
+  });
+
   await t('[10th] dePageColor paints the live page sheet (#pm-editor background)', () => {
     if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
     if (PM().dePageColor('#ABCDEF') !== true) return 'refused';
@@ -6296,7 +6368,9 @@
   await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
   await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
   await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
-  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('margins') === true);
+  // NB: margins/orientation/size are now UNBLOCKED (page-setup export shipped — ENGINE_READY). `columns`
+  // is the layout-page representative that stays Phase-7-blocked; `header` covers header-footer.
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('columns') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------
