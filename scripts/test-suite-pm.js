@@ -5930,6 +5930,37 @@
     return /<w:pgBorders\b/.test(xml) || 'no <w:pgBorders> in document.xml';
   });
 
+  await t('[10th] EXPORT (Word COM-validated): dePageBorders → pgBorders val/sz/color on all 4 edges', async () => {
+    // Word COM (validate-pageborders-win.ps1, oracle-probe-pageborders.js) confirmed Word reads
+    // Sections(1).Borders.Enable==true, .Item(wdBorderTop).LineStyle==wdLineStyleSingle(1),
+    // .LineWidth==wdLineWidth300pt(24), .Color==255 (red). The existing test above only checks
+    // <w:pgBorders> PRESENCE — this gate pins the SPECIFIC values (style->w:val, width->w:sz eighths,
+    // color->w:color) on ALL FOUR edges, so a wrong style/width/color or a dropped edge fails here.
+    setDoc('page border body');
+    if (typeof PM().dePageBorders !== 'function') return 'PM.dePageBorders missing (red)';
+    try {
+      // width 3 -> size max(2,round(3*8))=24 eighths == 3.0pt; solid -> w:val="single"; red.
+      if (PM().dePageBorders({ style: 'solid', color: '#FF0000', width: 3 }) !== true) return 'dePageBorders refused (red)';
+      await sleep(80);
+      const xml = await exportDocumentXml();
+      const pgb = (xml.match(/<w:pgBorders\b[\s\S]*?<\/w:pgBorders>/) || [''])[0];
+      if (!pgb) return 'no <w:pgBorders> block in document.xml';
+      const edges = ['top', 'bottom', 'left', 'right'];
+      for (const e of edges) {
+        const edge = (pgb.match(new RegExp('<w:' + e + '\\b[^>]*\\/?>')) || [''])[0];
+        if (!edge) return 'pgBorders missing <w:' + e + '> edge';
+        if (!/\bw:val="single"/.test(edge)) return 'w:' + e + ' wrong style (expected single): ' + edge;
+        if (!/\bw:sz="24"/.test(edge)) return 'w:' + e + ' wrong size (expected 24 = 3pt): ' + edge;
+        if (!/\bw:color="FF0000"/i.test(edge)) return 'w:' + e + ' wrong color (expected FF0000): ' + edge;
+      }
+      return true;
+    } finally {
+      // Teardown: page borders live on the section sectPr (global, not reset by setDoc) — remove them
+      // so this test does not leak a page border into later tests that assume no page border.
+      PM().dePageBordersRemove();
+    }
+  });
+
   await t('[10th] EXPORT: dePageColor → <w:background w:color> in document.xml (real)', async () => {
     setDoc('x');
     if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
