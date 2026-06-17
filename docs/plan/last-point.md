@@ -7,7 +7,49 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — finish-all loop; ITEM 2 picture grayscale DONE (PR #128) — a14 deferral was an ENUM MISREAD)
+## 2026-06-17 (RESUME HERE — finish-all loop; ITEM 3 header/footer text DONE (PR #130); NEXT = ITEM 4 frames-overlay KEYSTONE)
+
+> **Branch:** `main` (PR #130 merged `2e6302b`; branch deleted). **Phase:** 4 (layout engine). **Directive:**
+> finish ALL big Phase-4 items, no-stop loop, my order — [[phase4-finish-all-directive]].
+> Gates: **PM 474 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode (scope-workflow per item).**
+>
+> **ORDER:** ① page-setup (DONE #126) → ② picture grayscale (DONE #128) → ③ header/footer text (DONE #130)
+> → ④ frames-overlay keystone (NEXT, the biggest/last).
+>
+> **✅ ITEM 3 — HEADER/FOOTER TEXT — DONE (PR #130, Word-COM-validated):** set/read/round-trip the REAL
+> OOXML parts. A scope-workflow proved only the on-page VISUAL band is keystone-gated; the export path is
+> keystone-INDEPENDENT (converter + Document API `headerFooters` + story-runtime were already built+tested).
+> New `src/renderer/bridge/header-footer.ts` (`setHeaderText`/`setFooterText`/`getHeaderText`/`getFooterText`)
+> drives `resolveHeaderFooterSlotRuntime` (story-runtime) → edits a headless story editor (selectAll +
+> insertContent; there is NO `commands.setContent` in the fork) → `runtime.commit(host)` writes
+> `word/headerN.xml` `<w:hdr>` + materializes the sectPr `w:headerReference` + rel (+ `[Content_Types]`
+> auto-register). NO converter code. `ENGINE_READY` un-blocked `header`/`footer`; `H.header`/`H.footer` →
+> Edit modal (both `run()` AND `dropdown()` dispatch routed to it — the dropdown arrow hit the dead
+> `WC.HeaderFooter.headerMenu`). **🔬 Word COM** (validate-headerfooter-win.ps1): `Sections(1).Headers(1).Range.Text=='HdrProbe'`,
+> `Footers(1)=='FtrProbe'`. `[9]` test (parts+refs+rel+round-trip+**re-edit replace-not-append**); repointed
+> `[0a]`/`[11]` block probes header→`pageNumber`. `/code-review` ×1: removed an editability-leak `setEditable`
+> + added the re-edit test.
+> **LESSON:** "keystone-gated" can be PARTIALLY true — the EXPORT/round-trip half of a layout feature is
+> often independent of the visual/multi-page half. Scope down to the COM-validatable export slice and defer
+> only the on-page rendering. The story-runtime (resolveHeaderFooterSlotRuntime) is the content-edit path
+> for header/footer/notes (no public domain content verb).
+>
+> **🆕 LATENT (tracked, not this loop):** the still-blocked header-footer cmds (pageNumber/goToHeader/
+> goToFooter/closeHeaderFooter/docInfo/differentFirstPage/OddEven) still call the retired
+> `WC.HeaderFooter`/`E()` (commands.js:400-408,457,1593) — will `TypeError` if unblocked without a rewrite.
+> Same class as spawn_task `task_a4196ed8` (manualHyphenate).
+>
+> **NEXT — ITEM 4: FRAMES-OVERLAY KEYSTONE (docs/LAYOUT_ENGINE.md).** The biggest, last item — the Phase-4
+> layout-engine keystone that unblocks float/image resize+relocate, floating objects, multi-page positioning,
+> the on-page header/footer band, page numbers. This is ARCHITECTURAL (not a bounded export slice) — START
+> with a deep scope-workflow over docs/LAYOUT_ENGINE.md + the current PresentationEditor/pagination/layout
+> model to decompose it into shippable sub-PRs; expect multiple PRs. Be honest if a sub-part needs steering.
+> spawn_tasks (NOT this loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list
+> `task_eb50ae00`, manualHyphenate `task_a4196ed8`. Branch off `main` (docs checkpoints on a branch + PR).
+
+---
+
+## 2026-06-16 (finish-all loop; ITEM 2 picture grayscale DONE (PR #128) — a14 deferral was an ENUM MISREAD)
 
 > **Branch:** `main` (PR #128 merged `091c737`; branch deleted). **Phase:** 4 (layout engine). **Directive:**
 > finish ALL big Phase-4 items, no-stop loop, my order — see [[phase4-finish-all-directive]].
