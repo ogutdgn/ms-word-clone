@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-17 (finish-all loop — ITEM 3 header/footer text DONE; NEXT = item 4 frames-overlay keystone)
+- [x] **ITEM 3 header/footer text — DONE (PR #130 `2e6302b`)** — set/read/round-trip the real OOXML parts
+  (word/headerN.xml + sectPr w:headerReference + rel). New bridge/header-footer.ts over the story-runtime
+  (resolveHeaderFooterSlotRuntime → headless story editor → commit); NO converter code. ENGINE_READY
+  un-block header/footer; Edit modal (run + dropdown dispatch). **Word COM-validated:** Sections(1).Headers(1)
+  .Range.Text=='HdrProbe'/Footers=='FtrProbe'. `[9]` test (parts+refs+round-trip+re-edit-replace); repointed
+  [0a]/[11] block probes to pageNumber. /code-review: removed editability-leak + added re-edit test.
+  Gates: **PM 474 / smoke 9 / roundtrip 27**. LESSON: "keystone-gated" can be PARTIAL — the export half is
+  often independent of the visual half; ship the COM-validatable export slice, defer on-page rendering.
+- [ ] **NEXT — ITEM 4: frames-overlay KEYSTONE** (docs/LAYOUT_ENGINE.md) — biggest/last, ARCHITECTURAL.
+  Deep scope-workflow over LAYOUT_ENGINE.md + PresentationEditor/pagination → decompose into shippable
+  sub-PRs (float/image resize+relocate, on-page header band, page numbers). Multiple PRs; steer if needed.
+
 ### 2026-06-16 (finish-all loop — ITEM 2 picture grayscale DONE; a14 deferral was an enum misread)
 - [x] **ITEM 2 picture grayscale — DONE (PR #128 `091c737`)** — Picture Format > Color > Grayscale. Bridge
   setImageGrayscale + render attr as CSS filter (image.js renderDOM) + Adjust>Color UI. **Word's own OOXML
