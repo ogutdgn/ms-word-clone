@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (NEW DIRECTIVE: finish ALL big Phase-4 items, no-stop loop — ITEM 1 page-setup DONE)
+- [x] **User directive:** finish ALL big items autonomously, I pick order (memory phase4-finish-all-directive).
+  ORDER: ① page-setup export → ② a14 picture effects → ③ headers/footers → ④ frames-overlay keystone.
+- [x] **ITEM 1 page-setup export — DONE (PR #126 `aedf0da`)** — LAYOUT margins/size/orientation now export
+  to body sectPr (were CSS-only + double-broken). Bridge dePageMargins/dePageSize → sections adapter
+  (w:pgMar/w:pgSz). **Word COM-validated:** Narrow+Legal+Landscape → 36pt/1008/612/orient=1. Fixed 2 bugs
+  to make it reachable: D6-unblock (ENGINE_READY) + setPageVar dead-E() throw → WC.PM.__repaginate. New
+  bridge + UI-flyout-click gate tests; repointed [0a]/[11] block probes to `columns`. Scope via ultracode
+  workflow; /code-review ×2 (caught the E() throw). Gates: **PM 472 / smoke 9 / roundtrip 27**.
+- [x] **spawn_task task_a4196ed8:** dead E() in manualHyphenate + sibling layout handlers (latent, gated).
+- [ ] **NEXT — ITEM 2: a14 picture effects** (deferred grayscale, real a14 OOXML not a:grayscl). Scope-workflow
+  → implement → COM-validate (InlineShapes picture format) → gates → /code-review → merge → checkpoint.
+
 ### 2026-06-16 (v4 #5 page color — DONE; bounded design backlog EXHAUSTED, `/loop` 5-min cadence)
 - [x] **v4 #5 pageColor export + COM — DONE (PR #124 `e325b9a`)** — new oracle; Word read page bg CLEANLY
   (Background.Fill.ForeColor.RGB=65535, Type=1, DisplayBackgrounds=true). New `[10th]` test gates BOTH
