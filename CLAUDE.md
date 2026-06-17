@@ -79,10 +79,11 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 2. **Every fix ships a regression test** in `scripts/test-suite-pm.js`. Run all **three gates**
    before committing (after `npm run build`): `test:pm` (PM functional suite), `test:smoke`
    (PM-core smoke), and `test:roundtrip` (the PM-converter docx gate).
-3. **Commits:** follow `.claude/skills/commit-style/SKILL.md` —
+3. **Commits & merge mode:** follow `.claude/skills/commit-style/SKILL.md` —
    `type(scope): summary`, a what/why body, explicit `git add <path>`, and **no
-   `Co-Authored-By`/AI trailer**. Branch for non-trivial work; PR for
-   save/docx-format, harness, or 5+ file changes.
+   `Co-Authored-By`/AI trailer**. **Merge mode = ff-merge straight to `main` by
+   DEFAULT (no GitHub PRs — still the user's commits); `/code-review` still runs.**
+   Ask PR-vs-ff once per session/loop and honor it. See SKILL.md → "Merge mode".
 4. **Don't hand-edit generated files:** `src/renderer/public/js/ribbon-data.js`
    (`scripts/gen.js`) and `src/renderer/public/js/icons-fluent.js` (`scripts/gen-icons.js`).
 5. **Mind the gotchas** in AGENTS.md (no `window.prompt`, the `WC.PM` bridge is the only
