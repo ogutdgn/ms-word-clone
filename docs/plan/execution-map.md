@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-17 (ITEM 4 keystone carve-out DONE — drag-reposition; STEERING INFLECTION on the render tier)
+- [x] **Keystone scope-workflow** audited 4a-4f: MODEL/EXPORT tier ~90% done; the remainder is the
+  VISUAL/RENDER tier (overlay/paged-container rework) — architectural, no objective COM gate, a design fork.
+- [x] **ITEM 4 carve-out — image drag-to-reposition — DONE (PR #132 `15aae62`, Word-COM-validated)** —
+  move-region on the resize overlay writes marginOffset → wp:posOffset; Word read-shapes Left=120pt/Top=60pt
+  after a +160/+80px drag. `[4c]` synthetic-drag gate test + probe. /code-review fixed a listener
+  cross-contamination. Gates: **PM 475 / smoke 9 / roundtrip 27**. ALL 4 big items now have shipped,
+  COM-validated increments (#126/#128/#130/#132).
+- [ ] **STEERING:** keystone COM-validatable surface EXHAUSTED. Remainder = visual render (z-stacking,
+  line/row-split render, on-page header band, page-number render) — no COM gate + render-model fork
+  (A overlay vs B paged containers). Asked the user (A/B + next priority). Possible export-loop increment:
+  page-number FIELD in header/footer (builds on item 3; verify validatability).
+
 ### 2026-06-17 (finish-all loop — ITEM 3 header/footer text DONE; NEXT = item 4 frames-overlay keystone)
 - [x] **ITEM 3 header/footer text — DONE (PR #130 `2e6302b`)** — set/read/round-trip the real OOXML parts
   (word/headerN.xml + sectPr w:headerReference + rel). New bridge/header-footer.ts over the story-runtime
