@@ -469,10 +469,22 @@ rich. 5 runtime-confirmed (`s3b7-mail.js` / `s3b7-directory.js`); BUG-063 code-c
 - _Batch-7 also: 1 duplicate (Draw Add-Pen custom-pen opacity → **BUG-019d**); 4 not-bugs (Envelopes, Check-for-Errors, Select-
   Recipients-Type-New-List, Insert Pictures-dropdown); 3 known-stubs (Update Labels no-op, Shapes no-op stub, Selection Pane deferred)._
 
+## S3-audit-triage new bugs (BUG-064…065) — batch-8 (final), runtime/code-confirmed 2026-06-17
+Batch-8 (12 last untriaged items, deduped vs the 63-bug catalog) surfaced 2 new bugs — the fresh wrong-output-risk pool is now
+mined out. Full detail in `BUGS-DETAILED.md` § BUG-064…065.
+- **BUG-064 [S3] Mailings Rules ▸ Next Record (NEXT) never advances the record cursor** — it's stripped (`__NextRecord__→''`)
+  and records stay page-broken, so multi-record-per-page (labels/Directory/Update Labels) is impossible. `mmBuildMerge` has no
+  record cursor (`mail.ts:56`). Probe: `«Name»`+NEXT, 2 recs → Alice + page-break + Bob (`bugConfirmed:true`).
+- **BUG-065 [S3] Draw ▸ Select Objects can't select non-ink objects** (ink-only, no marquee, no move/resize) — `selectAt()`
+  hit-tests only `.pm-ink-stroke` (`ink-overlay.ts:255`). Code-confirmed (same class as BUG-063 Lasso).
+- _Batch-8 also: 2 duplicates (Start-Mail-Merge type → **BUG-059**; Paragraph dialog launcher → **BUG-055**); 7 not-bugs
+  (Font-name-combo, Line-Spacing presets, Add/Remove-Space, Online-Video, Drawing-Canvas, Bullets-Library-glyphs, New+Templates);
+  and References Insert-Citation "Add New Placeholder…" — an **honest no-op redirect toast** (missing-feature stub, not a wrong-output bug)._
+
 ## ★ Final sweep summary — S2 + S3 fidelity-audit triage (2026-06-17)
 The bug-hunt extended into a systematic, runtime-verified triage of the wrong-output-risk items in the 321-control fidelity
-audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (7 curated batches): ~133 audit candidates triaged →
-30 genuine new runtime-confirmed bugs (BUG-034…063).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
+audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (8 curated batches): ~145 audit candidates triaged →
+32 genuine new runtime/code-confirmed bugs (BUG-034…065).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
 (BUG-005 read-only leak, BUG-027 bookmark dup, BUG-028 Shift+Tab, BUG-029 float anchor, BUG-030 print chrome, BUG-032/033 table).
 
 | Batch | Area | Candidates | New bugs | Dups | Not-bug | Stub | Needs-runtime |
@@ -485,13 +497,13 @@ audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (7 curated
 | S3-5 | Text-Effects/Font-Size/Arrange | 16 | **4** (052–055) | 1 | 9 | 0 | 2 |
 | S3-6 | Table-Styles/AutoFit/TOC/Layout | 16 | **2** (056–057) | 0 | 4 | 10 | — |
 | S3-7 | Mailings/Insert/Draw | 14 | **6** (058–063) | 1 | 4 | 3 | — |
-| **Σ** | | **~133** | **30** | ~15 | ~44 | ~40 | ~4 |
+| S3-8 | Mailings/Home/Draw/File (final) | 12 | **2** (064–065) | 2 | 7 | 1 | — |
+| **Σ** | | **~145** | **32** | ~17 | ~51 | ~41 | ~4 |
 
-**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2/**6** (batch-7 Mailings rebounded to 6/14 — that subsystem held a rich vein
-of half-wired/lying controls). Outside Mailings, the wrong-output-risk vein is largely exhausted — remaining S3 items skew toward
-feature-completeness DEVIATION/GAP/STUB (already in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless (TTS, view panels,
-native OS dialogs, pixels). **Mailings remains the one area still worth a further pass** (Rules dialogs, Insert-Merge-Field
-variants, Step-by-Step Wizard, Start-Mail-Merge types).
+**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2/6/2 (batch-7 Mailings rebounded to 6/14 — that subsystem held a rich vein of
+half-wired/lying controls — then batch-8 fell to 2/12). **The wrong-output-risk vein is now mined out:** the remaining audit
+items skew toward feature-completeness DEVIATION/GAP/STUB (already in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless
+(TTS, view panels, native OS dialogs, pixels). **This sweep is complete.**
 
 **Highest-severity finds:** BUG-005 (read-only protection bypassed), BUG-047/048 (Source-Manager + Merge-paste data loss),
 BUG-051 (Outline exports invalid OOXML `CURRENTCOLOR` — only visible in a FULL .docx save), BUG-054 (Shadow/Reflection dropped

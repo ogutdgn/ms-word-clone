@@ -1590,3 +1590,49 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : Match Word's enclosure rule — select a stroke if ANY sampled point is inside the loop (or anchor the threshold far below 0.6); extend the selectable set beyond `.pm-ink-stroke` to shapes/images; add move/format to the lasso selection. Effort: M. Risk: low-medium.
 
 ---
+
+## BUG-064 — Mailings Rules ▸ Next Record (NEXT) never advances the record cursor; it's stripped and records stay page-broken
+**Severity:** S3
+
+**Where**
+: Mailings > Rules > Next Record. Insert: `commands.js:1112` ("Next Record" → `WC.PM.mmInsertRule('NEXT','NEXT')`, `:1105`). Merge: `bridge/mail.ts:51` (`code==='NEXT' → '__NextRecord__'`) and `mail.ts:39-57 mmBuildMerge` (models a merge as one-record-per-output-block joined by a hard page `BREAK`, `:56`; **no record cursor**). Resolver `mailings-tools.js:131` (`composite('__NextRecord__') → ''`). Export `…/v3/handlers/w/sdt/helpers/translate-field-annotation.js:14,57` (NEXT ∈ EMPTY_FIELD_CODES → a structurally-valid but inert 3-run field).
+
+**When / repro**
+: 1) A label/directory template with a `«Name»` field and a Next Record field. 2) Merge 2 records. 3) The clone outputs "Name: Alice" + a page break + "Name: Bob" — the NEXT did nothing. Word's NEXT advances the data cursor **mid-page**, packing multiple records onto one page (the basis of label sheets, Directory, and Update Labels).
+
+**Symptom (Word vs clone)**
+: Word's NEXT consumes the next data row within the same page. The clone strips NEXT (`__NextRecord__ → ''`) and always emits one record per page-broken block, so multi-record-per-page layouts are impossible. (Shares the `mail.ts:56` unconditional-`BREAK` root with BUG-059; overlaps BUG-008's "no NEXTIF/SKIPIF logic" note, but the specific NEXT record-advance no-op is logged by neither.)
+
+**Why it happens (root cause)**
+: `mmBuildMerge` has no record-cursor concept — it maps recipients 1:1 to page-broken blocks and resolves NEXT to an empty string rather than advancing the cursor.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b8-next2.js` (`s3b8-next2.json`): a template with `«Name»` + a NEXT field, merged over `[{Name:'Alice'},{Name:'Bob'}]`, returns HTML where both `Alice` and `Bob` resolved (`hasAlice/hasBob:true`) but are separated by a `manual-break` page break (`breaksBetweenRecords:2` on the one BREAK div) and the NEXT left no residue (`nextStripped:true`) — NEXT did not pack the records onto one page. `bugConfirmed:true`.
+
+**Solution**
+: Give `mmBuildMerge` a record cursor: walk the template runs and, on a NEXT (or satisfied NEXTIF) sentinel, advance an index into `recipients[]` and keep emitting into the **same** block (no `BREAK`) with the next record's values; emit the page `BREAK` only at the per-page template boundary. Pair with BUG-059 (suppress the per-record BREAK for Directory). Effort: M. Risk: medium. Regression: a NEXT-containing template with 2 recipients yields both on one page (zero `manual-break` between them).
+
+---
+
+## BUG-065 — Draw ▸ Select Objects can't select non-ink objects (ink-only, no marquee, no move/resize)
+**Severity:** S3 (code-confirmed)
+
+**Where**
+: Draw > Select Objects. `commands.js:731 H.selectObjects = () => WC.PM.dSetSelect()`; `bridge/draw.ts:103 dSetSelect()` only sets `drawState.tool='select'; drawState.on=true`; `bridge/ink-overlay.ts:163` `onDown` for `tool==='select'` calls `selectAt(p)` and returns without starting a marquee; `selectAt()` (`ink-overlay.ts:255`) hit-tests **only** `.pm-ink-stroke` elements.
+
+**When / repro**
+: 1) Insert a shape/image/text box. 2) Draw > Select Objects, click it. 3) Nothing is selected (only ink strokes are selectable). There is no marquee/rubber-band selection, and selected strokes can't be moved or resized.
+
+**Symptom (Word vs clone)**
+: Word's "Select Objects" arrow click- and marquee-selects any floating object (shapes, images, text boxes, ink) and supports move/resize. The clone routes it through the ink-overlay's draw-tool state machine, which only hit-tests ink strokes and offers no marquee or transform — a lying control (the arrow labelled "Select Objects" can't select objects). Same class as BUG-063 (Lasso): an ink-overlay tool that doesn't reach body-level objects.
+
+**Why it happens (root cause)**
+: `dSetSelect` drives the ink overlay rather than Word's body-level object-pick arrow; `selectAt()` matches only `.pm-ink-stroke`, and `onDown` returns immediately for the select tool (no marquee), with no move/resize wired.
+
+**Evidence**
+: **Code-confirmed** (interactive overlay behavior; the deviations are negative facts — can't select non-ink objects, no marquee, no move/resize — with no model/XML/dialog artifact to assert, and the gesture is impractical to synthesize headlessly, like BUG-063): `ink-overlay.ts:255 selectAt()` queries only `.pm-ink-stroke`; `:163 onDown` returns for `tool==='select'` before starting a drag; `draw.ts:103 dSetSelect` sets only `tool='select'`.
+
+**Solution**
+: Wire the Draw-tab Select Objects arrow to the existing image/shape frame-selection machinery so it can click- and marquee-select any floating object (ink, shapes, images, text boxes) and move/resize them, instead of routing through the ink-only overlay. Effort: M. Risk: low-medium.
+
+---

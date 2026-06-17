@@ -2246,3 +2246,19 @@ Batch-7 (14 Mailings/Insert/Draw items) triaged + runtime-probed (`s3b7-mail.js`
 Mailings remains the one subsystem still worth a further pass (Rules dialogs / Insert-Merge-Field / Wizard / Start-Mail-Merge types).
 
 ---
+## Resolution log — S3 batch-8 triage sweep (2026-06-17) — FINAL batch, sweep complete
+Batch-8 (12 last untriaged wrong-output-risk items) triaged + probed (`s3b8-next2.js`):
+- **Promoted to numbered bugs:** Mailings Rules ▸ Next Record (NEXT inert, no record cursor) → **BUG-064** (runtime-confirmed);
+  Draw ▸ Select Objects (ink-only, no marquee/move) → **BUG-065** (code-confirmed).
+- **Duplicates:** Start Mail Merge type (Directory consequence) → **BUG-059**; Paragraph group dialog launcher → **BUG-055**.
+- **Verdict = not-a-bug / honest reduction:** Font name combo; Line-and-Paragraph-Spacing presets; Add/Remove Space; Insert
+  Online Video (honest dialog); Draw Drawing Canvas; Bullets Library glyphs; File New ▸ Blank + Templates.
+- **Honest no-op stub (NOT a numbered bug):** References Insert Citation ▸ "Add New Placeholder…" — an honest redirect toast
+  ("Add a source via Add New Source…"); Word mints a placeholder, the clone declines honestly — a missing feature, not wrong output.
+
+**SWEEP COMPLETE.** S2 + S3 batches 1-8: ~145 audit candidates triaged → 32 new runtime/code-confirmed bugs (BUG-034…065).
+The wrong-output-risk vein is mined out; see the "★ Final sweep summary" in `BUG-LEDGER.md`. Remaining audit `_needsRuntime_`
+items are feature-completeness (in `FEATURE-IMPROVEMENTS.md`) or need TTS/native-dialog/pixels. Next work is feature
+implementation + the layout engine (Phase 4), not more triage.
+
+---
