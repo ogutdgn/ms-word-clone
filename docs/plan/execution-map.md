@@ -450,6 +450,15 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (font-size export test, `/loop` 5-min cadence)
+- [x] **Font-size export test (PR #108 `2307876`)** — char-format matrix 4b. `setFontSize('20pt')` →
+  `<w:sz w:val="40">` (half-points) + probe + reusable `validate-fontsize-win.ps1` (text-only range).
+  **Word COM-validated:** Font.Size=20 — half-point conversion correct. `/code-review` clean. Gates: **PM
+  462 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** char-format matrix 4d rFonts (Font.Name) → 4e sub/superscript (Font.Subscript/Superscript).
+  After the matrix, only #3 highlight (UX-judgment bug — steer) + #5 lists remain in v3 → re-scout v4 or
+  escalate a bigger item.
+
 ### 2026-06-16 (font-color export test, `/loop` 5-min cadence)
 - [x] **Font-color export test (PR #106 `577bf07`)** — char-format matrix 4c. `setColor` → `<w:color
   w:val="FF0000">` (whole paragraph) + probe + reusable `validate-fontcolor-win.ps1` (text-only range).
