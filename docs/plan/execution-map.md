@@ -450,6 +450,15 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (sub/superscript export test — CHAR-FORMAT MATRIX COMPLETE, `/loop` 5-min cadence)
+- [x] **Sub/superscript export test (PR #112 `137e0cb`)** — char-format matrix 4e (last). Two paras →
+  `<w:vertAlign w:val="subscript"|"superscript">` + probe + reusable `validate-vertalign-win.ps1`. **Word
+  COM-validated:** Font.Subscript=-1, Font.Superscript=-1. `/code-review` clean. Gates: **PM 464 / smoke 9 / roundtrip 27**.
+- [x] **🏁 CHARACTER-FORMAT EXPORT+COM MATRIX COMPLETE** (underline-style/color/size/family/sub-sup, PRs #104–112).
+- [ ] **NEXT (decision point, surfaced to user):** #5 numbered/multilevel list export+COM (last clean v3 item)
+  → then RE-SCOUT v4 OR escalate a bigger STEERED item (a14 picture effects / frames-overlay / 4e headers).
+  #3 highlight = real bug w/ UX-judgment fix (steer). ~15 COM-validated export slices merged this run; gates PM 448→464.
+
 ### 2026-06-16 (font-family rFonts export test, `/loop` 5-min cadence)
 - [x] **Font-family (rFonts) export test (PR #110 `fde5e76`)** — char-format matrix 4d.
   `setFontFamily('Georgia')` → `<w:rFonts w:ascii="Georgia">` + probe + reusable `validate-fontname-win.ps1`.
