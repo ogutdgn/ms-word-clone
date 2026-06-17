@@ -7,7 +7,46 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — v4 #4 page borders Word-COM-validated CORRECT (PR #122); next = #5 pageColor (low COM))
+## 2026-06-16 (RESUME HERE — v4 #5 page color DONE (PR #124); design backlog EXHAUSTED → page-setup geometry OR ESCALATE)
+
+> **Branch:** `main` (PR #124 merged `e325b9a`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 470 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **✅ v4 #5 PAGE COLOR — Word-COM-validated CORRECT (PR #124, NO source bug):** new oracle
+> (`oracle-probe-pagecolor.js` + `validate-pagecolor-win.ps1`). **Contrary to expectation, page-background
+> COM read CLEANLY:** `doc.Background.Fill.ForeColor.RGB=65535` (yellow), `Fill.Type=1` (solid),
+> `ActiveWindow.View.DisplayBackgrounds=true`. New `[10th]` test gates BOTH document.xml `<w:background
+> w:color>` AND settings.xml `<w:displayBackgroundShape/>` — the K4 render flag the existing test MISSED
+> (without it Word shows a WHITE page despite the byte being present; endnote-class blind spot). Non-vacuous
+> via clear-first + distinct color 00FFFF + `finally{}` teardown. `/code-review`: softened the now-inaccurate
+> "KNOWN UNRELIABLE" framing; clarified getUpdatedDocs = modified parts (authoritative here).
+>
+> **📊 v4 COMPLETE / VERDICT — design+references bounded surface EXHAUSTED:** 5 slices: #1 endnote
+> (FOUND+FIXED a real data-loss bug), #2 comments / #3 paraspacing / #4 pageBorders / #5 pageColor (all
+> CONFIRM-CORRECT + a stronger gate). **The bounded, cleanly-COM-validatable export surface is now largely
+> covered and faithful.** The endnote bug was the payoff; the rest built the COM-oracle net.
+>
+> **🗂️ WHAT'S LEFT (re-ranked) — two honest paths:**
+>   - **PATH A (bounded, autonomous): PAGE-SETUP GEOMETRY (v4 #6).** FRESH area, CLEAN reliable COM
+>     (`Section.PageSetup.TopMargin/.PageWidth/.PageHeight/.Orientation`). ⚠️ FIRST verify a bridge verb
+>     exists to MUTATE margins/size/orientation (LAYOUT tab) — grep `bridge/layout.ts` / commands.js for
+>     pageSetup/margins/orientation. If a mutate verb exists → probe + `validate-pagesetup-win.ps1`
+>     (px/in→twips: 1in=1440). If NOT wired → it's a feature, not a bounded test slice → flag + pivot.
+>   - **Low-value remainder (SKIP unless asked):** TOC entries / caption SEQ / citation CITATION export COM
+>     — these are DEGRADED-BY-DESIGN (TOC page numbers are "0" placeholder; SEQ/CITATION resolve on Word
+>     F9/open), so a COM gate would be flaky/low-signal. Do NOT manufacture a flaky gate here.
+>   - **PATH B (RECOMMENDED — STEERED, needs user):** a14 picture effects / FRAMES-OVERLAY keystone /
+>     4e headers-footers / highlight-picker UX. These are the high-impact remaining work but are multi-PR
+>     and need the user's steer. **I have recommended escalation in chat repeatedly; user keeps firing the
+>     autonomous loop without naming one → default continues.**
+>
+> **NEXT — try PATH A (page-setup geometry) IF a mutate bridge verb exists; else flag it's a feature and
+> STRONGLY recommend the user pick a PATH B item.** spawn_tasks (NOT loop): 2+-table `task_0e043993`,
+> CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main` (docs checkpoints on a branch + PR).
+
+---
+
+## 2026-06-16 (v4 #4 page borders Word-COM-validated CORRECT (PR #122); next = #5 pageColor (low COM))
 
 > **Branch:** `main` (PR #122 merged `4f2caf3`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 469 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
