@@ -2231,3 +2231,18 @@ honest-stub rate confirms the wrong-output-risk vein is exhausted; the remaining
 deviations (in `FEATURE-IMPROVEMENTS.md`) or need TTS/native-dialog/pixels.
 
 ---
+## Resolution log — S3 batch-7 triage sweep (2026-06-17) — Mailings-weighted
+Batch-7 (14 Mailings/Insert/Draw items) triaged + runtime-probed (`s3b7-mail.js`, `s3b7-directory.js`); the Mailings vein rebounded.
+- **Promoted to numbered, runtime-confirmed bugs:** Preview Results resolves only MERGEFIELD → **BUG-058**; Finish & Merge
+  ignores Directory type (page break per record) → **BUG-059**; Labels "Full page" checkbox inert → **BUG-060**; CSV UTF-8 BOM
+  corrupts first field name → **BUG-061**; Bibliography dropdown ignores chosen title → **BUG-062**. Code-confirmed: Lasso Select
+  <60% threshold + ink-only + delete-only → **BUG-063**.
+- **Duplicate:** Draw Add-Pen custom-pen opacity → **BUG-019d**.
+- **Verdict = not-a-bug:** Mailings Envelopes (working-but-simplified); Check for Errors (lightweight validator, honest);
+  Select Recipients ▸ Type a New List (feature-completeness gaps only); Insert Pictures dropdown (sub-claims don't meet the bar).
+- **Known stubs:** Mailings Update Labels (honest no-op toast); Insert Shapes (honest no-op stub, in FEATURE-IMPROVEMENTS.md);
+  Layout Selection Pane (DEFERRED area).
+
+Mailings remains the one subsystem still worth a further pass (Rules dialogs / Insert-Merge-Field / Wizard / Start-Mail-Merge types).
+
+---

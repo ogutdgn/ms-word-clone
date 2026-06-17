@@ -1452,3 +1452,141 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : Give "Manual Table" its own non-auto path — insert literal placeholder paragraphs in TOC1/TOC2/TOC3 styles carrying Word's "Type chapter title (level N)" text + a right-aligned tab + page-number slot, with NO field and NO heading collection (a `refInsertManualTOC` verb or a `{manual:true}` branch that builds placeholders directly instead of `d.create.tableOfContents()`). Effort: S-M. Risk: low. Regression: after Manual Table on a doc with headings, the block contains the literal "Type chapter title" placeholder and not the heading captions.
 
 ---
+
+## BUG-058 — Mailings Preview Results resolves only MERGEFIELD; composite fields (Address Block, Greeting Line) keep their «placeholder»
+**Severity:** S3
+
+**Where**
+: Mailings > Preview Results. `bridge/mail.ts:28-38 mmPreview()` hard-filters at `:31` (`if (n.type.name !== 'fieldAnnotation' || n.attrs.fieldType !== 'MERGEFIELD') return`), so only MERGEFIELD `displayLabel`s are updated. `mailings-tools.js:144-148 _previewMap()` only builds value entries for recipient column names (`this.fields`), never `__AddressBlock__`/`__GreetingLine__`/MERGEREC/MERGESEQ.
+
+**When / repro**
+: 1) Mail merge with a recipient list, insert a Merge Field + an Address Block. 2) Preview Results ON (toast "Preview on, record 1 of N"). 3) The Merge Field shows the record value, but the Address Block still shows `«AddressBlock»`.
+
+**Symptom (Word vs clone)**
+: Word's Preview Results swaps **every** field to its evaluated value. The clone resolves only simple MERGEFIELDs; ADDRESSBLOCK/GREETINGLINE/MERGEREC/MERGESEQ stay as raw guillemet placeholders while the toggle reports "on" — a lying control. (Distinct from BUG-008, which is the exported OOXML of these fields; this is the in-app live preview. The merge path `mmBuildMerge` *does* resolve composites, so only the preview path is deficient.)
+
+**Why it happens (root cause)**
+: `mmPreview` filters to `MERGEFIELD` and `_previewMap` only knows recipient columns, so composite/record fields are never evaluated during preview.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b7-mail.js` (`s3b7-mail.json` → `preview`): with preview ON, the MERGEFIELD node `displayLabel:"John"` (resolved) but the ADDRESSBLOCK node `displayLabel:"«AddressBlock»"` (unresolved). `bugConfirmed:true`.
+
+**Solution**
+: In `mmPreview` stop hard-filtering to MERGEFIELD; evaluate composite/record types too (reuse the `composite()` resolver at `mailings-tools.js:129-131` already used by Finish&Merge) and restore `defaultDisplayLabel` on toggle-off. Also ensure a Save while preview is ON doesn't persist preview values. Effort: M. Risk: low-medium.
+
+---
+
+## BUG-059 — Mailings Finish & Merge ignores the Directory merge type; emits a page break between every record
+**Severity:** S3
+
+**Where**
+: Mailings > Finish & Merge > Edit Individual Documents. `mailings-tools.js:171-182 finishMerge('edit')` calls `WC.PM.mmBuildMerge(recipients, resolve)` which (`bridge/mail.ts:39-57`) **always** joins records with `BREAK` (a `manual-break` page-break div, `:42`/`:56`), never consulting `this.mergeType`. The app DOES store a real mergeType — `startMailMerge('directory')` (`commands.js:1097` flyout → `mailings-tools.js:18`) sets `mergeType='directory'` — but neither `finishMerge` nor `mmBuildMerge` reads it.
+
+**When / repro**
+: 1) Start Mail Merge > **Directory**. 2) Insert fields, select recipients. 3) Finish & Merge > Edit Individual Documents. 4) The merged document has a page break after every record. Word's Directory merge concatenates records **continuously** (no per-record page break).
+
+**Symptom (Word vs clone)**
+: For Letters/Email a per-record page break is correct; for **Directory** Word emits none. The clone emits one regardless — wrong output for the Directory type, from a half-wired control (mergeType is selectable but ignored). (Not BUG-008, which is field-code export; not the BUG-008 SKIPIF/NEXTIF note, a different missing branch.)
+
+**Why it happens (root cause)**
+: `mmBuildMerge` unconditionally `.join(BREAK)`s the per-record HTML and never branches on `mergeType`.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b7-directory.js` (`s3b7-directory.json`): with `mergeType:"directory"` and 2 recipients, `WC.PM.mmBuildMerge(...)` output contains a `manual-break`/`break-after:page` BREAK between the records (`pageBreaksBetweenRecords:2` hits on the one BREAK div). `bugConfirmed:true`.
+
+**Solution**
+: In `mmBuildMerge` (or `finishMerge`) branch on `mergeType`: for `directory` join records with no break (continuous), for letters/email keep the page break. Effort: S. Risk: low. Regression: a Directory merge of N records produces 0 page breaks.
+
+---
+
+## BUG-060 — Mailings Labels: the "Full page of the same label" checkbox is inert (never read)
+**Severity:** S3
+
+**Where**
+: Mailings > Labels. `mailings-tools.js:193-203 labels()`: the "Full page of the same label" checkbox is declared at `:196` and placed at `:198`, but its `.checked` is **never read** — `buildHTML()` (`:197`) unconditionally emits a full cols×rows grid of identical label cells.
+
+**When / repro**
+: 1) Mailings > Labels, **uncheck** "Full page of the same label", New Document. 2) The result is still a full page of identical labels (e.g. 30 cells for Avery 5160 3×10), not a single label.
+
+**Symptom (Word vs clone)**
+: Word's checkbox toggles between a full sheet of identical labels and a single label. The clone always produces the full grid regardless — a lying control.
+
+**Why it happens (root cause)**
+: `buildHTML()` always emits the full grid; the `fullPage` checkbox's state is never consulted.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b7-mail.js` (`labels`): opened the dialog, **unchecked** the full-page box (`uncheckedIt:true`), clicked New Document → the doc has `cellCountAfterUncheck:30` (full Avery 5160 grid). `bugConfirmed:true`.
+
+**Solution**
+: Read `fullPage.checked` in the New-Document handler; when unchecked, emit a single populated label cell (or one row) instead of the full grid. Effort: S. Risk: low.
+
+---
+
+## BUG-061 — Mailings: CSV recipient lists with a UTF-8 BOM prepend `﻿` to the first field name (breaks the first merge field)
+**Severity:** S3
+
+**Where**
+: Mailings > Select Recipients > Use an Existing List (CSV). `mailings-tools.js:232-248 parseCSV` does no BOM stripping — the leading `﻿` is not a quote/delimiter/CR/LF so it falls through to `else field += c` (`:244`) and is prepended to the first header cell. `main.js:304` reads the CSV with `fsp.readFile(filePath,'utf8')`, which decodes the BOM bytes into the string rather than stripping them. `useExistingList` (`:36-56`) then sets `fields = rows[0]` (`:51`).
+
+**When / repro**
+: 1) A CSV saved with a UTF-8 BOM (Excel's default "CSV UTF-8"). 2) Use an Existing List → the first column is named `﻿FirstName` instead of `FirstName`. 3) Inserting that merge field exports as `MERGEFIELD ﻿FirstName` and never matches the data.
+
+**Symptom (Word vs clone)**
+: Word strips the BOM. The clone keeps it, corrupting the first field name throughout the merge — a common, silent data defect for Excel-exported CSVs.
+
+**Why it happens (root cause)**
+: Neither the file read (`utf8` without BOM stripping) nor `parseCSV` removes the leading `﻿`.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b7-mail.js` (`csvBom`): `WC.Mail._parseCSV('﻿FirstName,LastName\n…')` → `rows[0][0] === "﻿FirstName"`, `firstCharCode:65279` (0xFEFF). `bugConfirmed:true`.
+
+**Solution**
+: Strip a leading `﻿` in `parseCSV` (`if (i===0) text = text.replace(/^﻿/, '')`) and/or in the main-process read. Effort: S (1 line). Risk: low. Regression: a BOM-prefixed CSV yields `rows[0][0] === "FirstName"`.
+
+---
+
+## BUG-062 — References Bibliography dropdown: the chosen title (Bibliography / References / Works Cited) is ignored; no title heading is emitted
+**Severity:** S3
+
+**Where**
+: References > Bibliography > Bibliography / References / Works Cited. `bridge/references.ts:611-619 refInsertBibliography(_title?)` accepts a title from the flyout (`commands.js:1001 insertBib(t)`) but **never uses it** — it calls `d.citations.bibliography.insert({at:{kind:'documentEnd'}})` with no title. (The fork's bibliography insert input has no title slot; an in-code comment notes threading it through `style` would corrupt the export.)
+
+**When / repro**
+: 1) References > Bibliography > "Works Cited". 2) The inserted block has no "Works Cited" heading — it's identical to picking "Bibliography" or "References".
+
+**Symptom (Word vs clone)**
+: Word's three built-in choices insert a styled heading ("Bibliography"/"References"/"Works Cited") above the field. The clone ignores the choice and emits no heading — all three produce identical output. (Related to BUG-031 — ToF/Bibliography re-insert duplication — but a distinct title-dropping defect.)
+
+**Why it happens (root cause)**
+: `refInsertBibliography` discards the `_title` argument; no styled-caption paragraph is inserted.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b7-mail.js` (`bibTitle`): exporting after `refInsertBibliography('Bibliography')`, `('References')`, and `('Works Cited')` yields byte-identical `document.xml` for all three (`allThreeIdentical:true`) with no `Works Cited` heading run (`worksCitedHeadingPresent:false`). `bugConfirmed:true`.
+
+**Solution**
+: Thread the title into a styled heading paragraph (e.g. `styleId 'BibliographyHeading'`/'Heading 1') prepended to the bibliography block — analogous to the BUG-044 TOC-caption fix — without routing it through the citation `style` field. Effort: S-M. Risk: low.
+
+---
+
+## BUG-063 — Draw Lasso Select drops a stroke that is <60% inside the loop and is ink-only / delete-only (Word selects partial enclosure)
+**Severity:** S3 (code-confirmed)
+
+**Where**
+: Draw > Lasso Select. `bridge/ink-overlay.ts:262-277 finishLasso` selects a rendered ink stroke only when `inside / total > 0.6` (`:274`); it iterates only `.pm-ink-stroke` overlay elements (`:265`); `deleteSelected` (`:393-396`) is Delete/Backspace-only (no move/recolor). Wiring `commands.js:732 H.lassoSelect = () => WC.PM.dSetLasso()`; `draw.ts:104 dSetLasso` sets `tool='lasso'`.
+
+**When / repro**
+: 1) Draw > Lasso, loop around a stroke that's ~50% enclosed. 2) The stroke is not selected ("No strokes inside the loop"). 3) Lasso also can't select shapes/images (ink only), and selected strokes can only be deleted (not moved/recolored).
+
+**Symptom (Word vs clone)**
+: Word's Lasso selects any object **fully or partially** enclosed, across object types, and supports move/format. The clone requires >60% enclosure, is ink-only, and delete-only.
+
+**Why it happens (root cause)**
+: The `inside/total > 0.6` threshold drops partially-enclosed strokes; the selection set is restricted to `.pm-ink-stroke`; `deleteSelected` is the only operation.
+
+**Evidence**
+: **Code-confirmed** (the lasso gesture is impractical to synthesize headlessly): `ink-overlay.ts:274` literally gates selection on `inside / total > 0.6`; `:265` queries only `.pm-ink-stroke`; `:393-396` handles only Delete/Backspace. Word's enclosure rule is partial-or-full across object types.
+
+**Solution**
+: Match Word's enclosure rule — select a stroke if ANY sampled point is inside the loop (or anchor the threshold far below 0.6); extend the selectable set beyond `.pm-ink-stroke` to shapes/images; add move/format to the lasso selection. Effort: M. Risk: low-medium.
+
+---

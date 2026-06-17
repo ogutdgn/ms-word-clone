@@ -452,10 +452,27 @@ Batch-6 (16 fresh Table-Styles/AutoFit/TOC/Layout/Styles-pane items, deduped vs 
   10 known-stubs (Table Styles gallery sparse-on-blank-doc, AutoFit DOM-measure deferral, Footnote&Endnote dialog launcher,
   Layout Align/Rotate/Hyphenation/Line-Numbers, Find Advanced, Styles task pane, Style Inspector — all documented feature gaps)._
 
+## S3-audit-triage new bugs (BUG-058…063) — batch-7 (Mailings-weighted), runtime-confirmed 2026-06-17
+Batch-7 (14 Mailings/Insert/Draw items, deduped vs the 57-bug catalog) surfaced **6** new bugs — the Mailings vein was still
+rich. 5 runtime-confirmed (`s3b7-mail.js` / `s3b7-directory.js`); BUG-063 code-confirmed. Full detail in `BUGS-DETAILED.md` § BUG-058…063.
+- **BUG-058 [S3] Preview Results resolves only MERGEFIELD** — Address Block / Greeting Line keep their «placeholder» while
+  preview is "on" (`mmPreview` hard-filters to MERGEFIELD). Probe: MERGEFIELD→"John", ADDRESSBLOCK→"«AddressBlock»".
+- **BUG-059 [S3] Finish & Merge ignores the Directory merge type** — emits a page break between every record (Word's Directory
+  is continuous). `mmBuildMerge` always `.join(BREAK)`s, never reads `mergeType`. Probe: directory + 2 recs → a BREAK between them.
+- **BUG-060 [S3] Labels "Full page of the same label" checkbox is inert** — always emits the full grid. Probe: unchecked → 30 cells.
+- **BUG-061 [S3] CSV recipient lists with a UTF-8 BOM prepend `﻿` to the first field name** — `parseCSV` doesn't strip the BOM.
+  Probe: `rows[0][0]` charCode 0xFEFF. (Common for Excel "CSV UTF-8" exports.)
+- **BUG-062 [S3] Bibliography dropdown ignores the chosen title** (Bibliography/References/Works Cited) — all three identical,
+  no heading emitted (`refInsertBibliography` drops `_title`). Probe: 3 exports byte-identical, no "Works Cited" heading.
+- **BUG-063 [S3] Draw Lasso Select drops <60%-enclosed strokes; ink-only, delete-only** (Word selects partial enclosure across
+  object types). Code-confirmed (`ink-overlay.ts:274` `inside/total > 0.6`).
+- _Batch-7 also: 1 duplicate (Draw Add-Pen custom-pen opacity → **BUG-019d**); 4 not-bugs (Envelopes, Check-for-Errors, Select-
+  Recipients-Type-New-List, Insert Pictures-dropdown); 3 known-stubs (Update Labels no-op, Shapes no-op stub, Selection Pane deferred)._
+
 ## ★ Final sweep summary — S2 + S3 fidelity-audit triage (2026-06-17)
 The bug-hunt extended into a systematic, runtime-verified triage of the wrong-output-risk items in the 321-control fidelity
-audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (6 curated batches): ~119 audit candidates triaged →
-24 genuine new runtime-confirmed bugs (BUG-034…057).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
+audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (7 curated batches): ~133 audit candidates triaged →
+30 genuine new runtime-confirmed bugs (BUG-034…063).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
 (BUG-005 read-only leak, BUG-027 bookmark dup, BUG-028 Shift+Tab, BUG-029 float anchor, BUG-030 print chrome, BUG-032/033 table).
 
 | Batch | Area | Candidates | New bugs | Dups | Not-bug | Stub | Needs-runtime |
@@ -467,11 +484,14 @@ audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (6 curated
 | S3-4 | Proofing/View/font/clipboard | 16 | **3** (049–051) | 0 | 4 | 7 | 2 |
 | S3-5 | Text-Effects/Font-Size/Arrange | 16 | **4** (052–055) | 1 | 9 | 0 | 2 |
 | S3-6 | Table-Styles/AutoFit/TOC/Layout | 16 | **2** (056–057) | 0 | 4 | 10 | — |
-| **Σ** | | **~119** | **24** | ~14 | ~40 | ~37 | ~4 |
+| S3-7 | Mailings/Insert/Draw | 14 | **6** (058–063) | 1 | 4 | 3 | — |
+| **Σ** | | **~133** | **30** | ~15 | ~44 | ~40 | ~4 |
 
-**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2 (~17%, declining; batch-6 was 10/16 honest stubs). The wrong-output-risk
-vein of the audit is now **largely exhausted** — remaining S3 items skew toward feature-completeness DEVIATION/GAP/STUB
-(already catalogued in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless (TTS, view panels, native OS dialogs, pixels).
+**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2/**6** (batch-7 Mailings rebounded to 6/14 — that subsystem held a rich vein
+of half-wired/lying controls). Outside Mailings, the wrong-output-risk vein is largely exhausted — remaining S3 items skew toward
+feature-completeness DEVIATION/GAP/STUB (already in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless (TTS, view panels,
+native OS dialogs, pixels). **Mailings remains the one area still worth a further pass** (Rules dialogs, Insert-Merge-Field
+variants, Step-by-Step Wizard, Start-Mail-Merge types).
 
 **Highest-severity finds:** BUG-005 (read-only protection bypassed), BUG-047/048 (Source-Manager + Merge-paste data loss),
 BUG-051 (Outline exports invalid OOXML `CURRENTCOLOR` — only visible in a FULL .docx save), BUG-054 (Shadow/Reflection dropped
