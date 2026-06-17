@@ -5970,6 +5970,35 @@
     return /<w:background\b[^>]*w:color="FFFF00"/.test(xml) || 'no <w:background w:color=FFFF00>: ' + xml.slice(0, 200);
   });
 
+  await t('[10th] EXPORT (Word COM-validated): dePageColor → w:background + settings.xml displayBackgroundShape', async () => {
+    // Word COM (validate-pagecolor-win.ps1, oracle-probe-pagecolor.js) confirmed Word reads
+    // doc.Background.Fill.ForeColor.RGB == 65535 (yellow), DisplayBackgrounds == true. The CRITICAL
+    // half the existing test above misses: <w:background> alone does NOT render in Word — settings.xml
+    // must also carry <w:displayBackgroundShape/> (the K4 requirement). Without it the byte test stays
+    // green but Word shows a WHITE page (endnote-class blind spot). This gate pins BOTH parts.
+    setDoc('page color body');
+    if (typeof PM().dePageColor !== 'function' || typeof PM().dePageColorClear !== 'function') return 'dePageColor verbs missing (red)';
+    try {
+      // Clear first so the displayBackgroundShape assertion is NON-VACUOUS: prior dePageColor tests
+      // leave the flag set, and ensureDisplayBackgroundShape(false) splices it out — so its presence
+      // after the set below proves THIS call wrote it, not stale global state.
+      PM().dePageColorClear(); await sleep(50);
+      const s0 = (await exportParts())['word/settings.xml'] || '';
+      if (/<w:displayBackgroundShape\b/.test(s0)) return 'dePageColorClear did not remove displayBackgroundShape (stale flag — assertion would be vacuous)';
+      // Set a DISTINCT color (00FFFF; prior tests use FFFF00 / ABCDEF / 00FF00) so the doc check is non-vacuous.
+      if (PM().dePageColor('#00FFFF') !== true) return 'dePageColor refused (red)';
+      await sleep(60);
+      const docXml = await exportDocumentXml();
+      if (!/<w:background\b[^>]*w:color="00FFFF"/i.test(docXml)) return 'no <w:background w:color=00FFFF> in document.xml: ' + docXml.slice(0, 200);
+      const settings = (await exportParts())['word/settings.xml'] || '';
+      return /<w:displayBackgroundShape\b/.test(settings) || 'settings.xml missing <w:displayBackgroundShape> — Word would render a WHITE page despite the w:background';
+    } finally {
+      // Teardown: page color is doc-level global state (background attr + settings flag), not reset by
+      // setDoc — clear it so it does not leak into later tests.
+      PM().dePageColorClear();
+    }
+  });
+
   await t('[10th] dePageColor paints the live page sheet (#pm-editor background)', () => {
     if (typeof PM().dePageColor !== 'function') return 'PM.dePageColor missing (red)';
     if (PM().dePageColor('#ABCDEF') !== true) return 'refused';
