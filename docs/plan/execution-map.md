@@ -450,6 +450,19 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (v4 re-scout — endnote-lost-on-export BUG FOUND + FIXED, `/loop` 5-min cadence)
+- [x] **v4 RE-SCOUT (3 parallel agents)** over references / comments / design — ranked bounded
+  COM-validatable candidates; #1 footnotes+endnotes, #2 comments, #3 paragraphSpacing.
+- [x] **🐞 endnote lost on export — FIXED (PR #116 `62f100f`)** — exporter node-router had no
+  `endnoteReference` entry → endnote marker dropped from document.xml → **Word read 0 endnotes**
+  (body orphaned in endnotes.xml; byte test + roundtrip both stayed green and MISSED it). One router
+  line (+import), symmetric with footnote. **Word COM-validated** (new `validate-notes-win.ps1`):
+  endnoteCount 0→1. New `[9]` regression test (`<w:endnoteReference>` in document.xml). `/code-review`
+  clean. Gates: **PM 466 / smoke 9 / roundtrip 27**.
+- [x] **References area got its FIRST Word-COM oracle** (`oracle-probe-notes.js` + `validate-notes-win.ps1`).
+- [ ] **NEXT (continue v4):** #2 comments export + COM (`doc.Comments.Count`/`.Range.Text`/`.Author`),
+  then #3 paragraphSpacing (`Paragraphs.Item(1).SpaceAfter`). Default to v4 unless the user names a big item.
+
 ### 2026-06-16 (numbered-list export test — SCOUT BACKLOG v3 EXHAUSTED, `/loop` 5-min cadence)
 - [x] **Numbered-list export test (PR #114 `b59c3ba`)** — v3 #5. Numbered → `w:numPr` + decimal
   numbering.xml abstractNum + multilevel probe. **Word COM-validated:** numbered "simple numbering"/"1.";
