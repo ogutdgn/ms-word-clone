@@ -7,7 +7,34 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — font-size export test DONE (PR #108); char-format matrix 4a/4b/4c done; next = 4d rFonts / 4e sub-sup)
+## 2026-06-16 (RESUME HERE — font-family (rFonts) export test DONE (PR #110); char-format matrix 4/5 done; next = 4e sub-sup → finish matrix)
+
+> **Branch:** `main` (font-family test merged PR #110 `fde5e76`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 463 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Font-family (rFonts) export test — DONE (PR #110):** char-format matrix **4d**. `setFontFamily('Georgia')`
+> → `<w:rFonts w:ascii="Georgia" w:hAnsi/eastAsia/cs>`, whole paragraph. **🔬 Word COM-validated:**
+> `Font.Name = "Georgia"` (text-only range). `oracle-probe-1-fontname.js` + reusable `validate-fontname-win.ps1`.
+> `/code-review` clean (reset paragraph emits no competing paragraph-mark rFonts; exportXmlOnly excludes styles.xml).
+>
+> **🗂️ SCOUT BACKLOG v3 (char-format matrix #4 — 4 of 5 done):**
+>   Done: 1 hyperlink (#100), 2 bookmark (#102), 4a underline (#104), 4c color (#106), 4b size (#108), 4d rFonts (#110).
+>   4e. **sub/superscript export+COM — RECOMMENDED NEXT (finishes the matrix).** `<w:vertAlign
+>       w:val="subscript"|"superscript">`; COM `Font.Subscript`/`Font.Superscript` (bool -1/0). Apply each to
+>       its own paragraph (two paras). Clean lock-in. Bridge: setMark textStyle {vertAlign} or toggleSub/Superscript.
+>   3. **HIGHLIGHT over-exposure (REAL bug, UX-judgment fix — STEER, don't auto-change UX)** — non-keyword
+>      swatches export as `w:shd` not `w:highlight` → Word `wdNoHighlight`. Restrict picker to 15 keywords.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness.
+>
+> **NEXT:** 4e sub/superscript → FINISHES the char-format matrix. After that v3 has only #3 highlight
+> (steer) + #5 lists → **RE-SCOUT v4** (fresh areas: section/page props that aren't Phase-7-deferred, tables
+> remaining, view/zoom export, doc settings) OR **escalate a bigger item** (a14 picture effects / frames-overlay
+> / 4e headers — STEERED session). Char-format COM lesson: whole-paragraph apply + text-only COM range.
+> spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (font-size export test DONE (PR #108); char-format matrix 4a/4b/4c done; next = 4d rFonts / 4e sub-sup)
 
 > **Branch:** `main` (font-size test merged PR #108 `2307876`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 462 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**

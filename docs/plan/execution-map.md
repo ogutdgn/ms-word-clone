@@ -450,6 +450,13 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (font-family rFonts export test, `/loop` 5-min cadence)
+- [x] **Font-family (rFonts) export test (PR #110 `fde5e76`)** — char-format matrix 4d.
+  `setFontFamily('Georgia')` → `<w:rFonts w:ascii="Georgia">` + probe + reusable `validate-fontname-win.ps1`.
+  **Word COM-validated:** Font.Name="Georgia". `/code-review` clean. Gates: **PM 463 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT:** char-format matrix 4e sub/superscript (Font.Subscript/Superscript) → FINISHES the matrix.
+  Then v3 = #3 highlight (UX-judgment bug, steer) + #5 lists → RE-SCOUT v4 or escalate a bigger item.
+
 ### 2026-06-16 (font-size export test, `/loop` 5-min cadence)
 - [x] **Font-size export test (PR #108 `2307876`)** — char-format matrix 4b. `setFontSize('20pt')` →
   `<w:sz w:val="40">` (half-points) + probe + reusable `validate-fontsize-win.ps1` (text-only range).
