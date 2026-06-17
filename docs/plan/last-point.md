@@ -7,7 +7,38 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — font-color export test DONE (PR #106); char-format matrix 4a+4c done; next = 4b size / 4d rFonts / 4e sub-sup)
+## 2026-06-16 (RESUME HERE — font-size export test DONE (PR #108); char-format matrix 4a/4b/4c done; next = 4d rFonts / 4e sub-sup)
+
+> **Branch:** `main` (font-size test merged PR #108 `2307876`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 462 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Font-size export test — DONE (PR #108):** char-format matrix **4b**. `setFontSize('20pt')` → `<w:sz
+> w:val="40">` (HALF-points; `\b` excludes `<w:szCs>`), whole paragraph. **🔬 Word COM-validated:**
+> `Font.Size = 20` (text-only range) — the half-point ×2 conversion is correct. `oracle-probe-1-fontsize.js`
+> + reusable `validate-fontsize-win.ps1`. `/code-review` clean (reviewer empirically confirmed `\b` excludes
+> szCs; the `fontSize` mark maps only to `w:sz`).
+>
+> **🗂️ SCOUT BACKLOG v3 (char-format matrix #4 — 3 of 5 done):**
+>   1. ~~Hyperlink~~ (#100). 2. ~~Bookmark~~ (#102). 4a. ~~Underline-style~~ (#104). 4c. ~~Font color~~ (#106).
+>      4b. ~~Font size~~ **DONE (#108).**
+>   3. **HIGHLIGHT over-exposure (REAL bug)** — non-keyword swatches export as `w:shd` not `w:highlight` →
+>      Word `wdNoHighlight`. Fix = restrict picker to 15 ST_HighlightColor keywords (UX judgment — steer).
+>   4d. **rFonts export+COM** — `<w:rFonts w:ascii="Georgia"..>`; COM `Font.Name`. Clean lock-in.
+>   4e. **sub/superscript export+COM** — `<w:vertAlign w:val="subscript"|"superscript">`; COM
+>       `Font.Subscript`/`Font.Superscript` (bool). Clean lock-in.
+>   5. **Numbered/multilevel list export+COM** — fold onto the lists harness.
+>
+> **CHAR-FORMAT COM LESSON (reusable):** apply to a WHOLE paragraph + read a TEXT-ONLY COM range (exclude the
+> pilcrow) — full Paragraphs(i).Range can read `wdUndefined`(9999999). Mirror validate-fontsize/color-win.ps1.
+>
+> **NEXT:** 4d rFonts (Font.Name) → 4e sub/superscript. After the matrix, only #3 highlight (UX-judgment bug,
+> steer) + #5 lists remain in v3 → then RE-SCOUT v4 or escalate to a bigger item. #3 highlight + the bigger
+> items (a14 picture effects / frames-overlay / 4e headers) need a STEERED session. spawn_tasks (NOT loop):
+> 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (font-color export test DONE (PR #106); char-format matrix 4a+4c done; next = 4b size / 4d rFonts / 4e sub-sup)
 
 > **Branch:** `main` (font-color test merged PR #106 `577bf07`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 461 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
