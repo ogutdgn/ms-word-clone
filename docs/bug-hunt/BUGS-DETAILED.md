@@ -834,16 +834,16 @@ Every confirmed bug, uniformly documented: **Where** (file/function/line + ribbo
 : Ribbon: Layout > Arrange > Position / Picture Format positioning. Floating-image offset is computed relative to the document/`#pm-editor`, not the object's own page (PM equivalent of the legacy `layout-tools.js position()` bug).
 
 **When / repro**
-: On a multi-page doc, position a floating image relative to "Page" — its offset is measured from the document top, not the page it sits on, so it drifts on pages 2+. (needs runtime confirm on a multi-page floating-image doc.)
+: On a multi-page doc, position a floating image relative to "Page" — its offset is measured from the document top, not the page it sits on, so it drifts on pages 2+.
 
 **Symptom (Word vs clone)**
 : Word anchors a positioned object to its own page (per-page coordinates). The clone's absolute offsets are doc-relative, so "centered on the page" is only correct on page 1.
 
 **Why it happens (root cause)**
-: The position math uses the document origin instead of computing the object's page index and offsetting within that page — the same class as the keystone per-page anchoring gap.
+: The fork *does* ship a per-page absolute-anchor branch — `imagePositionPlugin.js:153-169` anchors `vRelativeFrom==='margin'` images to the previous DOM node carrying the class `pagination-break-wrapper` (`findPreviousDomNodeWithClass`, imagePositionPlugin.js:214). But the clone's *owned* pagination layer emits `pm-page-spacer` / `pm-gap-band` nodes (pagination.ts:85/97), **never** `pagination-break-wrapper`, so that lookup always returns null and the per-page branch is dead code. Floats fall back to a doc-relative `position:absolute` (image.js:437/615), so per-page anchoring is impossible on pages 2+.
 
 **Evidence**
-: Legacy re-triage (Layout) — `still-present` vs the PM positioning path; see `LEGACY-RETRIAGE.md`.
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\anchor-print-verify.js` (`anchor-print-verify.json`, 2026-06-17): on a 7-page doc, `pagination-break-wrapper` count = **0** while `pm-page-spacer` = 7 and `pm-gap-band` = 6 (`perPageAnchorBranchDead:true`). Plus legacy re-triage (Layout) — `new-variant`; see `LEGACY-RETRIAGE.md`.
 
 **Solution**
 : Make floating offsets page-relative (compute pageIndex from offsetTop, offset within the page). Effort: M-L (ties into the keystone overlay). Risk: medium.
@@ -866,7 +866,7 @@ Every confirmed bug, uniformly documented: **Where** (file/function/line + ribbo
 : The print/PDF path renders the live DOM with no print-specific CSS to strip chrome and the pagination gap bands.
 
 **Evidence**
-: Legacy re-triage (File-IO) — `still-present`; no `print.css`/`@media print` block in `src/renderer/public/styles/`.
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\anchor-print-verify.js` (`anchor-print-verify.json`, 2026-06-17): scanned all 9 loaded stylesheets — **0** `@media print` rules and **0** print-targeted stylesheets, while `#titlebar`, `#ribbon`, `#statusbar`, and `#ruler` are all present in the DOM the print path renders. Plus legacy re-triage (File-IO) — `still-present`; no `print.css`/`@media print` block in `src/renderer/public/styles/`.
 
 **Solution**
 : Ship `print.css` with `@media print` hiding `#titlebar,#ribbon,#ruler,#statusbar,#backstage,.pm-gap-band` and resetting page layout; apply during export/print. Effort: S-M. Risk: low.
