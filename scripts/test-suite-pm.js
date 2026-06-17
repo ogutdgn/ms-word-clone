@@ -4423,6 +4423,35 @@
     } finally { commentsReset(); }
   });
 
+  await t('[8] EXPORT (Word COM-validated): full comment set — 3 document.xml markers + comments.xml body/author', async () => {
+    // Word COM (validate-comments-win.ps1, oracle-probe-comments.js) confirmed Word reads
+    // doc.Comments.Count==1 with the right body, author, AND anchored Scope text. This gate
+    // guards the FULL export set against an endnote-class drop: a marker/part can vanish while
+    // the byte-only marker test stays green and Word silently reads 0 comments. We assert all
+    // THREE document.xml markers (rangeStart + rangeEnd + reference) AND the word/comments.xml
+    // body + a non-empty w:author — the side part exportXmlOnly never returns.
+    setDoc('export comment anchor words tail');
+    if (typeof PM().getComments !== 'function') return 'PM.getComments missing (red)';
+    try {
+      selectText('anchor');
+      if (!PM().cmd('addComment', 'CommentBodyABC')) return 'addComment cmd unavailable/refused (red)';
+      await sleep(120);
+      const xml = await exportDocumentXml(); // document.xml — the three markers
+      const start = /<w:commentRangeStart\b/.test(xml);
+      const end = /<w:commentRangeEnd\b/.test(xml);
+      const ref = /<w:commentReference\b/.test(xml);
+      if (!(start && end && ref)) return 'document.xml markers incomplete: rangeStart=' + start + ' rangeEnd=' + end + ' reference=' + ref;
+      // A2: the comment BODY + author live in word/comments.xml — read it via the
+      // getUpdatedDocs part map, NOT exportXmlOnly (which returns only document.xml).
+      const parts = await window.WC.editor.exportDocx({ getUpdatedDocs: true });
+      const cx = parts && parts['word/comments.xml'];
+      if (typeof cx !== 'string') return 'word/comments.xml not in the export part map (Word would read 0 comments)';
+      if (!/CommentBodyABC/.test(cx)) return 'comment body "CommentBodyABC" not in word/comments.xml';
+      const author = (cx.match(/<w:comment\b[^>]*\bw:author="([^"]*)"/) || [])[1];
+      return (typeof author === 'string' && author.trim().length > 0) || 'comment w:author missing/empty in word/comments.xml';
+    } finally { commentsReset(); }
+  });
+
   await t('[8] getRevisions merges tracked changes + comments (T11)', async () => {
     setDoc('merge probe words tail');
     if (typeof PM().getRevisions !== 'function') return 'PM.getRevisions missing (red)';
