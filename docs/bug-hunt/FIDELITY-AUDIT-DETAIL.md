@@ -2216,3 +2216,18 @@ Batch-5 of the **S3** tier (16 Text-Effects/Font-Size/Arrange/Styles items) tria
   walk); Insert Index; Wrap Text; Bring Forward.
 
 ---
+## Resolution log — S3 batch-6 triage sweep (2026-06-17) — FINAL wrong-output-risk batch
+Batch-6 of the **S3** tier (16 fresh Table-Styles/AutoFit/TOC/Layout/Styles-pane items) triaged + runtime-probed (`s3b6-toc.js`):
+- **Promoted to numbered, runtime-confirmed bugs:** Custom TOC "Tab leader" dead/lying control → **BUG-056**; "Manual Table"
+  TOC harvests headings instead of placeholder rows → **BUG-057**.
+- **Verdict = not-a-bug:** Multilevel Change-List-Level; Editor (F7); File Export Change-File-Type (intentional format scope);
+  Insert Blank Page (two page breaks — correct).
+- **Known stubs (documented feature gaps):** Table Styles gallery (sparse on blank docs — TableNormal is `w:semiHidden`; the
+  APPLY path works); AutoFit Contents (DOM-measure deferral — export intent correct); Footnote&Endnote dialog launcher; Layout
+  Align / Rotate / Hyphenation / Line-Numbers; Find ▸ Advanced Find; Styles task pane; Style Inspector.
+
+**This concludes the wrong-output-risk audit sweep** — see the "★ Final sweep summary" in `BUG-LEDGER.md`. Batch-6's 10/16
+honest-stub rate confirms the wrong-output-risk vein is exhausted; the remaining `_needsRuntime_` items are feature-completeness
+deviations (in `FEATURE-IMPROVEMENTS.md`) or need TTS/native-dialog/pixels.
+
+---

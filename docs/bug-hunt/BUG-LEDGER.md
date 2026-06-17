@@ -441,6 +441,49 @@ bugs (`s3b5-model.js` / `s3b5-export.js`). Full detail in `BUGS-DETAILED.md` § 
   Show/Hide ¶, Save-As html/txt, Send-Backward, Insert-ToA, Number-Styles/Ligatures, Increase/Decrease-Font-Size jump-list
   correct, Insert-Index, Wrap-Text, Bring-Forward — all honest reductions / verified-correct)._
 
+## S3-audit-triage new bugs (BUG-056…057) — batch-6, runtime-confirmed 2026-06-17
+Batch-6 (16 fresh Table-Styles/AutoFit/TOC/Layout/Styles-pane items, deduped vs the 55-bug catalog) surfaced 2 more bugs
+(`s3b6-toc.js`); the rest were honest stubs/reductions (yield is tailing off). Full detail in `BUGS-DETAILED.md` § BUG-056…057.
+- **BUG-056 [S3] Custom TOC dialog "Tab leader" select is a dead/lying control** — OK handler never reads `leader.value`
+  (`commands.js:954-958`), so every choice yields default dots. Probe: dialog path → `w:leader="dot"`; `tabLeader:'hyphen'` → `w:leader="hyphen"`.
+- **BUG-057 [S3] "Manual Table" TOC harvests the document headings instead of literal placeholder rows** — wired to the
+  auto-TOC verb (`commands.js:937`). Probe: TOC text `"Alpha0Beta0"`, no "Type chapter title" placeholder.
+- _Batch-6 also: 0 duplicates; 4 not-bugs (Multilevel Change-List-Level, Editor F7, Export Change-File-Type, Insert Blank-Page);
+  10 known-stubs (Table Styles gallery sparse-on-blank-doc, AutoFit DOM-measure deferral, Footnote&Endnote dialog launcher,
+  Layout Align/Rotate/Hyphenation/Line-Numbers, Find Advanced, Styles task pane, Style Inspector — all documented feature gaps)._
+
+## ★ Final sweep summary — S2 + S3 fidelity-audit triage (2026-06-17)
+The bug-hunt extended into a systematic, runtime-verified triage of the wrong-output-risk items in the 321-control fidelity
+audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (6 curated batches): ~119 audit candidates triaged →
+24 genuine new runtime-confirmed bugs (BUG-034…057).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
+(BUG-005 read-only leak, BUG-027 bookmark dup, BUG-028 Shift+Tab, BUG-029 float anchor, BUG-030 print chrome, BUG-032/033 table).
+
+| Batch | Area | Candidates | New bugs | Dups | Not-bug | Stub | Needs-runtime |
+|---|---|---|---|---|---|---|---|
+| S2 | mixed wrong-behavior | 23 | **7** (034–040) | 1 | 6 | 8 | — |
+| S3-1 | search/sort/paste/convert | 16 | **3** (041–043) | 4 | 8 | 2 | — |
+| S3-2 | References/Table-insert/fields | 16 | **3** (044–046) | 2 | 6 | 5 | — |
+| S3-3 | Mailings/lists/footnotes | 16 | **2** (047–048, data-loss) | 6 | 3 | 5 | — |
+| S3-4 | Proofing/View/font/clipboard | 16 | **3** (049–051) | 0 | 4 | 7 | 2 |
+| S3-5 | Text-Effects/Font-Size/Arrange | 16 | **4** (052–055) | 1 | 9 | 0 | 2 |
+| S3-6 | Table-Styles/AutoFit/TOC/Layout | 16 | **2** (056–057) | 0 | 4 | 10 | — |
+| **Σ** | | **~119** | **24** | ~14 | ~40 | ~37 | ~4 |
+
+**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2 (~17%, declining; batch-6 was 10/16 honest stubs). The wrong-output-risk
+vein of the audit is now **largely exhausted** — remaining S3 items skew toward feature-completeness DEVIATION/GAP/STUB
+(already catalogued in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless (TTS, view panels, native OS dialogs, pixels).
+
+**Highest-severity finds:** BUG-005 (read-only protection bypassed), BUG-047/048 (Source-Manager + Merge-paste data loss),
+BUG-051 (Outline exports invalid OOXML `CURRENTCOLOR` — only visible in a FULL .docx save), BUG-054 (Shadow/Reflection dropped
+on export). **Recurring lesson:** validate export bugs via the real `.docx` package (`exportDocxBytes`→`saveBytes`→unzip), not
+`exportXmlOnly` (which omits w14 run effects).
+
+**Not yet triaged (low expected yield):** the S3 feature-completeness tail (~64 items), the S4/S5 cosmetic deviations (code
+evidence already establishes them), and the large unimplemented features (Shapes / SmartArt / Chart / Equation / Drawing — all
+tracked as P1–P3 work in `FEATURE-IMPROVEMENTS.md`). **Recommendation:** the high-value *bug discovery* is essentially complete;
+the remaining work is *feature implementation* (per `FEATURE-IMPROVEMENTS.md`) and the **layout engine (Phase 4)**, not more
+audit triage.
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via

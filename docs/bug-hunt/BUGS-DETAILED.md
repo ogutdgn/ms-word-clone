@@ -1406,3 +1406,49 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : (1) Stop the clobber: only write `spacing.line`/`lineRule` when the user actually changed the line-spacing control (track the seeded value; skip if unchanged), and never force `lineRule:'auto'` on a paragraph whose existing rule is exact/atLeast. (2) Restore parity: add a line-rule selector (Single/1.5/Double/At least/Exactly/Multiple) + "At" field, a Special indent dropdown (first-line/hanging) + By, and a Line-and-Page-Breaks tab (all already supported by the model/translator). Effort: M. Risk: low-medium. Regression: the dialog's indent-only path preserves a pre-existing `lineRule:'exact'`.
 
 ---
+
+## BUG-056 — Custom Table of Contents dialog: the "Tab leader" select is a dead/lying control (never read on OK)
+**Severity:** S3
+
+**Where**
+: References > Table of Contents > Custom Table of Contents…. `commands.js:942-961 customTOCDialog()`: the leader select is built at `:945` (`['……… (dots)','------ (dashes)','(none)']`), but the OK handler (`:954-958`) calls `WC.PM.refInsertTOC({ includePageNumbers, showLevels, rightAlignPageNumbers })` and **never reads `leader.value`**. The bridge `references.ts:114-126 refInsertTOC` DOES support `opts.tabLeader` (`:125`), and the fork serializes it (`toc-switches.ts:378-387 tabLeader→separator`, `:282-284` emits the `\p "<sep>"` switch / the TOC entry `w:tab w:leader`). Only the dialog→bridge hop is missing.
+
+**When / repro**
+: 1) References > Custom Table of Contents. 2) Change "Tab leader" to dashes (or none). 3) OK. 4) The inserted TOC still uses dotted leaders — the choice had no effect. Every leader selection produces identical output.
+
+**Symptom (Word vs clone)**
+: Word's Custom TOC "Tab leader" actually changes the leader between TOC entries and page numbers. The clone presents the option but discards it on OK, so dots/dashes/none all yield the default dots — a lying control.
+
+**Why it happens (root cause)**
+: The OK handler omits `leader.value` from the `refInsertTOC` call. (Secondary: the select's option labels are display strings, not the bridge enum values `dot`/`hyphen`/`none`, so a fix must map label→enum.)
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b6-toc.js` (`s3b6-toc.json` → `customTocTabLeader`): replaying the dialog's exact `refInsertTOC` args (no `tabLeader`) exports a TOC entry tab with `w:leader="dot"` and no `\p` override (`dialogHasP:false`); passing `tabLeader:'hyphen'` exports `w:leader="hyphen"` (`hyphenHasP:true`). The bridge differentiates leaders; the dialog path never sends one.
+
+**Solution**
+: In `customTOCDialog()` OK handler read the leader select, map label→enum (`{'……… (dots)':'dot','------ (dashes)':'hyphen','(none)':'none'}`), and add `tabLeader` to the `refInsertTOC` opts — a ~3-line dialog-side fix (bridge + serialization already work end-to-end). Effort: S. Risk: low. Regression: different leaders produce different `w:leader`/`\p` in the export.
+
+---
+
+## BUG-057 — "Manual Table" TOC harvests the document headings instead of inserting Word's literal placeholder rows
+**Severity:** S3
+
+**Where**
+: References > Table of Contents > Manual Table. `commands.js:937` wires the "Manual Table" item to `WC.PM.refInsertTOC({showLevels:3})` — the **same** auto-TOC verb as Automatic Table 1/2. `references.ts:114-134 refInsertTOC` unconditionally calls `d.create.tableOfContents()` (the heading-collecting auto builder); there is no manual/literal-placeholder path. (Disclosed as a slice-9 deferral at `deferrals.md:381`, but not surfaced in-UI and not in the bug-hunt NOT_IMPLEMENTED.md/FEATURE-IMPROVEMENTS.md.)
+
+**When / repro**
+: 1) A doc with Heading 1 paragraphs ("Alpha", "Beta"). 2) References > Table of Contents > **Manual Table**. 3) Instead of Word's type-it-yourself placeholder rows ("Type chapter title (level 1)", …), the clone inserts an auto field TOC that has harvested "Alpha"/"Beta".
+
+**Symptom (Word vs clone)**
+: Word's "Manual Table" inserts literal placeholder paragraphs in TOC styles (no heading collection, no field) for the user to type over. The clone runs the auto heading-collecting builder — wrong output Word never produces for this command, and a misleading/degrading control (not an honest "not implemented" toast). Distinct from BUG-044 (Automatic 1/2 collapse via dropped title) and BUG-031 (re-insert duplication).
+
+**Why it happens (root cause)**
+: "Manual Table" shares the auto-TOC bridge verb; there's no manual-placeholder code path.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b6-toc.js` (`manualTable`): after Manual Table on a doc with "Alpha"/"Beta" headings, the inserted TOC node text is `"Alpha0Beta0"` (`harvestedHeadings:true`) and contains no `"Type chapter title"` placeholder (`hasManualPlaceholder:false`).
+
+**Solution**
+: Give "Manual Table" its own non-auto path — insert literal placeholder paragraphs in TOC1/TOC2/TOC3 styles carrying Word's "Type chapter title (level N)" text + a right-aligned tab + page-number slot, with NO field and NO heading collection (a `refInsertManualTOC` verb or a `{manual:true}` branch that builds placeholders directly instead of `d.create.tableOfContents()`). Effort: S-M. Risk: low. Regression: after Manual Table on a doc with headings, the block contains the literal "Type chapter title" placeholder and not the heading captions.
+
+---
