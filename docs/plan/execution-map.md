@@ -450,6 +450,18 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (finish-all loop — ITEM 2 picture grayscale DONE; a14 deferral was an enum misread)
+- [x] **ITEM 2 picture grayscale — DONE (PR #128 `091c737`)** — Picture Format > Color > Grayscale. Bridge
+  setImageGrayscale + render attr as CSS filter (image.js renderDOM) + Adjust>Color UI. **Word's own OOXML
+  is plain `<a:grayscl/>` (NOT a14) — the converter already round-trips it; ZERO converter work.** The prior
+  "needs a14" deferral was a FALSE NEGATIVE: ColorType==2 IS grayscale (1-based MsoPictureColorType, not
+  0-based). Scope-workflow authored grayscale in live Word + extracted bytes. **Word COM-validated:**
+  InlineShapes(1).PictureFormat.ColorType==2. `[4b]` ON/OFF + coexistence(grayscale+rotate) test.
+  /code-review clean. Gates: **PM 473 / smoke 9 / roundtrip 27**.
+- [ ] **NEXT — ITEM 3: headers/footers (4e)** — real header/footer constructs (D6-blocked header-footer
+  area). Scope-workflow → edit region + export (header*.xml + sectPr refs) + COM-validate
+  (doc.Sections(1).Headers(wdHeaderFooterPrimary).Range.Text). Biggest item before the keystone.
+
 ### 2026-06-16 (NEW DIRECTIVE: finish ALL big Phase-4 items, no-stop loop — ITEM 1 page-setup DONE)
 - [x] **User directive:** finish ALL big items autonomously, I pick order (memory phase4-finish-all-directive).
   ORDER: ① page-setup export → ② a14 picture effects → ③ headers/footers → ④ frames-overlay keystone.
