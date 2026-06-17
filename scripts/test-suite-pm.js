@@ -296,6 +296,18 @@
     const ascii = (rf.match(/w:ascii="([^"]*)"/) || [])[1];
     return (ascii === 'Georgia') || ('w:rFonts w:ascii not "Georgia": ' + rf);
   });
+  await t('[1] EXPORT: sub/superscript → <w:vertAlign w:val="subscript"|"superscript"> (Word: Font.Subscript/Superscript)', async () => {
+    // The vertAlign MARK is covered above; this guards the EXPORT. Two paragraphs (sub, sup); the export
+    // must emit <w:vertAlign w:val="subscript"> then "superscript" in order. Word COM-validated:
+    // Paragraphs(1) text-only Range.Font.Subscript = -1, Paragraphs(2).Font.Superscript = -1 —
+    // oracle-probe-1-vertalign.js + scripts/oracle/validate-vertalign-win.ps1.
+    setDocs(['sub line', 'sup line']); await sleep(60);
+    selectText('sub line'); WC.PM.cmd('setMark', 'textStyle', { vertAlign: 'subscript' }); await sleep(50);
+    selectText('sup line'); WC.PM.cmd('setMark', 'textStyle', { vertAlign: 'superscript' }); await sleep(50);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const vals = (xml.match(/<w:vertAlign\b[^>]*w:val="([^"]*)"/g) || []).map((m) => m.match(/w:val="([^"]*)"/)[1]);
+    return (vals.join(',') === 'subscript,superscript') || ('w:vertAlign vals: got [' + vals.join(',') + '] want [subscript,superscript]');
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
