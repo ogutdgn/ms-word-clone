@@ -450,6 +450,17 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-16 (numbered-list export test — SCOUT BACKLOG v3 EXHAUSTED, `/loop` 5-min cadence)
+- [x] **Numbered-list export test (PR #114 `b59c3ba`)** — v3 #5. Numbered → `w:numPr` + decimal
+  numbering.xml abstractNum + multilevel probe. **Word COM-validated:** numbered "simple numbering"/"1.";
+  multilevel "outline numbering"/"1.1." (gated multilevel test deferred — level-transition caret quirk).
+  `/code-review` clean. Gates: **PM 465 / smoke 9 / roundtrip 27**.
+- [x] **SCOUT BACKLOG v3 EXHAUSTED** (only #3 highlight remains — UX-judgment bug, steer). ~17 COM-validated
+  export slices merged this run; gates PM 448→465.
+- [ ] **NEXT (decision):** RE-SCOUT v4 (references/comments/track-changes/section-geometry/doc-settings export)
+  — productive autonomous path; OR ESCALATE a steered big item (a14 picture effects / frames-overlay / 4e
+  headers / highlight UX). Default to RE-SCOUT v4 unless the user picks a big item.
+
 ### 2026-06-16 (sub/superscript export test — CHAR-FORMAT MATRIX COMPLETE, `/loop` 5-min cadence)
 - [x] **Sub/superscript export test (PR #112 `137e0cb`)** — char-format matrix 4e (last). Two paras →
   `<w:vertAlign w:val="subscript"|"superscript">` + probe + reusable `validate-vertalign-win.ps1`. **Word

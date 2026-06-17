@@ -7,7 +7,41 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — sub/superscript export test DONE (PR #112); 🏁 CHAR-FORMAT MATRIX COMPLETE; next = #5 lists → RE-SCOUT v4 / ESCALATE)
+## 2026-06-16 (RESUME HERE — numbered-list export test DONE (PR #114); SCOUT BACKLOG v3 EXHAUSTED → RE-SCOUT v4 or ESCALATE)
+
+> **Branch:** `main` (numbered-list test merged PR #114 `b59c3ba`; branch deleted). **Phase:** 4 (layout
+> engine). Gates: **PM 465 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Numbered-list export test — DONE (PR #114):** v3 **#5**. Numbered list → `w:numPr` linked to a
+> `numbering.xml` decimal abstractNum (level-0 numFmt="decimal"). **🔬 Word COM-validated:** read-para-props
+> `listType "simple numbering"`, `listString "1."`. **Multilevel also Word-validated** (probe
+> `oracle-probe-2-multilevel.js`): the from-scratch minted abstractNum renders as `outline numbering`/`"1.1."`.
+> `/code-review` clean. ⚠️ **Deferred + noted:** a gated MULTILEVEL test (the in-app `increaseListIndent`
+> level-transition put BOTH paras at ilvl 1 in the probe — lingering-selection caret quirk; NOT corruption;
+> same list-toggle area as `task_eb50ae00` — verify/fix there).
+>
+> **🗂️ SCOUT BACKLOG v3 — EXHAUSTED.** Done: hyperlink (#100), bookmark (#102), char-format matrix 4a–4e
+> (#104/#106/#108/#110/#112), bullet (#98) + numbered (#114) lists. Only **#3 highlight over-exposure**
+> remains (REAL bug; fix = restrict picker to 15 ST_HighlightColor keywords — a UX judgment call, STEER).
+>
+> **📊 SESSION TALLY (~17 COM-validated export slices merged):** PRs #82,84,86,88,90,92,94,96,98,100,102,104,
+> 106,108,110,112,114 + docs checkpoints. Gates PM 448→465. 1 real feature (cell margins). 3 real bugs
+> found+flagged (mixed-list `task_eb50ae00`, grayscale-needs-a14 [deferred], 2+-table `task_0e043993`). A
+> reusable `scripts/oracle/validate-*-win.ps1` family (~14) + `oracle-probe-*` pattern is established.
+>
+> **NEXT — the bounded export-test backlog is genuinely empty. Pick:**
+>   A. **RE-SCOUT v4** over FRESH areas not yet covered: **references** (TOC/footnote/SEQ/CITATION export +
+>      COM), **comments / track-changes** export, **section/page geometry** that's NOT Phase-7-deferred,
+>      **document settings**, **remaining table props**. (The productive autonomous path — may find more bugs.)
+>   B. **ESCALATE a bigger STEERED item** (multi-PR, needs the user): **a14 picture effects** (the deferred
+>      grayscale), the **FRAMES-OVERLAY keystone**, **4e headers/footers**, or the **highlight-picker UX fix** (#3).
+> **The user has been told (in chat) the bigger items need their steer; the loop keeps running, so default to
+> RE-SCOUT v4 unless the user picks a big item.** spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign
+> `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (sub/superscript export test DONE (PR #112); 🏁 CHAR-FORMAT MATRIX COMPLETE; next = #5 lists → RE-SCOUT v4 / ESCALATE)
 
 > **Branch:** `main` (sub/sup test merged PR #112 `137e0cb`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 464 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
