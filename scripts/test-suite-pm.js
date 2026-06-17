@@ -271,6 +271,18 @@
     if (!val) return 'no <w:color w:val> in export';
     return /^ff0000$/i.test(val) || ('w:color w:val not FF0000 (hex must round-trip, no #): ' + val);
   });
+  await t('[1] EXPORT: font size → <w:sz w:val="40"> for 20pt (half-points; Word: Font.Size = 20)', async () => {
+    // The font-size MARK (12->20pt) is covered above; this guards the EXPORT and the HALF-POINT unit
+    // conversion: w:sz is in half-points, so 20pt → w:sz=40. \b excludes <w:szCs>. Applied to the WHOLE
+    // paragraph. Word COM-validated: Paragraphs(1) text-only Range.Font.Size = 20 —
+    // oracle-probe-1-fontsize.js + scripts/oracle/validate-fontsize-win.ps1.
+    setDoc('sized text'); selectText('sized text'); await sleep(40);
+    WC.PM.cmd('setFontSize', '20pt'); await sleep(80);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const sz = (xml.match(/<w:sz\b[^>]*w:val="([^"]*)"/) || [])[1];
+    if (!sz) return 'no <w:sz w:val> in export';
+    return (sz === '40') || ('w:sz not 40 (20pt × 2 half-points): ' + sz);
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
