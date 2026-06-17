@@ -7,7 +7,46 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — v4 #5 page color DONE (PR #124); design backlog EXHAUSTED → page-setup geometry OR ESCALATE)
+## 2026-06-16 (RESUME HERE — NEW DIRECTIVE: finish ALL big Phase-4 items in a no-stop loop; ITEM 1 page-setup export DONE (PR #126))
+
+> **Branch:** `main` (PR #126 merged `aedf0da`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 472 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **🧭 NEW USER DIRECTIVE (supersedes the v4/escalate decision):** "finish all of it, just working loop, do
+> not stop, you can decide the order." So I'm building ALL the big steered Phase-4 items autonomously, my
+> chosen order. See memory [[phase4-finish-all-directive]]. **ORDER:** ① page-setup export (DONE) →
+> ② a14 picture effects (the deferred grayscale, real OOXML) → ③ 4e headers/footers → ④ frames-overlay
+> keystone. Same cycle per item: scope (ultracode workflow) → implement → Word-COM validate → 3 gates →
+> /code-review → merge → checkpoint → next. NOTE: these are FEATURES (not bounded oracle slices) — bigger,
+> source-touching, higher-risk; use the scope-workflow + COM-validate discipline.
+>
+> **✅ ITEM 1 — PAGE-SETUP EXPORT — DONE (PR #126, real new feature):** LAYOUT margins/size/orientation
+> now export to the body `sectPr` and render in Word (were VISUAL-ONLY + double-broken). Bridge verbs
+> `dePageMargins`/`dePageSize` (design.ts, inches → `doc.sections.setPageMargins/setPageSetup`, adapter
+> writes `w:pgMar`/`w:pgSz` + auto-swaps w/h on orient flip). **Word COM-validated** (validate-pagesetup-win.ps1):
+> Narrow+Legal+Landscape → margins 36pt, PageWidth 1008, PageHeight 612, Orientation 1.
+> **🔑 TWO BUGS FIXED to make it reachable (a scope-workflow found the mutation API already existed; /code-review
+> found the wiring was dead):** (a) the cmds were **D6-blocked** at dispatch → added margins/orientation/size
+> to `ENGINE_READY` (index.ts); (b) `setPageVar` called the **retired `E()=WC.Editor.repaginate()`** which
+> THREW before the bridge call → use guarded `WC.PM.__repaginate()`; dropped dead `E().pageH`/`E().repaginate()`.
+> New `[10th]` bridge-export test + a `[10th]` **UI test that drives the real flyout click** (guards the
+> wiring class of bug). Repointed `[0a]`/`[11]` D6-block probes off the now-unblocked `margins` → `columns`.
+> **LESSON:** a CSS-only ribbon feature can be triple-gated (blocked dispatch + dead legacy E() + no export);
+> always drive the REAL UI path in a probe, not just the bridge verb.
+>
+> **🆕 spawn_task `task_a4196ed8`:** dead `E()` in `manualHyphenate` (commands.js:857-861) + sibling
+> layout-arrange handlers (WC.Layout.*) — latent behind still-blocked cmds; fix when unblocking them.
+>
+> **NEXT — ITEM 2: a14 picture effects.** Resume the reverted slice-#2 grayscale with the REAL Word OOXML
+> (the `a14`/`a:effectLst`/compat extension Word actually authors — NOT `a:grayscl`, which COM read as
+> wrong). Scope-workflow first: find the image/pict export path, how picture effects are modeled, and
+> author a Word-native grayscale to diff the correct OOXML. COM-validate `InlineShapes`/`Shapes`
+> picture-format. spawn_tasks (NOT this loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`,
+> mixed-list `task_eb50ae00`, manualHyphenate `task_a4196ed8`. Branch off `main` (docs checkpoints on a branch + PR).
+
+---
+
+## 2026-06-16 (v4 #5 page color DONE (PR #124); design backlog EXHAUSTED → page-setup geometry OR ESCALATE)
 
 > **Branch:** `main` (PR #124 merged `e325b9a`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 470 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
