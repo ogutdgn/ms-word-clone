@@ -5886,6 +5886,41 @@
     return /<w:spacing\b[^>]*w:after="260"/.test(dd) || 'no docDefaults <w:spacing w:after="260"> (13pt->260twips): ' + dd.slice(0, 400);
   });
 
+  await t('[10th] EXPORT (Word COM-validated): deParagraphSpacing → full chain (docDefaults before/after/line + Normal)', async () => {
+    // Word COM (validate-paraspacing-win.ps1, oracle-probe-paraspacing.js) confirmed Word reads
+    // Paragraphs.Item(1).SpaceBefore==12, SpaceAfter==18, LineSpacingRule==wdLineSpaceMultiple(5) for
+    // a plain inheriting paragraph. The bridge writes spacing into BOTH docDefaults AND the Normal
+    // style; this gate pins the WHOLE set (before+after+line in docDefaults AND the Normal-style
+    // write) so an endnote-class partial drop — e.g. losing before/line, or the Normal half of the
+    // resolution chain — fails here instead of silently changing what Word renders.
+    // NB: line:3 (->720) is deliberately DISTINCT from the prior [10th] test's line:2 (->480) which
+    // persists in global docDefaults (setDoc resets only body text) — otherwise the w:line check
+    // would pass vacuously on the stale value even if THIS call dropped `line`.
+    setDoc('spacing body text');
+    if (typeof PM().deParagraphSpacing !== 'function') return 'PM.deParagraphSpacing missing (red)';
+    try {
+      if (PM().deParagraphSpacing({ before: 12, after: 18, line: 3 }) !== true) return 'deParagraphSpacing refused (red)';
+      await sleep(80);
+      const parts = await exportParts();
+      const sx = parts['word/styles.xml'] || '';
+      const dd = (sx.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/) || [''])[0];
+      // pt->twips x20: 12->240, 18->360; line multiple->240ths: 3->720.
+      if (!/<w:spacing\b[^>]*\bw:before="240"/.test(dd)) return 'docDefaults missing w:before="240" (12pt): ' + dd.slice(0, 400);
+      if (!/<w:spacing\b[^>]*\bw:after="360"/.test(dd)) return 'docDefaults missing w:after="360" (18pt): ' + dd.slice(0, 400);
+      if (!/<w:spacing\b[^>]*\bw:line="720"/.test(dd)) return 'docDefaults missing w:line="720" (3.0): ' + dd.slice(0, 400);
+      // The Normal-style half of the resolution chain (styleId="Normal") must also carry the spacing.
+      const normal = (sx.match(/<w:style\b[^>]*w:styleId="Normal"[\s\S]*?<\/w:style>/) || [''])[0];
+      if (!normal) return 'no Normal style in styles.xml';
+      return /<w:spacing\b[^>]*\bw:after="360"/.test(normal) || 'Normal style missing w:after="360" (resolution-chain half dropped): ' + normal.slice(0, 400);
+    } finally {
+      // Teardown: deParagraphSpacing mutates the Normal style + docDefaults GLOBALLY (setDoc only
+      // resets body text, not styles). A non-zero `before` (12pt = 16px) would leak a paragraph
+      // top-margin into later tests (e.g. [4a] "no phantom top-margin"). Restore before:0 (the
+      // baseline the prior [10th] test leaves), so global style state is unchanged after this test.
+      PM().deParagraphSpacing({ before: 0, after: 13, line: 2 });
+    }
+  });
+
   await t('[10th] EXPORT: dePageBorders → <w:pgBorders> in document.xml sectPr (real)', async () => {
     setDoc('x');
     if (typeof PM().dePageBorders !== 'function') return 'PM.dePageBorders missing (red)';
