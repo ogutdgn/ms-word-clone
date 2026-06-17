@@ -50,8 +50,9 @@ class ImageResizeView {
   view: any
   overlay: HTMLElement | null = null
   handleEls: HTMLElement[] = []
+  moveRegion: HTMLElement | null = null // 4c.2 drag-to-reposition body (floating images only)
   pagesEl: HTMLElement | null = null
-  // Active drag state (null when idle).
+  // Active RESIZE drag state (null when idle).
   drag: {
     pos: number
     nodeDOM: HTMLElement
@@ -64,6 +65,20 @@ class ImageResizeView {
     startClientY: number
     width: number
     height: number
+  } | null = null
+  // Active MOVE drag state (null when idle) — 4c.2 drag-to-reposition for a floating picture.
+  moveDrag: {
+    pos: number
+    nodeDOM: HTMLElement
+    startClientX: number
+    startClientY: number
+    startH: number // marginOffset.horizontal at drag start (px)
+    startT: number // marginOffset.top at drag start (px)
+    baseTransform: string // the node's existing CSS transform (rotate/scale) — preserved, not clobbered
+    boxLeft: number
+    boxTop: number
+    h: number
+    t: number
   } | null = null
   onMove: ((e: PointerEvent) => void) | null = null
   onUp: ((e: PointerEvent) => void) | null = null
@@ -108,6 +123,18 @@ class ImageResizeView {
     ov.style.pointerEvents = 'none' // only the handles are interactive
     ov.style.zIndex = '40'
     ov.style.display = 'none'
+    // 4c.2 — drag-to-reposition body. FIRST child so the 8 resize handles paint ON TOP and win
+    // at the edges; `inset` keeps it inside the handle ring so it only grabs the center. Enabled
+    // (pointerEvents:'auto') ONLY for a floating (isAnchor) image — see place().
+    const mv = document.createElement('div')
+    mv.className = 'wc-img-move-region'
+    mv.style.position = 'absolute'
+    mv.style.inset = '8px'
+    mv.style.pointerEvents = 'none'
+    mv.style.cursor = 'move'
+    mv.addEventListener('pointerdown', (e) => this.onMoveDown(e as PointerEvent))
+    ov.appendChild(mv)
+    this.moveRegion = mv
     for (const spec of HANDLES) {
       const h = document.createElement('div')
       h.className = 'wc-img-handle wc-img-handle-' + spec.id
@@ -133,7 +160,7 @@ class ImageResizeView {
     return { left: (r.left - pr.left) / z, top: (r.top - pr.top) / z, width: r.width / z, height: r.height / z }
   }
 
-  place(box: Box) {
+  place(box: Box, floating: boolean) {
     const ov = this.overlay!
     ov.style.left = box.left + 'px'
     ov.style.top = box.top + 'px'
@@ -147,6 +174,9 @@ class ImageResizeView {
       el.style.top = `calc(${s.gy * 100}% - 4px)`
       el.style.cursor = handleCursor(s)
     }
+    // Drag-to-reposition is only meaningful for a FLOATING picture (an inline picture flows with
+    // the text and has no marginOffset). Enable the move-region's hit area only then.
+    if (this.moveRegion) this.moveRegion.style.pointerEvents = floating ? 'auto' : 'none'
   }
 
   hide() {
@@ -155,13 +185,13 @@ class ImageResizeView {
 
   update() {
     if (this.destroyed) return
-    if (this.drag) return // don't fight an in-progress drag
+    if (this.drag || this.moveDrag) return // don't fight an in-progress drag
     const sel = this.selectedImage()
     if (!sel) { this.hide(); return }
     if (!this.ensureOverlay()) return
     const box = this.boxFor(sel.pos)
     if (!box) { this.hide(); return }
-    this.place(box)
+    this.place(box, !!sel.node?.attrs?.isAnchor)
   }
 
   onHandleDown(e: PointerEvent, spec: HandleSpec) {
@@ -172,6 +202,7 @@ class ImageResizeView {
     // Clear any prior drag's window listeners before re-arming, so a re-entrant
     // pointerdown (missed pointerup, multi-pointer) can never leak a live listener.
     this.teardownDragListeners()
+    this.moveDrag = null // abandon any stranded MOVE drag (shared listener slots, separate state)
     let dom: any = null
     try { dom = this.view.nodeDOM(sel.pos) } catch { dom = null }
     if (!dom) return
@@ -259,6 +290,78 @@ class ImageResizeView {
     // Re-assert the NodeSelection so the overlay stays up after the markup change.
     try { tr.setSelection(NodeSelection.create(tr.doc, d.pos)) } catch { /* selection re-assert best-effort */ }
     this.view.dispatch(tr)
+    this.update()
+  }
+
+  // 4c.2 — drag-to-reposition a FLOATING picture. Mirrors the resize drag (screen-delta / zoom =
+  // content-px) but TRANSLATES instead of resizing, then writes marginOffset on pointer-up via the
+  // guarded WC.PM.setImagePosition (the same path the numeric dialog + arrow-nudge already use, which
+  // the exporter turns into wp:positionH/V → wp:posOffset EMU, Word-COM-validated as Shapes.Left/Top).
+  onMoveDown(e: PointerEvent) {
+    const sel = this.selectedImage()
+    if (!sel || !sel.node?.attrs?.isAnchor) return // inline pictures flow with text — no reposition
+    // Imported floating pictures keep verbatim originalDrawingChildren — a new offset would be DROPPED
+    // on save (setImagePosition refuses them). Don't start a misleading drag.
+    const odc = sel.node.attrs.originalDrawingChildren
+    if (Array.isArray(odc) && odc.length) return
+    e.preventDefault()
+    e.stopPropagation()
+    this.teardownDragListeners()
+    this.drag = null // abandon any stranded RESIZE drag (shared listener slots, separate state)
+    let dom: any = null
+    try { dom = this.view.nodeDOM(sel.pos) } catch { dom = null }
+    if (!dom) return
+    const box = this.boxFor(sel.pos)
+    if (!box) return
+    const mo = sel.node.attrs.marginOffset || {}
+    const startH = Number(mo.horizontal) || 0
+    const startT = Number(mo.top) || 0
+    this.moveDrag = {
+      pos: sel.pos,
+      nodeDOM: dom as HTMLElement,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startH,
+      startT,
+      baseTransform: (dom as HTMLElement).style.transform || '',
+      boxLeft: box.left,
+      boxTop: box.top,
+      h: startH,
+      t: startT,
+    }
+    this.onMove = (ev: PointerEvent) => this.onMoveDragMove(ev)
+    this.onUp = (ev: PointerEvent) => this.onMoveDragUp(ev)
+    window.addEventListener('pointermove', this.onMove, true)
+    window.addEventListener('pointerup', this.onUp, true)
+  }
+
+  onMoveDragMove(e: PointerEvent) {
+    const d = this.moveDrag
+    if (!d) return
+    const z = this.zoom()
+    const dxc = (e.clientX - d.startClientX) / z
+    const dyc = (e.clientY - d.startClientY) / z
+    d.h = d.startH + dxc
+    d.t = d.startT + dyc
+    // Live preview: APPEND a translate to the node's existing transform (preserve any rotate/scale —
+    // never clobber it). The real model write happens once on pointer-up.
+    d.nodeDOM.style.transform = (d.baseTransform ? d.baseTransform + ' ' : '') + `translate(${dxc}px, ${dyc}px)`
+    if (this.overlay) {
+      this.overlay.style.left = d.boxLeft + dxc + 'px'
+      this.overlay.style.top = d.boxTop + dyc + 'px'
+    }
+  }
+
+  onMoveDragUp(_e: PointerEvent) {
+    const d = this.moveDrag
+    this.teardownDragListeners()
+    this.moveDrag = null
+    if (!d) return
+    // Clear the preview transform before the model write re-renders (avoid a flash of double offset).
+    try { d.nodeDOM.style.transform = d.baseTransform } catch { /* node may be gone */ }
+    // Absolute marginOffset = start + drag delta. The guarded bridge verb writes marginOffset →
+    // wp:posOffset, refuses imported anchors, and re-asserts the NodeSelection + refocus.
+    ;(window as any).WC?.PM?.setImagePosition?.({ horizontal: Math.round(d.h), top: Math.round(d.t) })
     this.update()
   }
 
