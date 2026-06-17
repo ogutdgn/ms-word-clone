@@ -9,6 +9,7 @@ import { installInsert } from './insert'
 import { installTable } from './table'
 import { installReview } from './review'
 import { installReferences } from './references'
+import { installHeaderFooter } from './header-footer'
 import { installMailMerge } from './mail'
 import { installDesign } from './design'
 import { installInsertExotica } from './insert-exotica'
@@ -153,7 +154,7 @@ const AREA: Record<string, string> = {
 // hyphenation; position presets, align, group, rotate, selectionPane) still lack engine
 // support and MUST stay blocked. Per-command granularity keeps the coarse AREA flag honest
 // without re-exposing genuinely-unimplemented controls.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size'])
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -372,6 +373,8 @@ export function preinstallBridge() {
     refUpdateSource: () => false, refRemoveSource: () => false,
     refSetCitationStyle: () => false, refInsertBibliography: () => false,
     refCrossReference: () => false,
+    // Phase 4 (item 3) header/footer pre-mount stubs (replaced by installHeaderFooter on mount)
+    setHeaderText: () => false, setFooterText: () => false, getHeaderText: () => '', getFooterText: () => '',
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
@@ -456,7 +459,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

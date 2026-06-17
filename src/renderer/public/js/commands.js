@@ -430,8 +430,30 @@
   H.onlineVideo = () => WC.Insert.onlineVideoDialog();
   H.bookmark = () => WC.Insert.bookmarkDialog();
   H.crossReference = () => { crossRefDialogPM(WC.PM); };
-  H.header = (c, node) => WC.HeaderFooter.headerMenu(node);
-  H.footer = (c, node) => WC.HeaderFooter.footerMenu(node);
+  // Edit Header / Edit Footer (item 3) — a minimal modal that round-trips the section's
+  // primary header/footer TEXT via the WC.PM bridge (getHeaderText/setHeaderText → the
+  // story-runtime → word/headerN.xml + sectPr ref, Word-COM-validated). The richer on-page
+  // editable band is Phase-4 (frames-overlay) gated; this dialog persists unchanged when it lands.
+  function headerFooterDialog(kind) {
+    const isH = kind === 'header';
+    const getter = isH ? WC.PM.getHeaderText : WC.PM.getFooterText;
+    const setter = isH ? WC.PM.setHeaderText : WC.PM.setFooterText;
+    const cur = (typeof getter === 'function' ? getter() : '') || '';
+    const ta = el('textarea', { style: { width: '100%', height: '90px', resize: 'vertical', boxSizing: 'border-box' } });
+    ta.value = cur;
+    WC.dialog({
+      title: isH ? 'Edit Header' : 'Edit Footer',
+      width: '460px',
+      body: el('div', {}, [el('div', { class: 'row', style: { marginBottom: '6px' }, text: (isH ? 'Header' : 'Footer') + ' text:' }), ta]),
+      footer: [
+        { label: 'OK', primary: true, onClick: () => { if (typeof setter === 'function') setter(ta.value); } },
+        { label: 'Cancel' },
+      ],
+    });
+    setTimeout(() => { try { ta.focus(); } catch (e) { /* none */ } }, 0);
+  }
+  H.header = (c, node) => headerFooterDialog('header');
+  H.footer = (c, node) => headerFooterDialog('footer');
   H.pageNumber = (c, node) => WC.HeaderFooter.pageNumberMenu(node);
   H.quickParts = (c, node) => WC.Insert.quickPartsMenu(node);
   H.wordart = (c, node) => WC.Insert.wordArtMenu(node);
@@ -1566,9 +1588,9 @@
       if (cmd === 'pictures') return picturesMenu(node);
       if (cmd === 'shapes') return WC.Insert.shapesMenu(node);
       if (cmd === 'screenshot') return screenshotMenu(node);
-      if (cmd === 'header') return WC.HeaderFooter.headerMenu(node);
-      if (cmd === 'footer') return WC.HeaderFooter.footerMenu(node);
-      if (cmd === 'pageNumber') return WC.HeaderFooter.pageNumberMenu(node);
+      if (cmd === 'header') return H.header(control, node); // item 3: Edit-Header modal (WC.HeaderFooter retired)
+      if (cmd === 'footer') return H.footer(control, node);
+      if (cmd === 'pageNumber') return WC.HeaderFooter.pageNumberMenu(node); // still D6-blocked (unreachable until unblocked)
       if (cmd === 'textBox') return textBoxMenu(node);
       if (cmd === 'quickParts') return WC.Insert.quickPartsMenu(node);
       if (cmd === 'wordart') return WC.Insert.wordArtMenu(node);

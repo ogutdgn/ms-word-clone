@@ -150,8 +150,9 @@
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    // Repointed slice 10: `header` (AREA header-footer, Phase-7-gated, a dropdown control).
-    window.WC.Commands.dropdown({ cmd: 'header', type: 'dropdown' }, document.body);
+    // Repointed: `header`/`footer` were unblocked (header/footer text ships — ENGINE_READY), so the
+    // dropdown-block probe moves to `pageNumber` (AREA header-footer, still Phase-7-gated, a dropdown).
+    window.WC.Commands.dropdown({ cmd: 'pageNumber', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -4805,6 +4806,55 @@
     return /<w:endnoteReference\b/.test(xml) || 'no <w:endnoteReference in document.xml (exporter router dropped the marker — Word reads 0 endnotes)';
   });
 
+  await t('[9] EXPORT (Word COM-validated): header+footer TEXT → word/headerN.xml <w:hdr> + sectPr w:headerReference + rel', async () => {
+    // Item 3 (headers/footers). setHeaderText/setFooterText drive the Document API story-runtime:
+    // word/headerN.xml (<w:hdr>) + a sectPr <w:headerReference r:id> + the document.xml.rels
+    // relationship (+ [Content_Types] auto-register). Word COM (validate-headerfooter-win.ps1)
+    // confirmed Sections(1).Headers(1).Range.Text=='HdrProbe' / Footers(1)=='FtrProbe' on this export.
+    if (typeof PM().setHeaderText !== 'function' || typeof PM().setFooterText !== 'function') return 'PM.setHeaderText/setFooterText missing (red)';
+    await PM().newBlank(); await sleep(100); // clean baseline (header/footer parts are global converter state)
+    try {
+      setDoc('hf body');
+      // NON-VACUOUS: a blank doc must have NO header reference before the call.
+      const before = await exportDocumentXml();
+      if (/<w:headerReference\b/.test(before)) return 'doc already had a w:headerReference before setHeaderText (vacuous baseline)';
+      if (PM().setHeaderText('HdrProbe') !== true) return 'setHeaderText refused (red)';
+      if (PM().setFooterText('FtrProbe') !== true) return 'setFooterText refused (red)';
+      await sleep(140);
+      // Cache round-trip (the dialog prefill path).
+      if (PM().getHeaderText() !== 'HdrProbe') return 'getHeaderText round-trip != HdrProbe: ' + JSON.stringify(PM().getHeaderText());
+      if (PM().getFooterText() !== 'FtrProbe') return 'getFooterText round-trip != FtrProbe: ' + JSON.stringify(PM().getFooterText());
+      // document.xml sectPr references.
+      const docXml = await exportDocumentXml();
+      if (!/<w:headerReference\b[^>]*\br:id="[^"]+"/.test(docXml)) return 'no <w:headerReference r:id> in document.xml sectPr';
+      if (!/<w:footerReference\b[^>]*\br:id="[^"]+"/.test(docXml)) return 'no <w:footerReference r:id> in document.xml sectPr';
+      // Side parts (the <w:hdr> body) + rels — exportXmlOnly returns only document.xml, so use the part map.
+      const parts = await window.WC.editor.exportDocx({ getUpdatedDocs: true });
+      const hdrPart = Object.entries(parts).find(([k, v]) => /header\d*\.xml$/i.test(k) && /<w:hdr\b/.test(String(v)) && /HdrProbe/.test(String(v)));
+      if (!hdrPart) return 'no word/headerN.xml part with <w:hdr> containing HdrProbe';
+      const ftrPart = Object.entries(parts).find(([k, v]) => /footer\d*\.xml$/i.test(k) && /<w:ftr\b/.test(String(v)) && /FtrProbe/.test(String(v)));
+      if (!ftrPart) return 'no word/footerN.xml part with <w:ftr> containing FtrProbe';
+      const rels = String(parts['word/_rels/document.xml.rels'] || '');
+      if (!/relationships\/header/.test(rels)) return 'no header relationship in document.xml.rels';
+      if (!/relationships\/footer/.test(rels)) return 'no footer relationship in document.xml.rels';
+      // RE-EDIT must REPLACE, not append (selectAll + insertContent over the already-materialized,
+      // content-seeded slot). A second setHeaderText with a distinct value must read back EXACTLY that
+      // value — guards against concatenation ('HdrProbeHdrTwo').
+      if (PM().setHeaderText('HdrTwo') !== true) return 'second setHeaderText refused (red)';
+      await sleep(120);
+      if (PM().getHeaderText() !== 'HdrTwo') return 're-edit did not REPLACE (append bug?): ' + JSON.stringify(PM().getHeaderText());
+      const reXml = await window.WC.editor.exportDocx({ getUpdatedDocs: true });
+      const reHdr = Object.entries(reXml).find(([k, v]) => /header\d*\.xml$/i.test(k) && /HdrTwo/.test(String(v)));
+      if (!reHdr) return 'header part not rewritten with HdrTwo on re-edit';
+      if (/HdrProbe/.test(String(reHdr[1]))) return 're-edit left stale HdrProbe in the header part (append bug)';
+      return true;
+    } finally {
+      // Teardown: header/footer parts + sectPr refs are global converter state (NOT reset by setDoc) —
+      // reset to a blank doc so later sectPr-reading tests don't see leftover header references.
+      await PM().newBlank(); await sleep(80);
+    }
+  });
+
   await t('[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads "0" (A1)', async () => {
     setDocs(['Chapter One Intro', 'Chapter Two Body', 'plain trailing paragraph']);
     // Real Heading-styled paragraphs (styleId Heading1 — collected by the default
@@ -6425,9 +6475,10 @@
   await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
   await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
   await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
-  // NB: margins/orientation/size are now UNBLOCKED (page-setup export shipped — ENGINE_READY). `columns`
-  // is the layout-page representative that stays Phase-7-blocked; `header` covers header-footer.
-  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('header') === true && window.WC.PM.isBlocked('columns') === true);
+  // NB: margins/orientation/size (layout-page) AND header/footer (header-footer) are now UNBLOCKED as
+  // their engine support shipped (ENGINE_READY). `columns` is the still-blocked layout-page representative;
+  // `pageNumber` is the still-blocked header-footer representative (page numbers are keystone-gated).
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('pageNumber') === true && window.WC.PM.isBlocked('columns') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------
