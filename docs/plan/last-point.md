@@ -7,7 +7,48 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — v4 #2 comments export Word-COM-validated CORRECT (PR #118); next = #3 paragraphSpacing)
+## 2026-06-16 (RESUME HERE — v4 #3 paragraph spacing Word-COM-validated CORRECT (PR #120); next = pageBorders)
+
+> **Branch:** `main` (PR #120 merged `76bec23`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 468 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **✅ v4 #3 PARAGRAPH SPACING — Word-COM-validated CORRECT (PR #120, NO source bug):** Design tab got its
+> FIRST Word-COM oracle (`scripts/oracle-probe-paraspacing.js` + `scripts/oracle/validate-paraspacing-win.ps1`).
+> `deParagraphSpacing({before:12,after:18,line:3})` → Word reads `Paragraphs.Item(1).SpaceBefore=12`,
+> `.SpaceAfter=18`, `.LineSpacing=36`, `.LineSpacingRule=5` (wdLineSpaceMultiple). Export faithful — no fix.
+> New `[10th]` regression test gates the FULL resolution chain (docDefaults before+after+line + the Normal
+> style write) — closes the byte-only-docDefaults blind spot.
+> **⚠️ TWO LESSONS this slice:**
+>   1. **Test pollution:** `deParagraphSpacing` mutates the Normal style + docDefaults GLOBALLY (`setDoc`
+>      resets only body text), so a non-zero `before` (12pt=16px) leaked a top-margin into the later `[4a]`
+>      phantom-margin test → added a `finally{}` restoring `before:0`. **Global-style bridge verbs need a
+>      teardown in their regression test.**
+>   2. **/code-review caught a vacuous assertion:** the prior `[10th]` test leaves `line:2`→`480` in the
+>      persisted docDefaults, so a `w:line="480"` check would pass even if THIS call dropped `line`. Fixed
+>      by using a DISTINCT value (`line:3`→`720`). **When global state persists across tests, pick assertion
+>      values the prior test does not leave.** (Also corrected validator enum comment + `$p`→`$para` shadowing.)
+>
+> **🗂️ SCOUT BACKLOG v4 — progress:**
+>   - ✅ **#1 Footnote+Endnote (PR #116, FOUND+FIXED the endnote drop).**
+>   - ✅ **#2 Comments export (PR #118, validated correct).**
+>   - ✅ **#3 paragraphSpacing (PR #120, validated correct).**
+>   - **#4 pageBorders** (`dePageBorders` design.ts:228; COM `Sections(1).Borders` — `.Item(wdBorderTop=-1)`
+>     etc. `.LineStyle`/`.LineWidth`/`.Color`, or `Borders.Enable`). Existing byte test `[10th]` checks
+>     `<w:pgBorders>` presence only. **← NEXT.**
+>   - **#5 pageColor** (`dePageColor` design.ts:201 → `w:background`; LOW COM confidence — page background
+>     reads poorly via COM, `doc.Background` is unreliable. **May be byte-only acceptable — flag + skip COM.**)
+>   - Lower: TOC/caption/citation export COM (refInsertTOC :114 / refInsertCaption :300 / refAddSource :518),
+>     track-changes insert (riskier COM). Re-rank if pageBorders/pageColor exhaust.
+>
+> **NEXT — continue v4: ship #4 (pageBorders export + COM).** Keep execute→test→COM-validate→/code-review→
+> merge→checkpoint. spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list
+> `task_eb50ae00`. Branch off `main` (docs checkpoints on a branch + PR too). **Bigger STEERED items still
+> pending the user:** a14 picture effects / FRAMES-OVERLAY keystone / 4e headers-footers / highlight-picker
+> UX. Default to v4 re-scout unless the user names one.
+
+---
+
+## 2026-06-16 (v4 #2 comments export Word-COM-validated CORRECT (PR #118); next = #3 paragraphSpacing)
 
 > **Branch:** `main` (PR #118 merged `8497efc`; branch deleted). **Phase:** 4 (layout engine).
 > Gates: **PM 467 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
