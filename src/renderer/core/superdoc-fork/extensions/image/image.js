@@ -227,7 +227,10 @@ export const Image = Node.create({
        */
       grayscale: {
         default: false,
-        rendered: false,
+        // Render the OOXML a:grayscl effect (Word's Picture Format > Color > Grayscale) as a CSS
+        // filter on the <img>. The style lands in htmlAttributes.style and reaches BOTH the plain
+        // <img> and the clipped wrapper <span> (CSS filter cascades to the child img) — single site.
+        renderDOM: ({ grayscale }) => (grayscale ? { style: 'filter: grayscale(100%);' } : undefined),
       },
 
       /**

@@ -495,6 +495,26 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // Phase 4 (item 2) — toggle the picture GRAYSCALE recolor (Word's Picture Format → Color → Grayscale).
+  // Sets the image node's `grayscale` attr; the exporter ALREADY emits <a:grayscl/> as a child of a:blip
+  // (decode-image-node-helpers.js:369), which Word reads as PictureFormat.ColorType = grayscale (2, the
+  // 1-based MsoPictureColorType — an earlier attempt mis-read this as BlackAndWhite via a 0-based enum and
+  // was wrongly reverted). The image extension renders it as a CSS `filter: grayscale(100%)`. No exporter
+  // change. NodeSelection is re-asserted after setNodeMarkup (mirrors setImageTransform).
+  function setImageGrayscale(on: boolean): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then apply Grayscale.'); return false }
+    try {
+      const tr = editor.state.tr.setNodeMarkup(sel.pos, undefined, { ...sel.node.attrs, grayscale: Boolean(on) }, sel.node.marks)
+      try { tr.setSelection(NodeSelection.create(tr.doc, sel.pos)) } catch { /* best-effort keep selection */ }
+      editor.view?.dispatch(tr)
+    } catch {
+      return false
+    }
+    refocus()
+    return true
+  }
+
   // Phase 4c.2 — reposition a FLOATING picture (Word's Layout → Position → absolute position). Sets the
   // node's `marginOffset` (px offsets: horizontal = "to the right of" the column, top = "below" the
   // paragraph — matching the anchor's hRelativeFrom='column'/vRelativeFrom='paragraph' that setImageWrap
@@ -544,6 +564,7 @@ export function installInsert(editor: AnyEditor) {
     setImageCrop,
     setImagePosition,
     setImageTransform,
+    setImageGrayscale,
     insertLink,
     removeLink,
     insertImage,

@@ -312,6 +312,15 @@
     fly.appendChild(WC.flySep());
     fly.appendChild(WC.flyItem('Reset Rotation', { onClick: () => tx({ reset: true }) }));
   });
+  // Picture Color / Recolor (Word's Picture Format → Adjust → Color) → WC.PM.setImageGrayscale.
+  // "Grayscale" sets the selected picture's `grayscale` attr (render = CSS filter; export = <a:grayscl/>
+  // in a:blip, which Word reads as PictureFormat.ColorType=grayscale(2)); "No Recolor" clears it.
+  H.imgColor = (c, node) => WC.flyout(node, (fly) => {
+    const gs = (on) => { if (WC.PM && WC.PM.setImageGrayscale) WC.PM.setImageGrayscale(on); };
+    fly.appendChild(WC.flyHeader('Recolor'));
+    fly.appendChild(WC.flyItem('No Recolor', { onClick: () => gs(false) }));
+    fly.appendChild(WC.flyItem('Grayscale', { onClick: () => gs(true) }));
+  });
   // Picture Position (Word's Layout → Position → absolute position) → WC.PM.setImagePosition. A flyout
   // with Horizontal (right of column) + Vertical (below paragraph) offsets in inches, prefilled from the
   // selected floating picture's marginOffset. Writes marginOffset (render left/top + wp:posOffset export).
@@ -1594,7 +1603,7 @@
       if (cmd === 'lineNumbers' || cmd === 'hyphenation' || cmd === 'position' || cmd === 'wrapText' || cmd === 'align' || cmd === 'group' || cmd === 'rotate') return H[cmd](control, node);
       // Picture Format → Size group (4b numeric Height/Width) + Crop + Rotate + Alt Text. Redundant
       // with Commands.run's H[cmd] intercept, mirrors the tblRowHeight/tblColWidth dual-path.
-      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop' || cmd === 'imgRotate' || cmd === 'imgPosition') return H[cmd](control, node);
+      if (cmd === 'imgHeight' || cmd === 'imgWidth' || cmd === 'imgAltText' || cmd === 'imgCrop' || cmd === 'imgRotate' || cmd === 'imgPosition' || cmd === 'imgColor') return H[cmd](control, node);
       // References tab — Footnotes split-button ▾ flyout. Routes every item to the
       // bridge: refNextNote takes a direction ('next'/'prev'); refShowNotes reveals
       // the clone-owned notes area.

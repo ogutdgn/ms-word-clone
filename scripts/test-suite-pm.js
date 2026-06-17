@@ -2434,6 +2434,63 @@
     return (/\brot="5400000"/.test(rt) && /\bflipH="1"/.test(rt)) || 'round-trip changed rot/flip (expected 90°=5400000 + flipH): ' + rt;
   });
 
+  await t('[4b] Picture Format Grayscale: setImageGrayscale → grayscale attr + CSS filter + <a:grayscl> in a:blip; OFF clears (Word COM ColorType=2)', async () => {
+    // Item 2 (a14 picture effects). NOTE: Word's OWN grayscale OOXML is plain <a:grayscl/> in a:blip (NOT
+    // the a14 imgEffect extension) — authored-in-Word COM ground truth. Word reads it as
+    // InlineShapes(1).PictureFormat.ColorType == 2 (grayscale, 1-based MsoPictureColorType). An earlier
+    // attempt mis-read 2 as BlackAndWhite (0-based) and wrongly reverted a:grayscl. validate-picteffect-win.ps1
+    // confirmed ColorType==2 on this exact export. The converter already round-trips grayscale; this gates
+    // the new bridge verb + render + the a:grayscl export (and a NEGATIVE guard against a14).
+    if (typeof PM().setImageGrayscale !== 'function') return 'PM.setImageGrayscale missing (red)';
+    if (PM().isBlocked('imgColor') !== false) return 'imgColor should not be blocked';
+    const grayOf = () => { let g = null; doc().descendants((n) => { if (n.type.name === 'image') g = n.attrs.grayscale; }); return g; };
+    const blipHasGrayscl = (xml) => /<a:blip[\s\S]*?<a:grayscl\b/.test(xml);
+    setDoc('gray: ');
+    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 120), 'gray.png');
+    await sleep(160);
+    if (selectImage() == null) return 'no image node';
+    // ON: attr set + CSS filter rendered + <a:grayscl/> in a:blip; NO a14.
+    if (PM().setImageGrayscale(true) !== true) return 'setImageGrayscale(true) refused (red)';
+    await sleep(80); selectImage();
+    if (grayOf() !== true) return 'grayscale attr not set: ' + JSON.stringify(grayOf());
+    const img = document.querySelector('#pm-editor .ProseMirror img');
+    if (!img) return 'no rendered <img>';
+    const sp = img.closest('span');
+    const fImg = getComputedStyle(img).filter || '';
+    const fSpan = sp ? (getComputedStyle(sp).filter || '') : '';
+    if (!/grayscale/.test(fImg) && !/grayscale/.test(fSpan)) return 'rendered img has no grayscale filter: img=' + fImg + ' span=' + fSpan;
+    let xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!blipHasGrayscl(xml)) return 'no <a:grayscl> inside a:blip on export';
+    if (/a14:imgEffect|a14:imgLayer|a14:imgProps/.test(xml)) return 'unexpected a14 imgEffect — grayscale must be plain a:grayscl (Word-faithful)';
+    // COEXISTENCE: grayscale + a transform must BOTH survive (the image attrs' renderDOM styles are
+    // CONCATENATED into one style string — Attribute.ts joins 'style' with '; ' — not last-wins). Apply
+    // a 90° rotation and confirm the rendered <img> keeps the grayscale filter AND a transform, and the
+    // export carries BOTH <a:grayscl> (in a:blip) and <a:xfrm rot> (in spPr) — independent OOXML elements.
+    if (typeof PM().setImageTransform === 'function') {
+      selectImage();
+      PM().setImageTransform({ rotate: 90 }); await sleep(60); selectImage();
+      const img2 = document.querySelector('#pm-editor .ProseMirror img');
+      if (img2) {
+        const cs = getComputedStyle(img2); const sp2 = img2.closest('span');
+        const filt = (cs.filter || '') + ' ' + (sp2 ? (getComputedStyle(sp2).filter || '') : '');
+        const xf = (cs.transform || '') + ' ' + (sp2 ? (getComputedStyle(sp2).transform || '') : '');
+        if (!/grayscale/.test(filt)) return 'grayscale filter lost after a rotate (style-merge clobber): ' + filt;
+        if (!xf || /^\s*none\s*none\s*$/.test(xf) || !/matrix|rotate/.test(xf)) return 'transform lost after grayscale (style-merge clobber): ' + xf;
+      }
+      xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+      if (!blipHasGrayscl(xml)) return 'a:grayscl lost when combined with a transform';
+      if (!/<a:xfrm\b[^>]*\brot=/.test(xml)) return 'a:xfrm rot lost when combined with grayscale';
+      selectImage(); PM().setImageTransform({ reset: true }); await sleep(50); // restore for the OFF check
+    }
+    // OFF (anti-vacuous): attr cleared + a:grayscl gone.
+    selectImage();
+    if (PM().setImageGrayscale(false) !== true) return 'setImageGrayscale(false) refused (red)';
+    await sleep(80); selectImage();
+    if (grayOf() !== false) return 'grayscale attr not cleared: ' + JSON.stringify(grayOf());
+    xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return !blipHasGrayscl(xml) || 'a:grayscl still present in a:blip after OFF';
+  });
+
   await t('[4c] Picture Position (4c.2): setImagePosition → marginOffset → exports wp:posOffset (EMU) + round-trips; inline-guarded', async () => {
     if (typeof PM().setImagePosition !== 'function') return 'PM.setImagePosition missing (red)';
     if (PM().isBlocked('imgPosition') !== false) return 'imgPosition should not be blocked';
