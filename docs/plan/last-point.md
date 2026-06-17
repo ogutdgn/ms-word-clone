@@ -7,7 +7,42 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — font-family (rFonts) export test DONE (PR #110); char-format matrix 4/5 done; next = 4e sub-sup → finish matrix)
+## 2026-06-16 (RESUME HERE — sub/superscript export test DONE (PR #112); 🏁 CHAR-FORMAT MATRIX COMPLETE; next = #5 lists → RE-SCOUT v4 / ESCALATE)
+
+> **Branch:** `main` (sub/sup test merged PR #112 `137e0cb`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 464 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **Sub/superscript export test — DONE (PR #112):** char-format matrix **4e** (the last). Two paragraphs
+> (sub/sup) → `<w:vertAlign w:val="subscript"|"superscript">`. **🔬 Word COM-validated:**
+> `Paragraphs(1).Font.Subscript = -1`, `Paragraphs(2).Font.Superscript = -1`. `oracle-probe-1-vertalign.js`
+> + reusable `validate-vertalign-win.ps1`. `/code-review` clean.
+>
+> **🏁 CHARACTER-FORMAT EXPORT+COM MATRIX COMPLETE:** underline-style (#104), font color (#106), font size
+> (#108), font family (#110), sub/superscript (#112) — all 5 Word-COM-validated at the export boundary.
+>
+> **📊 SESSION TALLY (this /loop run):** ~15 Word-COM-validated export-regression slices merged (PRs #82,84,86,
+> 88,90,92,94,96,98,100,102,104,106,108,110,112) spanning tables, paragraphs, lists, hyperlinks, bookmarks,
+> and the full character-format set — plus 1 real feature (cell margins #84) and **3 real bugs found+flagged**
+> (mixed-list `task_eb50ae00`, grayscale-needs-a14 [deferred], 2+-table `task_0e043993`). Gates PM 448→464.
+> A reusable `scripts/oracle/validate-*-win.ps1` family (~13 validators) + `oracle-probe-*` pattern now exists.
+>
+> **🗂️ SCOUT BACKLOG v3 — nearly exhausted.** Remaining: **#3 highlight over-exposure** (REAL bug, fix is a
+> UX judgment call — restrict picker to 15 ST_HighlightColor keywords; STEER with user) + **#5 numbered/
+> multilevel list export+COM** (fold onto the lists harness; multilevel mints a from-scratch abstractNum — the
+> higher-risk part; COM read-para-props listType/listString).
+>
+> **⚖️ DECISION POINT (surfaced to the user in chat):** the docx EXPORT surface is now broadly COM-hardened;
+> marginal value of more test-only lock-ins is low. The high-leverage remaining work needs a STEERED session:
+> **a14 picture effects** (the deferred grayscale path), the **FRAMES-OVERLAY keystone**, **4e headers/footers**.
+>
+> **NEXT:** #5 numbered/multilevel list export+COM (last clean bounded v3 item) → then **RE-SCOUT v4** (fresh
+> areas: non-Phase-7-deferred section/page props, view/zoom, doc settings, remaining tables) OR escalate a
+> bigger item per the user. spawn_tasks (NOT loop): 2+-table `task_0e043993`, CUA vAlign `task_c62b4d4c`,
+> mixed-list `task_eb50ae00`. Branch off `main`.
+
+---
+
+## 2026-06-16 (font-family (rFonts) export test DONE (PR #110); char-format matrix 4/5 done; next = 4e sub-sup → finish matrix)
 
 > **Branch:** `main` (font-family test merged PR #110 `fde5e76`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 463 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
