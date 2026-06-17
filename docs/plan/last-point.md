@@ -7,7 +7,44 @@
 
 ---
 
-## 2026-06-16 (RESUME HERE — numbered-list export test DONE (PR #114); SCOUT BACKLOG v3 EXHAUSTED → RE-SCOUT v4 or ESCALATE)
+## 2026-06-16 (RESUME HERE — v4 RE-SCOUT found+FIXED a REAL bug: endnote lost on export (PR #116))
+
+> **Branch:** `main` (PR #116 merged `62f100f`; branch deleted). **Phase:** 4 (layout engine).
+> Gates: **PM 466 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
+>
+> **🐞 REAL BUG FOUND + FIXED — endnotes were silently dropped on export (PR #116):** the v4 re-scout
+> over the **references** area (its FIRST target) immediately paid off. The docx exporter node-router
+> (`super-converter/exporter.js` → `exportSchemaToJson`) mapped `footnoteReference`→translator but had
+> **NO `endnoteReference` entry**, so the endnote MARKER never reached `word/document.xml`. The body still
+> landed in `word/endnotes.xml` (so the byte-only `[9]` body test + `test:roundtrip` stayed GREEN), but with
+> no marker referencing it **Word read `doc.Endnotes.Count == 0` — the endnote was lost entirely.** Fix = one
+> router line (+import), symmetric with footnote. **🔬 Word COM-validated (new `validate-notes-win.ps1`):
+> before footnoteCount=1/endnoteCount=0 → after footnoteCount=1/endnoteCount=1, bodies "Footnote"/"Endnote".**
+> Regression test: new `[9]` asserting `<w:endnoteReference>` in document.xml (red→green). `/code-review`
+> clean (2 finders, 0 findings). **Textbook reinforcement of the lesson: exportXmlOnly + roundtrip both MISS
+> this corruption class — only `Documents.Open` in real Word catches it.**
+>
+> **🆕 References area now has its FIRST Word-COM oracle:** `scripts/oracle-probe-notes.js` +
+> `scripts/oracle/validate-notes-win.ps1` (footnote + endnote count/body). It had ZERO before.
+>
+> **🗂️ SCOUT BACKLOG v4 (re-scout, 3 parallel agents) — ranked, partly consumed:**
+>   - ✅ **#1 Footnote+Endnote export+COM — DONE (PR #116, found a bug).**
+>   - **#2 Comments export** (review.ts:296 `addComment`; COM `doc.Comments.Count==1`/`.Range.Text`/`.Author`).
+>     Clone `oracle-probe-6-bookmark.js` + `validate-bookmark-win.ps1`. **← NEXT bounded candidate.**
+>   - **#3 paragraphSpacing** (design.ts:120; COM `Paragraphs.Item(1).SpaceAfter` clean float), then
+>     **pageBorders** (`Sections(1).Borders.Item(-3)`), **pageColor** (low COM confidence).
+>   - Lower: TOC/caption/citation export COM (refInsertTOC :114 / refInsertCaption :300 / refAddSource :518),
+>     track-changes insert (riskier COM). Re-rank if #2/#3 exhaust.
+>
+> **NEXT — continue v4: ship #2 (comments export + COM).** Then #3 (paragraphSpacing). Keep the
+> execute→test→COM-validate→/code-review→merge→checkpoint cycle. spawn_tasks (NOT loop): 2+-table
+> `task_0e043993`, CUA vAlign `task_c62b4d4c`, mixed-list `task_eb50ae00`. Branch off `main`.
+> **Bigger STEERED items still pending the user:** a14 picture effects / FRAMES-OVERLAY keystone /
+> 4e headers-footers / highlight-picker UX (#3 v3). Default to v4 re-scout unless the user names one.
+
+---
+
+## 2026-06-16 (numbered-list export test DONE (PR #114); SCOUT BACKLOG v3 EXHAUSTED → RE-SCOUT v4 or ESCALATE)
 
 > **Branch:** `main` (numbered-list test merged PR #114 `b59c3ba`; branch deleted). **Phase:** 4 (layout
 > engine). Gates: **PM 465 / smoke 9 / roundtrip 27.** Word COM-validated. **Ultracode `/loop` (5-min cadence).**
