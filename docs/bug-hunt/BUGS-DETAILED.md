@@ -1245,3 +1245,72 @@ The S2-audit triage theorized that `H.reject` (`commands.js:1393` = `rejectChang
 : In the exporter run translator (`super-converter/exporter.js`), flatten the nested `run`-wrapping-`run` structure the paste parser produces and read text-level emphasis marks (bold/italic/underline/strike/links) when synthesizing `<w:rPr>`; OR normalize the paste output so marked text lands in a single run node whose runProperties reflect the marks (as `insertContent` does). Fixing this one site also repairs Keep-Source paste fidelity. Effort: M. Risk: medium (export run-property path — validate via a real Word COM save). Regression test: merge-paste and keep-source-paste `<b>/<i>/<u>` HTML, export, assert `<w:b/>/<w:i/>/<w:u/>` present.
 
 ---
+
+## BUG-049 — Word Count dialog ignores the selection (no Word-style "N of M words" row)
+**Severity:** S4
+
+**Where**
+: Review > Proofing > Word Count. `dialogs.js:264-274 D.wordCount` renders whole-document totals only and never reads `c.selWords`. The bridge DOES compute the selection word count (`bridge/io.ts:51-53` — `selWords` = words in `textBetween(sel.from, sel.to)`) and returns it in `counts()` (`io.ts:54`); the only consumer today is `statusbar.js:72`.
+
+**When / repro**
+: 1) Type "one two three four five". 2) Select "one two". 3) Review > Word Count. 4) The dialog shows "Words: 5" (whole-doc), not Word's "2 of 5 words" for the selection.
+
+**Symptom (Word vs clone)**
+: Word's Word Count dialog shows "N of M words" when a range is selected. The clone always shows whole-document totals, discarding the already-computed `selWords`. (The "Include textboxes, footnotes and endnotes" checkbox is an acknowledged faithful no-op, not this defect.)
+
+**Why it happens (root cause)**
+: `D.wordCount` builds its rows purely from whole-document totals and never reads `c.selWords`, even though `counts()` returns it.
+
+**Evidence**
+: **Runtime-confirmed** — probe `C:\tmp\bughunt\probes\s3b4-chrome.js` (`s3b4-chrome.json` → `wordCount`): with "one two" selected, `selWords:2`, `totalWords:5`, the `#modal-root` dialog text shows "Words\n5" only (`dialogShowsOfFormat:false` — no "2 of 5"). `bugConfirmed:true`.
+
+**Solution**
+: In `D.wordCount`, when `c.selWords > 0`, render the Words row as "selWords of words" (Word's "N of M" format); ideally apply the same to Characters/Paragraphs/Lines (extend `io.ts counts()` to return `selChars`/`selParas`). No new bridge plumbing needed for the Words row. Effort: S. Risk: low.
+
+---
+
+## BUG-050 — View ▸ Navigation Pane checkbox never reflects the pane's open/closed state (lying control)
+**Severity:** S4
+
+**Where**
+: View > Show > Navigation Pane (declared `type:"checkbox"` at `ribbon-data.js:2574`, id `view.show.navigation-pane`). `commands.js:507 H.navigationPane = (c,node) => WC.Dialogs.navPane();` — never calls `markChecked(node)`. `dialogs.js:297-313 D.navPane` toggles `#nav-pane` by remove-if-present. Contrast siblings `H.ruler` (`commands.js:500`) and `H.gridlines` (`:501-506`), which call `markChecked` (`:2163`); `navigationPane` is absent from `TOGGLE_MAP` (`ribbon.js:35`) and has no `stateRule` (`ribbon.js:608`).
+
+**When / repro**
+: 1) View > Navigation Pane → the pane opens. 2) The ribbon checkbox stays **unchecked** even though the pane is open. 3) Click again → pane closes (blind toggle decoupled from the checkbox).
+
+**Symptom (Word vs clone)**
+: Word's Navigation Pane checkbox reflects the pane's actual open state. The clone's checkbox never latches — it's a lying control. (The absent Pages-thumbnail/Results-search/drag-reorder features are a separate, larger feature gap.)
+
+**Why it happens (root cause)**
+: The handler only calls `WC.Dialogs.navPane()` and never sets the control's checked class; it isn't in `TOGGLE_MAP` and has no state rule, so the checkbox state is never updated.
+
+**Evidence**
+: **Runtime-confirmed** — probe `s3b4-chrome.js` (`navPane`): after one dispatch, `paneOpen:true` (`#nav-pane` present) but `toggledAfterOpen:false` (the checkbox never gains `.toggled`); `toggledBefore:false`; a second dispatch yields `paneClosed:true`. `bugConfirmed:true`.
+
+**Solution**
+: Have `D.navPane` return its new open/closed boolean and set the control class in the handler: `H.navigationPane = (c,node) => { const open = WC.Dialogs.navPane(); if (node) node.classList.toggle('toggled', !!open); }` (mirrors `H.ruler`/`H.gridlines`); or register a `stateRule` whose `latched()` checks `#nav-pane`. Effort: S. Risk: low.
+
+---
+
+## BUG-051 — Text Effects ▸ Outline width presets export invalid OOXML color `CURRENTCOLOR` → Word drops the outline color on save+reopen
+**Severity:** S3 (data loss / OOXML corruption on save)
+
+**Where**
+: Home > Font > Text Effects and Typography > Outline > a width preset (¾/1/1½/2¼/3 pt). `commands.js:584-585 outlineMenu` applies the `textOutline` mark with `color:'currentColor'` (a CSS keyword). Export bridge `core/superdoc-fork/core/super-converter/styles.js:776-778` passes the value verbatim; the v3 translator `…/v3/handlers/w/w14-textOutline/textOutline-translator.js:34-47` does `String(o.color).replace(/^#/,'').toUpperCase()` → `'CURRENTCOLOR'` and emits `<w14:srgbClr w14:val="CURRENTCOLOR"/>` (invalid OOXML — must be 6 hex digits). The separate "Outline Color…" picker (`commands.js:587`) passes a real hex and round-trips fine.
+
+**When / repro**
+: 1) Select text, Home > Text Effects > Outline > "1 pt outline". 2) Save as .docx, reopen in Word. 3) The outline color is gone (Word treats the unparseable `srgbClr` as no/black color).
+
+**Symptom (Word vs clone)**
+: Word's outline width presets apply an outline in the current text color that persists. The clone stores the CSS keyword `currentColor`, which the exporter uppercases into the invalid hex `CURRENTCOLOR`; Word can't parse it, so the user's outline color is lost on save+reopen.
+
+**Why it happens (root cause)**
+: The width presets store the CSS keyword `'currentColor'` instead of a resolved RGB hex. It renders fine on-screen (`-webkit-text-stroke`) and survives the model + bridge unchanged, but the export translator's `.toUpperCase()` produces an invalid OOXML color rather than resolving the keyword to a hex.
+
+**Evidence**
+: **Runtime-confirmed via the full .docx package** — probe `C:\tmp\bughunt\probes\s3b4-outline-save.js` saved real .docx files (`WC.PM.exportDocxBytes()` → `wordAPI.saveBytes`); unzipping `word/document.xml` shows the width-preset file containing `<w14:srgbClr w14:val="CURRENTCOLOR" />` (invalid), while the `#FF0000` control file contains valid `<w14:srgbClr w14:val="FF0000" />`. (Note: `exportDocx({exportXmlOnly:true})` omits `w14:textOutline` entirely — the corruption only surfaces in the full package, a textbook case of "validate the real save, not `exportXmlOnly`".) The model stores `textOutline.color === 'currentColor'` (confirmed by `s3b4-outline-fix.json` `modelOutlineColor`).
+
+**Solution**
+: Resolve the outline color to a real RGB hex before export. Best: in `outlineMenu` (`commands.js:585`) don't store the keyword for width presets — resolve the run's effective text color (fall back to `#000000`) and store that hex, mirroring "Outline Color…". Defense-in-depth: in `styles.js:777` or the translator decode, coerce any non-hex color (`currentColor`, named CSS colors) to a valid 6-hex `srgbClr` (resolve `currentColor` → the run's `w:color`, default `000000`). Effort: S-M. Risk: low. Regression: assert the width-preset Outline export emits a valid `w14:srgbClr`, not `CURRENTCOLOR`. (Same class of "render-fine-but-export-invalid" as a real save defect — always Word-COM-validate.)
+
+---

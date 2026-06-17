@@ -409,6 +409,22 @@ Full detail in `BUGS-DETAILED.md` § BUG-047…048.
   honest functional dialogs / verified-clean); 5 known-stubs (Insert-Merge-Field shape, Edit-Recipient-List alias, Multilevel
   List, Bullets/Numbering dropdown rows)._
 
+## S3-audit-triage new bugs (BUG-049…051) — batch-4, runtime-confirmed 2026-06-17
+Batch-4 of the S3 tier (16 Proofing/View/Home-font/clipboard items, deduped vs the 48-bug catalog) surfaced 3 more bugs
+(`s3b4-chrome.js` / `s3b4-outline-save.js`). Full detail in `BUGS-DETAILED.md` § BUG-049…051.
+- **BUG-049 [S4] Word Count dialog ignores the selection** (no "N of M words" row) — `D.wordCount` (dialogs.js:264) never
+  reads the already-computed `selWords`. Probe: `selWords:2`/`totalWords:5`, dialog shows "Words 5" only.
+- **BUG-050 [S4] View ▸ Navigation Pane checkbox never reflects the pane state** (lying control) — `H.navigationPane`
+  (commands.js:507) never `markChecked`. Probe: `paneOpen:true` but `toggledAfterOpen:false`.
+- **BUG-051 [S3 data loss] Text Effects ▸ Outline width presets export invalid OOXML `CURRENTCOLOR`** → Word drops the
+  outline color on save+reopen. Width presets store `color:'currentColor'` (commands.js:585); the translator uppercases it
+  to invalid hex. **Confirmed via the full .docx package** (`exportXmlOnly` omits it!): width-preset save → `<w14:srgbClr
+  w14:val="CURRENTCOLOR"/>` vs the `#FF0000` control → valid `FF0000`. (Re-affirms: validate the real save, not exportXmlOnly.)
+- _Batch-4 also: 0 duplicates; 4 not-bugs (Display-for-Review 4-mode parity correct, Clear-All-Formatting resets to Normal,
+  Zoom dialog fewer-options, Paste-main-face honors Set-Default-Paste); 7 known-stubs (Spelling&Grammar pane, 8-word Thesaurus,
+  Show-Markup items, Accessibility 4-checks, Language doc-level-only, Read-Mode snapshot, Underline-color unreachable); 2
+  needs-runtime-not-headless (Read Aloud TTS, Side-to-Side CSS targets retired #editor)._
+
 ## Minor deviations (S4) — works, but not like Word (catalog)
 - **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
   (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via

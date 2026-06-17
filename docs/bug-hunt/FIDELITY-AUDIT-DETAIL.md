@@ -2188,3 +2188,18 @@ Batch-3 of the **S3** tier (16 Mailings/lists/footnotes/formatting items) triage
   typeNewList); Multilevel List; Bullets dropdown rows; Numbering dropdown rows.
 
 ---
+## Resolution log — S3 batch-4 triage sweep (2026-06-17)
+Batch-4 of the **S3** tier (16 Proofing/View/Home-font/clipboard items) triaged + runtime-probed
+(`s3b4-chrome.js`, `s3b4-outline-save.js`):
+- **Promoted to numbered, runtime-confirmed bugs:** Word Count ignores selection → **BUG-049**; Navigation Pane checkbox
+  lying control → **BUG-050**; Text Effects Outline width presets export invalid OOXML `CURRENTCOLOR` (full-package
+  confirmed; exportXmlOnly omits it) → **BUG-051**.
+- **Verdict = not-a-bug:** Display for Review (4-mode parity is Word-correct); Clear All Formatting (resets to OOXML Normal —
+  already a PASS in the ledger); Zoom dialog (fewer options); Paste main face (honors Set Default Paste correctly).
+- **Known stubs:** Spelling & Grammar (pane substitution); Thesaurus (8-word lexicon); Show Markup (missing Comments/Ink items);
+  Check Accessibility (4 checks); Language (doc-level only, no per-run `w:lang`); Read Mode (static-snapshot overlay);
+  Underline color / More-Underlines (unreachable).
+- **Real but NOT headless-confirmable:** Read Aloud (TTS prev/next + voice picker); Side to Side (CSS targets the retired
+  `#editor` id) — observable only via audio/pixels.
+
+---
