@@ -3,7 +3,8 @@
 ## Upstream
 
 - **Project:** SuperDoc
-- **Repository:** https://github.com/opensource-solutions/SuperDoc
+- **Repository:** https://github.com/superdoc-dev/superdoc (canonical; the org formerly
+  recorded here as `opensource-solutions/SuperDoc` has been renamed/moved and now 404s)
 - **Git commit:** 03ab3f3
 - **Published version:** 1.38.0
 - **License:** AGPL-3.0
@@ -21,6 +22,24 @@ The following upstream packages are included in this directory tree:
 - `_vendor/superdoc/document-api/` — `@superdoc/document-api`
 - `_vendor/superdoc/presentation-editor/` — `@superdoc/presentation-editor`
 - `_vendor/superdoc/layout-adapter/` — layout-adapter sibling package
+
+The **layout engine** packages the PresentationEditor targets (vendored 2026-06-18 from
+`superdoc-dev/superdoc` v1.38.0 for the Option-B real per-page layout engine):
+
+- `_vendor/superdoc/layout-resolved/` — `@superdoc/layout-resolved`
+- `_vendor/superdoc/layout-engine/` — `@superdoc/layout-engine`
+- `_vendor/superdoc/layout-bridge/` — `@superdoc/layout-bridge`
+- `_vendor/superdoc/painter-dom/` — `@superdoc/painter-dom` (upstream `painters/dom`)
+- `_vendor/superdoc/measuring-dom/` — `@superdoc/measuring-dom` (upstream `measuring/dom`)
+- `_vendor/superdoc/dom-contract/` — `@superdoc/dom-contract`
+- `_vendor/superdoc/geometry-utils/` — `@superdoc/geometry-utils`
+- `_vendor/superdoc/word-layout/` — `@superdoc/word-layout`
+- `_vendor/superdoc/preset-geometry/` — `@superdoc/preset-geometry`
+- `_vendor/superdoc/font-utils/` — `@superdoc/font-utils` (upstream `shared/font-utils`)
+
+Modification: each layout-engine package's per-package `tsconfig*.json` was removed (they
+`extends` monorepo-relative paths that don't exist in this flattened tree; esbuild uses the
+project tsconfig instead — matching the other vendored packages, which also ship no tsconfig).
 
 ## Modifications made in this fork
 

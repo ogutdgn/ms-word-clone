@@ -68,6 +68,19 @@ const aliases = [
   { find: '@superdoc/style-engine', replacement: resolve(VENDOR, 'style-engine/src/index.ts') },
   { find: '@superdoc/url-validation', replacement: resolve(VENDOR, 'url-validation/index.js') },
   { find: '@superdoc/document-api', replacement: resolve(VENDOR, 'document-api/src/index.ts') },
+  // Layout-engine packages (vendored from superdoc-dev/superdoc v1.38.0; the Option-B
+  // real per-page layout engine the PresentationEditor targets). Most-specific subpath first.
+  { find: '@superdoc/measuring-dom/canvas-resolver', replacement: resolve(VENDOR, 'measuring-dom/src/canvas-resolver.ts') },
+  { find: '@superdoc/measuring-dom', replacement: resolve(VENDOR, 'measuring-dom/src/index.ts') },
+  { find: '@superdoc/layout-resolved', replacement: resolve(VENDOR, 'layout-resolved/src/index.ts') },
+  { find: '@superdoc/layout-engine', replacement: resolve(VENDOR, 'layout-engine/src/index.ts') },
+  { find: '@superdoc/layout-bridge', replacement: resolve(VENDOR, 'layout-bridge/src/index.ts') },
+  { find: '@superdoc/painter-dom', replacement: resolve(VENDOR, 'painter-dom/src/index.ts') },
+  { find: '@superdoc/dom-contract', replacement: resolve(VENDOR, 'dom-contract/src/index.ts') },
+  { find: '@superdoc/geometry-utils', replacement: resolve(VENDOR, 'geometry-utils/src/index.ts') },
+  { find: '@superdoc/word-layout', replacement: resolve(VENDOR, 'word-layout/src/index.ts') },
+  { find: '@superdoc/preset-geometry', replacement: resolve(VENDOR, 'preset-geometry/index.js') },
+  { find: '@superdoc/font-utils', replacement: resolve(VENDOR, 'font-utils/index.js') },
   { find: '@superdoc/super-editor', replacement: resolve(FORK, 'index.js') }, // SELF — fork entry
 
   // Category A — @-aliases → fork dirs (the flattened tree).
