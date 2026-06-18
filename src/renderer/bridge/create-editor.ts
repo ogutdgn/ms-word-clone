@@ -8,6 +8,10 @@ import { Pagination } from '@/pagination/pagination'
 // Phase 4b: live image resize — an owned NodeSelection-driven handle overlay over the
 // fork (same out-of-fork philosophy as Pagination). See src/renderer/imageresize/.
 import { ImageResize } from '@/imageresize/image-resize'
+// Option-B standup: SuperDoc's real per-page layout engine (the dormant PresentationEditor,
+// now buildable after vendoring the engine packages). Used only under WC_LAYOUT=paged.
+// @ts-ignore - vendored fork TS module (no ambient types for the barrel)
+import { PresentationEditor } from '@core/presentation-editor/index.js'
 
 // Real shapes: docx → DocxFileEntry[] | Record<string,unknown> (EditorOptions.content),
 // mediaFiles → Record<string,unknown> (EditorOptions.mediaFiles),
@@ -62,4 +66,59 @@ export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extr
 
 export async function createPmEditor(mountEl: HTMLElement, source: ArrayBuffer) {
   return constructPmEditor(mountEl, await parseDocx(source))
+}
+
+// ─── Option-B paged path (WC_LAYOUT=paged) — the standup spike ──────────────────────
+// PresentationEditor EXTENDS Editor, wipes mountEl, builds a HIDDEN offscreen inner Editor
+// (the real PM view/edit/undo/IME source), and paints REAL per-page DOM (.superdoc-page
+// [data-page-index]). It IS the paginator, so pass getStarterExtensions() ONLY — adding our
+// Pagination/ImageResize would measure the hidden host and inject spurious seams. The WC
+// bridge reads `editor.view`, which PresentationEditor does NOT expose; callers must bind the
+// bridge to `.editor` (the inner Editor, which HAS `.view`), never to the PresentationEditor.
+export type PagedMount = { presentation: any; editor: any }
+
+export async function constructPresentationEditor(mountEl: HTMLElement, parsed: ParsedDocx): Promise<PagedMount> {
+  const presentation = new (PresentationEditor as any)({
+    element: mountEl,
+    mode: 'docx',
+    content: parsed.docx,
+    mediaFiles: parsed.mediaFiles,
+    fonts: parsed.fonts,
+    extensions: getStarterExtensions(), // NO Pagination/ImageResize — PE is the sole paginator
+    documentId: 'wc-paged-boot',
+    documentMode: 'editing',
+    user: { name: storedAuthorName(), email: '' },
+    isDebug: false,
+    telemetry: { enabled: false },
+  })
+  // Paint is automatic (the ctor schedules a rAF rerender). Await the FIRST layout before
+  // returning so __WC_READY never races first paint. On reject, tear down to avoid an orphaned
+  // hidden host + a live static-registry entry (the ctor appends/self-registers synchronously,
+  // BEFORE this await, so the ctor's own try/catch can't clean up an async-layout failure).
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let done = false
+      const finish = (fn: () => void) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        try { offUpdate?.() } catch {}
+        try { offError?.() } catch {}
+        fn()
+      }
+      const offUpdate = presentation.onLayoutUpdated?.(() => finish(resolve))
+      const offError = presentation.onLayoutError?.((e: any) =>
+        finish(() => reject(new Error('[PE layout] ' + (e?.error?.message ?? e?.message ?? String(e))))))
+      const timer = setTimeout(() => finish(() => reject(new Error('[PE layout] first-paint timeout (15s)'))), 15000)
+      if (!offUpdate) finish(() => reject(new Error('[PE layout] onLayoutUpdated missing — fork API drift')))
+    })
+  } catch (e) {
+    try { presentation.destroy?.() } catch {}
+    throw e
+  }
+  return { presentation, editor: presentation.editor }
+}
+
+export async function createPagedEditor(mountEl: HTMLElement, source: ArrayBuffer): Promise<PagedMount> {
+  return constructPresentationEditor(mountEl, await parseDocx(source))
 }

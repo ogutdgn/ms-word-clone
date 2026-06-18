@@ -131,7 +131,12 @@ export default defineConfig({
       ],
     },
     // Fixes the one unguarded process.env read at ProseMirrorRenderer.ts:966.
-    define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+    // __WC_LAYOUT_DEFAULT__ bakes the WC_LAYOUT toggle's build-time default (overlay unless
+    // `WC_LAYOUT=paged npm run build`); main.ts also honors a runtime localStorage override.
+    define: {
+      'process.env.NODE_ENV': JSON.stringify('production'),
+      __WC_LAYOUT_DEFAULT__: JSON.stringify(process.env.WC_LAYOUT || ''),
+    },
     plugins: [stubVueComponentsPlugin(), devCspPlugin()],
     build: { rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } } },
   },
