@@ -1,0 +1,64 @@
+# Layout-Engine (Paged Render Migration) — Execution Runbook
+
+> **The single live doc for EXECUTING the Option-B layout-engine migration.** It holds
+> (1) the locked decisions, (2) how we work (the per-milestone loop), (3) the milestone
+> checklist, and (4) the **Current Status** (bottom) — where we are + what's next.
+>
+> **A new session resumes by reading this file top-to-bottom and continuing from
+> "Current Status".** Keep the **Current Status** section up-to-date EVERY session
+> (this is part of the `plan-tracking` discipline). [plan.md](plan.md) /
+> [last-point.md](last-point.md) / [execution-map.md](execution-map.md) point HERE for
+> the layout-engine execution state, so this is the one place that must not go stale.
+
+**Pointers**
+- Spec (the WHAT): [../../specs/001-paged-render-migration/spec.md](../../specs/001-paged-render-migration/spec.md) — US1–US4, FR-001..013, SC-001..007
+- What's already proven + the retarget surface: [../layout-engine-standup-findings.md](../layout-engine-standup-findings.md)
+- Memory: `layout-engine-redesign`, `merge-mode-ff`
+
+## Locked decisions
+
+- **Methodology:** GitHub **spec-kit** — `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` (+ optional `/speckit-clarify`, `/speckit-analyze`).
+- **Scope = A:** umbrella spec covers ALL milestones; detailed design is produced **per slice** via `/speckit-plan` as each is reached (not all up front).
+- **End-state = A:** paged becomes the faithful **default** later, via a **separate gated flip** (all milestones green + full COM-oracle parity). The flip is a **non-goal** of this work; default stays overlay throughout.
+- **Branch model:** long-lived **`layout-engine`** integration branch off `main`. Each slice branches off `layout-engine` and **ff-merges back into `layout-engine`**. `layout-engine` merges to **`main`** ONLY when the whole migration is complete + parity-proven.
+- **Commit cadence:** consolidated — commit at **slice boundaries** (feature/fix/slice done), NOT per doc tweak. Fewer, coherent commits.
+- **Strangler-fig:** all new render work lives behind `WC_LAYOUT=paged`; the default (`overlay`) is the **byte-identical shipping app** (the regression gate).
+- **Invariant:** the document model stays **page-free** (no `page` nodes) so it keeps round-tripping to `.docx`. Never break this.
+
+## How we work — the per-milestone loop
+
+Repeat for each milestone, ONE at a time (never run ahead):
+
+1. **PLAN** — run `/speckit-plan` for THIS milestone only. Ask clarifying questions FIRST, then present the plan (architecture, files, contracts, approach) and **WAIT for the user's approval before writing any code.**
+2. **TASKS** — `/speckit-tasks`: break the approved plan into an ordered task list.
+3. **IMPLEMENT** — on a slice branch off `layout-engine`; build incrementally behind `WC_LAYOUT=paged`; the default (overlay) must stay byte-identical.
+4. **VERIFY (mandatory before "done"):**
+   - `npm run build`, then the 3 gates — `npm run test:pm`, `npm run test:smoke`, `npm run test:roundtrip` — all green (overlay/default must stay **268 / 9 / 27**).
+   - Validate the milestone's behavior against the **Word-for-Windows COM oracle** (`scripts/oracle/word-oracle-win.ps1`) where applicable.
+   - Run **`/code-review`** on the slice diff. **If it surfaces ANY problems/findings, FIX them**, then re-run build + the 3 gates (and re-validate) before moving on. **Do not proceed with unresolved findings.**
+5. **CHECK IN** — show the user the results. Only after the user is satisfied: **ff-merge the slice into `layout-engine`**, **update the Current Status section below**, then move to the next milestone.
+
+## Milestones (order C) — checklist
+
+- [ ] **M1** — shared per-page coordinate adapter + dynamic-import of the paged path
+- [ ] **M2** — pointer click hit-test routing into the hidden inner editor
+- [ ] **M3** — status bar → `presentation.getPages()`
+- [ ] **M4** — retarget the 6 overlays (image-resize, ink-overlay, notes-area, track-chrome, comments-ui, header-footer) to the painted per-page DOM
+- [ ] **M5** — paged-mode `.docx` export COM-oracle round-trip parity
+- [ ] **M6** — glyph-metric tolerance vs the Word COM oracle
+- [ ] **(later, separate)** flip the default to paged + retire the overlay (gated on all of M1–M6 + full parity)
+
+---
+
+## Current Status  ⟵ KEEP THIS UP TO DATE (every session)
+
+- **Last updated:** 2026-06-18
+- **Branch:** `layout-engine` (off `main` @ 7f15724; pushed to `origin/layout-engine`). Latest commit: `6ab84f8` (spec-kit scaffold + spec).
+- **Done so far:**
+  - Root-caused the old engine (decoration overlay) + chose Option B (adopt SuperDoc's real layout engine).
+  - Vendored the 10 engine packages; build-proven; **standup spike PASSED** (real per-page DOM, pagination 1→12, model page-free, caret/typing) — see findings doc.
+  - Installed spec-kit; wrote the umbrella spec (scope A, milestone order C, end-state A).
+- **Where we are:** spec COMPLETE. **No milestone started yet.**
+- **NEXT:** **Milestone 1** — run `/speckit-plan` (shared per-page coordinate adapter + dynamic-import). Ask questions → present plan → get approval → then tasks/implement/verify.
+- **Open questions:** none blocking (end-state resolved = A).
+- **Gates baseline (overlay/default):** test:pm 268 / smoke 9 / roundtrip 27.

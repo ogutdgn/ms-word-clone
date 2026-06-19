@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-06-18 (Option-B layout engine: spec-kit adopted + umbrella spec; execution tracked in the RUNBOOK)
+
+> **Branch:** `layout-engine` (off `main` @ 7f15724; pushed to `origin/layout-engine`). **Phase:** 4 — layout engine, EXECUTION.
+>
+> **▶ Layout-engine execution now has a single live runbook:
+> [layout-engine-runbook.md](layout-engine-runbook.md)** — read it + its "Current Status" to resume.
+> Decisions locked: scope **A** (umbrella spec) · milestone order **C** · end-state **A** (paged = default
+> later via a gated flip). The Option-B engine was **runtime-proven** by a standup spike (real per-page DOM,
+> pagination 1→12, model page-free, caret/typing) — see [../layout-engine-standup-findings.md](../layout-engine-standup-findings.md).
+> Umbrella spec written via GitHub **spec-kit** at [../../specs/001-paged-render-migration/spec.md](../../specs/001-paged-render-migration/spec.md).
+> **NEXT:** `/speckit-plan` for Milestone 1 (per-page coordinate adapter + dynamic-import). Branch model: slices
+> off `layout-engine` → ff-merge back; `layout-engine` → `main` only when complete. Commit cadence: consolidated.
+
 ## 2026-06-17 (doc maintenance — Word PARITY TARGET LOCKED (ADR-0006); docs verified up-to-date)
 
 > **Branch:** `main`. **Phase:** 4. Docs/plan all current + git clean/synced.

@@ -4,6 +4,10 @@
 > here; the **Daily work log** (below) records what we actually did each day, with checkboxes.
 > Big picture: [plan.md](plan.md) · dated state snapshots: [last-point.md](last-point.md).
 > Renewed via the `plan-tracking` skill.
+>
+> **▶ Layout-engine (Option-B paged render migration) execution is tracked in
+> [layout-engine-runbook.md](layout-engine-runbook.md) — read it + its "Current Status" to
+> resume that work; keep its status section up-to-date every session.**
 
 ## At session START (always, in order)
 1. Read **[last-point.md](last-point.md)** (top entry) — where we left off, current branch, next.

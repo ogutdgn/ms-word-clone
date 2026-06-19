@@ -3,6 +3,10 @@
 > The **general, agreed plan**. Stable; changes only when the strategy itself changes.
 > Companion docs: [execution-map.md](execution-map.md) (what to do in a session) ·
 > [last-point.md](last-point.md) (exact current state). Decisions: [../decisions/](../decisions/).
+>
+> **▶ Layout-engine (Option-B paged render migration) is executed via a single live runbook:
+> [layout-engine-runbook.md](layout-engine-runbook.md) — its "Current Status" is the live
+> resume point for that work (kept up-to-date every session).**
 
 ## Goal
 Turn the Electron MS Word clone into a **computer-use-agent (CUA) reinforcement-learning /
