@@ -99,3 +99,8 @@ npm run build && npm run test:pm            # PM functional suite (grows per sli
 npm run build && npm run test:smoke         # PM-core smoke (9)
 npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
 ```
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
