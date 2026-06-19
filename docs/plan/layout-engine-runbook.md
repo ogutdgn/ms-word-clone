@@ -15,6 +15,21 @@
 - What's already proven + the retarget surface: [../layout-engine-standup-findings.md](../layout-engine-standup-findings.md)
 - Memory: `layout-engine-redesign`, `merge-mode-ff`
 
+## How to start a session (resume here)
+
+> A new session can begin by reading THIS file and following the steps below — no external
+> prompt needed. (One-liner that's enough to paste: *"Read docs/plan/layout-engine-runbook.md
+> and follow it; start from Current Status."*)
+
+1. Confirm you are on the `layout-engine` branch: `git branch --show-current`.
+2. Read this runbook in full + orient via the **Pointers** above (spec, standup findings, memory). Then read **[Current Status](#current-status--keep-this-up-to-date-every-session)** (bottom) and continue from there.
+3. Follow the **per-milestone loop** below EXACTLY. Non-negotiable guardrails:
+   - **ONE milestone at a time.** Do not run ahead.
+   - **PLAN FIRST:** run `/speckit-plan` scoped to the **CURRENT milestone ONLY** (not all 6 — spec-kit defaults to the whole feature; constrain it). Ask the user clarifying questions, present the plan, and **WAIT for approval. No code before approval.**
+   - **VERIFY before "done":** `npm run build` + the 3 gates (overlay/default MUST stay **268 / 9 / 27**) + COM-oracle validation + **`/code-review`**. If `/code-review` finds ANYTHING, **FIX it and re-verify** — never proceed with unresolved findings.
+   - When verified AND the user is satisfied: **ff-merge the slice into `layout-engine`**, **update Current Status** below, then go to the next milestone.
+   - **Never touch `main`.** Keep the model **page-free**. All new render behind `WC_LAYOUT=paged`.
+
 ## Locked decisions
 
 - **Methodology:** GitHub **spec-kit** — `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` (+ optional `/speckit-clarify`, `/speckit-analyze`).
