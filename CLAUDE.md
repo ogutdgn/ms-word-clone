@@ -101,6 +101,7 @@ npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE 
 ```
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Active spec-kit plan: [specs/001-paged-render-migration/plan.md](specs/001-paged-render-migration/plan.md)
+(Paged Render Migration — **Milestone 1**: shared per-page coordinate adapter + dynamic-import).
+Sequencing is owned by [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
 <!-- SPECKIT END -->

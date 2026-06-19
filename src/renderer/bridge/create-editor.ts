@@ -8,10 +8,10 @@ import { Pagination } from '@/pagination/pagination'
 // Phase 4b: live image resize — an owned NodeSelection-driven handle overlay over the
 // fork (same out-of-fork philosophy as Pagination). See src/renderer/imageresize/.
 import { ImageResize } from '@/imageresize/image-resize'
-// Option-B standup: SuperDoc's real per-page layout engine (the dormant PresentationEditor,
-// now buildable after vendoring the engine packages). Used only under WC_LAYOUT=paged.
-// @ts-ignore - vendored fork TS module (no ambient types for the barrel)
-import { PresentationEditor } from '@core/presentation-editor/index.js'
+// Option-B: SuperDoc's real per-page layout engine (PresentationEditor). Imported LAZILY
+// inside constructPresentationEditor (a dynamic import — Milestone 1) so the heavy engine
+// subgraph (presentation-editor + layout-engine + painter-dom + measuring-dom) is code-split
+// OUT of the default (overlay) bundle and fetched only when WC_LAYOUT=paged boots this path.
 
 // Real shapes: docx → DocxFileEntry[] | Record<string,unknown> (EditorOptions.content),
 // mediaFiles → Record<string,unknown> (EditorOptions.mediaFiles),
@@ -78,6 +78,11 @@ export async function createPmEditor(mountEl: HTMLElement, source: ArrayBuffer) 
 export type PagedMount = { presentation: any; editor: any }
 
 export async function constructPresentationEditor(mountEl: HTMLElement, parsed: ParsedDocx): Promise<PagedMount> {
+  // Lazy (dynamic) import — see the file-top note. Rollup splits this into its own chunk,
+  // keeping the overlay default lean. Adding one `await` here is behavior-preserving: the
+  // paged boot is already async (it awaits the first onLayoutUpdated below).
+  // @ts-ignore - vendored fork TS module (no ambient types for the barrel)
+  const { PresentationEditor } = await import('@core/presentation-editor/index.js')
   const presentation = new (PresentationEditor as any)({
     element: mountEl,
     mode: 'docx',

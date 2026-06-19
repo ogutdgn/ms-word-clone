@@ -55,7 +55,7 @@ Repeat for each milestone, ONE at a time (never run ahead):
 
 ## Milestones (order C) — checklist
 
-- [ ] **M1** — shared per-page coordinate adapter + dynamic-import of the paged path
+- [x] **M1** — shared per-page coordinate adapter + dynamic-import of the paged path ✓ DONE 2026-06-19
 - [ ] **M2** — pointer click hit-test routing into the hidden inner editor
 - [ ] **M3** — status bar → `presentation.getPages()`
 - [ ] **M4** — retarget the 6 overlays (image-resize, ink-overlay, notes-area, track-chrome, comments-ui, header-footer) to the painted per-page DOM
@@ -67,13 +67,14 @@ Repeat for each milestone, ONE at a time (never run ahead):
 
 ## Current Status  ⟵ KEEP THIS UP TO DATE (every session)
 
-- **Last updated:** 2026-06-18
-- **Branch:** `layout-engine` (off `main` @ 7f15724; pushed to `origin/layout-engine`). Latest commit: `6ab84f8` (spec-kit scaffold + spec).
+- **Last updated:** 2026-06-19
+- **Branch:** `layout-engine` (off `main` @ 7f15724). M1 ff-merged in from `slice/m1-coordinate-adapter`.
 - **Done so far:**
   - Root-caused the old engine (decoration overlay) + chose Option B (adopt SuperDoc's real layout engine).
   - Vendored the 10 engine packages; build-proven; **standup spike PASSED** (real per-page DOM, pagination 1→12, model page-free, caret/typing) — see findings doc.
   - Installed spec-kit; wrote the umbrella spec (scope A, milestone order C, end-state A).
-- **Where we are:** spec COMPLETE. **No milestone started yet.**
-- **NEXT:** **Milestone 1** — run `/speckit-plan` (shared per-page coordinate adapter + dynamic-import). Ask questions → present plan → get approval → then tasks/implement/verify.
-- **Open questions:** none blocking (end-state resolved = A).
-- **Gates baseline (overlay/default):** test:pm 268 / smoke 9 / roundtrip 27.
+  - **M1 COMPLETE (2026-06-19):** shared `WC.PM.coords` coordinate adapter (`src/renderer/layout/coordinate-adapter.ts`, installed once in `preinstallBridge`) + dynamic-import of the PE path (overlay bundle code-split back to ~8.16 MB). Pure infra — NO consumer rewired (that's M2/M3/M4). New `scripts/paged-coords-probe.js` (overlay 9/9 parity + paged 10/10 round-trip Δ=0/0) and `scripts/check-overlay-bundle.js` gate (`test:bundle`, 4/4). `/code-review` xhigh → 5 findings fixed + re-verified.
+- **Where we are:** **M1 done + verified + merged.** Spec/plan/tasks for M1 in `specs/001-paged-render-migration/`.
+- **NEXT:** **Milestone 2** — pointer click hit-test routing into the hidden inner editor (the first CONSUMER of `WC.PM.coords.clientToPos`). Run `/speckit-plan` scoped to M2 only → questions → approval → tasks/implement/verify.
+- **Open questions:** none blocking.
+- **Gates baseline (overlay/default):** test:pm **475** / smoke **9** / roundtrip **27** (+ `test:bundle` 4/4 for the M1 code-split). NOTE: the prior "268" figure here was STALE — the suite has had 475 `t()` cases since the standup commit (verified statically + by run).

@@ -27,6 +27,7 @@ import { toQueryState } from './state-sync'
 import { parseDocx, constructPmEditor } from './create-editor'
 import { blankArrayBuffer } from '@/core/fixture'
 import { textToParagraphHtml, csvToTableHtml } from './file-content'
+import { createCoordinateAdapter } from '@/layout/coordinate-adapter'
 
 type AnyEditor = any
 let current: AnyEditor = null
@@ -399,6 +400,18 @@ export function preinstallBridge() {
     dReplay: () => false, dClearInk: () => false, dInkToShape: () => false, dInkToMath: () => false, dGetState: () => null,
     // slice 11: WC.Styles (formatting.js) is retired — expose the canonical PM style list here.
     allStyleNames: (): string[] => Object.keys(STYLE_NAME_TO_ID),
+    // Milestone 1 (paged-render migration): the shared client↔model coordinate seam.
+    // Mode-agnostic core — delegates to editor.* (which the vendored Editor branches by
+    // presentationEditor); getPages reads the real PE pages in paged mode, a length-only
+    // shim in overlay. Installed ONCE here (not per installBridge): it is stateless and
+    // every dep is a LIVE getter (current is the module-scoped live editor; WC.presentation
+    // / WC.PM.__pagination are read at call time), so it is pre-mount- AND remount-safe and
+    // gracefully returns null/[]/1 before first mount. See src/renderer/layout/coordinate-adapter.ts.
+    coords: createCoordinateAdapter({
+      getEditor: () => current,
+      getPresentation: () => ((window as any).WC?.presentation ?? null),
+      getOverlayPageCount: () => (((window as any).WC?.PM?.__pagination?.pageCount as number) || 1),
+    }),
     // slice 11: zoom + view ownership migrated off the retired WC.Editor. The
     // #pages host carries the scale() transform; the content node is #pm-editor.
     // Lives in the preinstall stub (DOM-driven) so it works pre- and post-mount.
