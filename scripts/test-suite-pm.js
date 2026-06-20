@@ -5861,6 +5861,10 @@
   await t('[0b] New Document loads the blank template + clean state', async () => {
     const f = window.WC.Files;
     const ok = await PM().newBlank();
+    // blank-template IO settle — mirrors the 8 other newBlank() sites (e.g. lines 1032/1298/…). WITHOUT it, this
+    // doc-replace's deferred async work can race the very next test (the [10mm] mail-merge block) under machine load
+    // (e.g. many concurrent Electron probes), silently aborting the [10mm]/[4a] tail (~207 tests → a flaky 268/475).
+    await sleep(100);
     return ok === true && PM().isDirty() === false && window.WC.view.state.doc.content.size < 60;
   });
 
