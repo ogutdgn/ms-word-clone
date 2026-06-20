@@ -60,6 +60,10 @@ export interface CoordinateAdapter {
   getPages(): PageInfo[]
   /** 1-based current page of the caret. paged: PE.computeCaretLayoutRect(caret).pageIndex+1; overlay: __pagination break-scan. */
   getCurrentPage(): number
+  /** Model pos → {top,bottom,left} in #pages-local space (page-relative, zoom-divided). null off-page/hidden run. (M4a — track-chrome) */
+  posToOverlayLocalRect(pos: number): { top: number; bottom: number; left: number } | null
+  /** Model pos → top in #pages-local space. null off-page. (M4a — comments-ui) */
+  posToOverlayLocalY(pos: number): number | null
 }
 
 // ─── M4-DEFERRED (documented, NOT implemented in M1) ─────────────────────────────────────
@@ -91,6 +95,38 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
     }
   }
 
+  // Model pos → viewport-space rect (painted-aware in paged via editor.coordsAtPos; view rect in overlay).
+  // The body of posToClientRect, extracted so the overlay-local helpers (M4a) reuse it without `this`.
+  const clientRectOf = (pos: number): ClientRect | null => {
+    try {
+      const editor = deps.getEditor()
+      if (!editor || typeof editor.coordsAtPos !== 'function') return null
+      const r = editor.coordsAtPos(pos)
+      if (!r || ![r.top, r.bottom, r.left, r.right].every((n: number) => Number.isFinite(n))) return null
+      const width = typeof r.width === 'number' ? r.width : r.right - r.left
+      const height = typeof r.height === 'number' ? r.height : r.bottom - r.top
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width, height }
+    } catch {
+      return null
+    }
+  }
+  // Clamp a pos to [1, doc.content.size] exactly as the legacy localY/localRect did before coordsAtPos.
+  const clampPos = (pos: number): number => {
+    const editor = deps.getEditor()
+    if (!editor) return pos
+    let max: number | undefined
+    try { max = editor.view.state.doc.content.size } catch { max = undefined }
+    return typeof max === 'number' ? Math.max(1, Math.min(pos, max)) : pos
+  }
+  // The #pages overlay container + its rendered scale (= zoom in both modes: #pages' own transform ratio).
+  const pagesScale = (): { r: DOMRect; scale: number } | null => {
+    const pages = document.getElementById('pages')
+    if (!pages) return null
+    const r = pages.getBoundingClientRect()
+    const scale = pages.offsetWidth ? r.width / pages.offsetWidth : 1
+    return { r, scale: scale || 1 }
+  }
+
   return {
     clientToPos(clientX: number, clientY: number): PositionHit | null {
       try {
@@ -115,23 +151,10 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       }
     },
 
-    // NOTE: does NOT clamp `pos` — callers clamp to [1, doc.content.size] exactly as today,
-    // so behavior is byte-identical to the direct `view.coordsAtPos` call this replaces.
-    posToClientRect(pos: number): ClientRect | null {
-      try {
-        const editor = deps.getEditor()
-        if (!editor || typeof editor.coordsAtPos !== 'function') return null
-        const r = editor.coordsAtPos(pos)
-        // Guard the four edges: PM rects omit width/height (we derive them), but a degenerate
-        // rect with a non-finite edge must surface as null, not a NaN-bearing ClientRect.
-        if (!r || ![r.top, r.bottom, r.left, r.right].every((n: number) => Number.isFinite(n))) return null
-        const width = typeof r.width === 'number' ? r.width : r.right - r.left
-        const height = typeof r.height === 'number' ? r.height : r.bottom - r.top
-        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width, height }
-      } catch {
-        return null
-      }
-    },
+    // Model position → viewport-space caret/selection rect (overlay: view.coordsAtPos; paged: PE.coordsAtPos).
+    // Does NOT clamp `pos` — callers clamp; byte-identical to the direct view.coordsAtPos call it replaces.
+    // (A degenerate non-finite rect surfaces as null, not a NaN-bearing ClientRect.) Body in clientRectOf.
+    posToClientRect: clientRectOf,
 
     getPageCount: pageCount,
 
@@ -177,6 +200,34 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
         return breaks.filter((b) => b.pos <= caret).reduce((a, b) => a + (b.pages || 1), 0) + 1
       } catch {
         return 1
+      }
+    },
+
+    // M4a — VERBATIM port of comments-ui.ts:125-136 localY (#pages-local Y of a model pos), with the only
+    // change being view.coordsAtPos → clientRectOf (painted-aware in paged; identical in overlay).
+    posToOverlayLocalY(pos: number): number | null {
+      try {
+        const c = clientRectOf(clampPos(pos))
+        if (!c) return null
+        const ps = pagesScale()
+        if (!ps) return null
+        return (c.top - ps.r.top) / ps.scale
+      } catch {
+        return null
+      }
+    },
+
+    // M4a — VERBATIM port of track-chrome.ts:91-106 localRect ({top,bottom,left} in #pages-local space),
+    // including the "zero viewport rect → null" hidden-run guard. Same coordsAtPos → clientRectOf swap.
+    posToOverlayLocalRect(pos: number): { top: number; bottom: number; left: number } | null {
+      try {
+        const c = clientRectOf(clampPos(pos))
+        if (!c || (c.top === 0 && c.bottom === 0)) return null // hidden/unlaid-out run
+        const ps = pagesScale()
+        if (!ps) return null
+        return { top: (c.top - ps.r.top) / ps.scale, bottom: (c.bottom - ps.r.top) / ps.scale, left: (c.left - ps.r.left) / ps.scale }
+      } catch {
+        return null
       }
     },
   }

@@ -53,6 +53,7 @@ let paneOpen = false
 let paneOrientation: PaneOrientation = 'vertical'
 let paneCollapsed = false
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+let pagedRelayoutBound = false // M4a: bind the window 'wc:paged-relayout' listener exactly once
 
 const w = () => window as any
 // Live-bridge accessor (NOT a captured closure): probes/tests may swap PM impls.
@@ -89,20 +90,11 @@ function iconBtn(cls: string, title: string, html: string, onClick: () => void):
 function pagesEl(): HTMLElement | null { return document.getElementById('pages') }
 
 function localRect(pos: number): { top: number; bottom: number; left: number } | null {
-  const pages = pagesEl()
-  if (!pages || !editor?.view) return null
-  try {
-    const max = editor.state.doc.content.size
-    const c = editor.view.coordsAtPos(Math.max(1, Math.min(pos, max)))
-    if (!c || (c.top === 0 && c.bottom === 0)) return null // hidden/unlaid-out run
-    const r = pages.getBoundingClientRect()
-    const scale = pages.offsetWidth ? r.width / pages.offsetWidth : 1
-    return {
-      top: (c.top - r.top) / (scale || 1),
-      bottom: (c.bottom - r.top) / (scale || 1),
-      left: (c.left - r.left) / (scale || 1),
-    }
-  } catch { return null }
+  // M4a: route through the WC.PM.coords seam so the rect is painted-page-correct in paged mode. The helper
+  // is this exact formula (incl. the zero-rect hidden-run guard) with the only change being
+  // view.coordsAtPos → the seam's posToClientRect, so overlay output is byte-identical.
+  // (See src/renderer/layout/coordinate-adapter.ts posToOverlayLocalRect.)
+  return ((window as any).WC?.PM?.coords?.posToOverlayLocalRect?.(pos)) ?? null
 }
 
 // Rect for a range END/START with a fallback to the neighbouring position --
@@ -331,5 +323,8 @@ export function installTrackChrome(ed: AnyEditor) {
   ed.on?.('transaction', schedule)
   ed.on?.('commentsUpdate', schedule)
   ed.on?.('comment-positions', schedule)
+  // M4a: reposition bars/balloons when PE re-paginates without a transaction (zoom/reflow) in paged mode.
+  // Bound ONCE to the window event; schedule() is a module singleton reading the live `editor` (remount-safe).
+  if (!pagedRelayoutBound) { pagedRelayoutBound = true; window.addEventListener('wc:paged-relayout', schedule) }
   schedule()
 }

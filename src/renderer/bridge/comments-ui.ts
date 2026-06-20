@@ -53,6 +53,7 @@ let replyDrafts: Record<string, string> = {}
 let paneCollapsed = false
 let accessorDone = false
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+let pagedRelayoutBound = false // M4a: bind the window 'wc:paged-relayout' listener exactly once
 
 const w = () => window as any
 // Live-bridge accessor (NOT a captured closure): the probe/tests may swap PM impls.
@@ -123,16 +124,10 @@ function anchorStart(row: any): number | null {
 }
 
 function localY(pos: number): number | null {
-  const pages = pagesEl()
-  if (!pages || !editor?.view) return null
-  try {
-    const max = editor.state.doc.content.size
-    const coords = editor.view.coordsAtPos(Math.max(1, Math.min(pos, max)))
-    const r = pages.getBoundingClientRect()
-    // #pages carries the zoom scale() transform -- divide back to local coords.
-    const scale = pages.offsetWidth ? r.width / pages.offsetWidth : 1
-    return (coords.top - r.top) / (scale || 1)
-  } catch { return null }
+  // M4a: route through the WC.PM.coords seam so the Y is painted-page-correct in paged mode. The helper
+  // is this exact formula with the only change being view.coordsAtPos → the seam's posToClientRect, so
+  // overlay output is byte-identical. (See src/renderer/layout/coordinate-adapter.ts posToOverlayLocalY.)
+  return ((window as any).WC?.PM?.coords?.posToOverlayLocalY?.(pos)) ?? null
 }
 
 // ---- debounced re-render (transactions fire per keystroke -- coalesce) ----
@@ -556,5 +551,8 @@ export function installCommentsUI(ed: AnyEditor) {
     schedule()
   })
   ed.on?.('transaction', schedule)
+  // M4a: in paged mode, reposition when PE re-paginates without a transaction (zoom/reflow). Bound ONCE
+  // to the window event; schedule() is a module singleton that reads the live `editor`, so it's remount-safe.
+  if (!pagedRelayoutBound) { pagedRelayoutBound = true; window.addEventListener('wc:paged-relayout', schedule) }
   schedule()
 }

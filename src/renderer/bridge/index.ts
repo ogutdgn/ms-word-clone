@@ -653,10 +653,22 @@ export function installBridge(editor: AnyEditor) {
   // so the transaction/selection-driven status-bar refresh (state-sync.ts) misses it and "Page X
   // of Y" goes stale. Subscribe PE's layout hook to keep it live. Guarded to THIS paged editor
   // (pe.editor === editor) so an overlay replaceEditor re-run never re-subscribes to an orphaned PE.
+  // Tear down any PRIOR PE layout subscription UNCONDITIONALLY (before the guard): an overlay
+  // replaceEditor leaves WC.presentation pointing at the now-stale boot PE and makes the guard below
+  // false, so a teardown nested inside the guard would never run — leaking the old subscription and
+  // letting it fire StatusBar.update / wc:paged-relayout against a destroyed editor. Re-subscribe only
+  // for the CURRENT paged editor. The two handler effects are independent (each in its own try/catch)
+  // so a throw in one never suppresses the other.
+  try { peLayoutUnsub?.() } catch { /* prior-sub teardown is best-effort */ }
+  peLayoutUnsub = null
   const pe = w.WC?.presentation
   if (pe && typeof pe.onLayoutUpdated === 'function' && pe.editor === editor) {
-    try { peLayoutUnsub?.() } catch { /* prior-sub teardown is best-effort */ }
-    peLayoutUnsub = pe.onLayoutUpdated(() => { w.WC?.StatusBar?.update?.() }) || null
+    peLayoutUnsub = pe.onLayoutUpdated(() => {
+      try { w.WC?.StatusBar?.update?.() } catch { /* status-bar refresh best-effort */ }
+      // M4a: notify paged-mode overlays (comments/track-chrome; later image-resize/ink) to reposition on a
+      // no-transaction relayout (zoom/reflow) — the transaction/selection refresh misses those.
+      try { window.dispatchEvent(new Event('wc:paged-relayout')) } catch { /* event dispatch best-effort */ }
+    }) || null
   }
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
