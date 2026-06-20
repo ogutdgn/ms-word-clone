@@ -63,6 +63,11 @@ export function installFocusGuards() {
     if (!(t instanceof Element)) return
     const w = window as any
     if (!w.WC?.PM?.active) return
+    // Paged renderer owns ALL clicks: PresentationEditor's EditorInputManager handles painted-page,
+    // margin, and below-text clicks with correct per-page geometry. This overlay margin heuristic
+    // (#pm-editor && !.ProseMirror) mis-fires on EVERY painted-page click — the editable .ProseMirror
+    // is hidden off-screen in paged mode — and would clobber PE's selection. Bail entirely in paged.
+    if (w.__WC_LAYOUT_MODE === 'paged') return
     if (!t.closest('#pm-editor')) return // not on the page sheet
     if (t.closest('.ProseMirror')) return // editable content handles its own clicks
     const editor = w.WC?.editor
@@ -87,7 +92,10 @@ export function installFocusGuards() {
       const clamp = (val: number, lo: number, hi: number) => Math.max(lo, Math.min(val, hi))
       const x = clamp(e.clientX, box.left + 1, box.right - 1)
       const y = clamp(e.clientY, box.top + 1, box.bottom - 1)
-      const hit = view.posAtCoords({ left: x, top: y })
+      // M2: route through the M1 coordinate seam instead of calling view.* directly. This path
+      // runs only in overlay (paged bailed above), where clientToPos delegates to
+      // view.posAtCoords({left,top}) identically (M1 overlay-parity proven).
+      const hit = w.WC?.PM?.coords?.clientToPos(x, y)
       const pos = Math.max(1, Math.min(hit ? hit.pos : max, max))
       editor.commands.setTextSelection({ from: pos, to: pos })
     }

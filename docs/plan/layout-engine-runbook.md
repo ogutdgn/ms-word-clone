@@ -56,7 +56,7 @@ Repeat for each milestone, ONE at a time (never run ahead):
 ## Milestones (order C) — checklist
 
 - [x] **M1** — shared per-page coordinate adapter + dynamic-import of the paged path ✓ DONE 2026-06-19
-- [ ] **M2** — pointer click hit-test routing into the hidden inner editor
+- [x] **M2** — pointer click hit-test routing into the hidden inner editor ✓ DONE 2026-06-19
 - [ ] **M3** — status bar → `presentation.getPages()`
 - [ ] **M4** — retarget the 6 overlays (image-resize, ink-overlay, notes-area, track-chrome, comments-ui, header-footer) to the painted per-page DOM
 - [ ] **M5** — paged-mode `.docx` export COM-oracle round-trip parity
@@ -68,13 +68,14 @@ Repeat for each milestone, ONE at a time (never run ahead):
 ## Current Status  ⟵ KEEP THIS UP TO DATE (every session)
 
 - **Last updated:** 2026-06-19
-- **Branch:** `layout-engine` (off `main` @ 7f15724). M1 ff-merged in from `slice/m1-coordinate-adapter`.
+- **Branch:** `layout-engine` (off `main` @ 7f15724). M1 + M2 ff-merged in (M1 docs archived at `specs/001-paged-render-migration/milestones/m1/`).
 - **Done so far:**
   - Root-caused the old engine (decoration overlay) + chose Option B (adopt SuperDoc's real layout engine).
   - Vendored the 10 engine packages; build-proven; **standup spike PASSED** (real per-page DOM, pagination 1→12, model page-free, caret/typing) — see findings doc.
   - Installed spec-kit; wrote the umbrella spec (scope A, milestone order C, end-state A).
   - **M1 COMPLETE (2026-06-19):** shared `WC.PM.coords` coordinate adapter (`src/renderer/layout/coordinate-adapter.ts`, installed once in `preinstallBridge`) + dynamic-import of the PE path (overlay bundle code-split back to ~8.16 MB). Pure infra — NO consumer rewired (that's M2/M3/M4). New `scripts/paged-coords-probe.js` (overlay 9/9 parity + paged 10/10 round-trip Δ=0/0) and `scripts/check-overlay-bundle.js` gate (`test:bundle`, 4/4). `/code-review` xhigh → 5 findings fixed + re-verified.
-- **Where we are:** **M1 done + verified + merged.** Spec/plan/tasks for M1 in `specs/001-paged-render-migration/`.
-- **NEXT:** **Milestone 2** — pointer click hit-test routing into the hidden inner editor (the first CONSUMER of `WC.PM.coords.clientToPos`). Run `/speckit-plan` scoped to M2 only → questions → approval → tasks/implement/verify.
-- **Open questions:** none blocking.
+  - **M2 COMPLETE (2026-06-19):** pointer click hit-test routing. Root cause = `focus.ts`'s margin-click handler clobbered PE's already-complete click pipeline in paged mode (it ran `view.posAtCoords` on the hidden off-screen view). Fix = `focus.ts` bails in paged mode (PE's `EditorInputManager` owns all paged clicks) + migrated its overlay hit-test to `WC.PM.coords.clientToPos` (first real consumer of the M1 seam). 3-line product change; no fork edits. New `scripts/paged-pointer-probe.js` (`probe:pointer`): paged 13/13 — single-click correct on page 0 **and page 1 (Δ=0)**, double-click word-select, focus + insert follow; **triple-click + drag are PE-native and INFO-only** (synthetic DOM events can't replicate native multi-click/drag detection — our change provably can't break them). Overlay parity 6/6. `/code-review` high → 4 probe-honesty gaps fixed + re-verified. Real-app gesture verification was BLOCKED (computer-use can't target the CLI-launched dev Electron build via the installed-app allowlist; "Word" title collides with MS Word) → user approved merge on the probe evidence.
+- **Where we are:** **M1 + M2 done + verified + merged.** Active spec/plan/tasks (M2) in `specs/001-paged-render-migration/`; M1 archived under `milestones/m1/`.
+- **NEXT:** **Milestone 3** — status bar → `presentation.getPages()` (consume `WC.PM.coords.getPageCount`). Run `/speckit-plan` scoped to M3 only → questions → approval → tasks/implement/verify.
+- **Open questions:** none blocking. Carry-forward: triple-click/drag in paged mode are PE-native and unverified-by-automation — worth a real-app spot-check when a controllable run is available (not M2-blocking).
 - **Gates baseline (overlay/default):** test:pm **475** / smoke **9** / roundtrip **27** (+ `test:bundle` 4/4 for the M1 code-split). NOTE: the prior "268" figure here was STALE — the suite has had 475 `t()` cases since the standup commit (verified statically + by run).

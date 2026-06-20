@@ -102,6 +102,7 @@ npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE 
 
 <!-- SPECKIT START -->
 Active spec-kit plan: [specs/001-paged-render-migration/plan.md](specs/001-paged-render-migration/plan.md)
-(Paged Render Migration — **Milestone 1**: shared per-page coordinate adapter + dynamic-import).
-Sequencing is owned by [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
+(Paged Render Migration — **Milestone 2**: pointer click hit-test routing). M1 done (archived at
+specs/001-paged-render-migration/milestones/m1/). Sequencing is owned by
+[docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
 <!-- SPECKIT END -->
