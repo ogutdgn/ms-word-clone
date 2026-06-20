@@ -68,17 +68,20 @@ export interface CoordinateAdapter {
   nodeBoxFor(pos: number): { left: number; top: number; width: number; height: number } | null
   /** Rendered #pages scale (rect.width/offsetWidth, = WC.PM.zoom today). One scale source for overlays. (M4b) */
   overlayScale(): number
+  /** Client(viewport) pt → #pages-local pt + the painted page under the pointer. null over a gap/off-page. (M4c — ink) */
+  clientToOverlayLocalPt(clientX: number, clientY: number): { x: number; y: number; pageIndex: number } | null
+  /** Painted .superdoc-page[data-page-index] box in #pages-local space. null overlay/virtualized. (M4c — ink page origin) */
+  overlayPageBox(pageIndex: number): { left: number; top: number; width: number; height: number } | null
 }
 
-// ─── M4-DEFERRED (documented, NOT implemented in M1) ─────────────────────────────────────
-// The per-annotation specialty helpers that encapsulate the viewport→overlay-local (page-
-// relative, zoom-divided) math the 6 overlays currently each duplicate. M4 ADDS + TESTS each
-// when it rewires its overlay; M1 ships none of them. Listed here only so M2/M3 consumers
-// know the seam will grow here (do NOT implement in M1):
-//   posToOverlayLocalY(pos)            ← replaces bridge/comments-ui.ts localY()
-//   posToOverlayLocalRect(pos)         ← replaces bridge/track-chrome.ts localRect()
-//   nodeBoxFor(pos)                    ← replaces imageresize/image-resize.ts boxFor()
-//   clientToOverlayLocalPt(x, y)       ← replaces bridge/ink-overlay.ts localPt()
+// ─── M4 overlay-local helpers — all implemented in the interface above ───────────────────
+// The per-overlay specialty helpers that encapsulate the viewport↔overlay-local (page-relative,
+// zoom-divided) math the overlays previously each duplicated. Each was added + tested when its
+// milestone rewired its overlay onto the painted pages:
+//   posToOverlayLocalY(pos)            ← comments-ui.ts localY()        [M4a]
+//   posToOverlayLocalRect(pos)         ← track-chrome.ts localRect()   [M4a]
+//   nodeBoxFor(pos)                    ← image-resize.ts boxFor()      [M4b]
+//   clientToOverlayLocalPt(x, y)       ← ink-overlay.ts draw-page res. [M4c] (+ overlayPageBox)
 // ─────────────────────────────────────────────────────────────────────────────────────────
 
 export function createCoordinateAdapter(deps: CoordinateAdapterDeps): CoordinateAdapter {
@@ -269,6 +272,56 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
     overlayScale(): number {
       const ps = pagesScale()
       return ps ? ps.scale : (((window as any).WC?.PM?.zoom as number) || 1)
+    },
+
+    // M4c (ink) — viewport pt → #pages-local pt (the inverse of the M4a/M4b mapping) + WHICH painted page the
+    // pointer is over. In paged the .superdoc-page[data-page-index] sheets exist → containment scan; null over an
+    // inter-page gap / off-page. In overlay there are no painted sheets → pageIndex 0 (single continuous sheet).
+    // Used at ink onDown to resolve the draw page (the stroke is then clamped to it).
+    clientToOverlayLocalPt(clientX: number, clientY: number): { x: number; y: number; pageIndex: number } | null {
+      try {
+        const ps = pagesScale()
+        if (!ps) return null
+        const x = (clientX - ps.r.left) / ps.scale
+        const y = (clientY - ps.r.top) / ps.scale
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+        let pageIndex = 0
+        const pagesEl = document.getElementById('pages')
+        const sheets = pagesEl ? pagesEl.querySelectorAll('.superdoc-page[data-page-index]') : null
+        if (sheets && sheets.length) {
+          pageIndex = -1
+          for (const el of Array.from(sheets)) {
+            const b = (el as HTMLElement).getBoundingClientRect()
+            if (clientX >= b.left && clientX <= b.right && clientY >= b.top && clientY <= b.bottom) {
+              const idx = parseInt((el as HTMLElement).getAttribute('data-page-index') || '', 10)
+              if (Number.isFinite(idx)) { pageIndex = idx; break }
+            }
+          }
+          if (pageIndex < 0) return null // over an inter-page gap / off every painted page
+        }
+        return { x, y, pageIndex }
+      } catch {
+        return null
+      }
+    },
+
+    // M4c (ink) — the painted page's #pages-local box (origin + size), same formula as nodeBoxFor. renderInk
+    // offsets each committed (page-local) stroke onto its page origin; onUp subtracts it to persist page-local.
+    // Overlay (no painted sheets) → null; paged page 0 → {left:0,top:0,...}. null for a virtualized/missing page.
+    overlayPageBox(pageIndex: number): { left: number; top: number; width: number; height: number } | null {
+      try {
+        const pagesEl = document.getElementById('pages')
+        if (!pagesEl) return null
+        const el = pagesEl.querySelector('.superdoc-page[data-page-index="' + pageIndex + '"]') as HTMLElement | null
+        if (!el || typeof el.getBoundingClientRect !== 'function') return null
+        const c = el.getBoundingClientRect()
+        if (![c.left, c.top, c.width, c.height].every((n: number) => Number.isFinite(n))) return null
+        const ps = pagesScale()
+        if (!ps) return null
+        return { left: (c.left - ps.r.left) / ps.scale, top: (c.top - ps.r.top) / ps.scale, width: c.width / ps.scale, height: c.height / ps.scale }
+      } catch {
+        return null
+      }
     },
   }
 }

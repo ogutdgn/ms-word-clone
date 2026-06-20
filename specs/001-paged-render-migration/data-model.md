@@ -1,36 +1,41 @@
-# Phase 1 Data Model — Milestone 4b (image-resize overlay retarget)
+# Data Model — Milestone 4c (ink-overlay retarget)
 
-Overlay-positioning fix; entities are coordinate value-types + the relayout trigger. No storage, no model
-change (the image box is derived; model stays page-free).
+M4c adds NO document-model entities (the doc keeps the same `vectorShape` ink nodes). It introduces coordinate /
+DOM-surface concepts at the bridge↔seam boundary.
 
-## Value types
+## OverlayLocalPt — the return of `clientToOverlayLocalPt`
+- **Shape**: `{ x: number; y: number; pageIndex: number } | null`.
+- **`x`/`y`**: the pointer in `#pages`-local px = `(client − #pages.rect)/#pages.scale` (the inverse of the
+  M4a/M4b `posToOverlayLocalRect`/`nodeBoxFor` mapping; `pagesScale()` supplies the rect+scale).
+- **`pageIndex`**: which painted `.superdoc-page[data-page-index]` the pointer is over (paged); `0` in overlay
+  (single sheet). Determined by `getBoundingClientRect` containment over `#pm-editor`'s `.superdoc-page` elements.
+- **`null`**: pointer over an inter-page gap, off-page, or a virtualized/unmounted page (mirrors the null guards in
+  `posToOverlayLocalRect`).
+- **Validation**: all numbers finite; `pageIndex ≥ 0`; `null` on any non-finite intermediate or missing `#pages`.
 
-### `NodeBox`
-An image node's box in **#pages-local** space (page-relative, zoom-divided) — what the resize overlay positions against.
-| field | type | notes |
-|-------|------|-------|
-| `left` / `top` / `width` / `height` | `number` | #pages-local px (`(getBoundingClientRect − #pages.rect)/#pages.scale`). |
+## InkLayerSurface — the `svg.wc-ink-layer`
+- **overlay (unchanged)**: a `#pages` child sized/positioned to `#pm-editor.offsetLeft/Top/Width/Height`; draws in
+  `#pm-editor`-local px.
+- **paged (new)**: a `#pages` child sized to `#pages(0,0)` at full `#pages.offsetWidth/Height` — ONE surface spanning
+  all stacked painted pages; survives PE repaints (re-appended in `ensureLayer`); draws in `#pages`-local px.
+- **Capture**: `setPointerCapture(pointerId)` on pointerdown, released on pointerup (paged), so a stroke clamped to its
+  start page keeps receiving move/up across an inter-page gap. Window-level move/up listeners remain the fallback.
 
-## Adapter methods (NEW on `WC.PM.coords`)
-| method | signature | behavior |
-|--------|-----------|----------|
-| `nodeBoxFor` | `(pos:number) => {left,top,width,height} \| null` | `editor.getElementAtPos(pos)` (painted in paged, view in overlay, null off-page) → `(rect − #pages.rect)/#pages.scale`. |
-| `overlayScale` | `() => number` | rendered `#pages` scale = `rect.width/offsetWidth` (or 1). = `WC.PM.zoom` in overlay. ONE scale source for positioning + dragging. |
+## InkPlacementModel — how a committed FRESH stroke renders per mode (`renderInk`)
+- **overlay (unchanged)**: place `customGeometry.inkPoints` at the `inkPos`-offset px (free-floating over the
+  continuous sheet).
+- **paged (new)**: resolve the stroke's painted page from its node doc position, then offset the placed points onto
+  that page's `#pages`-local origin. **Primary**: `editor.getElementAtPos(pos)` → the painted anchor element → its
+  `.superdoc-page` origin. **Fallback (probe-gated)**: `overlayPageBox(pageIndex)` from a page index recovered off the
+  node. (Reopened `.paths` strokes: NOT rendered by the overlay in paged — PE owns them.)
 
-- Both reuse the M4a `pagesScale()` local. `nodeBoxFor` returns null when no element / no #pages.
+## InkPersistFrame — what `onUp` writes (`dInsertInk` `pos`)
+- **overlay (unchanged)**: stroke bbox top-left in `#pm-editor`-local px.
+- **paged (new)**: stroke bbox top-left in **page-LOCAL** px — the captured `#pages`-local point minus the
+  onDown-page origin (clamp model). Aligns with the `wp:anchor relativeFrom='page'` `posOffset` so the stroke reopens
+  at the right on-page position. (Verify `synthesizeInkDrawing`'s emitted `relativeFrom` during implementation.)
 
-## Entity — `PagedRelayoutEvent` (reused from M4a)
-`window` event `wc:paged-relayout` (dispatched by the bridge's `onLayoutUpdated` handler, paged only).
-image-resize adds a once-bound listener → `update()` (reposition handles on no-transaction reflow).
-
-## Validation rules / invariants
-- **Overlay byte-identical:** `nodeBoxFor(pos)` == legacy `boxFor(pos)` for a selected image (gate-verified);
-  `overlayScale()` == `WC.PM.zoom` in overlay.
-- **Per-page visibility:** image on a non-painted page → `getElementAtPos` null → `nodeBoxFor` null → overlay
-  hides handles until the page paints (matches virtualization).
-- **Coherent scale:** handle positioning and drag deltas use the SAME `overlayScale()` → no divergence.
-- **Page-free model:** the resize commits w/h to the image node (existing path, unchanged); no page data stored.
-
-## State / lifecycle
-- Helpers read live each call. The image-resize `wc:paged-relayout` listener is bound once (module guard),
-  remount-safe. No new persistent state.
+## State transitions (the live gesture — unchanged shape, retargeted space)
+`idle → onDown(resolve page once, clamp) → onMove(append, same page space) → onUp(persist page-local + renderInk)`.
+Eraser/select/lasso operate over the rendered `.pm-ink-stroke` paths (now in the painted-page space) → `data-ink-pos`
+→ `deleteNodesAt`. No transition changes; only the coordinate space each step uses.

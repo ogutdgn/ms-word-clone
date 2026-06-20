@@ -8,6 +8,7 @@
 // NON-dirtying — they only mutate the shared drawState and late-bind to the PM-only ink
 // overlay (PM.__inkOverlay) if it is mounted; they NEVER dispatch a doc transaction (K6).
 // inkToShape/inkToMath degrade honestly. editor.commands/state read fresh each call (K5).
+import { TextSelection } from '@/pm'
 type AnyEditor = any
 
 // Shared tool state — the ink overlay (installed later) reads the SAME object via dGetState().
@@ -30,8 +31,22 @@ export function installDraw(editor: AnyEditor) {
 
   // ---- dInsertInk — the canonical persist verb (overlay calls it on stroke-up; also directly callable) ----
   // pos is optional (the direct [10dr] test path calls dInsertInk(points, pen) with no pos) → defaults to origin.
-  function dInsertInk(points: any[], pen?: any, pos?: any): boolean {
+  // insertPos (M4c, paged re-anchor) is optional: when given, the ink node is inserted at that doc position (a
+  // paragraph on the PAGE THE USER DREW ON) instead of the stale caret, so its wp:anchor anchor — and thus its
+  // EXPORTED page — is the draw page. `pos` must then be PAGE-LOCAL px (relativeFrom='page' posOffset). Overlay
+  // callers omit insertPos → the node anchors at the current selection with #pm-editor-local pos (unchanged).
+  function dInsertInk(points: any[], pen?: any, pos?: any, insertPos?: number): boolean {
     try {
+      if (typeof insertPos === 'number' && editor.view) {
+        try {
+          const d = editor.state.doc
+          const clamped = Math.max(0, Math.min(insertPos, d.content.size))
+          // TextSelection.near (NOT .create): snaps to the nearest valid TEXT position. .create THROWS when `clamped`
+          // lands on an atom / non-text node (e.g. the user drew over an existing image or ink stroke), which the
+          // catch would swallow → the re-anchor silently drops → the ink exports on the stale-caret page.
+          editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(d.resolve(clamped))))
+        } catch { /* re-anchor best-effort; fall back to the current selection */ }
+      }
       return editor.commands.insertInkShape({
         points,
         pen: pen || drawState.pen,

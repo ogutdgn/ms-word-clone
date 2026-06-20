@@ -1,57 +1,107 @@
-# Phase 0 Research — Milestone 4b (image-resize overlay retarget)
+# Phase 0 Research — Milestone 4c (ink-overlay retarget)
 
-From a read-only map of `imageresize/image-resize.ts` + the PresentationEditor image surface. File:line exact.
+> ## ⚠️ SPIKE-CORRECTED SCOPE (supersedes the pre-spike premise below)
+> The probe-first spike (`scripts/paged-ink-spike.js`, 4 rounds under `WC_LAYOUT=paged`) **disproved the central
+> premise** that ink "mis-positions on every axis in paged because `localPt` reads the hidden editor". Findings:
+> - **`#pm-editor` is NOT hidden in paged.** It is `parent=#pages`, fills `#pages` exactly (`offL/offT=0`, rect ==
+>   `#pages` rect), and PE paints the `.superdoc-page` *inside* it. So `localPt` (`(client − #pm-editor.rect)/scale`)
+>   and `sizeLayer` (sized to `#pm-editor.offset*`) already resolve to `#pages`-local — **correct in paged**.
+> - **In-app paged ink ALREADY WORKS** (proven): a fresh stroke captures + renders on the correct page (page 0 AND
+>   page 1 of an 8-page doc), the `svg.wc-ink-layer` (`zIndex:5`) spans all stacked pages and toggles
+>   `pointer-events` (`none`→`auto` on `pm-ink-active`); a synthetic pointerdown on the **active** layer captures
+>   (`elementFromPoint`→the SVG, `insideInk=true`) → in-progress path → committed stroke. Eraser/select/lasso ride
+>   the same working space.
+> - **The ONE real defect = multi-page `.docx` EXPORT.** The persisted `pos` is `#pages`-local but
+>   `synthesizeInkDrawing` writes it as `wp:positionH/V relativeFrom='page'` `posOffset` (vector-shape.js:137-138)
+>   → a page-2+ stroke exports at the wrong on-page offset, on the wrong page. Two parts: (i) `posOffset` must be
+>   **page-local**; (ii) the node anchors at the **caret**, not the draw page — `computeCaretLayoutRect`/
+>   `posToClientRect`/`getElementAtPos` all return **null for the anchored ink node itself**, but resolve for a
+>   *nearby in-flow* position (`computeCaretLayoutRect(nodePos−1).pageIndex` ✓). Correct export needs **re-anchoring
+>   the node to the page drawn on** (via `WC.PM.coords.clientToPos` at pointerdown) + a page-local `posOffset`.
+> - **Decision (user): lock in-app correctness with a comprehensive probe + fix the multi-page export** (re-anchor +
+>   page-local). Overlay mode stays byte-identical. See the corrected plan/tasks. Page-resolution at render uses
+>   `computeCaretLayoutRect(nodePos−1)` + `overlayPageBox`; page 0 origin `(0,0)` → no change (single-page/overlay
+>   byte-identical).
 
-## Finding 1 — PE draws NO resize handles → RETARGET (not disable)
+---
 
-- **Decision**: retarget the bridge's `.wc-img-resize` handle overlay to the painted pages. Disabling it in
-  paged mode is NOT viable because nothing else would draw handles.
-- **Evidence**: PE's `ImageInteractionLayer.apply()` (`ImageInteractionLayer.ts:64-105`) only stamps drag
-  METADATA on painted images — `root.draggable = true`, `root.dataset.dragSourceKind = 'existingImage'`,
-  `imageKind`/`nodeType`/`displayLabel`/`pmStart`/`pmEnd` (:83-89). **No handle DOM, no resize math.**
-  `FieldAnnotationInteractionLayer` is the same pattern; `PresentationPostPaintPipeline.ts:139` just calls
-  `imageLayer.apply()` post-paint. PE owns image SELECTION/drag-source metadata, not resize affordances.
+Sourced from the **M4c understanding sweep** (5 parallel readers → synthesis → adversarial completeness critic;
+all findings code-grounded, file/line cited). **NB: the spike (above) corrected several premises — read it first.**
 
-## Finding 2 — The image-resize coordinate surface (what M4b retargets)
+## Decision: PE does NOT paint FRESH in-app ink → the overlay stays the SOLE renderer in paged (the M4b inversion)
+- **Rationale**: A fresh ink node is a `vectorShape` with `attrs.isInk:true` + `customGeometry.{inkPoints,inkPen,inkPos}`
+  and **no `.paths`** (vector-shape.js `insertInkShape`). Three independent confirmations: (1) the live NodeView
+  returns a zero-size placeholder span for `isInk` ("isInk nodes are painted by the PM ink overlay",
+  VectorShapeView.js:99-106); (2) the PE painter's `tryCreateCustomGeometrySvg` bails `if (!custGeom?.paths?.length)
+  return null` (renderer.ts:3237) and the preset-geometry lib is stubbed `()=>''` in this fork build; (3) grep for
+  `isInk` across `_vendor/superdoc` painter = **zero matches**. So PE renders, at most, an invisible fallback box —
+  never the stroke geometry. **Consequence**: unlike M4b (PE painted the image, overlay added handles), here
+  `renderInk()` must KEEP rendering committed fresh strokes in paged; the SVG layer is a real render + hit-test
+  surface, so eraser/select/lasso are preserved for free.
+- **Alternatives considered**: (a) teach PE to paint `isInk` → REJECTED (fork edit + duplicates working overlay
+  render). (b) capture-only scratch layer (let PE paint committed strokes) → REJECTED (PE doesn't paint fresh ink, so
+  committed strokes would vanish).
 
-- Mounts `div.wc-img-resize` into `#pages` (`image-resize.ts:116-150`): 8 grips `.wc-img-handle-{nw…w}` + a
-  `.wc-img-move-region` (floating images). z-index 40.
-- **`boxFor(pos)`** (`image-resize.ts:153-161`): `const dom = this.view.nodeDOM(pos); const r =
-  dom.getBoundingClientRect(); const pr = this.pagesEl.getBoundingClientRect(); return {left:(r.left-pr.left)/z,
-  top:(r.top-pr.top)/z, width:r.width/z, height:r.height/z}` where `z = this.zoom()`. **`view.nodeDOM(pos)` is
-  the hidden off-screen image in paged → wrong geometry.** This is the only coordinate surface to retarget.
-- **`zoom()`** (`:101-103`): `return WC?.PM?.zoom || 1`. Used by boxFor AND the drag deltas
-  (`onDragMove` :234-239, `onMoveDragMove` :341): `(e.clientX - startClientX) / z`.
-- **Selection** (`:106-112`): a `NodeSelection` over an `image` node. **Update**: plugin-view `update()` on
-  selection; rAF on window resize (`:93-96`); manual after `onDragUp` (`:293`).
+## Decision: add ONE seam method `clientToOverlayLocalPt(cx,cy) → {x,y,pageIndex}|null`
+- **Rationale**: It is the literal inverse of the shipped M4a/M4b `#pages`-local mapping
+  (`(client − #pages.rect)/#pages.scale` via the existing internal `pagesScale()` — coordinate-adapter.ts:218/232/259),
+  so it round-trips cleanly (critic-CONFIRMED by code read). The `pageIndex` is NEW: scan `#pm-editor`'s
+  `.superdoc-page[data-page-index]` rects for pointer containment (PE exposes no client→page helper). This is the
+  M4-deferred method already stubbed at coordinate-adapter.ts:81.
+- **Alternatives considered**: reuse `clientToPos` (gives a doc pos, not a page-local point/index) — insufficient for
+  the SVG draw space. A new per-page SVG — see below.
 
-## Finding 3 — `editor.getElementAtPos(pos)` is the painted-image access for nodeBoxFor
+## Decision: SINGLE `#pages`-spanning SVG layer (option A), not per-page
+- **Rationale**: matches the existing single-layer model, survives PE repaints as a `#pages` child, preserves ONE
+  unified hit-test surface for the tools, avoids per-page DOM churn under PE virtualization. `renderInk` offsets each
+  committed stroke onto its page origin.
+- **Alternatives considered**: (B) a surface inside each `.superdoc-page` (Word-accurate clipping but DOM rebuilt on
+  every PE repaint/virtualization) — REJECTED at this milestone (per-page clipping is not a visible in-canvas ink
+  fidelity gap). (C) live-capture-only surface repositioned on pointerdown — REJECTED (overlay must also RENDER
+  committed strokes, which a capture-only layer can't).
 
-- **Decision**: `nodeBoxFor` reads `editor.getElementAtPos(pos)` (NOT `view.nodeDOM`). It is mode-aware:
-  `Editor.getElementAtPos` delegates to `presentationEditor.getElementAtPos` in paged (the PAINTED element,
-  null if off-page/virtualized) and a view-based path in overlay. Then apply the proven M4a formula
-  `(rect − #pages.rect)/#pages.scale` for `{left,top,width,height}`.
-- **Risk to gate**: confirm the OVERLAY path of `getElementAtPos` returns the SAME element/box as the legacy
-  `view.nodeDOM(pos)`, else overlay parity breaks. The parity probe checks `nodeBoxFor === legacy boxFor`.
-- **Alternative**: `EntityRectFinder.elementsToRangeRects` (`EntityRectFinder.ts:136-156`) — overkill for a
-  single node; `getElementAtPos` is the single-element path. Rejected for M4b.
+## Decision: cross-page stroke CLAMPED to the pointerdown page
+- **Rationale** (user): a committed stroke is ONE `vectorShape` anchored to ONE page (`wp:anchor relativeFrom='page'`).
+  Resolve the page once at `onDown` and map all points into that page's local space → faithful single-anchor Word
+  export. Lasso *selection* may still iterate all rendered strokes regardless of page.
+- **Alternatives considered**: allow cross-page (no faithful single-anchor export); split into per-page nodes
+  (schema churn, not Word-shaped) — both REJECTED.
 
-## Finding 4 — Zoom is SAFE; use ONE scale source (overlayScale)
+## Decision: byte-identity via MODE-BRANCH
+- **Rationale**: ink is the ONLY overlay that mounts at `#pm-editor.offsetLeft/Top` (ink-overlay.ts:122-138), which is
+  NON-ZERO in overlay (the sheet is centered in `#pages`). Routing overlay through a `#pages(0,0)` origin would SHIFT
+  overlay ink. The safe path: keep overlay on its `#pm-editor`-local origin + `localPt`; gate every retarget on
+  `window.__WC_LAYOUT_MODE==='paged'`. The probe's overlay-parity rows are the guard.
+- **Alternatives considered**: move BOTH origin and `localPt` to `#pages`-local in lockstep (cleaner long-term, higher
+  regression risk) — DEFERRED; not worth the risk for M4c.
 
-- **Decision**: expose `WC.PM.coords.overlayScale()` = `#pages.rect.width/offsetWidth` (the rendered scale),
-  and use it for BOTH `nodeBoxFor` positioning and the image-resize drag deltas (replacing `WC.PM.zoom`).
-- **Rationale**: `#pages` carries the only zoom transform in all modes (`bridge/index.ts:429-430`:
-  `pages.style.transform = scale(WC.PM.zoom)`), and PE's internal zoom is never set (stays 1), so the rendered
-  `#pages` scale IS the total visible scale. Using the rendered ratio (not the `WC.PM.zoom` global) as ONE
-  source for positioning + dragging keeps them coherent (no divergence bug) and is robust if PE ever owns an
-  inner zoom. In overlay `overlayScale() === WC.PM.zoom` → byte-identical.
+## Decision: reopened-ink (`.paths`) double-draw → suppress the overlay's `.paths` branch in paged
+- **Rationale**: the docx importer rewrites `customGeometry` to `{paths}` and drops `isInk` (extractCustomGeometry,
+  vector-shape-helpers.js:469-480), so PE's `.paths` gate PASSES and PE paints it. The overlay's `.paths` branch
+  (ink-overlay.ts:310-325) would also draw it → double-draw. Gate that branch off in paged (PE owns reopened ink;
+  fresh `inkPoints` strokes stay overlay-rendered). **Probe-gated**: confirm reopened ink actually paints via PE in
+  paged before disabling the overlay branch.
 
-## Finding 5 — Verification (computer-use blocked)
+## Decision: NO fork edits for PE's invisible fallback box
+- **Rationale**: a fresh `isInk` node, lacking `.paths`, falls through to `applyFallbackShapeStyle` (renderer.ts:2817)
+  → a `width×height` CONTAINER box, invisible only because `dInsertInk` leaves `fillColor=null` (→ `background:none`,
+  2840) and `strokeColor=null` (→ `border:none`, 2861). The project invariant forbids editing the vendored painter.
+  **Probe-first**: confirm the box is invisible AND doesn't steal overlay pointer events / skew `getElementAtPos`; if
+  it does, neutralize with a paged CSS rule in OUR stylesheet (`pointer-events:none` on the painted `isInk` box).
 
-- The handle POSITIONING is automatable: a probe inserts an image, selects it, and asserts the rendered
-  `.wc-img-resize` box ≈ `nodeBoxFor(imagePos)` + painted-aware. The live DRAG-resize gesture is not reliably
-  drivable by synthetic events (cf. M2's drag) and **computer-use cannot target the CLI-launched dev Electron
-  build** (M2 lesson — not a Start-menu app; "Document1 - Word" collides with MS Word) → manual real-app spot-check.
+## Probe-FIRST unknowns (code-read could not settle; verify empirically during implementation — the M4b discipline)
+1. **`getElementAtPos(inkPos)` resolves a fresh `isInk` node's painted page?** Proven only for IMAGE nodes
+   (paged-image-resize-probe.js). The painted element is PE's invisible fallback box, NOT the hidden-view placeholder
+   span (critic flagged the synthesis conflated them). If it doesn't resolve, fall back to a `clientToOverlayLocalPt`
+   page-containment / `overlayPageBox(pageIndex)` placement.
+2. **The invisible fallback box** — visible? in the DomPositionIndex? intercepts overlay pointer events?
+3. **Persist round-trip** — fresh ink is overlay-rendered, so page-local-vs-`#pages`-local correctness only bites at
+   **export→reopen**; needs a dedicated export→openDocx paged probe. Also confirm what `relativeFrom`
+   `synthesizeInkDrawing` (draw.ts) actually emits, and from which origin the `posOffset` is computed.
 
-## Open questions
-None blocking. M4c (ink) will reuse `overlayScale()`.
+## The ink coordinate consumers (what M4c must keep consistent)
+`localPt` (ink-overlay.ts:141), `ensureLayer`/`sizeLayer` (107-138), `onDown`/`onMove`/`onUp` (157-214),
+`renderInk` (286-328: fresh `inkPoints` placed at `inkPos`-offset px; reopened `.paths` EMU→px), `eraseAt`/`selectAt`/
+`finishLasso`/`pathNear`/`pointInPoly` (246-283, hit-test the rendered SVG paths via `getBBox`/`getTotalLength`/
+`getPointAtLength` → `data-ink-pos` → `deleteNodesAt`). All operate in ONE space today; M4c keeps them consistent by
+fixing `localPt` (capture) and `renderInk` (placement) to the SAME painted-page space.

@@ -34,6 +34,8 @@ const EMU = 9525 // px → EMU (1px = 9525 EMU at 96dpi)
 const w = () => window as any
 // Live-bridge accessor (NOT a captured closure): probes/tests may swap PM impls.
 const PM = () => { const pm = w().WC?.PM; return pm && pm.active && pm.ready ? pm : null }
+// M4c — paged vs overlay discriminator. EVERY paged-specific branch gates on this so overlay is byte-identical.
+const isPaged = () => w().__WC_LAYOUT_MODE === 'paged'
 
 // ---- module singletons (installInkOverlay re-runs on Open/New) ----
 let editor: AnyEditor = null
@@ -45,6 +47,12 @@ let curPts: Pt[] = []
 let lasso = false
 let lassoPath: SVGPathElement | null = null
 let lassoPts: Pt[] = []
+// M4c — paged draw-page clamp: resolved ONCE at onDown (the page the stroke started on, its #pages-local
+// origin, and the doc position to re-anchor the node to so its EXPORTED page is the draw page). null in
+// overlay / between strokes.
+let pageClamp: { pageIndex: number; origin: { left: number; top: number }; docPos: number | null } | null = null
+let relayoutHandler: (() => void) | null = null // M4c — re-render committed ink after a PE relayout (settle the page)
+let relayoutTimer: ReturnType<typeof setTimeout> | null = null // M4c — coalesce relayout bursts (zoom/scroll) into one render
 
 // ---- ported geometry (legacy draw-tools.js:201-233) ----
 // Catmull-Rom-ish smoother: midpoint quad béziers (1:1 with synthesizeInkDrawing's moveTo/quadBezTo).
@@ -148,6 +156,29 @@ function localPt(e: PointerEvent): Pt {
   return { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s }
 }
 
+// M4c (paged) — the #pages-local origin of the painted page a committed ink node is anchored to. The node's OWN
+// position has no layout rect (it's a relativeFrom='page' float), but a NEARBY in-flow position does, so scan a few
+// offsets for a finite pageIndex (PE.computeCaretLayoutRect) → WC.PM.coords.overlayPageBox(pageIndex). renderInk adds
+// this to a page-local inkPos to place the stroke at #pages-local on its page. null pre-layout / overlay / page-0.
+function pageOriginForNode(nodePos: number): { left: number; top: number } | null {
+  const C = w().WC?.PM?.coords
+  const pe = w().WC?.presentation
+  if (!C || typeof C.overlayPageBox !== 'function' || !pe || typeof pe.computeCaretLayoutRect !== 'function') return null
+  let pi: number | null = null
+  // FORWARD-FIRST: an ink float is an inline atom anchored in a paragraph; positions AFTER it (nodePos+1…) are the
+  // rest of that paragraph, on the ANCHOR's page. For a stroke anchored at a page TOP, nodePos−1 is the END of the
+  // PREVIOUS page → it would resolve the wrong page. So prefer forward neighbours (which stay on the anchor page),
+  // then fall back to backward and the node's own pos. (Skip negative positions.)
+  for (const d of [1, 2, 3, -1, -2, -3, 0]) {
+    const p = nodePos + d
+    if (p < 0) continue
+    try { const r = pe.computeCaretLayoutRect(p); if (r && Number.isFinite(r.pageIndex)) { pi = r.pageIndex; break } } catch { /* keep scanning */ }
+  }
+  if (pi == null) return null
+  try { const ob = C.overlayPageBox(pi); if (ob) return { left: ob.left, top: ob.top } } catch { /* none */ }
+  return null
+}
+
 // ---- capture binding (only while a draw/erase/select/lasso tool is active) ----
 function activeCapture(): boolean {
   const st = state()
@@ -170,6 +201,20 @@ function onDown(e: PointerEvent) {
     return
   }
   // pen / pencil / highlighter — start a temp in-progress stroke
+  if (isPaged()) {
+    // M4c: resolve the draw page ONCE (clamp the stroke to it) + the #pages-local page origin + the doc position
+    // to re-anchor the node to — so a page-2+ stroke EXPORTS on its page (page-local posOffset). + pointer capture
+    // so a stroke that crosses an inter-page gap keeps delivering move/up.
+    const C = w().WC?.PM?.coords
+    let pi = 0, origin = { left: 0, top: 0 }, docPos: number | null = null
+    try { const lp = C?.clientToOverlayLocalPt?.(e.clientX, e.clientY); if (lp && Number.isFinite(lp.pageIndex)) pi = lp.pageIndex } catch { /* page 0 */ }
+    try { const ob = C?.overlayPageBox?.(pi); if (ob) origin = { left: ob.left, top: ob.top } } catch { /* origin 0,0 */ }
+    try { const h = C?.clientToPos?.(e.clientX, e.clientY); if (h && typeof h.pos === 'number') docPos = h.pos } catch { /* anchor at caret */ }
+    pageClamp = { pageIndex: pi, origin, docPos }
+    try { layer.setPointerCapture(e.pointerId) } catch { /* capture best-effort */ }
+  } else {
+    pageClamp = null
+  }
   drawing = true; curPts = [p]
   curPath = svgPath('pm-ink-stroke in-progress')
   applyPen(curPath, st.pen)
@@ -204,11 +249,24 @@ function onUp() {
   // drawn). The fork blob localizes points to a (0,0)-origin bbox, so pos carries the offset.
   const minX = Math.min(...strokePts.map((q) => q.x))
   const minY = Math.min(...strokePts.map((q) => q.y))
-  const pos = { x: Math.max(0, Math.round(minX)), y: Math.max(0, Math.round(minY)) }
+  // overlay: pos = the stroke bbox top-left in #pm-editor-local px (anchored where drawn).
+  // M4c (paged): the captured points are #pages-local; subtract the clamped page origin → PAGE-LOCAL px so the
+  // wp:anchor posOffset (relativeFrom='page') is correct, and re-anchor the node to a doc position ON the draw page
+  // (insertPos) so its EXPORTED page is the draw page. The raw #pages-local points stay in inkPoints; renderInk
+  // re-adds the page origin (pageOriginForNode) to place them back at #pages-local. (pointerup implicitly releases
+  // the pointer capture set at onDown.)
+  let pos = { x: Math.max(0, Math.round(minX)), y: Math.max(0, Math.round(minY)) }
+  let insertPos: number | undefined
+  const clamp = pageClamp
+  pageClamp = null
+  if (isPaged() && clamp) {
+    pos = { x: Math.max(0, Math.round(minX - clamp.origin.left)), y: Math.max(0, Math.round(minY - clamp.origin.top)) }
+    insertPos = clamp.docPos != null ? clamp.docPos : undefined
+  }
   const pen = (st && st.pen) || { color: '#000000', width: 2, opacity: 1 }
   const pm = PM()
   // ONE persist per stroke, on pointerup only (K7/K8).
-  if (pm && typeof pm.dInsertInk === 'function') pm.dInsertInk(strokePts, pen, pos)
+  if (pm && typeof pm.dInsertInk === 'function') pm.dInsertInk(strokePts, pen, pos, insertPos)
   // renderInk() runs off the resulting transaction; force it in case the tr listener is async.
   renderInk()
 }
@@ -292,13 +350,23 @@ function renderInk() {
     if (/\bin-progress\b/.test(cls) || /\bpm-ink-lasso\b/.test(cls)) return
     lyr.removeChild(c)
   })
+  // M4c: the per-stroke page-origin re-add only matters in paged with >1 page (single-page/overlay → page-0 origin
+  // (0,0), a no-op). Compute the gate ONCE per render so single-page docs skip the per-node computeCaretLayoutRect.
+  const pagedMulti = isPaged() && (() => { try { const n = w().WC?.PM?.coords?.getPageCount?.(); return typeof n === 'number' ? n > 1 : true } catch { return true } })()
   editor.state.doc.descendants((node: any, pos: number) => {
     if (node.type?.name !== 'vectorShape') return
     const a = node.attrs || {}
     const cg = a.customGeometry
     if (a.isInk && cg && Array.isArray(cg.inkPoints)) {
       // FRESH: re-smooth the raw px points at the anchored position.
-      const ip = cg.inkPos || { x: 0, y: 0 }
+      let ip = cg.inkPos || { x: 0, y: 0 }
+      if (pagedMulti) {
+        // inkPos is PAGE-LOCAL in paged (M4c) — add the node's painted-page #pages-local origin so the stroke
+        // renders on its page. Page 0 origin = (0,0) → no change. Pre-layout/unresolved → render as-is (settles on
+        // the next wc:paged-relayout). Overlay/single-page never enter this branch.
+        const origin = pageOriginForNode(pos)
+        if (origin) ip = { x: (ip.x || 0) + origin.left, y: (ip.y || 0) + origin.top }
+      }
       const offset = (ip.x || 0) - Math.min(...cg.inkPoints.map((q: Pt) => q.x))
       const offY = (ip.y || 0) - Math.min(...cg.inkPoints.map((q: Pt) => q.y))
       const placed = cg.inkPoints.map((q: Pt) => ({ x: q.x + offset, y: q.y + offY }))
@@ -309,7 +377,10 @@ function renderInk() {
       lyr.appendChild(path)
     } else if (cg && Array.isArray(cg.paths) && cg.paths.length) {
       // REOPENED: the importer's ready-made SVG `d` strings are in EMU space (a:pt = px*EMU).
-      // Scale back to px and offset by the recovered anchor position.
+      // Scale back to px and offset by the recovered anchor position. (PE does NOT paint reopened ink — the overlay
+      // is the sole renderer in both modes — so no double-draw to suppress in paged.) NOTE: the multi-page
+      // positioning of REOPENED ink depends on the importer recovering customGeometry.inkPos (page-local), which it
+      // does not currently populate — a pre-existing gap (both modes), separate from M4c's export fix.
       const ip = cg.inkPos || { x: 0, y: 0 }
       const stroke = a.strokeColor || penColorFromDrawing(a) || '#000000'
       const sw = a.strokeWidth || 2
@@ -446,6 +517,14 @@ export function installInkOverlay(ed: AnyEditor) {
   }
   // re-render ink on every transaction AND on document load (track-chrome/notes-area mechanism)
   ed.on?.('transaction', () => { try { renderInk() } catch (e) { console.error('[WC.InkOverlay] render failed', e) } })
+  // M4c (paged) — a pure PE relayout fires NO PM transaction, so re-render committed ink on wc:paged-relayout too;
+  // this settles a freshly-drawn page-2+ stroke onto its correct painted page once PE has laid the node out
+  // (pageOriginForNode then resolves). Window-scoped, so remove any prior handler (re-install on Open/New).
+  if (relayoutHandler) { try { window.removeEventListener('wc:paged-relayout', relayoutHandler) } catch { /* none */ } }
+  // DEBOUNCED (coalesce a relayout burst — zoom/scroll/reflow — into one render per 80ms, matching the M4a
+  // track-chrome/comments-ui schedule() pattern) so renderInk's per-stroke page resolution isn't run per-fire.
+  relayoutHandler = () => { if (relayoutTimer) return; relayoutTimer = setTimeout(() => { relayoutTimer = null; try { renderInk() } catch (e) { /* best-effort settle */ } }, 80) }
+  window.addEventListener('wc:paged-relayout', relayoutHandler)
   ensureLayer()
   renderInk()
   sync()
