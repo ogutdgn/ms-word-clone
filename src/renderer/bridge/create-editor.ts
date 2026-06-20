@@ -89,7 +89,10 @@ export async function constructPresentationEditor(mountEl: HTMLElement, parsed: 
     content: parsed.docx,
     mediaFiles: parsed.mediaFiles,
     fonts: parsed.fonts,
-    extensions: getStarterExtensions(), // NO Pagination/ImageResize — PE is the sole paginator
+    // M4b: + ImageResize (a NodeSelection-driven handle overlay; positions via WC.PM.coords.nodeBoxFor, so
+    // it tracks the PAINTED image). NOT Pagination — PE is the sole paginator (our Pagination would measure
+    // the hidden host and inject spurious seams; ImageResize neither measures nor paginates).
+    extensions: [...getStarterExtensions(), ImageResize],
     documentId: 'wc-paged-boot',
     documentMode: 'editing',
     user: { name: storedAuthorName(), email: '' },

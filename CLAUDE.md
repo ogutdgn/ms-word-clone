@@ -102,7 +102,7 @@ npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE 
 
 <!-- SPECKIT START -->
 Active spec-kit plan: [specs/001-paged-render-migration/plan.md](specs/001-paged-render-migration/plan.md)
-(Paged Render Migration — **Milestone 4a**: overlay retarget — helpers + comments + track-chrome; M4 is
-split into M4a–M4d). M1+M2+M3 done (archived under specs/001-paged-render-migration/milestones/). Sequencing
-is owned by [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
+(Paged Render Migration — **Milestone 4b**: image-resize overlay retarget; M4 split into M4a–M4d, M4a done).
+M1+M2+M3+M4a done (archived under specs/001-paged-render-migration/milestones/). Sequencing is owned by
+[docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
 <!-- SPECKIT END -->

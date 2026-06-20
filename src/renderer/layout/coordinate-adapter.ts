@@ -64,6 +64,10 @@ export interface CoordinateAdapter {
   posToOverlayLocalRect(pos: number): { top: number; bottom: number; left: number } | null
   /** Model pos → top in #pages-local space. null off-page. (M4a — comments-ui) */
   posToOverlayLocalY(pos: number): number | null
+  /** Image-node box in #pages-local space. null off-page / no element. (M4b — image-resize) */
+  nodeBoxFor(pos: number): { left: number; top: number; width: number; height: number } | null
+  /** Rendered #pages scale (rect.width/offsetWidth, = WC.PM.zoom today). One scale source for overlays. (M4b) */
+  overlayScale(): number
 }
 
 // ─── M4-DEFERRED (documented, NOT implemented in M1) ─────────────────────────────────────
@@ -229,6 +233,42 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       } catch {
         return null
       }
+    },
+
+    // M4b — the selected image's box in #pages-local space. Mode-branched on the ELEMENT source:
+    //  • overlay → editor.view.nodeDOM(pos) (the image node's own DOM element) — the LEGACY boxFor path,
+    //    so overlay output is byte-identical. (Editor.getElementAtPos's overlay path uses domAtPos, which
+    //    returns the CONTAINER not the image, so it is NOT usable here.)
+    //  • paged → editor.getElementAtPos(pos) (PE's [data-pm-start][data-pm-end] index → the PAINTED image;
+    //    null off-page). Then the same #pages-local formula as the M4a overlay helpers.
+    nodeBoxFor(pos: number): { left: number; top: number; width: number; height: number } | null {
+      try {
+        const editor = deps.getEditor()
+        if (!editor) return null
+        let el: any = null
+        if (editor.presentationEditor && typeof editor.getElementAtPos === 'function') {
+          try { el = editor.getElementAtPos(pos) } catch { el = null }
+        } else {
+          try { el = editor.view.nodeDOM(pos) } catch { el = null }
+        }
+        if (!el || typeof el.getBoundingClientRect !== 'function') return null
+        const c = el.getBoundingClientRect()
+        if (![c.left, c.top, c.width, c.height].every((n: number) => Number.isFinite(n))) return null
+        const ps = pagesScale()
+        if (!ps) return null
+        return { left: (c.left - ps.r.left) / ps.scale, top: (c.top - ps.r.top) / ps.scale, width: c.width / ps.scale, height: c.height / ps.scale }
+      } catch {
+        return null
+      }
+    },
+
+    // M4b — the rendered #pages scale (= WC.PM.zoom today, since #pages carries the only zoom transform and
+    // PE's internal zoom stays 1). ONE scale source for image-resize handle positioning AND drag deltas.
+    // No #pages (pre-mount/teardown) → fall back to the WC.PM zoom global, NOT 1 (a drag delta divided by 1
+    // would be wrongly unscaled at non-100% zoom).
+    overlayScale(): number {
+      const ps = pagesScale()
+      return ps ? ps.scale : (((window as any).WC?.PM?.zoom as number) || 1)
     },
   }
 }

@@ -93,13 +93,18 @@ class ImageResizeView {
     // resize (rAF-coalesced) so the handles don't drift off a selected image.
     this.onWinResize = () => { if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.update() }) }
     window.addEventListener('resize', this.onWinResize)
+    // M4b: in paged mode PE re-paginates without a transaction (zoom/reflow), so update() wouldn't fire.
+    // Reposition the handles on the shared wc:paged-relayout event (same rAF-coalesced handler). Removed in destroy().
+    window.addEventListener('wc:paged-relayout', this.onWinResize)
     this.update()
   }
 
   raf = 0
 
   zoom(): number {
-    return (window as any).WC?.PM?.zoom || 1
+    // M4b: the rendered #pages scale via the seam — ONE scale source for handle positioning AND the drag
+    // deltas (so they can't diverge). = WC.PM.zoom in overlay (byte-identical); painted-correct in paged.
+    return ((window as any).WC?.PM?.coords?.overlayScale?.()) ?? ((window as any).WC?.PM?.zoom || 1)
   }
 
   // The currently selected single image: { pos, node } or null.
@@ -150,14 +155,11 @@ class ImageResizeView {
   }
 
   // Image box in #pages UNSCALED coordinates (zoom-/scroll-invariant once placed).
+  // M4b: via the WC.PM.coords seam — painted-page-correct in paged mode, byte-identical in overlay (the seam's
+  // nodeBoxFor uses view.nodeDOM in overlay, the legacy path). Keep the pagesEl guard (overlay must be mounted).
   boxFor(pos: number): Box | null {
-    let dom: any = null
-    try { dom = this.view.nodeDOM(pos) } catch { dom = null }
-    if (!dom || !dom.getBoundingClientRect || !this.pagesEl) return null
-    const z = this.zoom()
-    const r = dom.getBoundingClientRect()
-    const pr = this.pagesEl.getBoundingClientRect()
-    return { left: (r.left - pr.left) / z, top: (r.top - pr.top) / z, width: r.width / z, height: r.height / z }
+    if (!this.pagesEl) return null
+    return ((window as any).WC?.PM?.coords?.nodeBoxFor?.(pos)) ?? null
   }
 
   place(box: Box, floating: boolean) {
@@ -383,7 +385,7 @@ class ImageResizeView {
   destroy() {
     this.destroyed = true
     this.teardownDragListeners()
-    if (this.onWinResize) window.removeEventListener('resize', this.onWinResize)
+    if (this.onWinResize) { window.removeEventListener('resize', this.onWinResize); window.removeEventListener('wc:paged-relayout', this.onWinResize) }
     this.onWinResize = null
     if (this.raf) cancelAnimationFrame(this.raf)
     this.raf = 0
