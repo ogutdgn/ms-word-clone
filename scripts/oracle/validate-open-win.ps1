@@ -21,11 +21,15 @@ try {
   try { $word.AutomationSecurity = 3 } catch {}  # msoAutomationSecurityForceDisable
   $after = @(Get-Process WINWORD -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
   $spawnedPid = ($after | Where-Object { $before -notcontains $_ } | Select-Object -First 1)
-  # Open(FileName, ConfirmConversions:=false, ReadOnly:=true, AddToRecentFiles:=false, ...,
-  #      OpenAndRepair:=false) — disabling auto-repair so an invalid file errors instead of
-  #      being silently fixed. Trailing args after ReadOnly use omitted-defaults via $missing.
-  $false2 = $false; $true2 = $true
-  $doc = $word.Documents.Open($abs, $false2, $true2, $false2)
+  # Open(FileName, ConfirmConversions:=false, ReadOnly:=true, AddToRecentFiles:=false,
+  #      [5..12 omitted via $miss], OpenAndRepair:=false) — OpenAndRepair is positional arg 13, so the
+  #      intervening optionals (PasswordDocument…Visible) are padded with [Reflection.Missing]::Value.
+  #      Explicitly DISABLING auto-repair makes a REPAIR-TRIGGERING file ERROR instead of being SILENTLY repaired
+  #      (DisplayAlerts=0 alone only catches an INTERACTIVE repair prompt). NOTE: necessary-not-sufficient — Word's
+  #      lenient OOXML loader still tolerates SOME malformations with no repair pass, so ok=true means "opened without
+  #      needing repair", NOT "byte-perfect"; the driver ALWAYS pairs ok=true with a per-construct read-back.
+  $false2 = $false; $true2 = $true; $miss = [System.Reflection.Missing]::Value
+  $doc = $word.Documents.Open($abs, $false2, $true2, $false2, $miss, $miss, $miss, $miss, $miss, $miss, $miss, $miss, $false2)
   # If we got here the file opened without a repair dialog (alerts are errors).
   $out.ok = $true
   $out.tableCount = $doc.Tables.Count

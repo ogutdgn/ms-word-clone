@@ -1,55 +1,44 @@
-# Quickstart — Validate Milestone 4d (notes-area disable + header-footer test)
+# Quickstart — Validate Milestone 5 (paged export ↔ Word-COM-oracle parity)
 
-M4d disables the `#pm-notes-area` overlay in paged (PE owns footnotes) + proves header/footer works in paged.
-Overlay byte-identical; header-footer.ts unchanged.
+M5 proves the paged-mode `.docx` export is Word-valid + equivalent to overlay, end-to-end against real Word.
+**Dev-box-only** (real foreground Word, sandbox-disabled, PID-safe); not headless CI. No `src/` change.
 
 ## Prerequisites
-- Branch `slice/m4d-notes-hf` (off `layout-engine`); `npm run build` succeeds.
+- Windows dev box with Word 16 (M365). Branch `slice/m5-paged-export-oracle` (off `layout-engine`). `npm run build`.
 
-## 1. Regression gates (overlay default — MUST stay flat)
+## 1. Existing gates stay flat (no src change)
 ```bash
 npm run build
-npm run test:smoke     # expect 9
-npm run test:roundtrip # expect 27
-npm run test:bundle    # expect 4/4
-npm run test:pm        # paged behavior is PROBE-gated; the suite's 268/475 early-abort is pre-existing (tracked)
+npm run test:pm        # 475   |  npm run test:smoke   # 9
+npm run test:roundtrip # 27    |  npm run test:bundle  # 4
 ```
 
-## 2. Notes probe
+## 2. The new paged COM gate (the M5 deliverable)
 ```bash
-WC_LAYOUT=paged npm run build
-electron . --probe-out=/tmp/wc-notes.json --shot-evalfile=scripts/paged-notes-probe.js
+npm run test:roundtrip:paged   # runs sandbox-disabled (real Word COM); dev-box-only
 ```
-Expect PASS (paged): inserting a footnote → PE PAINTED a per-page footnote body; `#pm-notes-area` absent OR
-`display:none`; the transaction driver did NOT re-render it; endnotes also disabled; `refShowNotes` scrolls the
-painted footnote into view. Then overlay parity (`#pm-notes-area` still mounts + edits).
-```bash
-npm run build   # overlay
-electron . --probe-out=/tmp/wc-notes-ovl.json --shot-evalfile=scripts/paged-notes-probe.js
-```
+Expect ALL-PASS:
+- **Determinism check** — exporting one fixture twice (one mode) reveals exactly which fields are non-deterministic
+  (revision ids / rsid / wordIds) → those are masked in the structural diff.
+- **Kitchen-sink (paged)** → `validate-open` `ok:true` (now `OpenAndRepair:=false` — silent repairs surface too);
+  `validate-comments`/`validate-notes`/`validate-headerfooter` read-back == the seeded markers (no `<scope-error>`).
+- **Shared-construct parity** — the NORMALIZED structural diff of the paged save vs the overlay save of the SAME edit
+  is EQUAL (the guard against a silent PE-side model divergence).
+- **Multi-page ink** (page-2+, gap-spanning, top-of-page-2) → `validate-open` `ok:true` + the page-local `posOffset`
+  EMU lands on the correct page (NOT a diff vs overlay — ink intentionally differs).
 
-## 3. Header/footer probe
-```bash
-WC_LAYOUT=paged npm run build
-electron . --probe-out=/tmp/wc-hf.json --shot-evalfile=scripts/paged-headerfooter-probe.js
-```
-Expect PASS (paged): `setHeaderText`/`setFooterText` → `get*` round-trip; `exportDocxBytes` carries `word/headerN.xml
-<w:hdr>` + `sectPr <w:headerReference>` + the rels relationship; a REPLACE leaves no stale text; a programmatically
-opened PE header session routes the bridge verbs through the live editor + survives exit/commit. Then overlay parity.
+## 3. PID-safety + Word hygiene
+- Only the SPAWNED WINWORD PIDs are killed — the user's live Word window is never touched. All powershell spawns are
+  sandbox-disabled (Word COM hangs at `New-Object` in a sandbox). Stale `C:/tmp/wc-*-m5-*.docx` are glob-cleaned first.
 
-## 4. Manual spot-check (real app — paged)
-`WC_LAYOUT=paged npm run build && npx electron .` → insert a footnote (References tab) → it should appear at the
-**page bottom** (PE), NOT in a separate panel below the doc; double-click it to edit. Show Notes jumps to it. Set a
-header (Insert ▸ Header) → it shows + exports.
-
-## 5. Code review
-`/code-review` on the slice diff; fix all findings (watch listener-leak + probe-honesty); re-run 1–3.
+## 4. Code review
+`/code-review` on the slice diff (scrutinize the Node→COM bridge: sandbox-disable, PID-safety, JSON parsing, the diff
+masking for false-confidence); fix all; re-run 1–2.
 
 ## Done checklist
-- [ ] Build clean.
-- [ ] smoke 9 / roundtrip 27 / bundle 4 (test:pm probe-gated).
-- [ ] probe:notes all-PASS (paged disabled + PE-painted + Show-Notes scroll; overlay parity).
-- [ ] probe:headerfooter all-PASS (paged parity export + interop; overlay parity).
-- [ ] overlay byte-identity (`#pm-notes-area` mounts in overlay).
+- [ ] Build clean; pm 475 / smoke 9 / roundtrip 27 / bundle 4 unchanged.
+- [ ] `test:roundtrip:paged` ALL-PASS: kitchen-sink open-ok + read-backs + normalized diff EQUAL; ink open-ok + page-correct.
+- [ ] determinism check ran; the mask set is justified.
+- [ ] PID-safe; sandbox-disabled; the user's Word untouched.
 - [ ] `/code-review` clean.
-- [ ] Runbook Current Status updated; slice ff-merged into `layout-engine` → **M4 COMPLETE**.
+- [ ] Runbook updated (test:roundtrip:paged is dev-box-only); slice ff-merged into `layout-engine`.

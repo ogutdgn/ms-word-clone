@@ -1,58 +1,69 @@
-# Implementation Plan: Paged Render Migration — **Milestone 4d** (notes-area disable + header-footer test)
+# Implementation Plan: Paged Render Migration — **Milestone 5** (paged export ↔ Word-COM-oracle parity)
 
-**Feature**: `001-paged-render-migration` (umbrella) · **This plan covers ONLY Milestone 4d** (the LAST M4 sub-slice)
-**Branch (slice)**: `slice/m4d-notes-hf` (off `layout-engine`) · **Date**: 2026-06-20
+**Feature**: `001-paged-render-migration` (umbrella) · **This plan covers ONLY Milestone 5**
+**Branch (slice)**: `slice/m5-paged-export-oracle` (off `layout-engine`) · **Date**: 2026-06-20
 **Spec**: [spec.md](spec.md) (US2 / FR-005) · **Runbook**: [../../docs/plan/layout-engine-runbook.md](../../docs/plan/layout-engine-runbook.md)
-**M1…M4c (done)**: archived at [milestones/](milestones/) · adapter at `src/renderer/layout/coordinate-adapter.ts`
+**M1…M4 (COMPLETE)**: archived at [milestones/](milestones/)
 
-> **M4 sub-slices:** M4a ✓ (comments+track) · M4b ✓/.1 (image-resize) · M4c ✓ (ink) · **M4d** = notes-disable + header-footer-test (THIS — the LIGHT one). After M4d, **M4 is COMPLETE** → M5/M6.
+> **After M4 (all 6 overlays).** M5 = prove the paged-mode `.docx` EXPORT is Word-valid + equivalent to overlay,
+> END-TO-END against the real Word-for-Windows COM oracle. Then M6 (glyph metrics), then `layout-engine → main`.
 
 ## Summary
 
-The last two of the six overlays. **(a) Notes-area:** the bridge's `#pm-notes-area` overlay (an editable
-footnote/endnote region flowed BELOW the page sheet — an overlay-mode workaround because note bodies are not
-editable PM nodes there) **double-renders + mis-positions in paged**, because PE already paints footnote/endnote
-bodies **per-page** at the page bottom and makes them **editable inline** (double-click → `NoteStorySession`,
-`documentMode:'editing'`). → **DISABLE the overlay in paged** (the Word-faithful swap). **(b) Header-footer:**
-`header-footer.ts` is **provably mode-agnostic** (4 doc-model verbs; **zero** coordinate/DOM math; binds to
-`presentation.editor` in paged exactly as the plain Editor in overlay) → **NO production change; just a paged
-integration TEST.**
+The migration kept the doc MODEL page-free and never touched the `.docx` export path — so the **thesis** is that a
+doc edited/laid-out in **paged** mode exports Word-equivalently to **overlay** (the converter is a pure function of
+`state.doc` + converter state, run by the SAME inner Editor in both modes). M5 **validates this end-to-end with real
+Word**, because the project lesson is **"exportXmlOnly + `test:roundtrip` BOTH MISS Word-corruption"** (`test:roundtrip`
+reimports via a JS unzip + the fork — it never opens the file in Word).
 
-## Decisions (planning Q&A + the M4d understanding sweep)
+**The real work is NEW infra:** there is **no** existing Node→Word-COM bridge (the `validate-*-win.ps1` oracles are
+hand-run). M5 builds a small **Node → `spawnSync(powershell)` → Word-COM** driver (sandbox-disabled, PID-safe,
+JSON-stdout) that saves real paged-export bytes and opens them in Word.
 
-1. **Notes-area = DISABLE in paged** (user-accepted): editing is NOT lost — PE renders + edits footnotes inline
-   per-page (Word-faithful). 2-point gate in `notes-area.ts` on `window.__WC_LAYOUT_MODE === 'paged'`; overlay
-   byte-identical; the `WC.NotesArea` facade (`refresh`/`render`/`showNotes`) stays DEFINED (guarded no-ops).
-2. **'Show Notes' (`refShowNotes`) in paged = SCROLL the first painted footnote into view** (user; Word behavior —
-   References ▸ Show Notes jumps to the note area). Cheap: the footnote is painted DOM → first painted footnote
-   element + `scrollIntoView({block:'nearest'})`; `return false` (documented) if none painted. NOT a PE
-   story-session entry (out of scope for the light slice).
-3. **Header-footer = PURE TEST, ZERO production change** — confirmed mode-agnostic (verbs operate on
-   `editor.converter`/`editor.doc`; the PE-aware story-runtime routes a bridge set/get during an open PE header
-   session into the SAME live editor — designed coexistence).
-4. **Verification = standalone paged probes** (M2/M3/M4 cadence), NOT new `test-suite-pm.js` cases (the suite has a
-   pre-existing 268/475 early-abort that could mask a new case; the probes are the trustworthy gate, and the existing
-   overlay test `[9]` already covers overlay header/footer + the docx-export assertions).
-5. **Interop driven PROGRAMMATICALLY** (computer-use is blocked for the dev build) — activate the PE header session
-   via `HeaderFooterSessionManager` (a small test-only hook if not exposed), never a synthetic click.
+## Decisions (planning Q&A + the M5 understanding sweep + adversarial critic)
+
+1. **Parity = TWO-TIER** (user): **(a)** for the 4 SHARED-model constructs (images, comments+track, footnotes/endnotes,
+   header/footer) — a **NORMALIZED structural diff** of the paged save vs the overlay save of the SAME edit (Word
+   revision-ids/`rsid`/wordIds MASKED, parts sorted), proving equality (catches a silent dropped/duplicated-content
+   divergence); **(b)** for INK (M4c) — **Word-VALID + correct page** (opens with no repair; page-local `posOffset` on
+   the right page), EXPLICITLY NOT a diff vs overlay (ink intentionally differs: re-anchor + page-local).
+2. **Scope = CONSOLIDATED + FOCUSED INK** (user): ONE kitchen-sink paged doc (image+comments+track+footnote+endnote+
+   header/footer) → save → validate-open + normalized diff vs overlay; PLUS a focused multi-page ink COM test. NOT
+   the full per-construct matrix.
+3. **`validate-open` is HARDENED** (critic): it currently does NOT pass `OpenAndRepair:=false` (only 4 positional args)
+   — `ok:true` = "no INTERACTIVE repair under `DisplayAlerts=0`", NOT "no silent repair". M5 adds `OpenAndRepair:=false`
+   so silent repairs surface, AND always pairs `ok:true` with a per-construct read-back.
+4. **The kitchen-sink normalized diff is the GUARD** (critic): PE exposes a public `dispatch(tr)` and there are
+   unaudited drag/node-move paths; the consolidated paged-vs-overlay diff catches any unforeseen PE-side model
+   mutation — it MUST stay.
+5. **Validate a header EDITED VIA THE PAGED STORY SESSION** (critic): header/footer + footnotes route through separate
+   story-session editors; M5 oracles a header edited via the paged session (not only a bridge `setHeaderText`).
+6. **Ink fixtures enumerate the corruption modes** (critic): page-2+ float, **inter-page-gap-spanning** stroke,
+   **top-of-page-2** (where `TextSelection.near` snapping is touchy).
+7. **CADENCE = HYBRID / local-only**: the gate needs real foreground Word (M365 dev box), sandbox-disabled; it CANNOT
+   run in headless CI (Word COM hangs at `New-Object` in a sandbox). Ship `npm run test:roundtrip:paged`, run each
+   milestone, documented dev-box-only.
+8. **NO fork edits, NO bridge edits** — the export path is already mode-correct; M5 only VALIDATES it.
 
 ## Technical Context
-**Language/Version**: TypeScript on `window.WC`; Electron 31. **Primary Dependencies**: `notes-area.ts`,
-`references.ts` (refShowNotes), `header-footer.ts` (unchanged), PE's footnote layout + `HeaderFooterSessionManager`.
-**Testing**: 3 gates (pm/smoke/roundtrip) + bundle + NEW `probe:notes` + `probe:headerfooter`. **Constraints**: model
-page-free; **overlay byte-identical** (paged-gated); **no fork edits**. **Scale/Scope**: ~1 small production change
-family (notes-area 2-point gate + refShowNotes paged branch) + 2 new probes; ZERO change to header-footer.ts.
+**Language/Version**: TypeScript renderer probe + Node driver + PowerShell COM; Electron 31; Windows 11 + Word 16
+(M365 Current Channel, ADR-0006). **Primary Dependencies**: `WC.PM.exportDocxBytes`/`editor.exportDocx`,
+`window.wordAPI.saveBytes` (main.js:357-365), `scripts/oracle/word-oracle-win.ps1` + `validate-open-win.ps1` +
+`validate-comments/notes/headerfooter-win.ps1`, `scripts/paged-ink-probe.js` (reused). **Testing**: a NEW
+`test:roundtrip:paged` (Node→Word-COM); the 4 existing gates UNCHANGED. **Constraints**: no fork edits; model
+page-free; dev-box-only (real Word; sandbox-disabled; PID-safe). **Scale/Scope**: 1 paged probe + 1 Node driver + 1
+reusable com-validate helper + a 1-line `validate-open` hardening + a package.json script. No `src/` changes.
 
 ## Constitution Check
 Unratified template; gates = project rules + runbook invariants.
 
-| Gate | M4d compliance |
+| Gate | M5 compliance |
 |------|----------------|
-| Model page-free | ✅ overlay disable + a test; no model change. |
-| Overlay byte-identical | ✅ both notes-area gates are `__WC_LAYOUT_MODE==='paged'`-only; overlay takes neither branch. header-footer untouched. Probe overlay-parity rows guard it. |
-| 3 gates + bundle 4 | ✅ required (test:pm's pre-existing abort noted; paged behavior is probe-gated). |
-| New behavior behind `WC_LAYOUT=paged` | ✅ every change is paged-gated. |
-| No fork edits | ✅ header-footer.ts untouched; the interop hook (if needed) is a test-only WC-side accessor, not a fork edit. |
+| Model page-free | ✅ M5 VALIDATES it (the kitchen-sink diff is the proof); no model change. |
+| Overlay byte-identical | ✅ no `src/` change at all. |
+| 3 gates + bundle 4 | ✅ unchanged (pm 475 / smoke 9 / roundtrip 27 / bundle 4); M5 ADDS `test:roundtrip:paged`. |
+| No fork edits | ✅ src/renderer/core/superdoc-fork untouched; only OUR oracle scripts + new test scripts. |
+| Validate vs real Word (project lesson) | ✅ that IS M5 — real Word COM, not exportXmlOnly/roundtrip. |
 | No hand-edit of generated files | ✅ untouched. |
 
 **Result: PASS.**
@@ -60,62 +71,63 @@ Unratified template; gates = project rules + runbook invariants.
 ## Project Structure
 ```text
 specs/001-paged-render-migration/
-├── spec.md · plan.md (THIS, M4d) · research.md · data-model.md
-├── contracts/notes-headerfooter.md
+├── spec.md · plan.md (THIS, M5) · research.md · data-model.md
+├── contracts/m5-com-gate.md
 ├── quickstart.md · checklists/requirements.md
-└── milestones/{m1,m2,m3,m4a,m4b,m4c}/   # archived
+└── milestones/{m1,m2,m3,m4a,m4b,m4c,m4d}/   # archived
 ```
-### Source Code — M4d touch set
+### Source Code — M5 touch set (NO src/ changes — test infra only)
 ```text
-src/renderer/bridge/notes-area.ts   # 2-point paged gate: renderInner() early-return+hide+teardown; installNotesArea() skip the transaction driver (keep the WC.NotesArea facade)
-src/renderer/bridge/references.ts   # refShowNotes() paged branch — scroll the first painted footnote into view (else return false)
-src/renderer/bridge/header-footer.ts# NO CHANGE (mode-agnostic — test only)
-scripts/paged-notes-probe.js        # NEW — paged: PE painted footnote + #pm-notes-area hidden + no driver + endnotes + Show-Notes scroll; overlay parity (region still mounts)
-scripts/paged-headerfooter-probe.js # NEW — paged parity (set/get + export round-trip) + PE-session interop; overlay parity
-package.json                        # add probe:notes + probe:headerfooter
+scripts/oracle/com-validate.js          # NEW — reusable Node helper: spawnSync a validate-*-win.ps1 SANDBOX-DISABLED, parse JSON stdout → {ok,…} (reused by M6)
+scripts/paged-export-m5-probe.js        # NEW — paged probe: edit the kitchen-sink fixture (+ a paged-session header) → exportDocxBytes → wordAPI.saveBytes(C:/tmp/wc-paged-m5-*.docx); also an OVERLAY save of the same edit
+scripts/test-roundtrip-paged.js         # NEW — Node driver: glob-clean stale files; spawn paged+overlay probes; per .docx → com-validate(validate-open ok:true + read-backs); normalized structural diff (id-masked) for the 4 shared constructs; ink = Word-valid + correct page
+scripts/oracle/validate-open-win.ps1    # HARDEN — pass OpenAndRepair:=false (so silent repairs surface). OUR oracle script, not the fork.
+package.json                            # add test:roundtrip:paged (SEPARATE gate; do NOT touch test:roundtrip's 27 pins)
+scripts/paged-ink-probe.js              # REUSED (not modified) — already asserts page-local posOffset EMU; M5 adds the multi-page ink fixtures via the driver
 ```
-**Structure Decision**: notes-area disables itself in paged (PE owns footnotes); header-footer is proven
-mode-agnostic and only tested. No fork edits; overlay byte-identical.
+**Structure Decision**: M5 is dev-box-only TEST INFRA building the Node→Word-COM bridge; zero `src/` change.
 
 ## Phase 0 — Research
-See [research.md](research.md): PE's per-page footnote render + editable `NoteStorySession`; the
-`#pm-notes-area` double-render in paged; header-footer.ts's zero-coordinate proof + the PE-aware story-runtime
-coexistence; the disable mechanism + the Show-Notes scroll; the test-vs-fix verdict.
+See [research.md](research.md): the mode-independent-export proof; why `test:roundtrip` misses corruption; the
+Node→COM orchestration (the new surface); the per-run-revision-id non-determinism → normalized diff; the
+`validate-open` `OpenAndRepair` gap; the two-tier parity; the ink corruption modes; the story-session edit path; the
+hybrid cadence.
 
 ## Phase 1 — Design & Contracts
-- **Entities**: [data-model.md](data-model.md) — the disabled notes region, the Show-Notes scroll target, the
-  header/footer slot verbs + the live PE session.
-- **Contract**: [contracts/notes-headerfooter.md](contracts/notes-headerfooter.md) — the notes-area paged-gate
-  behavior + refShowNotes contract + the header-footer verbs (unchanged) the probes assert.
+- **Entities**: [data-model.md](data-model.md) — the kitchen-sink fixture, the paged/overlay save pair, the
+  normalized-diff masking, the validate-open + read-back results, the ink fixture set.
+- **Contract**: [contracts/m5-com-gate.md](contracts/m5-com-gate.md) — the `com-validate` helper signature, the probe
+  save contract, the driver assertions, the `validate-open` hardened contract.
 - **Validation**: [quickstart.md](quickstart.md).
 
-## Verification (definition of done for M4d)
-1. `npm run build` clean.
-2. **3 gates** green (smoke 9 / roundtrip 27; test:pm — paged behavior is probe-gated, the suite's 268-abort is
-   pre-existing/tracked) + `test:bundle` 4/4.
-3. **`probe:notes`** (paged): inserting a footnote → PE PAINTED a per-page footnote body (so disabled ≠ no-notes),
-   `#pm-notes-area` absent OR `display:none`, the transaction driver NOT installed, endnotes covered, `refShowNotes`
-   scrolls the painted footnote into view. **Overlay parity**: `#pm-notes-area` still mounts + renders the editable
-   region.
-4. **`probe:headerfooter`** (paged): parity set/get + `exportDocxBytes` → `word/headerN.xml <w:hdr>` + `sectPr
-   <w:headerReference>` + the rels relationship + a REPLACE (no stale text); **interop** — a programmatically-opened
-   PE header session routes `WC.PM.get/setHeaderText` through the live editor + survives exit/commit. **Overlay
-   parity**: same round-trip.
-5. **`/code-review`** on the slice (watch listener-leak + probe-honesty); fix all; re-verify.
-6. **COM-oracle: OPTIONAL** — header/footer export is doc-model/converter (mode-independent), identical to the
-   overlay path already validated by test `[9]`; a Word-COM spot-check is a courtesy, not a new corruption risk.
+## Verification (definition of done for M5)
+1. `npm run build` clean; the 4 existing gates stay green (pm 475 / smoke 9 / roundtrip 27 / bundle 4 — no `src/`
+   change).
+2. **`npm run test:roundtrip:paged` ALL-PASS** on the Windows dev box (sandbox-disabled): kitchen-sink paged save →
+   `validate-open` `ok:true` (now `OpenAndRepair:=false`) + comments/notes/header-footer read-back==seeded + the
+   paged-vs-overlay NORMALIZED structural diff EQUAL for the 4 shared constructs; multi-page ink (page-2+,
+   gap-spanning, top-of-page-2) → `validate-open` `ok:true` + page-local `posOffset` on the correct page.
+3. **Determinism check** — export one fixture twice (same mode), diff → confirm exactly which fields are
+   non-deterministic (drives the normalization masking; if even same-mode diffs nontrivially, the masking is required).
+4. **PID-safety** — only spawned WINWORD PIDs killed (never the user's window); all powershell spawns sandbox-disabled.
+5. **`/code-review`** on the slice; fix all; re-verify.
 
 ## Risks
-- **PE footnote-editing is PE-native** (double-click); the WC bridge has no explicit ENTER wiring → the probe asserts
-  the *painted* footnote exists (not a live click — computer-use blocked), and `refShowNotes` only scrolls.
-- **`refShowNotes` scope-creep** — keep it scroll-only (or a clean `return false`); do NOT build PE story-session
-  entry in M4d.
-- **Keep the `WC.NotesArea` facade DEFINED** in paged (guarded no-ops) — dropping it risks a throw in
-  `references.ts`/tests.
-- **Header/footer is GLOBAL converter state** not reset by `setDoc` (test `[9]` resets via `newBlank`) — the paged
-  parity probe MUST replicate that teardown or it leaks header refs → false greens.
-- **`test:pm` 268-abort** (pre-existing, tracked) could mask a suite case → that's exactly why M4d gates on the
-  PROBES, not new suite cases.
+- **The Node→Word-COM bridge is NEW** (no precedent) — sandbox-disable, PID-safety, STA/foreground, JSON parsing are
+  the real engineering; get them right first (a small spike).
+- **`validate-open` `ok:true` ≠ byte-perfect** — it's "no repair"; ALWAYS pair with read-back. Hardened with
+  `OpenAndRepair:=false`.
+- **Per-run revision ids** make a literal byte-diff fail even overlay-vs-overlay → the shared-construct proof MUST be
+  a normalized structural diff. Verify the non-determinism first.
+- **INK is the only real corruption risk** — exportXmlOnly/roundtrip MISS it; only a real Word save+open reveals a
+  repair. Cover page-2+, gap-spanning, top-of-page-2.
+- **Story-session edits** (header/footer/notes) route through separate editors — validate a paged-session-edited
+  header, not only a bridge-API edit.
+- **PE `dispatch(tr)` + drag/node-move** could (future) mutate `state.doc` paged-only — the kitchen-sink diff is the
+  guard.
+- **OUT OF SCOPE (documented):** the pre-existing docx-REOPENED multi-page ink import gap (`customGeometry.inkPos`
+  recovery — both modes); no export→reopen leg in M5. M6 + the →main endgame.
+- **Real Word + foreground** — never touch the user's live Word window; the gate is dev-box-only, not headless CI.
 
 ## Complexity Tracking
 *No constitution violations — empty.*
