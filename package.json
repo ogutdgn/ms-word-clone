@@ -16,7 +16,8 @@
     "test:roundtrip": "node scripts/test-roundtrip-pm.js",
     "test:bundle": "node scripts/check-overlay-bundle.js",
     "probe:coords": "electron . --probe-out=/tmp/wc-coords.json --shot-evalfile=scripts/paged-coords-probe.js",
-    "probe:pointer": "electron . --probe-out=/tmp/wc-pointer.json --shot-evalfile=scripts/paged-pointer-probe.js"
+    "probe:pointer": "electron . --probe-out=/tmp/wc-pointer.json --shot-evalfile=scripts/paged-pointer-probe.js",
+    "probe:statusbar": "electron . --probe-out=/tmp/wc-statusbar.json --shot-evalfile=scripts/paged-statusbar-probe.js"
   },
   "dependencies": {
     "@fluentui/svg-icons": "^1.1.328",

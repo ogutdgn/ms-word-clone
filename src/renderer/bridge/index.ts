@@ -34,6 +34,9 @@ let current: AnyEditor = null
 // Single document-level Esc listener for the format painter — attached exactly
 // once (installBridge re-runs on Open/New; per-call addEventListener would stack).
 let painterEscInstalled = false
+// M3: the live PE.onLayoutUpdated → StatusBar.update unsubscribe handle. Stored so a re-run of
+// installBridge tears down the prior subscription before re-subscribing (idempotent, no accumulation).
+let peLayoutUnsub: (() => void) | null = null
 // Concurrency guard: replaceEditor must not overlap itself (concurrent Open/New
 // clicks must not race — second call is refused while first is in flight).
 let replacing = false
@@ -411,6 +414,7 @@ export function preinstallBridge() {
       getEditor: () => current,
       getPresentation: () => ((window as any).WC?.presentation ?? null),
       getOverlayPageCount: () => (((window as any).WC?.PM?.__pagination?.pageCount as number) || 1),
+      getOverlayPagination: () => ((window as any).WC?.PM?.__pagination ?? null), // M3: overlay break-scan source
     }),
     // slice 11: zoom + view ownership migrated off the retired WC.Editor. The
     // #pages host carries the scale() transform; the content node is #pm-editor.
@@ -645,6 +649,15 @@ export function installBridge(editor: AnyEditor) {
   // page sheet).
   installNotesArea(editor)
   installFocusGuards()
+  // M3: in paged mode PresentationEditor re-paginates WITHOUT a doc transaction (zoom, reflow),
+  // so the transaction/selection-driven status-bar refresh (state-sync.ts) misses it and "Page X
+  // of Y" goes stale. Subscribe PE's layout hook to keep it live. Guarded to THIS paged editor
+  // (pe.editor === editor) so an overlay replaceEditor re-run never re-subscribes to an orphaned PE.
+  const pe = w.WC?.presentation
+  if (pe && typeof pe.onLayoutUpdated === 'function' && pe.editor === editor) {
+    try { peLayoutUnsub?.() } catch { /* prior-sub teardown is best-effort */ }
+    peLayoutUnsub = pe.onLayoutUpdated(() => { w.WC?.StatusBar?.update?.() }) || null
+  }
   PM.ready = true
   editor.view?.focus() // PM page owns the caret from boot (replaces legacy boot focus)
   return PM

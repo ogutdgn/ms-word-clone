@@ -44,6 +44,9 @@ export interface CoordinateAdapterDeps {
   getEditor(): any | null
   getPresentation(): any | null
   getOverlayPageCount(): number
+  // The overlay decoration-paginator's live object (`WC.PM.__pagination`) — its `breaks` drive the
+  // overlay current-page scan in getCurrentPage(). null in paged mode (PE owns the count there).
+  getOverlayPagination(): { breaks?: Array<{ pos: number; pages?: number }> } | null
 }
 
 export interface CoordinateAdapter {
@@ -55,6 +58,8 @@ export interface CoordinateAdapter {
   getPageCount(): number
   /** Enumerate pages. paged: presentation.getPages() (real Layout pages); overlay: length-only shim. */
   getPages(): PageInfo[]
+  /** 1-based current page of the caret. paged: PE.computeCaretLayoutRect(caret).pageIndex+1; overlay: __pagination break-scan. */
+  getCurrentPage(): number
 }
 
 // ─── M4-DEFERRED (documented, NOT implemented in M1) ─────────────────────────────────────
@@ -151,6 +156,28 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       const out: PageInfo[] = []
       for (let i = 0; i < n; i++) out.push({ index: i })
       return out
+    },
+
+    getCurrentPage(): number {
+      try {
+        const editor = deps.getEditor()
+        if (!editor) return 1
+        let caret = 1
+        try { caret = editor.view.state.selection.from } catch { caret = 1 }
+        const pe = deps.getPresentation()
+        if (pe && typeof pe.computeCaretLayoutRect === 'function') {
+          // paged: PE owns the caret→page mapping (DOM-first, geometry fallback).
+          const r = pe.computeCaretLayoutRect(caret)
+          return r && Number.isFinite(r.pageIndex) ? r.pageIndex + 1 : 1
+        }
+        // overlay: sheets advanced by the seams at/above the caret + 1 — VERBATIM from the legacy
+        // statusbar.js:70 break-scan (a blank page is ONE seam spanning two boundaries → pages>1).
+        const pg = deps.getOverlayPagination()
+        const breaks = (pg && pg.breaks) || []
+        return breaks.filter((b) => b.pos <= caret).reduce((a, b) => a + (b.pages || 1), 0) + 1
+      } catch {
+        return 1
+      }
     },
   }
 }

@@ -61,14 +61,15 @@
       // counts() stub returns zeros (the correct boot display) before PM.ready.
       if (!(WC.PM && WC.PM.active)) return;
       const c = WC.PM.counts();
-      // Phase 4a: real "Page X of Y" from the pagination engine — total page count
-      // + the caret's page (sheets advanced by the seams above the caret + 1).
-      const pg = WC.PM.__pagination || { pageCount: c.pages || 1, breaks: [] };
-      let cur = 1;
-      // Each seam advances `pages` sheets (its band count) — a blank page is ONE seam that
-      // spans TWO boundaries — so the caret's page = the sheets advanced above it + 1.
-      try { const caret = WC.view.state.selection.from; cur = (pg.breaks || []).filter((b) => b.pos <= caret).reduce((a, b) => a + (b.pages || 1), 0) + 1; } catch (e) {}
-      this.pageEl.textContent = 'Page ' + Math.min(cur, pg.pageCount || 1) + ' of ' + (pg.pageCount || 1);
+      // M3: real "Page X of Y" via the WC.PM.coords seam — correct in BOTH renderers (paged:
+      // PE getPageCount/computeCaretLayoutRect; overlay: __pagination count + the break-scan,
+      // moved verbatim into the adapter). statusbar no longer reads __pagination directly. coords is
+      // installed in preinstallBridge alongside WC.PM.active (guarded above), so it is present here;
+      // both methods always return >= 1, so no numeric fallback is needed.
+      const coords = WC.PM.coords;
+      const total = coords ? coords.getPageCount() : 1;
+      const cur = coords ? coords.getCurrentPage() : 1;
+      this.pageEl.textContent = 'Page ' + Math.min(cur, total) + ' of ' + total;
       this.wordEl.textContent = c.selWords ? `${c.selWords} of ${c.words} words` : `${c.words} words`;
     },
     updateZoom() {
