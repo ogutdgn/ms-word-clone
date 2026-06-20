@@ -46,6 +46,17 @@ const HANDLES: HandleSpec[] = [
 
 interface Box { left: number; top: number; width: number; height: number }
 
+// M4b.1: write a live preview size onto an image element (and its inner <img> if it's a wrapper).
+// Used during a resize drag for BOTH the editable node DOM and (paged) the PAINTED image element, so the
+// image itself — not just the handle outline — resizes while dragging. (overlay: paintedDom is null → no-op.)
+function applyPreviewSize(el: HTMLElement | null, width: number, height: number): void {
+  if (!el || !el.style) return
+  el.style.width = width + 'px'
+  el.style.height = height + 'px'
+  const img = el.tagName === 'IMG' ? el : el.querySelector('img')
+  if (img && img !== el) { (img as HTMLElement).style.width = width + 'px'; (img as HTMLElement).style.height = height + 'px' }
+}
+
 class ImageResizeView {
   view: any
   overlay: HTMLElement | null = null
@@ -56,6 +67,7 @@ class ImageResizeView {
   drag: {
     pos: number
     nodeDOM: HTMLElement
+    paintedDom: HTMLElement | null // M4b.1: the PAINTED image element (paged) — for the live drag preview
     startW: number
     startH: number
     aspect: number
@@ -208,6 +220,11 @@ class ImageResizeView {
     let dom: any = null
     try { dom = this.view.nodeDOM(sel.pos) } catch { dom = null }
     if (!dom) return
+    // M4b.1: in paged mode `this.view` is the HIDDEN inner editor, so `dom` (view.nodeDOM) is the
+    // off-screen image — a live preview written to it is invisible. Also grab the PAINTED image element
+    // (PE's getElementAtPos) so onDragMove resizes the image the user actually sees. Null in overlay.
+    let paintedDom: HTMLElement | null = null
+    try { const ed = (window as any).WC?.editor; if (ed?.presentationEditor && typeof ed.getElementAtPos === 'function') paintedDom = ed.getElementAtPos(sel.pos) } catch { paintedDom = null }
     const box = this.boxFor(sel.pos)
     if (!box) return
     const startW = box.width
@@ -215,6 +232,7 @@ class ImageResizeView {
     this.drag = {
       pos: sel.pos,
       nodeDOM: dom as HTMLElement,
+      paintedDom,
       startW,
       startH,
       aspect: startH > 0 ? startW / startH : 1,
@@ -260,15 +278,13 @@ class ImageResizeView {
     }
     d.width = width
     d.height = height
-    // Live preview (cheap DOM; the real model write happens once on pointer-up). Set BOTH axes —
-    // the image renderDOM now honors an explicit height, so a free-stretch previews correctly.
-    d.nodeDOM.style.width = width + 'px'
-    d.nodeDOM.style.height = height + 'px'
-    const innerImg = d.nodeDOM.tagName === 'IMG' ? d.nodeDOM : d.nodeDOM.querySelector('img')
-    if (innerImg && innerImg !== d.nodeDOM) {
-      ;(innerImg as HTMLElement).style.width = width + 'px'
-      ;(innerImg as HTMLElement).style.height = height + 'px'
-    }
+    // Live preview (cheap DOM; the real model write happens once on pointer-up). Set BOTH axes — the image
+    // renderDOM now honors an explicit height, so a free-stretch previews correctly. Apply to the editable
+    // node DOM AND (paged) the PAINTED image, so the image — not just the handle outline — resizes live.
+    // (No PE repaint happens mid-drag — no doc change — so the painted inline style persists; the commit's
+    // repaint on pointer-up replaces it with the final size.)
+    applyPreviewSize(d.nodeDOM, width, height)
+    applyPreviewSize(d.paintedDom, width, height)
     // Keep the overlay box tracking the preview.
     if (this.overlay) {
       this.overlay.style.width = width + 'px'

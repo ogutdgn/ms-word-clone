@@ -94,6 +94,49 @@
       const d = Math.max(Math.abs(hidden.left - painted.left), Math.abs(hidden.top - painted.top));
       return d > 5 ? ('Δ(hidden,painted)=' + Math.round(d) + 'px') : ('Δ=' + Math.round(d) + ' — too close; nodeBoxFor may be reading the hidden view' && false);
     });
+    // M4b.1: a synthetic SE-handle drag must resize the PAINTED <img> LIVE (during the drag, pre-commit) AND
+    // commit that size on pointer-up. We measure the INNER <img> (the pixels the user sees), not just the
+    // [data-pm] wrapper, so a write that inflates only the wrapper can't false-pass. The drag runs OUTSIDE
+    // t() so a try/finally can always fire pointer-up (no leaked window listeners if a measure throws).
+    const imgOf = (el) => (el ? (el.tagName === 'IMG' ? el : el.querySelector('img')) : null);
+    const paintedAt = () => { try { return W.editor.getElementAtPos(imagePos); } catch (e) { return null; } };
+    const paintedEl = paintedAt();
+    const handle = document.querySelector('.wc-img-handle-se');
+    const beforeW = imgOf(paintedEl) ? imgOf(paintedEl).getBoundingClientRect().width : null;
+    let duringW = null, dragThrew = null;
+    if (paintedEl && handle && beforeW != null) {
+      const hr = handle.getBoundingClientRect();
+      const cx = hr.left + hr.width / 2, cy = hr.top + hr.height / 2;
+      try {
+        handle.dispatchEvent(new PointerEvent('pointerdown', { clientX: cx, clientY: cy, button: 0, buttons: 1, pointerId: 9, isPrimary: true, bubbles: true, cancelable: true }));
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: cx + 80, clientY: cy + 53, buttons: 1, pointerId: 9, bubbles: true }));
+        const im = imgOf(paintedEl); // SAME element across the drag (no repaint mid-drag) — its <img> shows the preview
+        duringW = im ? im.getBoundingClientRect().width : null;
+      } catch (e) { dragThrew = (e && e.message) || String(e); }
+      finally { window.dispatchEvent(new PointerEvent('pointerup', { clientX: cx + 80, clientY: cy + 53, pointerId: 9, bubbles: true })); }
+    }
+    t('dragging a handle resizes the PAINTED <img> LIVE (during drag, pre-commit)', () => {
+      if (!paintedEl || !handle) return ('paintedEl=' + !!paintedEl + ' seHandle=' + !!handle) && false;
+      if (beforeW == null || duringW == null) return ('no inner <img> rect (before=' + beforeW + ' during=' + duringW + ')') && false;
+      if (dragThrew) return ('drag threw: ' + dragThrew) && false;
+      return duringW > beforeW + 5 ? ('img W ' + Math.round(beforeW) + '→' + Math.round(duringW) + ' DURING drag') : ('img W ' + Math.round(beforeW) + '→' + Math.round(duringW) + ' — image did NOT resize live (only the outline)' && false);
+    });
+    // COMMIT outcome: after the pointer-up repaint, the FRESH painted <img> must HOLD the dragged-to size —
+    // proves the commit took and no stale inline style fights PE's repaint. Poll for the rebuilt element.
+    let committedW = null;
+    if (duringW != null) {
+      for (let i = 0; i < 50; i++) {
+        await sleep(50);
+        const im = imgOf(paintedAt());
+        const w = im ? im.getBoundingClientRect().width : null;
+        if (w != null) { committedW = w; if (Math.abs(w - duringW) <= 8) break; }
+      }
+    }
+    t('commit: painted image HOLDS the dragged-to size after pointer-up', () => {
+      if (duringW == null) return 'no live size to compare' && false;
+      if (committedW == null) return 'no painted image after commit' && false;
+      return Math.abs(committedW - duringW) <= 8 ? ('committed W ' + Math.round(committedW) + ' ≈ dragged ' + Math.round(duringW)) : ('committed W ' + Math.round(committedW) + ' ≠ dragged ' + Math.round(duringW) + ' — commit/stale-style mismatch' && false);
+    });
   } else {
     // OVERLAY PARITY — nodeBoxFor === the legacy boxFor formula (view.nodeDOM rect → #pages-local / WC.PM.zoom).
     const legacyBox = () => {
