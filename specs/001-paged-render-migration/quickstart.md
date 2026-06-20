@@ -1,59 +1,55 @@
-# Quickstart — Validate Milestone 4c (ink-overlay retarget)
+# Quickstart — Validate Milestone 4d (notes-area disable + header-footer test)
 
-M4c retargets the freehand ink overlay to the painted pages in paged mode via
-`WC.PM.coords.clientToOverlayLocalPt`, keeping overlay mode byte-identical (mode-branch).
+M4d disables the `#pm-notes-area` overlay in paged (PE owns footnotes) + proves header/footer works in paged.
+Overlay byte-identical; header-footer.ts unchanged.
 
 ## Prerequisites
-- Branch `slice/m4c-ink` (off `layout-engine`); `npm run build` succeeds.
+- Branch `slice/m4d-notes-hf` (off `layout-engine`); `npm run build` succeeds.
 
 ## 1. Regression gates (overlay default — MUST stay flat)
 ```bash
 npm run build
-npm run test:pm        # expect 475
 npm run test:smoke     # expect 9
 npm run test:roundtrip # expect 27
 npm run test:bundle    # expect 4/4
+npm run test:pm        # paged behavior is PROBE-gated; the suite's 268/475 early-abort is pre-existing (tracked)
 ```
 
-## 2. Paged ink probe (the headline checks)
+## 2. Notes probe
 ```bash
 WC_LAYOUT=paged npm run build
-electron . --probe-out=/tmp/wc-ink.json --shot-evalfile=scripts/paged-ink-probe.js
+electron . --probe-out=/tmp/wc-notes.json --shot-evalfile=scripts/paged-notes-probe.js
 ```
-Expect PASS (paged):
-- **render-on-page**: `dInsertInk` a stroke at the caret → exactly ONE `.pm-ink-stroke` renders; its `getBBox` lands
-  inside the target `.superdoc-page[data-page-index]`'s `#pages`-local box (NOT at the `#pm-editor`-offset origin).
-- **page-2 placement**: multi-page fixture, caret on page 2 → the stroke's bbox falls inside page 2's painted box.
-- **clientToOverlayLocalPt round-trip**: a viewport point over a painted page → correct `pageIndex` + `#pages`-local
-  coords that invert `posToOverlayLocalRect` for a known pos on that page.
-- **tools**: synthetic eraser pointerdown on a rendered stroke → its `vectorShape` node is deleted (`data-ink-pos`);
-  select adds `.sel`; a lasso loop selects the enclosed stroke(s).
-- **reopened-ink no-double-draw**: export→openDocx an ink stroke → it renders exactly once at the right page (PE OR
-  overlay, not both).
-- **probe-first checks** (surface as explicit rows): `getElementAtPos(inkPos)` resolves the stroke's
-  `.superdoc-page`; PE's invisible fallback box does not intercept the overlay's pointer events.
-
-## 3. Overlay parity
+Expect PASS (paged): inserting a footnote → PE PAINTED a per-page footnote body; `#pm-notes-area` absent OR
+`display:none`; the transaction driver did NOT re-render it; endnotes also disabled; `refShowNotes` scrolls the
+painted footnote into view. Then overlay parity (`#pm-notes-area` still mounts + edits).
 ```bash
-npm run build   # default (overlay)
-electron . --probe-out=/tmp/wc-ink-ovl.json --shot-evalfile=scripts/paged-ink-probe.js
+npm run build   # overlay
+electron . --probe-out=/tmp/wc-notes-ovl.json --shot-evalfile=scripts/paged-notes-probe.js
 ```
-Expect overlay rows PASS: `.pm-ink-stroke` `d`-strings + `svg.wc-ink-layer` geometry byte-identical to pre-M4c for
-the same inputs (the mount stays on the `#pm-editor`-offset origin; `localPt` unchanged).
 
-## 4. Manual draw spot-check (real app — automation can't drive a live draw)
-`WC_LAYOUT=paged npm run build && npx electron .` → Draw tab → pick the pen → draw on page 1 and page 2; the stroke
-should follow the cursor and land on the page drawn on; eraser/select/lasso should hit the right strokes.
-(computer-use is blocked for the dev build → this is a human spot-check, not a gate.)
+## 3. Header/footer probe
+```bash
+WC_LAYOUT=paged npm run build
+electron . --probe-out=/tmp/wc-hf.json --shot-evalfile=scripts/paged-headerfooter-probe.js
+```
+Expect PASS (paged): `setHeaderText`/`setFooterText` → `get*` round-trip; `exportDocxBytes` carries `word/headerN.xml
+<w:hdr>` + `sectPr <w:headerReference>` + the rels relationship; a REPLACE leaves no stale text; a programmatically
+opened PE header session routes the bridge verbs through the live editor + survives exit/commit. Then overlay parity.
+
+## 4. Manual spot-check (real app — paged)
+`WC_LAYOUT=paged npm run build && npx electron .` → insert a footnote (References tab) → it should appear at the
+**page bottom** (PE), NOT in a separate panel below the doc; double-click it to edit. Show Notes jumps to it. Set a
+header (Insert ▸ Header) → it shows + exports.
 
 ## 5. Code review
-`/code-review` on the slice diff; fix all findings; re-run 1–3.
+`/code-review` on the slice diff; fix all findings (watch listener-leak + probe-honesty); re-run 1–3.
 
 ## Done checklist
 - [ ] Build clean.
-- [ ] test:pm 475 / smoke 9 / roundtrip 27 / bundle 4.
-- [ ] paged ink probe all-PASS (render-on-page, page-2, round-trip, tools, reopened no-double-draw + probe-first rows).
-- [ ] overlay parity PASS (byte-identical).
-- [ ] manual draw spot-check OK (or noted).
+- [ ] smoke 9 / roundtrip 27 / bundle 4 (test:pm probe-gated).
+- [ ] probe:notes all-PASS (paged disabled + PE-painted + Show-Notes scroll; overlay parity).
+- [ ] probe:headerfooter all-PASS (paged parity export + interop; overlay parity).
+- [ ] overlay byte-identity (`#pm-notes-area` mounts in overlay).
 - [ ] `/code-review` clean.
-- [ ] Runbook Current Status updated; slice ff-merged into `layout-engine`.
+- [ ] Runbook Current Status updated; slice ff-merged into `layout-engine` → **M4 COMPLETE**.

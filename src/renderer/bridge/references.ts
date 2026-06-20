@@ -282,6 +282,25 @@ export function installReferences(editor: AnyEditor) {
   // (showNotes returns false when the region is hidden / absent).
   function refShowNotes(): boolean {
     try {
+      // M4d (paged): the #pm-notes-area overlay is DISABLED — PE paints footnote/endnote bodies per-page at the page
+      // foot. Word's References ▸ Show Notes jumps to the note area, so scroll the first locatable painted note body
+      // into view. PE gives no footnote-classed element, so locate it by the note's body text under .superdoc-page.
+      // Iterate ALL notes (skip empty bodies + the case where notes[0] is an unlocatable endnote), and among the
+      // matches prefer the LOWEST on screen (PE paints notes at the page FOOT — so a coincidental body occurrence of
+      // the same text higher up does not win).
+      if ((window as any).__WC_LAYOUT_MODE === 'paged') {
+        const pages = document.getElementById('pages')
+        if (!pages) return false
+        const els = Array.from(pages.querySelectorAll('.superdoc-page .superdoc-line, .superdoc-page .superdoc-fragment')) as HTMLElement[]
+        for (const note of refListFootnotes()) {
+          const needle = String((note && note.content) || '').trim()
+          if (!needle) continue
+          let best: HTMLElement | null = null, bestTop = -Infinity
+          for (const el of els) { if ((el.textContent || '').indexOf(needle) !== -1) { const top = el.getBoundingClientRect().top; if (top > bestTop) { bestTop = top; best = el } } }
+          if (best) { best.scrollIntoView({ block: 'nearest' }); return true }
+        }
+        return false // no note body locatable (e.g. all-empty bodies) — documented inert
+      }
       const na = (window as any).WC?.NotesArea
       if (na && typeof na.showNotes === 'function') return na.showNotes() === true
       // Fallback (notes-area not installed — e.g. mid-replace): degrade to "any notes?".

@@ -20,7 +20,9 @@
     "probe:statusbar": "electron . --probe-out=/tmp/wc-statusbar.json --shot-evalfile=scripts/paged-statusbar-probe.js",
     "probe:overlays": "electron . --probe-out=/tmp/wc-overlays.json --shot-evalfile=scripts/paged-overlays-probe.js",
     "probe:imageresize": "electron . --probe-out=/tmp/wc-imageresize.json --shot-evalfile=scripts/paged-image-resize-probe.js",
-    "probe:ink": "electron . --probe-out=/tmp/wc-ink.json --shot-evalfile=scripts/paged-ink-probe.js"
+    "probe:ink": "electron . --probe-out=/tmp/wc-ink.json --shot-evalfile=scripts/paged-ink-probe.js",
+    "probe:notes": "electron . --probe-out=/tmp/wc-notes.json --shot-evalfile=scripts/paged-notes-probe.js",
+    "probe:headerfooter": "electron . --probe-out=/tmp/wc-hf.json --shot-evalfile=scripts/paged-headerfooter-probe.js"
   },
   "dependencies": {
     "@fluentui/svg-icons": "^1.1.328",

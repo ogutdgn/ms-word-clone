@@ -166,6 +166,11 @@ function renderInner() {
   const pm = PM()
   const pages = document.getElementById('pages')
   let region = document.getElementById('pm-notes-area')
+  // M4d: in PAGED mode PE paints footnote/endnote bodies per-page at the page foot (editable inline) — the
+  // below-sheet #pm-notes-area would DOUBLE-render + mis-position, so DISABLE it here (hide + tear down any region,
+  // reset the signature). Covers footnotes AND endnotes (one region) and every render path. Overlay path unchanged
+  // (this branch is never taken). installNotesArea() additionally skips the per-keystroke driver in paged.
+  if ((window as any).__WC_LAYOUT_MODE === 'paged') { if (region) { region.innerHTML = ''; region.style.display = 'none' } lastSig = ''; return }
   if (!pm || !editor || !pages) { if (region) region.style.display = 'none'; return }
 
   const notes: any[] = (typeof pm.refListFootnotes === 'function' && pm.refListFootnotes()) || []
@@ -298,6 +303,11 @@ export function installNotesArea(ed: AnyEditor) {
     render, // synchronous variant (probe/test determinism)
     showNotes, // refShowNotes (references.ts) routes here
   }
-  ed.on?.('transaction', schedule)
-  schedule()
+  // M4d: in paged the overlay is disabled (PE owns footnotes) — skip the per-keystroke driver so no transaction
+  // listener thrashes the paged editor with no-op work. The WC.NotesArea facade above stays DEFINED (guarded
+  // no-ops: render() early-returns in paged, showNotes() too) so references.ts / tests never throw.
+  if ((window as any).__WC_LAYOUT_MODE !== 'paged') {
+    ed.on?.('transaction', schedule)
+    schedule()
+  }
 }
