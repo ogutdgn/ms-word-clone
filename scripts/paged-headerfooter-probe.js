@@ -98,6 +98,83 @@
     t('overlay: headerFooterState inactive + no contextual tab', () => (PM.headerFooterState().active === false && !hfTab()) ? 'inactive' : ('unexpected' && false));
   }
 
+  // ─── P2 (002): Different First Page / Different Odd & Even variants ─────────────────────
+  // Mode-agnostic model + export (the toggles + variant text route through the doc-api section
+  // adapters + the story-runtime — zero coords, identical paged/overlay); the painted-band check
+  // is paged-only. variant ∈ default|first|even = Word Primary/FirstPage/EvenPages.
+  t('P2 verbs present (setDifferentFirstPage/setDifferentOddEven/getHeaderFooterOptions)', () => ['setDifferentFirstPage', 'setDifferentOddEven', 'getHeaderFooterOptions'].every((k) => typeof PM[k] === 'function'));
+  try { await PM.newBlank(); } catch (e) {}
+  await sleep(140);
+
+  // Different First Page: the titlePg flag + distinct first/primary header & footer text.
+  t('setDifferentFirstPage(true) accepted', () => PM.setDifferentFirstPage(true) === true);
+  t('getHeaderFooterOptions().differentFirstPage === true', () => PM.getHeaderFooterOptions().differentFirstPage === true ? 'on' : ('got ' + JSON.stringify(PM.getHeaderFooterOptions()) && false));
+  t('setHeaderText("PrimaryHdr", {variant:"default"}) accepted', () => PM.setHeaderText('PrimaryHdr', { variant: 'default' }) === true);
+  t('setHeaderText("FirstHdr", {variant:"first"}) accepted', () => PM.setHeaderText('FirstHdr', { variant: 'first' }) === true);
+  t('setFooterText("FirstFtr", {variant:"first"}) accepted', () => PM.setFooterText('FirstFtr', { variant: 'first' }) === true);
+  await sleep(180);
+  t('getHeaderText({variant:"first"}) round-trips "FirstHdr"', () => PM.getHeaderText({ variant: 'first' }) === 'FirstHdr' ? 'FirstHdr' : ('got ' + JSON.stringify(PM.getHeaderText({ variant: 'first' })) && false));
+  t('getHeaderText({variant:"default"}) round-trips "PrimaryHdr" (no variant bleed)', () => PM.getHeaderText({ variant: 'default' }) === 'PrimaryHdr' ? 'PrimaryHdr' : ('got ' + JSON.stringify(PM.getHeaderText({ variant: 'default' })) && false));
+  await ta('export: sectPr has <w:titlePg> + headerReference type="first" AND type="default"', async () => {
+    const { doc } = await exp();
+    if (!/<w:titlePg\b/.test(doc)) return 'no <w:titlePg> in sectPr' && false;
+    if (!/<w:headerReference\b[^>]*\bw:type="first"/.test(doc)) return 'no headerReference type="first"' && false;
+    if (!/<w:headerReference\b[^>]*\bw:type="default"/.test(doc)) return 'no headerReference type="default"' && false;
+    return 'titlePg + first/default refs present';
+  });
+  await ta('export: a first-variant header part carries "FirstHdr" distinct from the primary "PrimaryHdr"', async () => {
+    const { parts } = await exp();
+    const first = Object.entries(parts).find(([k, v]) => /header\d*\.xml$/i.test(k) && /FirstHdr/.test(String(v)));
+    const prim = Object.entries(parts).find(([k, v]) => /header\d*\.xml$/i.test(k) && /PrimaryHdr/.test(String(v)));
+    if (!first) return 'no header part with FirstHdr' && false;
+    if (!prim) return 'no header part with PrimaryHdr' && false;
+    if (first[0] === prim[0]) return 'first + primary collapsed into one part' && false;
+    return 'distinct first/primary parts';
+  });
+
+  // Different Odd & Even: the document-level evenAndOddHeaders flag + even-variant text.
+  t('setDifferentOddEven(true) accepted', () => PM.setDifferentOddEven(true) === true);
+  t('getHeaderFooterOptions().differentOddEven === true', () => PM.getHeaderFooterOptions().differentOddEven === true ? 'on' : ('got ' + JSON.stringify(PM.getHeaderFooterOptions()) && false));
+  t('setHeaderText("EvenHdr", {variant:"even"}) accepted', () => PM.setHeaderText('EvenHdr', { variant: 'even' }) === true);
+  await sleep(180);
+  t('getHeaderText({variant:"even"}) round-trips "EvenHdr"', () => PM.getHeaderText({ variant: 'even' }) === 'EvenHdr' ? 'EvenHdr' : ('got ' + JSON.stringify(PM.getHeaderText({ variant: 'even' })) && false));
+  await ta('export: settings.xml has <w:evenAndOddHeaders> + headerReference type="even" with EvenHdr', async () => {
+    const { parts, doc } = await exp();
+    const settings = String(parts['word/settings.xml'] || '');
+    if (!/<w:evenAndOddHeaders\b/.test(settings)) return 'no <w:evenAndOddHeaders> in settings.xml' && false;
+    if (!/<w:headerReference\b[^>]*\bw:type="even"/.test(doc)) return 'no headerReference type="even"' && false;
+    const even = Object.entries(parts).find(([k, v]) => /header\d*\.xml$/i.test(k) && /EvenHdr/.test(String(v)));
+    if (!even) return 'no header part with EvenHdr' && false;
+    return 'evenAndOddHeaders + even ref present';
+  });
+
+  // Toggle OFF clears each flag (round-trip both directions).
+  t('setDifferentFirstPage(false) clears the flag', () => { PM.setDifferentFirstPage(false); return PM.getHeaderFooterOptions().differentFirstPage === false ? 'cleared' : ('still on' && false); });
+  t('setDifferentOddEven(false) clears the flag', () => { PM.setDifferentOddEven(false); return PM.getHeaderFooterOptions().differentOddEven === false ? 'cleared' : ('still on' && false); });
+  await ta('export after clear: no <w:titlePg> and no <w:evenAndOddHeaders>', async () => {
+    const { parts, doc } = await exp();
+    const settings = String(parts['word/settings.xml'] || '');
+    if (/<w:titlePg\b/.test(doc)) return 'titlePg still present after clear' && false;
+    if (/<w:evenAndOddHeaders\b/.test(settings)) return 'evenAndOddHeaders still present after clear' && false;
+    return 'both flags cleared';
+  });
+
+  // Painted first-page band (paged only): with titlePg on + first content authored, page 1's
+  // header band reflects the FIRST variant (a blank doc is a single page == the first page).
+  if (mode === 'paged') {
+    await ta('paged paint: page-1 header band reflects the first-page variant', async () => {
+      try { await PM.newBlank(); } catch (e) {}
+      await sleep(140);
+      PM.setDifferentFirstPage(true);
+      PM.setHeaderText('PaintFirst', { variant: 'first' });
+      PM.setHeaderText('PaintPrimary', { variant: 'default' });
+      await sleep(400);
+      const band = document.querySelector('.superdoc-page .superdoc-page-header');
+      const txt = band ? (band.textContent || '') : '';
+      return /PaintFirst/.test(txt) ? 'first-variant painted on page 1' : ('page-1 band="' + txt.slice(0, 48) + '" (expected PaintFirst)' && false);
+    });
+  }
+
   try { await PM.newBlank(); } catch (e) {} // teardown: reset global header/footer state
   return done();
 })();

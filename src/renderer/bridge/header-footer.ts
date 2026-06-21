@@ -40,39 +40,50 @@ export function installHeaderFooter(editor: AnyEditor) {
   const converter = (): any => { try { return editor.converter } catch { return null } }
   const docApi = (): any => { try { return editor.doc } catch { return null } }
 
-  // Section 0's address ({ kind:'section', sectionId }) for the slot locator —
-  // from the public sections discovery (items[].address IS a SectionAddress).
-  function firstSectionAddress(): { kind: 'section'; sectionId: string } | null {
+  // Section N's address ({ kind:'section', sectionId }) for the slot locator — from
+  // the public sections discovery (items[].address IS a SectionAddress). v1 is
+  // single-section so callers pass 0; the index param keeps the seam multi-section
+  // ready without a later signature churn.
+  function sectionAddressAt(index: number): { kind: 'section'; sectionId: string } | null {
     try {
-      const d = docApi()
-      const first = d?.sections?.list?.()?.items?.[0]
-      const addr = first?.address
+      const items = docApi()?.sections?.list?.()?.items
+      // Out-of-bounds index ⇒ undefined ⇒ null (fail-safe): a missing section must surface as
+      // ''/false, NOT a silent read/write of section 0. (No items[0] fallback — that would mask
+      // a bad section index as a wrong-section hit; reviewed 002 P2.)
+      const item = Array.isArray(items) ? items[index] : null
+      const addr = item?.address
       if (addr && typeof addr.sectionId === 'string' && addr.sectionId.length > 0) return addr
     } catch { /* fall through */ }
     return null
   }
+  const firstSectionAddress = () => sectionAddressAt(0)
 
-  // HeaderFooterSlotStoryLocator (story.types.ts): kind:'story' + storyType +
-  // section + headerFooterKind + variant (+ resolution/onWrite defaults).
-  function slotLocator(kind: HFKind): any {
-    const section = firstSectionAddress()
+  // P2 (002): a header/footer slot is (kind, variant, section). variant ∈ default|first|even
+  // = Word's Primary/FirstPage/EvenPages (default ≈ primary/odd); section defaults to 0
+  // (single-section v1). No `opts` ⇒ {variant:'default', section:0} = exact P1 behaviour.
+  type HFVariant = 'default' | 'first' | 'even'
+  interface HFOpts { variant?: HFVariant; section?: number }
+  const VARIANTS: readonly HFVariant[] = ['default', 'first', 'even']
+  const normVariant = (v: unknown): HFVariant => (VARIANTS.indexOf(v as HFVariant) >= 0 ? (v as HFVariant) : 'default')
+  const normSection = (s: unknown): number => { const n = Number(s); return Number.isInteger(n) && n >= 0 ? n : 0 }
+
+  // HeaderFooterSlotStoryLocator (story-types.ts): kind:'story' + storyType + section +
+  // headerFooterKind + variant + resolution/onWrite. WRITE resolves 'effective' then
+  // materializeIfInherited (creates the variant's LOCAL part). READ uses 'explicit' for
+  // first/even so a variant read returns ONLY that variant's part (no inheritance bleed to
+  // the primary) — 'default' keeps 'effective' (P1 back-compat: the primary IS the base).
+  function slotLocator(kind: HFKind, variant: HFVariant, sectionIndex: number, intent: 'read' | 'write'): any {
+    const section = sectionAddressAt(sectionIndex)
     if (!section) return null
-    return {
-      kind: 'story',
-      storyType: 'headerFooterSlot',
-      section,
-      headerFooterKind: kind,
-      variant: 'default',
-      resolution: 'effective',
-      onWrite: 'materializeIfInherited',
-    }
+    const resolution = intent === 'read' && variant !== 'default' ? 'explicit' : 'effective'
+    return { kind: 'story', storyType: 'headerFooterSlot', section, headerFooterKind: kind, variant, resolution, onWrite: 'materializeIfInherited' }
   }
 
   // Resolve the slot for WRITE (materializes a local part if inherited/missing),
   // replace the story editor's content with one paragraph of `text` (empty =>
   // cleared), commit the OOXML part + sectPr ref, then dispose. Returns true on commit.
-  function setSlotText(kind: HFKind, text: string): boolean {
-    const locator = slotLocator(kind)
+  function setSlotText(kind: HFKind, text: string, opts?: HFOpts): boolean {
+    const locator = slotLocator(kind, normVariant(opts?.variant), normSection(opts?.section), 'write')
     if (!locator) return false
     const value = typeof text === 'string' ? text : String(text ?? '')
     let runtime: AnyRuntime = null
@@ -102,8 +113,8 @@ export function installHeaderFooter(editor: AnyEditor) {
 
   // Resolve the slot for READ and extract plain text. Returns '' when no
   // header/footer exists (the runtime throws STORY_NOT_FOUND — caught here).
-  function getSlotText(kind: HFKind): string {
-    const locator = slotLocator(kind)
+  function getSlotText(kind: HFKind, opts?: HFOpts): string {
+    const locator = slotLocator(kind, normVariant(opts?.variant), normSection(opts?.section), 'read')
     if (!locator) return ''
     let runtime: AnyRuntime = null
     try {
@@ -119,10 +130,55 @@ export function installHeaderFooter(editor: AnyEditor) {
     }
   }
 
-  const setHeaderText = (text: string): boolean => setSlotText('header', text)
-  const setFooterText = (text: string): boolean => setSlotText('footer', text)
-  const getHeaderText = (): string => getSlotText('header')
-  const getFooterText = (): string => getSlotText('footer')
+  const setHeaderText = (text: string, opts?: HFOpts): boolean => setSlotText('header', text, opts)
+  const setFooterText = (text: string, opts?: HFOpts): boolean => setSlotText('footer', text, opts)
+  const getHeaderText = (opts?: HFOpts): string => getSlotText('header', opts)
+  const getFooterText = (opts?: HFOpts): string => getSlotText('footer', opts)
+
+  // ─── P2 (002): section header/footer structure options ───────────────────────────────────
+  // Different First Page = sectPr/titlePg (sections.setTitlePage); Different Odd & Even =
+  // settings/evenAndOddHeaders (sections.setOddEvenHeadersFooters). Both are public Document-API
+  // adapters (no fork edit); the variant CONTENT itself is materialized by setHeaderText/-Footer
+  // with opts.variant 'first'/'even'. A NO_OP result (already in the requested state) counts as
+  // success — these are idempotent toggles. setTitlePage requires `target` (a SectionAddress);
+  // setOddEvenHeadersFooters is a document-settings mutation (no target).
+  const sectionsApi = (): any => { try { return docApi()?.sections } catch { return null } }
+  const mutationOk = (res: any): boolean => res?.success === true || res?.failure?.code === 'NO_OP'
+
+  function setDifferentFirstPage(on: boolean): boolean {
+    try {
+      const sx = sectionsApi()
+      const addr = firstSectionAddress()
+      if (!sx?.setTitlePage || !addr) return false
+      const ok = mutationOk(sx.setTitlePage({ enabled: !!on, target: addr }))
+      if (ok) markDirty()
+      return ok
+    } catch { return false }
+  }
+
+  function setDifferentOddEven(on: boolean): boolean {
+    try {
+      const sx = sectionsApi()
+      if (!sx?.setOddEvenHeadersFooters) return false
+      const ok = mutationOk(sx.setOddEvenHeadersFooters({ enabled: !!on }))
+      if (ok) markDirty()
+      return ok
+    } catch { return false }
+  }
+
+  // { differentFirstPage, differentOddEven } from section 0's projection — sections.get returns
+  // the SectionInfo domain (carries titlePage + oddEvenHeadersFooters; odd/even is a
+  // document-level setting projected onto every section). Drives the contextual-tab toggles.
+  function getHeaderFooterOptions(): { differentFirstPage: boolean; differentOddEven: boolean } {
+    const off = { differentFirstPage: false, differentOddEven: false }
+    try {
+      const sx = sectionsApi()
+      const addr = firstSectionAddress()
+      if (!sx?.get || !addr) return off
+      const info = sx.get({ address: addr })
+      return { differentFirstPage: !!info?.titlePage, differentOddEven: !!info?.oddEvenHeadersFooters }
+    } catch { return off }
+  }
 
   // ─── P1 (002): on-page enter/exit/state for the "Header & Footer Tools" tab ──────────────
   // The paged PresentationEditor already PAINTS per-page header/footer bands (.superdoc-page-
@@ -217,5 +273,9 @@ export function installHeaderFooter(editor: AnyEditor) {
     return { active: true, region: lastMode === 'footer' ? 'footer' : 'header' }
   }
 
-  return { setHeaderText, setFooterText, getHeaderText, getFooterText, enterHeaderFooter, closeHeaderFooter, headerFooterState }
+  return {
+    setHeaderText, setFooterText, getHeaderText, getFooterText,
+    enterHeaderFooter, closeHeaderFooter, headerFooterState,
+    setDifferentFirstPage, setDifferentOddEven, getHeaderFooterOptions,
+  }
 }

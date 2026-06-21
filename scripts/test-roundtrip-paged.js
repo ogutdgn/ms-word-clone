@@ -36,7 +36,9 @@ const die = (msg) => { console.error('FATAL: ' + msg); console.log('RESULT: ' + 
 // ── build + probe helpers ──
 const build = (mode) => {
   console.log('  build WC_LAYOUT=' + (mode || 'overlay') + ' ...');
-  const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, env: Object.assign({}, process.env, { WC_LAYOUT: mode === 'paged' ? 'paged' : '' }), stdio: 'inherit', shell: true, timeout: 600000 });
+  // NB: overlay must be set EXPLICITLY — post-FR-013 (paged-default flip) an empty WC_LAYOUT falls back to 'paged'
+  // (main.ts:35), so the old `: ''` built paged-as-overlay → the overlay probe booted paged. 'overlay' is explicit.
+  const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, env: Object.assign({}, process.env, { WC_LAYOUT: mode === 'paged' ? 'paged' : 'overlay' }), stdio: 'inherit', shell: true, timeout: 600000 });
   if (r.status !== 0) die('build (' + mode + ') exited ' + r.status);
 };
 const probe = (evalfile, outName) => {
@@ -92,12 +94,13 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p2\.docx$/.test(n) || /^wc-hf-p2-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
   const pagedKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-paged.json');
   const pagedInk = probe('scripts/paged-export-m5-ink-probe.js', 'wc-m5-ink-paged.json');
+  const pagedHfP2 = probe('scripts/paged-export-hf-p2-probe.js', 'wc-hf-p2-paged.json'); // 002 P2 variants/flags doc
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -109,11 +112,14 @@ async function main() {
   check('paged kitchen-sink probe: fail===0', pagedKS.summary && pagedKS.summary.fail === 0, pagedKS.summary ? pagedKS.summary.fail + ' of ' + pagedKS.summary.total : 'no summary');
   check('overlay kitchen-sink probe: fail===0', ovlKS.summary && ovlKS.summary.fail === 0, ovlKS.summary ? ovlKS.summary.fail + ' of ' + ovlKS.summary.total : 'no summary');
   check('paged ink probe: fail===0', pagedInk.summary && pagedInk.summary.fail === 0, pagedInk.summary ? pagedInk.summary.fail + ' of ' + pagedInk.summary.total : 'no summary');
+  check('paged HF-P2 probe ran in PAGED mode', pagedHfP2.summary && pagedHfP2.summary.mode === 'paged', 'mode=' + (pagedHfP2.summary && pagedHfP2.summary.mode));
+  check('paged HF-P2 probe: fail===0', pagedHfP2.summary && pagedHfP2.summary.fail === 0, pagedHfP2.summary ? pagedHfP2.summary.fail + ' of ' + pagedHfP2.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
     'overlay kitchen-sink': DOCX_DIR + '/wc-overlay-m5-kitchensink.docx',
     'paged ink': DOCX_DIR + '/wc-paged-m5-ink.docx',
+    'paged HF-P2': DOCX_DIR + '/wc-paged-hf-p2.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -138,6 +144,23 @@ async function main() {
 
     const hf = comValidate('validate-headerfooter-win.ps1', pks);
     check('header/footer read-back: headerText ~ M5HDR + footerText ~ M5FTR', hf.ok && hf.json && /M5HDR/.test(String(hf.json.headerText || '')) && /M5FTR/.test(String(hf.json.footerText || '')), hf.ok ? ('headerText=' + JSON.stringify(hf.json && hf.json.headerText) + ' footerText=' + JSON.stringify(hf.json && hf.json.footerText)) : ((hf.json && hf.json.error) || hf.raw.slice(0, 140)));
+  }
+
+  // ── 5b) P2 (002) header/footer variant + structure-flag read-back on the dedicated P2 .docx ──
+  console.log('\nC2) paged HF-P2 read-backs == authored (DFP/odd-even flags + first/even variant text):');
+  {
+    const p2 = DOCS['paged HF-P2'];
+    const hf2 = comValidate('validate-headerfooter-win.ps1', p2);
+    const j = hf2.json || {};
+    const errDetail = (extra) => hf2.ok ? extra : ((j.error) || hf2.raw.slice(0, 140));
+    check('HF-P2: opened without repair + enum self-check', hf2.ok && j.openedWithoutRepair === true && j.enumCheck === true, errDetail(JSON.stringify({ open: j.openedWithoutRepair, enum: j.enumCheck })));
+    check('HF-P2: DifferentFirstPage flag === true', hf2.ok && j.differentFirstPage === true, errDetail('got ' + JSON.stringify(j.differentFirstPage)));
+    check('HF-P2: DifferentOddEven flag === true', hf2.ok && j.differentOddEven === true, errDetail('got ' + JSON.stringify(j.differentOddEven)));
+    check('HF-P2: primary header ~ P2PRIMH', hf2.ok && /P2PRIMH/.test(String(j.primaryHeader || '')), errDetail('got ' + JSON.stringify(j.primaryHeader)));
+    check('HF-P2: first header ~ P2FIRSTH', hf2.ok && /P2FIRSTH/.test(String(j.firstHeader || '')), errDetail('got ' + JSON.stringify(j.firstHeader)));
+    check('HF-P2: first footer ~ P2FIRSTF', hf2.ok && /P2FIRSTF/.test(String(j.firstFooter || '')), errDetail('got ' + JSON.stringify(j.firstFooter)));
+    check('HF-P2: even header ~ P2EVENH', hf2.ok && /P2EVENH/.test(String(j.evenHeader || '')), errDetail('got ' + JSON.stringify(j.evenHeader)));
+    check('HF-P2: even footer ~ P2EVENF', hf2.ok && /P2EVENF/.test(String(j.evenFooter || '')), errDetail('got ' + JSON.stringify(j.evenFooter)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

@@ -55,13 +55,13 @@ document-write path. Doc model stays page-free. Prefer NO fork edits.
 
 **Goal**: distinct first-page and odd/even header/footer variants that round-trip to Word. **Independent test**: enable Different First Page, give page 1 a distinct header; save → reopen → Word — first-page header differs and the flag is set; repeat for Odd & Even.
 
-- [ ] T018 [US2] Extend `src/renderer/bridge/header-footer.ts`: `setHeaderText(text, opts?)`/`getHeaderText(opts?)` and footer twins take `opts.variant ∈ {default,first,even}` + `opts.section` (default 0), backward-compatible (no `opts` ⇒ default/section-0); route variants through `resolveHeaderFooterSlotRuntime`.
-- [ ] T019 [US2] Add `setDifferentFirstPage(on)` (sectPr `titlePg`), `setDifferentOddEven(on)` (settings `evenAndOddHeaders`), and `getHeaderFooterOptions()` to `src/renderer/bridge/header-footer.ts`; merge onto `WC.PM` in `bridge/index.ts` with no-op fallbacks.
-- [ ] T020 [US2] Wire the two contextual-tab toggles in `src/renderer/public/js/header-footer-tools-pm.js` + `commands.js` (`differentFirstPage`/`differentOddEven` → the verbs; checked-state from `getHeaderFooterOptions()`); add the controls via `scripts/gen.js`; un-defer them in `bridge/index.ts`.
-- [ ] T021 [US2] Extend `scripts/paged-headerfooter-probe.js`: toggle each option, author distinct first/even content, assert the painted first/even bands + the exported `sectPr titlePg` / `evenAndOddHeaders` + the variant header/footer parts.
-- [ ] T022 [US2] Extend `scripts/oracle/validate-headerfooter-win.ps1`: self-verify `wdHeaderFooterFirstPage=2`/`EvenPages=3`; read back `PageSetup.DifferentFirstPageHeaderFooter`, `PageSetup.OddAndEvenPagesHeaderFooter`, `Headers(2)/Headers(3)/Footers(2)/Footers(3).Range.Text`; assert equal to authored.
-- [ ] T023 [US2] VERIFY P2: build + 4 gates + `probe:headerfooter` + the COM oracle (flags + variant text) green; `/code-review` xhigh; FIX; re-verify.
-- [ ] T024 [US2] CLOSE-OUT P2: commit; update runbook + memory; ff-merge → `main` + push.
+- [x] T018 [US2] Extend `src/renderer/bridge/header-footer.ts`: `setHeaderText(text, opts?)`/`getHeaderText(opts?)` and footer twins take `opts.variant ∈ {default,first,even}` + `opts.section` (default 0), backward-compatible (no `opts` ⇒ default/section-0); route variants through `resolveHeaderFooterSlotRuntime`.
+- [x] T019 [US2] Add `setDifferentFirstPage(on)` (sectPr `titlePg`), `setDifferentOddEven(on)` (settings `evenAndOddHeaders`), and `getHeaderFooterOptions()` to `src/renderer/bridge/header-footer.ts`; merge onto `WC.PM` in `bridge/index.ts` with no-op fallbacks.
+- [x] T020 [US2] Wire the two contextual-tab toggles in `src/renderer/public/js/header-footer-tools-pm.js` + `commands.js` (`differentFirstPage`/`differentOddEven` → the verbs; checked-state from `getHeaderFooterOptions()`); add the controls via `scripts/gen.js`; un-defer them in `bridge/index.ts`.
+- [x] T021 [US2] Extend `scripts/paged-headerfooter-probe.js`: toggle each option, author distinct first/even content, assert the painted first/even bands + the exported `sectPr titlePg` / `evenAndOddHeaders` + the variant header/footer parts.
+- [x] T022 [US2] Extend `scripts/oracle/validate-headerfooter-win.ps1`: self-verify `wdHeaderFooterFirstPage=2`/`EvenPages=3`; read back `PageSetup.DifferentFirstPageHeaderFooter`, `PageSetup.OddAndEvenPagesHeaderFooter`, `Headers(2)/Headers(3)/Footers(2)/Footers(3).Range.Text`; assert equal to authored.
+- [x] T023 [US2] VERIFY P2: build + 4 gates + `probe:headerfooter` + the COM oracle (flags + variant text) green; `/code-review` xhigh; FIX; re-verify.
+- [x] T024 [US2] CLOSE-OUT P2: commit; update runbook + memory; ff-merge → `main` + push.
 
 **Checkpoint**: first-page and odd/even variants work on-page and round-trip to real Word.
 

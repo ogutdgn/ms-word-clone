@@ -162,7 +162,7 @@ const AREA: Record<string, string> = {
 // Tools" tab drives entry/exit through the bridge verbs (enterHeaderFooter/closeHeaderFooter).
 // P1 delivers goToHeader/goToFooter/closeHeaderFooter (header/footer = the Insert dropdowns,
 // already ready). P2 adds differentFirstPage/differentOddEven; P3 adds pageNumber.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter'])
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -419,6 +419,8 @@ export function preinstallBridge() {
     // Phase 4 (item 3) + 002 header/footer pre-mount stubs (replaced by installHeaderFooter on mount)
     setHeaderText: () => false, setFooterText: () => false, getHeaderText: () => '', getFooterText: () => '',
     enterHeaderFooter: async () => false, closeHeaderFooter: () => false, headerFooterState: () => ({ active: false }),
+    setDifferentFirstPage: () => false, setDifferentOddEven: () => false,
+    getHeaderFooterOptions: () => ({ differentFirstPage: false, differentOddEven: false }),
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,

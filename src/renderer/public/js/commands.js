@@ -403,13 +403,22 @@
   H.goToFooter = () => { WC.PM.enterHeaderFooter('footer'); };
   H.closeHeaderFooter = () => { WC.PM.closeHeaderFooter(); };
   // Deferred / inert long-tail Header & Footer controls — honest toasts, no legacy refs.
-  // (differentFirstPage / differentOddEven get real WC.PM wiring in P2; pageNumber in P3.)
   H.docInfo = () => WC.toast('Document Info fields in the header/footer are not available in this version.');
   H.showDocText = () => WC.toast('Show Document Text is not available in this version.');
   H.dateAndTime = () => WC.toast('Date & Time in the header/footer is not available in this version.');
   H.linkToPrevious = () => WC.toast('Link to Previous applies across sections (this is a single-section document).');
-  H.differentFirstPage = () => WC.toast('Different First Page is coming in a later update.');
-  H.differentOddEven = () => WC.toast('Different Odd & Even Pages is coming in a later update.');
+  // P2: toggle the section's Different First Page / Different Odd & Even structure options,
+  // then re-sync the contextual-tab checked state from the bridge (the single source of truth).
+  H.differentFirstPage = () => {
+    const cur = (WC.PM.getHeaderFooterOptions && WC.PM.getHeaderFooterOptions()) || {};
+    WC.PM.setDifferentFirstPage(!cur.differentFirstPage);
+    if (WC.HeaderFooterToolsPM && WC.HeaderFooterToolsPM.refreshOptionToggles) WC.HeaderFooterToolsPM.refreshOptionToggles();
+  };
+  H.differentOddEven = () => {
+    const cur = (WC.PM.getHeaderFooterOptions && WC.PM.getHeaderFooterOptions()) || {};
+    WC.PM.setDifferentOddEven(!cur.differentOddEven);
+    if (WC.HeaderFooterToolsPM && WC.HeaderFooterToolsPM.refreshOptionToggles) WC.HeaderFooterToolsPM.refreshOptionToggles();
+  };
   H.horizontalLine = () => { WC.PM.insertHr(); };
   H.wordArt = (c, node) => insertWordArt();
   H.textBox = () => { WC.PM.xeTextBox(''); };
