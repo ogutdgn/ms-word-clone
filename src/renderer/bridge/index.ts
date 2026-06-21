@@ -222,6 +222,35 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
     // At this point the old editor may have been destroyed and the mount cleared;
     // call failBridge so the legacy world becomes visible rather than a blank page.
     try {
+      // PAGED: load the new doc INTO the live PresentationEditor instead of the overlay teardown below — the PE binds
+      // the bridge to its HIDDEN inner editor, so the teardown (`current.destroy()` + `mountEl.innerHTML=''`) would kill
+      // the PE + wipe the painted `.superdoc-page` DOM + leave `w.WC.presentation` dangling → open/new dead in paged.
+      // `replaceFile` re-imports via the super-converter → a `replaceWith(0,size,newDoc)` transaction the PE's update
+      // listener repaints IN PLACE, preserving the PE, mountEl, bridge closures, presentation, the wc:paged-relayout
+      // listeners + all 6 overlays (M4a–M4d). This runs INSIDE the Phase-2 try, so a replaceFile throw → the Phase-2
+      // catch → failBridge (replaceFile is NOT validate-before-mutate — once it has run the live doc IS changed, so the
+      // Phase-1 'untouched' contract no longer applies). parseDocx above already validated the bytes.
+      const pres = w.WC?.presentation
+      if (w.__WC_LAYOUT_MODE === 'paged' && pres?.editor?.replaceFile) {
+        await pres.editor.replaceFile(source) // docx-open OR a blank template (the html/text/csv legs pass blankArrayBuffer)
+        if (extra?.html) {
+          // html/text/csv import: apply the markup into the now-blank PE. Mirror the overlay §5.3 data-loss guard — if
+          // the markup carried text but NOTHING landed (a degraded import), do NOT let the caller bind a path to a blank
+          // doc (a later save would overwrite the original with the blank).
+          let landed = false
+          try { pres.editor.chain().selectAll().insertContent(extra.html).run(); landed = (pres.editor.state.doc.textContent || '').trim().length > 0 } catch { /* createNodeFromContent threw → degraded */ }
+          if (!landed && extra.html.replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').trim().length > 0) {
+            lastImportBlanked = true // the old doc is gone + the import is blank — caller must unbind its file state
+            w.WC.view = pres.editor.view; w.WC.PM.setClean(); pres.editor.view?.focus()
+            return false
+          }
+        }
+        w.WC.view = pres.editor.view // identity-stable across replaceFile, but keep the WC seam in sync
+        w.WC.PM.setClean()
+        try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
+        pres.editor.view?.focus()
+        return true
+      }
       try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
       mountEl.innerHTML = ''
       let contentErr = false
