@@ -102,9 +102,12 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 npm start                                   # build (electron-vite) + run the app
 
 # Gate suites — always build first:
-npm run build && npm run test:pm            # PM functional suite (grows per slice)
-npm run build && npm run test:smoke         # PM-core smoke (9)
-npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
+WC_LAYOUT=overlay npm run build && npm run test:pm  # PM functional suite — validates the OVERLAY engine (475);
+                                            #   a boot-mode guard FAILS LOUDLY against a paged build. Paged is
+                                            #   validated by the dedicated probes (probe:*). See memory
+                                            #   paged-testpm-overlay-suite.
+npm run build && npm run test:smoke         # PM-core smoke (9) — mode-agnostic (default paged build OK)
+npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate) — mode-agnostic
 ```
 
 <!-- SPECKIT START -->

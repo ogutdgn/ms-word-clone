@@ -1,5 +1,9 @@
-/* PM-world functional suite (Phase 2). Run:
-   npm run build && npx electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js
+/* PM-world functional suite (Phase 2). Validates the OVERLAY rendering engine — build OVERLAY first:
+     WC_LAYOUT=overlay npm run build && npx electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js
+   ~70 tests read overlay-only constructs (PM.__pagination, the #pm-notes-area overlay, overlay DOM) that the
+   default PAGED engine does NOT expose; paged is covered by the dedicated probes (probe:* + report:glyphgeom).
+   A boot-mode guard (below) fails loudly if run against a non-overlay build — see memory
+   paged-testpm-overlay-suite (a stale localStorage WC_LAYOUT silently flipped a paged build → the false-green).
    Sentinel-gated (NEVER --shot-delay-dependent). Same JSON contract as test-suite.js. */
 (async () => {
   const results = [];
@@ -12,6 +16,19 @@
     catch (e) { results.push({ name, pass: false, detail: 'ERR: ' + ((e && e.message) || e) }); }
   };
   for (let i = 0; i < 200 && !window.__WC_READY; i++) await sleep(50);
+
+  // GATE MODE GUARD (002 finding, see memory paged-testpm-overlay-suite): this suite validates the
+  // OVERLAY rendering engine — ~70 of its tests read overlay-only constructs (PM.__pagination from the
+  // overlay Pagination engine, the #pm-notes-area overlay, overlay table/list/border DOM) that the paged
+  // PresentationEditor does NOT expose, so it is VALID only in overlay. Paged is covered by the dedicated
+  // probes (probe:coords/pointer/statusbar/overlays/imageresize/ink/notes/headerfooter/opennew +
+  // report:glyphgeom). Refuse to run in the wrong mode with ONE loud failure rather than ~70 cryptic ones
+  // — and never silently pass-as-overlay when a stale localStorage WC_LAYOUT flips a paged build (the
+  // false-green that hid this: localStorage overrides the build define in main.ts).
+  if (window.__WC_LAYOUT_MODE !== 'overlay') {
+    results.push({ name: 'GATE MODE: test:pm validates the OVERLAY engine — build overlay (`WC_LAYOUT=overlay npm run build`) first; paged is covered by the probe:* probes. Booted mode=' + window.__WC_LAYOUT_MODE, pass: false, detail: '~70 tests assert overlay-only constructs (PM.__pagination, #pm-notes-area, overlay DOM) absent in paged — see memory paged-testpm-overlay-suite' });
+    return JSON.stringify({ summary: { total: results.length, pass: 0, fail: results.length }, results }, null, 2);
+  }
 
   const v = () => window.WC.view;
   const PM = () => window.WC.PM;

@@ -124,8 +124,9 @@ Read the doc that matches your task:
 # run (builds via electron-vite, then launches)
 npm start
 
-# PM functional suite — returns JSON to --probe-out
-npm run build && npm run test:pm
+# PM functional suite — returns JSON to --probe-out. Validates the OVERLAY engine (475); build OVERLAY
+# (a boot-mode guard fails loudly against a paged build). Paged rendering is covered by the probe:* probes.
+WC_LAYOUT=overlay npm run build && npm run test:pm
 node -e "const r=require('/tmp/wc-pm.json');console.log(r.summary)"
 
 # PM-core smoke (9)
