@@ -108,8 +108,10 @@ npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE 
 ```
 
 <!-- SPECKIT START -->
-Active spec-kit plan: [specs/001-paged-render-migration/plan.md](specs/001-paged-render-migration/plan.md)
-(Paged Render Migration — **Milestone 6**: glyph-metric tolerance vs the Word-COM oracle, REPORT-ONLY; M5 COMPLETE).
-M1+M2+M3+M4(a–d)+M5 done (archived under specs/001-paged-render-migration/milestones/). Sequencing is owned by
-[docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
+Active spec-kit plan: [specs/002-headers-footers/plan.md](specs/002-headers-footers/plan.md)
+(Headers & Footers in the paged editor — per-feature reconciliation on the now-default paged engine. P1 on-page
+enter/edit/close + the "Header & Footer Tools" contextual tab; P2 Different First Page / Odd & Even variants;
+P3 page-number fields. Probe-first spike resolves the entry mechanism. Validated vs the Word-COM oracle.)
+The paged-render migration (specs/001-paged-render-migration/) is COMPLETE & shipped to main. Sequencing is owned
+by [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
 <!-- SPECKIT END -->
