@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-06-21 (🚢 PAGED-RENDER MIGRATION COMPLETE & SHIPPED — now POST-MIGRATION; 002 headers/footers P1 done)
+
+> **Branch:** `main` (`a3e46da`, pushed). **Phase:** POST-MIGRATION (per-feature reconciliation + cleanup) —
+> the layout engine (Phase 4) is DONE.
+>
+> **🏁 THE PAGED-RENDER MIGRATION IS OVER.** M1…M6 + paged open/new + the paged-default FLIP (FR-013) + doc
+> reconciliation are all on `origin/main`. **Paged** (the SuperDoc PresentationEditor — real per-page sheets)
+> is the **shipping default**; overlay is the legacy engine behind `WC_LAYOUT=overlay`. Record:
+> `specs/001-paged-render-migration/`; full detail: [layout-engine-runbook.md](layout-engine-runbook.md).
+>
+> **We are now in the POST-MIGRATION PHASE** = per-feature reconciliation + cleanup, driven by spec-kit
+> features under `specs/00N-*`. Standing directive (memory `autonomous-postmigration-exec`): user pre-approves
+> the spec-kit plans + wants autonomous execution (plan → execute, no per-step approval); ff-merge to `main` + push.
+>
+> **Done this session:**
+> - Shipped the migration endgame (paged open/new fix, the paged-default flip, doc reconciliation, the
+>   `layout-engine → main` push).
+> - **002 Headers & Footers** (`specs/002-headers-footers/`, full spec-kit set). **P1 DONE + MERGED** (`a3e46da`):
+>   on-page header/footer editing on the paged engine + the "Header & Footer Tools" contextual tab, **fully
+>   no-fork** (a probe-first spike found entry/exit/state all reachable through the PE's public surface). A
+>   52-agent `/code-review` → 4 fixes (off-screen entry, materialize-clobber-race, focus-steal, stuck-tab-on-open/new).
+> - **Gate-infra finding + fix:** the migration's "paged test:pm 475" was a **FALSE GREEN** — `test:pm` is an
+>   OVERLAY-rendering suite (~70 tests read overlay-only `__pagination` / `#pm-notes-area` / overlay DOM), and a
+>   stale `localStorage WC_LAYOUT` in the shared probe profile made paged builds boot overlay (localStorage
+>   overrides the build define in `main.ts`). FIXED (`0f828a7`): a boot-mode guard pins `test:pm` to overlay
+>   (build overlay → 475; a paged build → 1 loud "build overlay" failure); paged rendering is covered by the
+>   dedicated `probe:*` probes. Memory: `paged-testpm-overlay-suite`.
+>
+> **Gate baseline now:** `test:pm` **475 (OVERLAY ONLY** — `WC_LAYOUT=overlay npm run build`) · `test:smoke`
+> **9** · `test:roundtrip` **27** · `test:bundle` **4** + the paged `probe:*` probes + `test:roundtrip:paged`
+> 19 + `report:glyphgeom` (dev-box-only).
+>
+> **Next:** **002 P2** (Different First Page / Different Odd & Even variants) → **P3** (page-number fields) —
+> `tasks.md` T018–T033, same no-fork story-runtime bridge + the Word-COM oracle. Then the post-migration
+> backlog (user picks order): overlay retirement · more per-feature reconciliation (the residual `isBlocked`
+> gates on layout-page/layout-arrange/text-effects) · port the ~70 overlay-only `test:pm` tests to paged-aware
+> variants · M6 → pass/fail gate + the multi-page pagination calibration (PE 2 vs Word 3) · paged
+> html/txt/csv import fidelity.
+>
+> **Blockers/notes:** none. ⚠️ `test:pm` MUST build overlay (the boot-guard enforces it; smoke/roundtrip are
+> mode-agnostic). Resume 002 P2 on a fresh feature branch off `main`.
+
 ## 2026-06-18 (Option-B layout engine: spec-kit adopted + umbrella spec; execution tracked in the RUNBOOK)
 
 > **Branch:** `layout-engine` (off `main` @ 7f15724; pushed to `origin/layout-engine`). **Phase:** 4 — layout engine, EXECUTION.

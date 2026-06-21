@@ -33,15 +33,36 @@
    **tick** the Daily work log below.
 6. **PR** for review; merge to the integration line; merge to `main` only at a stable milestone.
 
-## CURRENT PHASE → Phase 4 — LAYOUT ENGINE — 4a..4d.5 DONE (AutoFit trio complete) + a PAGINATION CARET fix; RELOCATE / row-split / frames-overlay / 4e NEXT
-> **AutoFit Contents (Phase 4d.5) DONE + MERGED** (PR #56 `c70c1fb`): completes the AutoFit trio
-> (Window+Fixed were 4d.4). The bridge measures each column's content width (reflow the selected table
-> at `table-layout:auto`, capped at the page text width, restore in `finally`) and passes it to
-> `autoFitTable`, which UNIFIES window+contents into one TableMap colwidth writer (the unify cleanup the
-> 4d.4 review flagged). Oracle: short "Hi" col vs a long col → Word 22.15pt + 332.25pt (short ≪ long,
-> col 1 exact). `/code-review high` → finally-restore + a stronger shrink assertion; rest refuted.
-> Gates: **PM 432 / smoke 9 / roundtrip 27**. **NEXT:** table RELOCATE / row-split-across-pages; OR the
-> FRAMES-OVERLAY (also unblocks the line-split coords-safe render); OR 4e headers/footers.
+## CURRENT PHASE → POST-MIGRATION (per-feature reconciliation + cleanup) — the layout engine (Phase 4) is DONE & SHIPPED
+> **🏁 The paged-render migration is COMPLETE & shipped to `main`** (paged = the default engine; the overlay
+> engine is legacy behind `WC_LAYOUT=overlay`). We are now in the **POST-MIGRATION phase**: per-feature
+> reconciliation + cleanup, driven by **spec-kit features** under `specs/00N-*`. The migration's full record is
+> [layout-engine-runbook.md](layout-engine-runbook.md) + `specs/001-paged-render-migration/`.
+>
+> **The loop (post-migration):** for each item, PLAN via `/speckit-specify` + `/speckit-plan` + `/speckit-tasks`
+> (or a scoped slice) on a **fresh feature branch off `main`** → a probe-first SPIKE for any unknown → IMPLEMENT
+> (NO fork edits; the `WC.PM` bridge is the only doc-write path; doc model stays page-free) → VERIFY (the gates +
+> the **Word-COM oracle** for fidelity + the `/code-review` fix-loop) → **ff-merge to `main` + push** → checkpoint
+> (this skill). **Standing directive** (memory `autonomous-postmigration-exec`): the user pre-approves the spec-kit
+> plans + wants autonomous execution (plan → execute, no per-step approval).
+>
+> **⚠️ GATES (post-flip — CORRECTED this session):** `test:pm` validates the **OVERLAY** engine — **build overlay**
+> (`WC_LAYOUT=overlay npm run build && npm run test:pm` → **475**; a boot-guard fails LOUDLY on a paged build, see
+> memory `paged-testpm-overlay-suite`). `test:smoke` (**9**) + `test:roundtrip` (**27**) + `test:bundle` (**4**) are
+> mode-agnostic (paged default OK). **Paged rendering is covered by the dedicated `probe:*` probes**
+> (coords/pointer/statusbar/overlays/imageresize/ink/notes/headerfooter/opennew + `report:glyphgeom`,
+> `test:roundtrip:paged` — dev-box-only).
+>
+> **IN PROGRESS — 002 Headers & Footers** (`specs/002-headers-footers/`): **P1 DONE + MERGED** (`a3e46da`) —
+> on-page header/footer editing on the paged engine + the "Header & Footer Tools" contextual tab, fully no-fork.
+> **NEXT: P2** (Different First Page / Different Odd & Even variants) → **P3** (page-number fields), `tasks.md`
+> T018–T033, same no-fork story-runtime bridge + the Word-COM oracle.
+>
+> **POST-MIGRATION BACKLOG** (independent; user picks order): finish **002 P2+P3** · **overlay retirement** (remove
+> the decoration-overlay engine + the `WC_LAYOUT=overlay` path) · **more per-feature reconciliation** (the residual
+> `isBlocked` gates on layout-page/layout-arrange/text-effects — un-block + wire vs the oracle) · **port the ~70
+> overlay-only `test:pm` tests** to paged-aware variants (real paged-suite coverage) · **M6 → pass/fail gate** + the
+> multi-page pagination calibration (PE 2 vs Word 3) · **paged html/txt/csv import fidelity**.
 >
 > <details><summary>Prior PAGINATION CARET-BUG CURRENT-PHASE note (kept for context)</summary>
 >
@@ -453,6 +474,14 @@ list-marker/spacing fidelity is per-feature polish; keep the headless Editor rea
 hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
+
+### 2026-06-21 (🚢 MIGRATION SHIPPED + 002 headers/footers P1 + the test:pm false-green fix)
+> (The migration days 06-18→06-21 were tracked in [layout-engine-runbook.md](layout-engine-runbook.md), not here — this is the consolidated checkpoint.)
+- [x] **Paged-render migration** M1…M6 + paged open/new + the paged-default **FLIP (FR-013)** + doc reconciliation — **shipped to `origin/main`** (`7af5590`); paged is the default engine, overlay is legacy behind `WC_LAYOUT=overlay`.
+- [x] **002 Headers & Footers P1** (`specs/002-headers-footers/`) — on-page header/footer editing on the paged engine + the "Header & Footer Tools" contextual tab, **fully no-fork** (probe-first spike found the entry/exit/state on the PE's public surface); 52-agent `/code-review` → 4 fixes; **merged to `main`** (`a3e46da`).
+- [x] **Gate fix** — found the migration's "paged test:pm 475" was a **FALSE GREEN** (a stale `localStorage WC_LAYOUT` made paged builds boot overlay; `test:pm` is an overlay-rendering suite — ~70 overlay-only tests). Pinned `test:pm` to overlay via a boot-guard (`0f828a7`); paged covered by the `probe:*` probes. Memory `paged-testpm-overlay-suite`.
+- [x] **Plan docs renewed** (plan-tracking): the layout engine (Phase 4) is DONE → **POST-MIGRATION phase**; CURRENT PHASE + gate baseline corrected.
+- [ ] **NEXT: 002 P2** (Different First Page / Different Odd & Even variants) → **P3** (page-number fields).
 
 ### 2026-06-17 (ITEM 4 keystone carve-out DONE — drag-reposition; STEERING INFLECTION on the render tier)
 - [x] **Keystone scope-workflow** audited 4a-4f: MODEL/EXPORT tier ~90% done; the remainder is the
