@@ -102,7 +102,7 @@ npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE 
 
 <!-- SPECKIT START -->
 Active spec-kit plan: [specs/001-paged-render-migration/plan.md](specs/001-paged-render-migration/plan.md)
-(Paged Render Migration — **Milestone 5**: paged .docx export ↔ Word-COM-oracle parity; M4 COMPLETE).
-M1+M2+M3+M4(a–d) done (archived under specs/001-paged-render-migration/milestones/). Sequencing is owned by
+(Paged Render Migration — **Milestone 6**: glyph-metric tolerance vs the Word-COM oracle, REPORT-ONLY; M5 COMPLETE).
+M1+M2+M3+M4(a–d)+M5 done (archived under specs/001-paged-render-migration/milestones/). Sequencing is owned by
 [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
 <!-- SPECKIT END -->

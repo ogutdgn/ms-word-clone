@@ -1,41 +1,53 @@
-# Data Model — Milestone 5 (paged export ↔ Word-COM-oracle parity)
+# M6 Data Model — glyph-geometry divergence
 
-M5 adds NO document-model entities (no `src/` change). It introduces test-infra concepts.
+Entities are runtime/JSON records (M6 is validation-only — no persistent model change). All units stated explicitly.
 
-## KitchenSinkFixture (the consolidated paged doc)
-- ONE doc edited in PAGED mode exercising every shared-model M4 construct: an **image** (inserted/resized), a
-  **comment** + a **tracked change**, a **footnote** + an **endnote**, and a **header/footer** (the header edited via
-  the paged story session where feasible). Seeded with DISTINCT marker text per construct so the read-back assertions
-  are unambiguous (e.g. `M5HDR`, `M5FTNOTE`, `M5CMT`).
-- Saved twice for the diff: `wc-paged-m5-kitchensink.docx` (paged) + `wc-overlay-m5-kitchensink.docx` (overlay, the
-  SAME edit) → the normalized structural diff proves equality.
+## Fixture
+A single calibration `.docx` + its identity.
+- `id` (e.g. `aptos-11`, `aptos-11-justified`, `times-12`, `multipage`)
+- `font` (family name as installed on the dev box, e.g. `Aptos`, `Calibri`, `Times New Roman`)
+- `sizePt` (10–12)
+- `alignment` (`left` | `justify`)
+- `kind` (`single-para` | `multi-page`)
+- `text` (the body string — BYTE-IDENTICAL across all single-para fixtures, so per-font width deltas are isolated)
+- `docxPath` (absolute `C:/tmp/wc-m6-<id>.docx`)
+- **Generation:** the app's paged export (D7) — the engine that paints == the producer of the `.docx` Word opens.
 
-## InkFixtureSet (the focused multi-page ink)
-- Multi-page paged doc with strokes drawn at: **(a)** a page-2+ float, **(b)** an inter-page-GAP-spanning stroke,
-  **(c)** the TOP of page 2 (where `TextSelection.near` snapping is touchy). Saved as `wc-paged-m5-ink.docx`. Reuses
-  `scripts/paged-ink-probe.js`'s draw+assert (page-local `posOffset` EMU on the correct page). Held to Word-VALID +
-  correct-page, NOT a diff vs overlay (ink intentionally differs).
+## PE line-geometry record (from `paged-glyphgeom-probe.js`, real renderer)
+One per painted line, read from the painted `.superdoc-page`. Units = **CSS px @ 96 DPI**, page-box-relative.
+- `page` (0-based painted page index)
+- `lineIndex` (0-based within the doc)
+- `topPx` (line top Y, relative to its `.superdoc-page` top)
+- `leftPx` (line start X / wrap X, relative to the page left)
+- `widthPx`
+- `firstCharOffset` (the document character offset of the line's first glyph — the alignment key)
+- plus `pageCount` + `perPageLineCount[]` (doc-level)
 
-## SavedExportArtifact
-- `{ filePath: 'C:/tmp/wc-paged-m5-<name>.docx', mode: 'paged'|'overlay', constructs: string[] }`. Written via
-  `window.wordApi.saveBytes({filePath, bytes})` from `WC.PM.exportDocxBytes()`. Glob-cleaned (`C:/tmp/wc-*-m5-*.docx`)
-  before each run.
+## Word char/line-geometry record (from `validate-glyphgeom-win.ps1`, hidden PID-safe COM)
+One per character (or word) after `Repaginate()` + print view. Units = **POINTS**, page-space.
+- `start` (`Range.Start` — the document char offset; the alignment key ↔ PE `firstCharOffset`)
+- `xPagePt` (`Information(<verified wdHorizontalPositionRelativeToPage>)`)
+- `yPagePt` (`Information(<verified wdVerticalPositionRelativeToPage>)`)
+- `line` (`Information(<verified wdFirstCharacterLineNumber>)` — wrap boundary = `start` where this increments)
+- `col` (`Information(<verified wdFirstCharacterColumnNumber>)`)
+- plus `lines` (`ComputeStatistics(wdStatisticLines)`) + `pages` (`ComputeStatistics(wdStatisticPages)`) + `enumCheck` (the self-verification result: first-char `xPagePt` ≈ left margin)
 
-## NormalizedDiffResult (shared-construct parity, tier 1)
-- Unzip both .docx; for each XML part, MASK the non-deterministic fields (`w:rsid*`, revision ids, `w14:*` wordIds,
-  any per-run allocator id) → canonicalize (sort parts + attributes) → compare. `{ equal: bool, deltas: [{part,
-  diff}] }`. `equal:true` proves the paged export === overlay export of the same model edit (the guard against a
-  silent PE-side model mutation). The exact mask set is derived from the **determinism check** (export one fixture
-  twice in one mode + diff).
+## Divergence record (per fixture, from `paged-glyphgeom-validate.js`)
+PE and Word aligned by char offset (PE `firstCharOffset` ↔ Word `start`), PE px→pt via ×0.75.
+- `fixtureId`, `font`, `sizePt`, `alignment`
+- `pageCount` `{pe, word, equal}` (target: **exact**)
+- `linesPerPage` `{pe[], word[], maxAbsDelta}` (target: **exact or ±1**)
+- `wrapPoints` `{agree:int, total:int, mismatches:[{lineIndex, peStartChar, wordStartChar}]}` (does line N start on the same char?)
+- `lineYDeltaPt[]` + `lineStartXDeltaPt[]` (per-line, signed)
+- **distribution** per metric: `{min, median, p95, max}` (absolute deltas)
 
-## ComValidateResult (Word-COM validation, both tiers)
-- `com-validate(scriptName, docxPath) → { ok: bool, … }` — spawnSync `powershell -File scripts/oracle/<scriptName>
-  <docxPath>` SANDBOX-DISABLED, parse JSON stdout. `validate-open-win.ps1` → `{ ok }` (opens with no repair, now
-  `OpenAndRepair:=false`). `validate-comments/notes/headerfooter-win.ps1` → read-back values (Comments Count +
-  Scope.Text catching `<scope-error>`; Footnotes/Endnotes Count + Item(1).Range.Text; Headers/Footers Range.Text).
-- **`ok:true` is necessary, NOT sufficient** — always paired with the read-back==seeded assertion.
+## Report (top-level, from `paged-glyphgeom-validate.js`)
+- `generatedFor` (Word build + font set + date — stamped by the driver)
+- `perFixture[]` (the Divergence records)
+- `perFontSummary[]` — per font: the worst-case + p95 of each metric across its fixtures (this is what SETS the tolerance)
+- `enumVerified` (bool — the ps1 self-verification passed for every fixture)
+- `pidSafe` (bool — no leaked WINWORD)
 
-## State transitions (the gate run)
-`glob-clean → spawn paged probe (save) → spawn overlay probe (save) → per .docx: com-validate(validate-open) ok:true
-→ com-validate(per-construct) read-back==seeded → normalized diff (shared) equal | ink: open-ok + page-correct →
-PASS/FAIL`. PID-safe (spawned WINWORD only); dev-box-only.
+## Tolerance (written into [contracts/m6-glyph-tolerance.md](contracts/m6-glyph-tolerance.md) AFTER the report runs)
+Derived from `perFontSummary`: page count = exact; lines-per-page = exact-or-±1; break/X = p95 (px or pt), per metric,
+reported per font. Lives ABOVE the 15-twip/1px floor. This is the M6 deliverable — the number that a FUTURE gate uses.

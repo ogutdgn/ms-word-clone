@@ -1,65 +1,42 @@
-# Phase 0 Research — Milestone 5 (paged export ↔ Word-COM-oracle parity)
+# M6 Research — glyph-metric tolerance vs the Word COM oracle
 
-Sourced from the **M5 understanding sweep** (3 parallel readers → synthesis → adversarial completeness critic;
-code-grounded, file/line cited).
+All decisions are grounded in the M6 understanding-sweep (verified file:line). Format: Decision / Rationale / Alternatives.
 
-## Decision: the export is MODE-INDEPENDENT → M5 VALIDATES (does not change) it
-- **Rationale (verified)**: `io.ts:16-21` `exportDocxBytes()` → `editor.exportDocx()`; `Editor.ts:3646-3656`
-  `#prepareDocumentForExport` serializes ONLY `this.state.doc` via a Transform + `toJSON` (NO view/DOM/layout read);
-  the bridge binds to `presentation.editor` = the SAME inner Editor (`create-editor.ts:127`, `index.ts:479`); PE does
-  NOT override `exportDocx` (grep clean) and its internal dispatches are setSelection-only. So for an identical model,
-  4 of 5 M4 constructs export identically; INK is the ONE intentional divergence.
-- **Alternatives considered**: prove by static inspection only → REJECTED (the project lesson: exportXmlOnly +
-  `test:roundtrip` BOTH miss Word-corruption). M5 proves it END-TO-END with real Word.
+## D1 — Report-only first cut (measure, then set the tolerance)
+- **Decision:** M6 ships a divergence **REPORT** (distribution that *sets* the tolerance), NOT a pass/fail gate.
+- **Rationale:** No tolerance number exists — FR-009/SC-005 (`spec.md:96,116`) literally say "the *agreed* tolerance", and the S3 quantifying spike (`docs/research/opensource-deepdive/05-edge-cases-and-technical-risks.md:81`) was never run. You can't gate against a threshold you haven't measured. Measuring first yields the data that *defines* the threshold.
+- **Alternatives:** A provisional pass/fail gate now (rejected — the threshold would be a guess); deferring measurement (rejected — M6's whole point is to quantify the ceiling).
 
-## Decision: `test:roundtrip` genuinely misses Word-corruption → M5 needs real Word COM
-- **Rationale (verified)**: `test-roundtrip-pm.js` spawns `docx-inspect.js` (a JS unzip/XML inspector) + an Electron
-  docx→PM→docx probe; it NEVER opens the file in Word. So a file can pass `test:roundtrip` yet trigger a Word repair.
-  `window.wordAPI.saveBytes` (`main.js:357-365`) writes real export bytes to an absolute path — the probe→file
-  primitive exists. The Word COM oracles (`scripts/oracle/*-win.ps1`) open real Word.
+## D2 — Full glyph X-Y comparison
+- **Decision:** compare page count + per-page line count + per-line **wrap points** (which char each line starts on) + per-line **Y** + per-char **X** (in points).
+- **Rationale:** The richest characterization. Wrap points answer "does our line-breaking match Word"; Y answers lines-per-page drift (the SC-005 metric); X answers intra-line glyph-advance drift. All come from the SAME `Range.Information()` reads, so the extra axes are nearly free once the ps1 exists.
+- **Alternatives:** counts-only (the literal spec minimum — too coarse to diagnose); counts+wrap (good, but X-Y is available for the same cost and the user wants the full picture).
 
-## Decision: build a Node → Word-COM bridge (THE new infra — not "primitive reuse")
-- **Rationale (critic)**: NO existing Node driver spawns any `validate-*-win.ps1` — every reference in `scripts/*.js`
-  is a comment/doc pointer; the 23 validate scripts are HAND-RUN per the runbook. So M5's Node→`spawnSync(powershell)`→
-  Word-COM orchestration is brand-new: it must own sandbox-disable (Word COM HANGS at `New-Object` inside a sandbox),
-  PID-safety (the validate-*-win.ps1 kill only the spawned WINWORD PID — never the user's window), STA/foreground
-  sequencing, and JSON-stdout parsing. Ship a small REUSABLE `scripts/oracle/com-validate.js` so M6 reuses it.
-- **Alternatives considered**: inline the spawn in the driver → REJECTED (M6 needs it too); use computer-use to drive
-  Word → BLOCKED for the dev build (but PowerShell COM is NOT blocked).
+## D3 — Fixtures: full Office font set, byte-identical text, + justified + multi-page
+- **Decision:** one `.docx` per **dev-box-installed Office font** (enumerate at fixture-gen time), a byte-identical body paragraph (~6–8 wrapped lines, Letter, 1in margins), body sizes ~10–12pt; PLUS a **justified** variant (predicted worst case) and a **~2.5-page** multi-page doc (page-break + per-page line count).
+- **Rationale:** Divergence is inherently **per-font** (Chromium's advances ≠ Word's GDI advances, scaling with glyph count). Byte-identical text isolates the per-font delta. Justified multiplies per-glyph error (worst case). Multi-page exercises the lines-per-page → page-break chain. The fonts must be the ones Word actually uses on this box = the system Office fonts.
+- **Alternatives:** Aptos-only (fastest, but misses the per-font spread the user wants characterized); a synthetic font list (rejected — must be the installed fonts Word renders).
 
-## Decision: parity = TWO-TIER (normalized structural diff for shared; Word-valid+page for ink)
-- **Rationale**: 4/5 constructs are model-shared → the strongest proof is the paged save EQUALS the overlay save of the
-  same edit. But a LITERAL byte-diff is unachievable — `exportDocx` mints fresh revision ids per run
-  (`Editor.ts #installWordIdAllocatorIfNeeded`), so even overlay-vs-overlay differs. → the shared-construct proof is a
-  NORMALIZED structural diff: unzip both, mask `w:rsid*`/revision ids/wordIds, sort parts + attrs, compare. INK
-  legitimately differs (re-anchored `insertPos` + page-local `posOffset`, `ink-overlay.ts:258-269` / `draw.ts:38-43` /
-  `vector-shape.js:135-138`) → a naive ink diff FAILS by design; ink is held to Word-VALID (no repair) + correct page.
-- **Verify FIRST**: export one fixture twice in one mode, diff the zips → confirm exactly which fields are
-  non-deterministic, to drive the masking.
+## D4 — Tolerance expressed per-metric, reported per-font
+- **Decision:** page count = **exact**; lines-per-page = **exact or ±1**; break/X position = **px (or pt) from the measured p95**; everything **reported per-font** so any font needing its own number is visible.
+- **Rationale:** The engine's **15-twip ≈ 1px ≈ 0.75pt** integer grid (`word-layout/src/unit-conversions.ts:16`) makes sub-px tolerance meaningless — tolerances live above this floor. A single universal px number would be set to the worst font's p95 and over-penalize good fonts; per-metric/per-font matches reality.
+- **Alternatives:** single universal number (blunt — rejected as the default); a sub-px tolerance (meaningless below the grid floor).
 
-## Decision: HARDEN `validate-open-win.ps1` (`OpenAndRepair:=false`)
-- **Rationale (critic)**: line 28 `Documents.Open($abs, $false, $true, $false)` passes only 4 positional args — the
-  `OpenAndRepair` arg is OMITTED; the header comment claiming `OpenAndRepair:=false` is aspirational. So `ok:true`
-  rests SOLELY on `DisplayAlerts=0` turning an INTERACTIVE repair prompt into a catchable error — a silent auto-repair
-  returns `ok:true` (false green). → pass `OpenAndRepair:=false` (positional padding with `$missing`), AND always pair
-  `ok:true` with the per-construct read-back (`ok:true` is necessary, NOT sufficient).
+## D5 — PE measurement: read the painted DOM in the REAL renderer
+- **Decision:** the PE probe reads each painted line's `getBoundingClientRect()` inside its `.superdoc-page` (CSS px @96dpi), running in the **real Electron renderer** (`electron . --shot-evalfile`), never headless.
+- **Rationale:** PE's advance comes from `ctx.measureText().width` (`measuring-dom/src/measurementCache.ts:92`) — REAL Chromium metrics. A headless/JSDOM run hits the mock-canvas 0.5-units/char stub (`canvas-resolver.ts:20-21`) → measures the stub, not the engine. The painted line element's rect is the engine's actual on-page output.
+- **Alternatives:** instrument the engine's internal layout objects (rejected — would need a fork edit; the painted rect is the same data, externally).
 
-## Decision: validate a header EDITED VIA THE PAGED STORY SESSION
-- **Rationale (critic)**: header/footer + footnotes are edited through SEPARATE story-session editors
-  (`HeaderFooterSessionManager` / `StoryPresentationSessionManager`), NOT the main inner editor. The "same
-  `convertedXml`" claim for a paged-SESSION edit was asserted, not traced. So M5 oracles a header edited via the paged
-  session (where feasible) — not only a bridge `setHeaderText` — before declaring header parity.
+## D6 — Word measurement: Range.Information() points, enum self-verified, NOT GetPoint
+- **Decision:** `$r.Collapse(1)` + `Range.Information(N)` for per-char page X/Y (points) + per-line wrap; `ComputeStatistics` for line/page counts; in the HIDDEN instance after `Repaginate()` + print view. **Self-verify each enum int** on a known one-line fixture before trusting it. Do NOT use `Window.GetPoint`.
+- **Rationale:** `Information()` is view-independent + works hidden → reuses the M5 PID-safe spawn-snapshot-kill skeleton (`validate-open-win.ps1:15-54`). The only enum proven in-repo is `Information(3)` (`word-oracle-win.ps1:341`); the readers disagreed on the X/Y/line/col ints, so they MUST be confirmed empirically. `GetPoint` returns SCREEN pixels and requires `Visible=$true` → fights PID-safety.
+- **Alternatives:** `GetPoint` for true w/h rects (rejected — visible window, DPI/zoom-coupled); hardcoding the enum ints from notes (rejected — unverified).
 
-## Decision: enumerate the ink corruption modes
-- **Rationale (critic)**: `paged-ink-probe.js` asserts page-local EMU only for a fixed page-1 stroke. The Word-repair
-  risks are: (a) a page-2+ float, (b) an inter-page-GAP-spanning stroke, (c) a top-of-page-2 stroke (where
-  `TextSelection.near` may snap the anchor to the wrong page). M5's ink fixtures MUST include all three.
+## D7 — Fixture generation: the app's own paged export
+- **Decision:** generate each fixture `.docx` via the app — set the font + insert the fixed paragraph (+ alignment) + `WC.PM.exportDocxBytes` → `wordAPI.saveBytes`. Fall back to a tiny OOXML author only if a font can't be driven through the UI/bridge.
+- **Rationale:** The engine that PAINTS the fixture is the one that produced the `.docx` Word OPENS — single source of truth, no third-party authoring tool to introduce its own layout. Reuses the M5 export path.
+- **Alternatives:** hand-authored OOXML (more control but a second layout authority); a Word-COM-authored fixture (rejected — circular: Word would author what we then measure Word against).
 
-## Decision: HYBRID / local-only cadence
-- **Rationale**: the gate's whole point is the real-Word save the headless gates miss → it needs real foreground Word
-  (M365 dev box), sandbox-disabled; it CANNOT run in headless CI (Word COM hangs at `New-Object` in a sandbox). Ship
-  `npm run test:roundtrip:paged`; run each milestone; document as dev-box-only / excluded from headless CI.
-
-## Out of scope (documented)
-- The pre-existing docx-REOPENED multi-page ink import gap (`customGeometry.inkPos` recovery — BOTH modes); no
-  export→reopen leg in M5. M6 (glyph metrics) + the `layout-engine → main` endgame.
+## D8 — No engine change in M6
+- **Decision:** M6 makes NO `src`/fork edit. If the data shows a *systematic* offset correctable via the empty calibration hook (`measuring-dom/src/index.ts:139-143`), that is a SEPARATE milestone.
+- **Rationale:** M6 is the *measurement* milestone (set the tolerance), mirroring M5's validation-only shape. Mixing in a calibration fix would conflate measuring the gap with closing it.

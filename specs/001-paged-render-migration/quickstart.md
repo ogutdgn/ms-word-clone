@@ -1,44 +1,41 @@
-# Quickstart — Validate Milestone 5 (paged export ↔ Word-COM-oracle parity)
+# M6 Quickstart — run the glyph-geometry divergence report
 
-M5 proves the paged-mode `.docx` export is Word-valid + equivalent to overlay, end-to-end against real Word.
-**Dev-box-only** (real foreground Word, sandbox-disabled, PID-safe); not headless CI. No `src/` change.
+**Dev-box only** (Windows + Word 16). The PE side needs the **real Electron renderer**; the Word side needs **real
+foreground-capable Word COM** run **sandbox-disabled** + **PID-safe**. See [plan.md](plan.md) / [contract](contracts/m6-glyph-tolerance.md).
 
 ## Prerequisites
-- Windows dev box with Word 16 (M365). Branch `slice/m5-paged-export-oracle` (off `layout-engine`). `npm run build`.
+- On `slice/m6-glyph-tolerance` (off `layout-engine`).
+- `npm run build` clean (no `src` change in M6, so the 5 gates stay green: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / roundtrip:paged 19).
+- Office fonts installed (the fixture generator enumerates them).
 
-## 1. Existing gates stay flat (no src change)
+## 1. Generate the fixtures (the app's own paged export)
 ```bash
-npm run build
-npm run test:pm        # 475   |  npm run test:smoke   # 9
-npm run test:roundtrip # 27    |  npm run test:bundle  # 4
+# builds paged + drives the app to author one .docx per installed Office font (byte-identical text) + a justified
+# variant + a ~2.5-page multi-page doc → C:/tmp/wc-m6-*.docx
+WC_LAYOUT=paged npm run build
+electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . \
+  --probe-out=/tmp/wc-m6-fixtures.json --shot-evalfile=scripts/paged-glyphgeom-fixtures.js
 ```
 
-## 2. The new paged COM gate (the M5 deliverable)
+## 2. Run the report (sandbox-disabled — Word COM)
 ```bash
-npm run test:roundtrip:paged   # runs sandbox-disabled (real Word COM); dev-box-only
+npm run report:glyphgeom      # node scripts/paged-glyphgeom-validate.js
 ```
-Expect ALL-PASS:
-- **Determinism check** — exporting one fixture twice (one mode) reveals exactly which fields are non-deterministic
-  (revision ids / rsid / wordIds) → those are masked in the structural diff.
-- **Kitchen-sink (paged)** → `validate-open` `ok:true` (now `OpenAndRepair:=false` — silent repairs surface too);
-  `validate-comments`/`validate-notes`/`validate-headerfooter` read-back == the seeded markers (no `<scope-error>`).
-- **Shared-construct parity** — the NORMALIZED structural diff of the paged save vs the overlay save of the SAME edit
-  is EQUAL (the guard against a silent PE-side model divergence).
-- **Multi-page ink** (page-2+, gap-spanning, top-of-page-2) → `validate-open` `ok:true` + the page-local `posOffset`
-  EMU lands on the correct page (NOT a diff vs overlay — ink intentionally differs).
+This, per fixture: runs the **PE probe** (real renderer → per-line px geometry) + the **Word ps1**
+(`validate-glyphgeom-win.ps1` → per-char point geometry, **self-verifying its `Information()` enum ints first**), aligns
+by character offset, converts px→pt, and emits the **per-font, per-metric divergence distribution**.
 
-## 3. PID-safety + Word hygiene
-- Only the SPAWNED WINWORD PIDs are killed — the user's live Word window is never touched. All powershell spawns are
-  sandbox-disabled (Word COM hangs at `New-Object` in a sandbox). Stale `C:/tmp/wc-*-m5-*.docx` are glob-cleaned first.
+> Must be invoked via the dangerously-disable-sandbox path for the powershell COM spawns (Word COM hangs at
+> `New-Object` inside a sandbox). PID-safe: only the spawned WINWORD is killed.
 
-## 4. Code review
-`/code-review` on the slice diff (scrutinize the Node→COM bridge: sandbox-disable, PID-safety, JSON parsing, the diff
-masking for false-confidence); fix all; re-run 1–2.
+## 3. Read the result + set the tolerance
+The report JSON's `perFontSummary[]` is the tolerance-setting artifact. Fill the blank right-hand column of the
+[contract](contracts/m6-glyph-tolerance.md) tolerance table from the measured p95 (per metric, per font). That number
+**is** the M6 deliverable; a future milestone turns it into a gate.
 
-## Done checklist
-- [ ] Build clean; pm 475 / smoke 9 / roundtrip 27 / bundle 4 unchanged.
-- [ ] `test:roundtrip:paged` ALL-PASS: kitchen-sink open-ok + read-backs + normalized diff EQUAL; ink open-ok + page-correct.
-- [ ] determinism check ran; the mask set is justified.
-- [ ] PID-safe; sandbox-disabled; the user's Word untouched.
-- [ ] `/code-review` clean.
-- [ ] Runbook updated (test:roundtrip:paged is dev-box-only); slice ff-merged into `layout-engine`.
+## Expected outcome
+- `ok:true`, `enumVerified:true`, `pidSafe:true`.
+- A per-font breakdown showing page count (exact), lines-per-page (exact or ±1), wrap-point agreement, and the p95 of
+  per-line Y and per-char X deltas. Justified + the worst font characterize the ceiling; the tolerance is set above the
+  15-twip/1px floor.
+- The 5 existing gates unchanged (M6 added no `src`).

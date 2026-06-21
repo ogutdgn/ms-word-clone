@@ -15,6 +15,7 @@
     "test:smoke": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-smoke.json --shot-evalfile=scripts/smoke-pm.js",
     "test:roundtrip": "node scripts/test-roundtrip-pm.js",
     "test:roundtrip:paged": "node scripts/test-roundtrip-paged.js",
+    "report:glyphgeom": "node scripts/paged-glyphgeom-validate.js",
     "test:bundle": "node scripts/check-overlay-bundle.js",
     "probe:ink:m5": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-m5-ink.json --shot-evalfile=scripts/paged-export-m5-ink-probe.js",
     "probe:export:m5": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-m5-ks.json --shot-evalfile=scripts/paged-export-m5-probe.js",
