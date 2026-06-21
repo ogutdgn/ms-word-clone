@@ -17,7 +17,10 @@ first, then dive into the linked `docs/`.
 >
 > **SINGLE WORLD:** the renderer builds with **electron-vite + TypeScript**, and the document core
 > is an **owned, vendored ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`,
-> no `superdoc` npm dep, telemetry off) mounted at `#pm-editor`. Phase 2 wired every ribbon area onto
+> no `superdoc` npm dep, telemetry off) mounted at `#pm-editor`. As of 2026-06-21 (FR-013) the default
+> rendering mode is the **paged** SuperDoc PresentationEditor, which paints real per-page multi-page sheets;
+> the legacy continuous-flow `overlay` paint is reachable only via `WC_LAYOUT=overlay npm run build` and is
+> slated for retirement. Phase 2 wired every ribbon area onto
 > that engine via the `WC.PM` bridge (`src/renderer/bridge/*.ts`): character/paragraph/lists/styles,
 > clipboard + editing-misc, find-replace, insert-basics + full Table Tools, file-io (docx/html/txt/csv
 > open + docx/html/txt save; `test:roundtrip` is THE docx gate), review (Track Changes + comments that
@@ -97,8 +100,9 @@ Read the doc that matches your task:
   the runtime contextual-tab mechanism. **How to add/change a control.**
 - [docs/ICONS.md](docs/ICONS.md) — `WC.icon()` resolution, the Fluent mapping, and
   the `gen-icons.js` build step. **How to add/remap an icon.**
-- [docs/PAGINATION.md](docs/PAGINATION.md) — the page sheet: PM continuous flow today;
-  real model-driven multi-page sheets are Phase-7-gated.
+- [docs/PAGINATION.md](docs/PAGINATION.md) — the page sheet: real per-page multi-page sheets are LIVE
+  by default (the paged PresentationEditor, the `WC_LAYOUT` default since FR-013); the legacy continuous-flow
+  `overlay` sheet is reachable only via `WC_LAYOUT=overlay`.
 - [docs/FEATURES.md](docs/FEATURES.md) — tab-by-tab feature inventory; links to
   each `docs/*_TAB.md`, the UI-fidelity audit, and `NOT_IMPLEMENTED.md`.
 - [docs/BUILD_AND_RUN.md](docs/BUILD_AND_RUN.md) — how to run, the headless QA
@@ -168,10 +172,13 @@ safe pattern.
   fork (`bridge/io.ts` → `doc:openBytes`/`doc:saveBytes`); `mammoth`/`html-to-docx` no longer
   exist. The converter rebuilds OOXML (not byte-identical) — guard round-trip with `test:roundtrip`.
 - **No `window.prompt()`:** Electron disables it — use `WC.dialog`.
-- **Phase-7 deferred areas honestly block.** layout-page, layout-arrange, header-footer, and
-  text-effects commands are gated by `isBlocked`/`notifyBlocked` and show a Word-like deferral
-  toast; their `commands.js` handler bodies are dead Phase-7 stubs (they reference the deleted
-  `WC.HeaderFooter`/`WC.Layout`/`E()` and never run). Don't "fix" them — they await Phase 7.
+- **Layout-deferred command gates are now RESIDUAL (re-verify before assuming).** layout-page,
+  layout-arrange, header-footer, and text-effects commands were gated by `isBlocked`/`notifyBlocked` with a
+  Word-like deferral toast (their `commands.js` bodies referenced the deleted `WC.HeaderFooter`/`WC.Layout`/`E()`).
+  The layout engine they awaited has now SHIPPED as the default paged PresentationEditor — so these gates are
+  candidates to be un-blocked and re-wired against the paged engine **per feature**, not a permanent "await a
+  future phase." Until each is reconciled some may still toast; check the current `isBlocked` state before
+  treating one as either blocked or done.
 - **Generated files:** `ribbon-data.js` (from `scripts/gen.js`) and
   `icons-fluent.js` (from `scripts/gen-icons.js`) are auto-generated — edit the
   sources + regenerate, don't hand-edit.

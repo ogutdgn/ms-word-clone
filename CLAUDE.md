@@ -14,10 +14,14 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 > - **Start each session at [docs/plan/](docs/plan/):** `last-point.md` (where we are),
 >   `execution-map.md` (what to do now), `plan.md` (the roadmap + dev process). Keep these
 >   current with the **`plan-tracking`** skill (`.claude/skills/plan-tracking/`) at session end.
-> - **NEXT/ACTIVE phase (pivot 2026-06-15): the LAYOUT ENGINE (Phase 4).** Most remaining
->   features/bugs (image/table **resize+relocate**, floating objects, multi-page, headers/footers,
->   page borders, columns) are layout-gated — build the engine first, then fix them. Spec +
->   acceptance checklist + sub-phases: **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)**.
+> - **LAYOUT ENGINE (Phase 4) — COMPLETE & SHIPPING as the default (paged-render migration, FR-013, 2026-06-21).**
+>   The paged SuperDoc **PresentationEditor** is the default rendering mode (`WC_LAYOUT` default flipped
+>   `'overlay'`→`'paged'` in `src/renderer/main.ts`) and paints real per-page multi-page sheets. The legacy
+>   continuous-flow `overlay` engine survives only behind `WC_LAYOUT=overlay npm run build` and is slated for
+>   retirement. The engine that gated the bug class (image/table **resize+relocate**, floating objects, multi-page,
+>   headers/footers, page borders, columns) has shipped — those areas are now layout-engine-backed and being
+>   reconciled **per-feature** against it (no longer blocked on a future engine). Spec + acceptance + the migration
+>   milestones (M1–M6): **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)**.
 >   **Windows is the native target** (Word-for-Windows COM oracle, native Office fonts) — see
 >   `plan.md` → "Cross-platform / running on Windows".
 > - **Locked decisions:** [docs/decisions/](docs/decisions/) (ADR-0001…0005 + `OPEN_DECISIONS.md`).
@@ -42,13 +46,16 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 
 - **Stack:** Electron 31 shell; renderer built by **electron-vite + TypeScript**. The **owned ProseMirror
   core** (`#pm-editor`, TS/ESM: `src/renderer/main.ts` → vendored fork in `src/renderer/core/superdoc-fork/`,
-  single `prosemirror-model` copy, telemetry off) is the **only** editor. The shared chrome (ribbon,
+  single `prosemirror-model` copy, telemetry off) is the **only** editor; its default rendering mode is the
+  **paged** SuperDoc PresentationEditor (real per-page sheets), with the legacy continuous-flow `overlay` paint
+  reachable only via `WC_LAYOUT=overlay npm run build`. The shared chrome (ribbon,
   dialogs, backstage, statusbar) is still vanilla JS on the `window.WC` namespace — classic `<script>` tags
   under `src/renderer/public/js/` — kept as-is; its WC→TS/ESM migration is DEFERRED to a future slice. Main
   process (plain CJS) owns fs + `.docx` via the `window.wordAPI` `contextBridge` bridge.
 - **Document:** `#pm-editor` driven by the `WC.PM` bridge (`src/renderer/bridge/*.ts` — commands/io/
-  state-sync/focus). The page sheet is continuous-flow; real multi-page sheets are Phase-7-gated — see
-  [docs/PAGINATION.md](docs/PAGINATION.md).
+  state-sync/focus). The default **paged** engine (the SuperDoc PresentationEditor) paints real per-page
+  multi-page sheets; the legacy continuous-flow `overlay` engine survives only behind `WC_LAYOUT=overlay` and is
+  slated for retirement — see [docs/PAGINATION.md](docs/PAGINATION.md).
 - **Ribbon:** data-driven from `WC.RIBBON` (10 tabs / 212 controls) →
   `WC.Ribbon` renders → `WC.Commands` dispatches `H[cmd]` (PM-only — each handler drives the `WC.PM` bridge).
   See [docs/RIBBON.md](docs/RIBBON.md).
@@ -57,7 +64,7 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 
 | Task | Read |
 |------|------|
-| **Build the layout engine (Phase 4 — NEXT)** | **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)** (+ `docs/plan/deferrals.md` §A feed) |
+| **The layout engine (Phase 4 — DONE; paged is the default)** | **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)** (+ `docs/plan/deferrals.md` §A feed) |
 | Big picture, module map, dispatch | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Libraries / versions / the build (electron-vite + TS) | [docs/TECH_STACK.md](docs/TECH_STACK.md) |
 | Add/change a ribbon control | [docs/RIBBON.md](docs/RIBBON.md) |

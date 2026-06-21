@@ -13,11 +13,11 @@
 |---|---|
 | ✅ **In scope** | should work; a Phase-3 fix target. |
 | ⛔ **Out of scope** | deliberately NOT built — permanent (e.g. Adobe Acrobat, Voice/Dictate, Add-ins, cloud-only services). |
-| 🕗 **Layout-deferred (Phase 4)** | needs the pagination/layout engine; **flagged, not hacked** (→ [deferrals.md](plan/deferrals.md) §A.1). Resolves when Phase 4 lands. |
+| 🕗 **Layout-reconciling (engine shipped)** | needed the pagination/layout engine; **flagged, not hacked** (→ [deferrals.md](plan/deferrals.md) §A.1). The engine — the paged SuperDoc PresentationEditor — has SHIPPED as the default (FR-013, 2026-06-21); these are now being reconciled **per-feature** against it. |
 
 > **Flag-don't-hack rule:** a layout-coupled feature is recorded 🕗 with its *specific
-> requirement* in `deferrals.md` §A.1 (the Phase-4 spec) — it is **never** faked with a
-> continuous-flow DOM hack. (The legacy spacer-hack pagination was deleted in slice 11; do
+> requirement* in `deferrals.md` §A.1 (the layout-engine spec) — it is **never** faked with a
+> continuous-flow DOM hack; it is realized for real by the now-default paged layout engine. (The legacy spacer-hack pagination was deleted in slice 11; do
 > not grow a new one.) **Classifier:** multi-page · floating-object position · text-wrap ·
 > headers/footers-on-page · columns · vertical page geometry.
 
@@ -106,8 +106,8 @@ feature wiring stands; this pass fixes the ribbon arrangement + label visibility
 |---|---|---|---|
 | Ribbon | Small stacked buttons keep their **labels** (Word arrangement) | ✅ In scope | THE reported bug (only icons on a narrow screen). `LARGE` set trimmed to the genuinely-large Insert buttons; the rest render as small labeled buttons stacked 3-per-column (`renderControl` `labeled` opt). Condense only ever hides LARGE-button labels, so the many small labels stay visible |
 | Pages / Tables / Illustrations / Links / Text / Symbols | feature behaviour | ✅ In scope (slice 10) | Cover Page, Blank Page, Page Break, Table, Pictures, Shapes, Icons, 3D Models, SmartArt, Chart, Screenshot, Link, Bookmark, Cross-reference, Text Box, WordArt, Drop Cap, Date & Time, Quick Parts, Object, Equation, Symbol — real inserts / honest toasts |
-| Header & Footer | Header / Footer / Page Number | 🕗 Deferred (Phase 4) | layout-engine-gated (`isBlocked`); honest deferral toast — deferrals.md §A.1 |
-| Illustrations / Text | Floating-object position + text-wrap | 🕗 Deferred (Phase 4) | insertion + export are real (slice-10 anchors); off-flow positioning needs the layout engine |
+| Header & Footer | Header / Footer / Page Number | 🕗 Reconciling (engine shipped) | the paged layout engine is the default; per-page header/footer rendering is engine-backed — ribbon-command wiring being reconciled (`isBlocked` may still toast) — deferrals.md §A.1 |
+| Illustrations / Text | Floating-object position + text-wrap | 🕗 Reconciling (engine shipped) | insertion + export are real (slice-10 anchors); off-flow positioning is now engine-backed (paged default), wiring being reconciled |
 
 ## Draw
 _TBD._
@@ -116,19 +116,19 @@ _TBD._
 _TBD._
 
 ## Layout
-_TBD — heavy 🕗 Phase-4 expected (margins/columns/orientation/size visuals are layout-gated)._
+_TBD — margins/columns/orientation/size visuals are now rendered by the default paged layout engine (no longer layout-gated); per-feature reconciliation pending._
 
 ## References
 _TBD._
 
 ## Mailings
-_TBD — envelopes/labels page geometry already 🕗 Phase-4 (deferrals.md §A)._
+_TBD — envelopes/labels page geometry is now supported by the default paged layout engine (deferrals.md §A)._
 
 ## Review
 _TBD._
 
 ## View
-_TBD — multi-page View modes / Side-to-Side are 🕗 Phase-4._
+_TBD — multi-page layout is live in the default paged engine; multi-page View modes / Side-to-Side wiring pending reconciliation._
 
 ## File (Backstage)
 _TBD._

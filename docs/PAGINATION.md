@@ -7,16 +7,18 @@
 > ~26-Aptos-12-lines-per-page calibration validated against real Word) and the page-sheet
 > CSS still inform the current design.
 >
-> **Current state (single PM world):** the document is a **ProseMirror editor** mounted
-> at `#pm-editor` rendered into a **continuous-flow page sheet** (`.page` in
-> `src/renderer/public/styles/editor.css`; geometry vars in `.../styles/base.css`). There
-> is **no `repaginate()` engine today** — real, model-driven multi-page sheets (line-level
-> splitting, per-sheet headers/footers, page-number fields) are **Phase-4** (the pagination /
-> layout engine, now the **active next phase** — see **[LAYOUT_ENGINE.md](LAYOUT_ENGINE.md)**),
-> to be rebuilt as an owned PM decoration/plugin validated against the Word-for-Windows COM
-> oracle (see also [docs/decisions/](decisions/) C1 and `docs/plan/deferrals.md` §A). **This
-> document is the prior art** for that rebuild — its geometry, binary-search line split, and
-> caret-as-char-offset trick carry over (operating on the PM model, not editable DOM).
+> **Current state (2026-06-21 — paged-render migration COMPLETE):** the document is a **ProseMirror editor**
+> mounted at `#pm-editor`, rendered **by default** by the **paged SuperDoc PresentationEditor** into **real
+> per-page sheets** (`.superdoc-page` per page). The layout engine described in
+> **[LAYOUT_ENGINE.md](LAYOUT_ENGINE.md)** has SHIPPED and is the `WC_LAYOUT` default (flipped `'overlay'`→`'paged'`
+> in `src/renderer/main.ts`, FR-013); it provides real, model-driven multi-page layout (line-level splitting,
+> per-page rendering, page-number context) and was validated against the Word-for-Windows COM oracle across the
+> M1–M6 milestones. The **legacy continuous-flow page sheet** (`.page` in
+> `src/renderer/public/styles/editor.css`; geometry vars in `.../styles/base.css`; **no `repaginate()` engine**)
+> survives only behind `WC_LAYOUT=overlay npm run build` and is slated for retirement (see also
+> [docs/decisions/](decisions/) C1 and `docs/plan/deferrals.md` §A). **This document is the prior art** for the
+> engine — its geometry, binary-search line split, and caret-as-char-offset trick informed the design (operating
+> on the PM model, not editable DOM).
 
 ---
 

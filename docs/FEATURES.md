@@ -85,11 +85,13 @@ UI but not fully functional" section) and the area-by-area feasibility matrix.
 
 ## Known architectural approximations
 
-A few outcomes are faithful in shape but bounded by the page-sheet rendering being
-continuous-flow today (real multi-page sheets are Phase-4-gated — the layout engine):
+The default **paged** layout engine (SuperDoc PresentationEditor, the rendering default since the
+2026-06-21 paged-render migration) paints real per-page multi-page sheets. A few layout-coupled
+outcomes are still being reconciled against it **per-feature**:
 
-- **Headers/footers, on-page page-number fields, and multi-page View modes** are
-  Phase-4-deferred — those commands honestly block until the PM pagination/layout engine lands.
+- **Real multi-page layout** is now LIVE in the default paged engine. Per-page **headers/footers**,
+  **on-page page-number fields**, and **multi-page View modes** are backed by the engine, but their
+  ribbon-command wiring is being reconciled per-feature — some may still show a deferral toast until wired.
 - **Asymmetric column widths** (Left/Right) and **mirrored margins** render with the
   dominant value; **Side-to-Side** paging is approximate. (UI Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.

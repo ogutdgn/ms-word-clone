@@ -4,7 +4,10 @@ A faithful Microsoft Word desktop clone built on **Electron 31**, with the
 renderer built by **electron-vite + TypeScript**. The document is a single
 **owned ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`)
 mounted at `#pm-editor` and driven through the `WC.PM` bridge
-(`src/renderer/bridge/*.ts`). The shared chrome around it (ribbon, dialogs,
+(`src/renderer/bridge/*.ts`). As of 2026-06-21 (FR-013) the default rendering mode
+is the **paged** SuperDoc PresentationEditor, which paints real per-page sheets; the
+legacy continuous-flow `overlay` paint is reachable only via `WC_LAYOUT=overlay npm run build`.
+The shared chrome around it (ribbon, dialogs,
 backstage, statusbar) is still **vanilla JavaScript** — classic `<script>` tags
 loaded in dependency order onto a global `WC` namespace (its WC→TS/ESM migration
 is deferred). The main process owns all privileged work (filesystem, dialogs,
@@ -227,8 +230,10 @@ transaction:
 - **Focus & overlays:** `focus.ts`, the ink overlay (`ink-overlay.ts`), and the
   comments/track chrome (`comments-ui.ts`, `track-chrome.ts`) layer UI over the view.
 
-The page sheet is continuous-flow today; real model-driven multi-page sheets are
-Phase-4-gated — the pagination/layout engine (see [PAGINATION.md](PAGINATION.md)).
+The default engine is the **paged** SuperDoc PresentationEditor, which paints real
+per-page sheets (real, model-driven multi-page layout). The legacy continuous-flow
+`overlay` sheet is reachable only via `WC_LAYOUT=overlay npm run build` during the
+transition and is slated for retirement (see [PAGINATION.md](PAGINATION.md)).
 
 ---
 
@@ -262,9 +267,12 @@ H.trackChanges = () => WC.PM.setTrackChanges();        // PM Track Changes
 ```
 
 The PM-only dispatch collapsed the old `pm ? PM : legacy` branches — there is no
-legacy `E()` fallback. The four Phase-4 deferred areas (layout-page, layout-arrange,
-header-footer, text-effects) are gated by `isBlocked`/`notifyBlocked` and show a
-Word-like deferral toast; their handler bodies are dead stubs awaiting Phase 4 (the layout engine).
+legacy `E()` fallback. Several layout-coupled areas (layout-page, layout-arrange,
+header-footer, text-effects) were gated by `isBlocked`/`notifyBlocked` with a Word-like
+deferral toast while the layout engine was unbuilt; that engine has now SHIPPED as the
+default paged PresentationEditor, so these gates are RESIDUAL — candidates to be un-blocked
+and re-wired per-feature against the paged engine (re-verify the current `isBlocked` state
+rather than assuming permanent deferral).
 Unknown / out-of-scope commands surface a uniform "not implemented" message — see
 `docs/NOT_IMPLEMENTED.md`.
 
