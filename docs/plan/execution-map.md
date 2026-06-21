@@ -64,6 +64,24 @@
 > overlay-only `test:pm` tests** to paged-aware variants (real paged-suite coverage) · **M6 → pass/fail gate** + the
 > multi-page pagination calibration (PE 2 vs Word 3) · **paged html/txt/csv import fidelity**.
 >
+> **⚠️ EVERYTHING from here is a SPEC-KIT FEATURE — no ad-hoc coding.** Per item: `/speckit-specify` →
+> `/speckit-plan` → `/speckit-tasks` (under `specs/00N-*`) → probe-first SPIKE → IMPLEMENT → VERIFY (gates +
+> Word-COM oracle + `/code-review` fix-loop) → ff-merge to `main` → checkpoint (plan-tracking). **The spec-kit
+> artifacts ARE the cross-session memory: a new session resumes the ACTIVE feature from its `spec.md` + `tasks.md`**
+> (session-start = read last-point.md → this CURRENT PHASE → the active feature's `tasks.md`, then continue the
+> unchecked `[ ]` tasks). `.specify/feature.json` points at the active feature dir.
+>
+> **THE SPEC-KIT FEATURE SEQUENCE (post-migration roadmap):**
+> 1. **002 headers-footers** — P1 ✅ · P2 (variants) · P3 (page numbers). ← **ACTIVE**; resume from `specs/002-headers-footers/tasks.md` (T018→).
+> 2. **003+ cleanup features** — one spec-kit feature each (scope decided at `/speckit-specify`): overlay-retirement ·
+>    residual-`isBlocked`-layout reconciliation · paged-test-coverage port · M6→gate+pagination-calibration · import-fidelity.
+> 3. **THE COMPLETENESS PASS — fix ALL bugs + implement ALL features, SPEC-DRIVEN** (the big final post-migration phase):
+>    SOURCE = `docs/bug-hunt/` — **BUG-LEDGER.md (65 numbered bugs)** + the **feature / 321-control audit (76 features)**.
+>    Turn them into spec-kit features (group related bugs/features per spec) and work each through the loop until the
+>    ledger + the audit are CLEAR. **NO ad-hoc fixes** — every fix/feature ships under a spec + a regression test (+ the
+>    Word-COM oracle for any fidelity claim). **Re-triage the ledger against the current PAGED codebase first** (some
+>    bugs pre-date the migration; several may already be fixed or moot under the paged engine).
+>
 > <details><summary>Prior PAGINATION CARET-BUG CURRENT-PHASE note (kept for context)</summary>
 >
 > **PAGINATION CARET BUG (user-reported) — root-caused + PRIMARY fix MERGED** (PR #54 `11909cd`):

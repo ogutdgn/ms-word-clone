@@ -12,6 +12,15 @@
 > **Branch:** `main` (`a3e46da`, pushed). **Phase:** POST-MIGRATION (per-feature reconciliation + cleanup) —
 > the layout engine (Phase 4) is DONE.
 >
+> **▶ NEXT SESSION — CONTINUE STRICTLY VIA SPEC-KIT (no ad-hoc coding).** All remaining work = `specs/00N-*`
+> features: `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → probe-first spike → implement → VERIFY
+> (gates + Word-COM oracle + `/code-review`) → ff-merge to `main` + push → checkpoint (plan-tracking). **RESUME
+> the ACTIVE feature 002** from `specs/002-headers-footers/tasks.md` (P2 next, T018→); `.specify/feature.json`
+> points at it. The full spec-kit feature SEQUENCE — **002 (headers/footers) → 003+ cleanup features → the
+> COMPLETENESS PASS (fix ALL bugs + implement ALL features, sourced from `docs/bug-hunt/` BUG-LEDGER.md + the
+> 76-feature/321-control audit)** — is in [execution-map.md](execution-map.md) → CURRENT PHASE. Every fix/feature
+> ships under a spec + a regression test (+ the oracle for fidelity).
+>
 > **🏁 THE PAGED-RENDER MIGRATION IS OVER.** M1…M6 + paged open/new + the paged-default FLIP (FR-013) + doc
 > reconciliation are all on `origin/main`. **Paged** (the SuperDoc PresentationEditor — real per-page sheets)
 > is the **shipping default**; overlay is the legacy engine behind `WC_LAYOUT=overlay`. Record:
