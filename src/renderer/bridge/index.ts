@@ -158,7 +158,11 @@ const AREA: Record<string, string> = {
 // hyphenation; position presets, align, group, rotate, selectionPane) still lack engine
 // support and MUST stay blocked. Per-command granularity keeps the coarse AREA flag honest
 // without re-exposing genuinely-unimplemented controls.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer'])
+// header/footer (002): the paged PE paints + edits header/footer regions; the "Header & Footer
+// Tools" tab drives entry/exit through the bridge verbs (enterHeaderFooter/closeHeaderFooter).
+// P1 delivers goToHeader/goToFooter/closeHeaderFooter (header/footer = the Insert dropdowns,
+// already ready). P2 adds differentFirstPage/differentOddEven; P3 adds pageNumber.
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -232,6 +236,12 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
       // Phase-1 'untouched' contract no longer applies). parseDocx above already validated the bytes.
       const pres = w.WC?.presentation
       if (w.__WC_LAYOUT_MODE === 'paged' && pres?.editor?.replaceFile) {
+        // 002 P1 review #4: if a header/footer editing session is active when the user opens/creates a
+        // doc, replaceFile (documentReplaced → refreshStructure) does NOT exit it, so no 'body' mode
+        // change fires and the "Header & Footer Tools" tab + bridge state would orphan over the fresh
+        // doc. Exit any active story surface first → emits headerFooterModeChanged('body') → the bridge
+        // dispatches wc:hf-mode 'body' → the tab hides + lastMode resets, BEFORE the doc swaps.
+        try { pres.exitActiveStorySurface?.() } catch { /* best-effort reconcile */ }
         await pres.editor.replaceFile(source) // docx-open OR a blank template (the html/text/csv legs pass blankArrayBuffer)
         if (extra?.html) {
           // html/text/csv import: apply the markup into the now-blank PE. Mirror the overlay §5.3 data-loss guard — if
@@ -406,8 +416,9 @@ export function preinstallBridge() {
     refUpdateSource: () => false, refRemoveSource: () => false,
     refSetCitationStyle: () => false, refInsertBibliography: () => false,
     refCrossReference: () => false,
-    // Phase 4 (item 3) header/footer pre-mount stubs (replaced by installHeaderFooter on mount)
+    // Phase 4 (item 3) + 002 header/footer pre-mount stubs (replaced by installHeaderFooter on mount)
     setHeaderText: () => false, setFooterText: () => false, getHeaderText: () => '', getFooterText: () => '',
+    enterHeaderFooter: async () => false, closeHeaderFooter: () => false, headerFooterState: () => ({ active: false }),
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,

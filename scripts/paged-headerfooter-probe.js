@@ -69,10 +69,34 @@
     return 'replaced cleanly';
   });
 
-  // INTEROP (live PE header session) — DEFERRED: PE's #headerFooterSession.activateRegion is a PRIVATE field with
-  // no public/WC accessor to open a header band programmatically; a fork hook is out of scope (no fork edits). The
-  // parity rows above already prove the verbs work in paged; coexistence-with-an-open-session is a follow-up.
-  results.push({ name: 'live PE-session interop (INFO): deferred — no public header-session activation API (no fork edits); parity above proves the verbs in paged', pass: true, detail: 'WC.presentation.getStorySessionManager exists but exposes no header-band activation' });
+  // ─── P1 (002): on-page enter/edit/close + the "Header & Footer Tools" contextual tab ───
+  // No-fork (spike-verified, research.md): enter = materialize-if-absent + synthesize the PE's
+  // double-click on the .superdoc-page-{header,footer} band; close = exitActiveStorySurface();
+  // state/tab signal = getActiveStoryLocator() + the 'headerFooterModeChanged' -> 'wc:hf-mode' event.
+  // PAGED-only (the PE paints the bands); overlay returns false (parity).
+  t('P1 verbs present (enterHeaderFooter/closeHeaderFooter/headerFooterState)', () => ['enterHeaderFooter', 'closeHeaderFooter', 'headerFooterState'].every((k) => typeof PM[k] === 'function'));
+  const hfTab = () => document.querySelector('.contextual-tab[data-tab="header-footer-tools"]');
+  const pagesText = () => Array.from(document.querySelectorAll('.superdoc-page')).map((p) => p.textContent || '').join(' ');
+  if (mode === 'paged') {
+    await ta('enterHeaderFooter("header") activates the header session', async () => { const ok = await PM.enterHeaderFooter('header'); await sleep(200); const st = PM.headerFooterState(); return (ok === true && st.active === true && st.region === 'header') ? 'active header' : ('ok=' + ok + ' state=' + JSON.stringify(st) && false); });
+    await ta('the "Header & Footer Tools" contextual tab is shown on enter', async () => { await sleep(120); return hfTab() ? 'tab shown' : ('no contextual tab in ribbon' && false); });
+    t('edit-on-page: setHeaderText while active persists', () => { PM.setHeaderText('OnPageHdr'); return PM.getHeaderText() === 'OnPageHdr' ? 'OnPageHdr' : ('got ' + JSON.stringify(PM.getHeaderText()) && false); });
+    await ta('the header text paints in the band', async () => { await sleep(300); return /OnPageHdr/.test(pagesText()) ? 'painted' : ('not painted' && false); });
+    await ta('Go to Footer switches the active region to footer', async () => { const ok = await PM.enterHeaderFooter('footer'); await sleep(200); const st = PM.headerFooterState(); return (ok === true && st.region === 'footer') ? 'footer active' : ('ok=' + ok + ' state=' + JSON.stringify(st) && false); });
+    await ta('closeHeaderFooter returns to the body (state inactive)', async () => { const ok = PM.closeHeaderFooter(); await sleep(300); const st = PM.headerFooterState(); return (ok === true && st.active === false) ? 'closed' : ('ok=' + ok + ' state=' + JSON.stringify(st) && false); });
+    await ta('the contextual tab is hidden after Close', async () => { await sleep(150); return !hfTab() ? 'tab hidden' : ('contextual tab still present after Close' && false); });
+    // review #4: Open/New while a header session is active must reconcile (force-exit in replaceEditor) — tab hides + state clears.
+    await ta('Open/New while a header session is active reconciles (tab hides + state inactive)', async () => {
+      const reEntered = await PM.enterHeaderFooter('header'); await sleep(200);
+      if (!hfTab()) return ('precondition: tab did not re-show before New (entered=' + reEntered + ')' && false);
+      await PM.newBlank(); await sleep(300);
+      const st = PM.headerFooterState();
+      return (!hfTab() && st.active === false) ? 'reconciled' : ('tab=' + !!hfTab() + ' state=' + JSON.stringify(st) && false);
+    });
+  } else {
+    await ta('overlay: enterHeaderFooter returns false (on-page entry is paged-only)', async () => { const ok = await PM.enterHeaderFooter('header'); return ok === false ? 'no-op in overlay' : ('returned ' + ok && false); });
+    t('overlay: headerFooterState inactive + no contextual tab', () => (PM.headerFooterState().active === false && !hfTab()) ? 'inactive' : ('unexpected' && false));
+  }
 
   try { await PM.newBlank(); } catch (e) {} // teardown: reset global header/footer state
   return done();

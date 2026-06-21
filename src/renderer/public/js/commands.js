@@ -396,16 +396,20 @@
   H.symbol = (c, node) => WC.Dialogs.symbol(node);
   H.pageBreak = () => { WC.PM.insertPageBreak(); };
   H.blankPage = () => { WC.PM.insertBlankPage(); };
-  // ---- Header & Footer contextual tab ----
-  H.goToHeader = () => WC.HeaderFooter.goTo('header');
-  H.goToFooter = () => WC.HeaderFooter.goTo('footer');
-  H.closeHeaderFooter = () => WC.HeaderFooter.exitMode();
-  H.docInfo = (c, node) => WC.flyout(node, (fly) => { [['Author', 'Word User'], ['File Name', (WC.Files.name || 'Document1')], ['Document Title', (WC.Files.name || 'Document1').replace(/\.[^.]+$/, '')], ['Page Number', '1']].forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => { const r = WC.HeaderFooter.editing === 'footer' ? E().node.querySelector('.wc-footer') : E().node.querySelector('.wc-header'); if (r) { r.insertAdjacentHTML('beforeend', '<span class="wc-field" data-field="docinfo">' + WC.escapeHtml(v) + '</span>'); E().dirty = true; } } }))); });
-  H.linkToPrevious = (c, node) => { if (node) node.classList.toggle('toggled'); WC.toast('Link to Previous toggled (single-section document).'); };
-  H.differentFirstPage = (c, node) => { const on = E().node.classList.toggle('hf-diff-first'); if (node) node.classList.toggle('toggled', on); WC.toast('Different First Page ' + (on ? 'on' : 'off') + '.'); };
-  H.differentOddEven = (c, node) => { const on = E().node.classList.toggle('hf-diff-oddeven'); if (node) node.classList.toggle('toggled', on); WC.toast('Different Odd & Even Pages ' + (on ? 'on' : 'off') + '.'); };
-  H.showDocText = (c, node) => { const on = !E().node.classList.toggle('hf-hide-body'); if (node) node.classList.toggle('toggled', !on); };
-  H.dateAndTime = () => E().insertHTML(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
+  // ---- Header & Footer Tools (002: on-page editing on the paged engine) ----
+  // Entry/exit drive the paged PresentationEditor through the WC.PM bridge verbs (no fork edit;
+  // the legacy WC.HeaderFooter object + the retired WC.Editor `E()` it used are gone).
+  H.goToHeader = () => { WC.PM.enterHeaderFooter('header'); };
+  H.goToFooter = () => { WC.PM.enterHeaderFooter('footer'); };
+  H.closeHeaderFooter = () => { WC.PM.closeHeaderFooter(); };
+  // Deferred / inert long-tail Header & Footer controls — honest toasts, no legacy refs.
+  // (differentFirstPage / differentOddEven get real WC.PM wiring in P2; pageNumber in P3.)
+  H.docInfo = () => WC.toast('Document Info fields in the header/footer are not available in this version.');
+  H.showDocText = () => WC.toast('Show Document Text is not available in this version.');
+  H.dateAndTime = () => WC.toast('Date & Time in the header/footer is not available in this version.');
+  H.linkToPrevious = () => WC.toast('Link to Previous applies across sections (this is a single-section document).');
+  H.differentFirstPage = () => WC.toast('Different First Page is coming in a later update.');
+  H.differentOddEven = () => WC.toast('Different Odd & Even Pages is coming in a later update.');
   H.horizontalLine = () => { WC.PM.insertHr(); };
   H.wordArt = (c, node) => insertWordArt();
   H.textBox = () => { WC.PM.xeTextBox(''); };
@@ -454,7 +458,7 @@
   }
   H.header = (c, node) => headerFooterDialog('header');
   H.footer = (c, node) => headerFooterDialog('footer');
-  H.pageNumber = (c, node) => WC.HeaderFooter.pageNumberMenu(node);
+  H.pageNumber = () => WC.toast('Page numbers in the header/footer are coming in a later update.');
   H.quickParts = (c, node) => WC.Insert.quickPartsMenu(node);
   H.wordart = (c, node) => WC.Insert.wordArtMenu(node);
   H.signatureLine = () => WC.Insert.signatureLine();
@@ -1590,7 +1594,7 @@
       if (cmd === 'screenshot') return screenshotMenu(node);
       if (cmd === 'header') return H.header(control, node); // item 3: Edit-Header modal (WC.HeaderFooter retired)
       if (cmd === 'footer') return H.footer(control, node);
-      if (cmd === 'pageNumber') return WC.HeaderFooter.pageNumberMenu(node); // still D6-blocked (unreachable until unblocked)
+      if (cmd === 'pageNumber') return H.pageNumber(control, node); // 002 P3: page-number field (blocked until then)
       if (cmd === 'textBox') return textBoxMenu(node);
       if (cmd === 'quickParts') return WC.Insert.quickPartsMenu(node);
       if (cmd === 'wordart') return WC.Insert.wordArtMenu(node);

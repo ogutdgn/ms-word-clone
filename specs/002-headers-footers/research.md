@@ -70,7 +70,36 @@ expanding it is required for the P2/P3 acceptance criteria. Hardening matches th
 **Alternatives**: assert variants only via exported-XML inspection (cheaper, but not real-Word parity). Rejected
 for the fidelity-critical claims; XML inspection is kept as a fast in-app pre-check in the probe.
 
-## OPEN — resolved by the Phase-0 spike (Task 0, real paged renderer, isolated probe profile)
+## SPIKE RESULTS — RESOLVED 2026-06-21 (4 throwaway probe rounds, real paged renderer) — ALL NO-FORK
+
+- **Q1 IMPORT→RENDER: PASS.** A headered `.docx` exported then reopened (`WC.PM.openDocx`) keeps the header
+  painted (`paintedHeaderAfterReopen: true`); the PE is preserved in-place (`presSameObject: true`, the open/new
+  fix). Import→render works.
+- **Q3 BRIDGE↔PAINT: PASS, single path.** `WC.PM.setHeaderText('X')` (headless story-runtime) updates the painted
+  band immediately (`paintedAfterSet: true`) and reads back. No live-session-vs-runtime divergence; no repaint
+  hook needed.
+- **Q2 ENTRY/EXIT/STATE: fully NO-FORK.**
+  - Painted bands: `.superdoc-page-header` / `.superdoc-page-footer` inside each `.superdoc-page`.
+  - **Enter** = synthesize a double-click (pointerdown/mousedown(detail1)/up/click, then a second cycle with
+    `detail:2` + `dblclick`) on the target band element. Verified: activates the region —
+    `getActiveStoryLocator()` → `{storyType:'headerFooterPart', refId}` and the PE emits
+    `headerFooterModeChanged` with `'header'`/`'footer'`. (The M2 synthetic-multi-click caveat does NOT apply to
+    the header/footer hit-test.)
+  - **Fresh doc (no header yet)**: double-clicking the *empty* margin does NOT activate (no region exists until a
+    part is materialized). Recipe: if the band isn't painted, materialize an empty part first
+    (`setHeaderText('')`/`setFooterText('')` — paints `.superdoc-page-header`), THEN double-click. Verified
+    (round 4): empty materialize paints the band + the double-click activates.
+  - **Close** = `presentation.exitActiveStorySurface()` (public) → back to body (`getActiveStoryLocator()` →
+    `null`). Verified.
+  - **State / contextual-tab signal** = `presentation.getActiveStoryLocator()` (headerFooterPart ⇒ active) +
+    the `headerFooterModeChanged` event (`'header'`/`'footer'`/`'body'`).
+  - **Persistence** stays the headless story-runtime (Decision 1) — confirmed by Q3.
+
+**Bridge `enterHeaderFooter(region)` recipe**: preserve existing content — materialize an empty part ONLY when the
+band is absent (never clobber an existing header); then double-click the first visible band of that region;
+confirm via `getActiveStoryLocator()`.
+
+## (historical) OPEN — was resolved by the Phase-0 spike (Task 0, real paged renderer, isolated probe profile)
 
 ### Spike Q1 — IMPORT → RENDER
 

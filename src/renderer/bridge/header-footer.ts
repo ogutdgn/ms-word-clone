@@ -29,7 +29,13 @@ type HFKind = 'header' | 'footer'
 
 export function installHeaderFooter(editor: AnyEditor) {
   const w = window as any
-  const refocus = () => { try { editor.view?.focus() } catch { /* no view */ } }
+  // Refocus the body after a programmatic/modal set — but NOT when an on-page header/footer
+  // session is active: setSlotText then targets the live band sub-editor, and focusing the body
+  // here would yank focus out of the band the user is editing (002 P1 review #3).
+  const refocus = () => {
+    try { if (w.WC?.presentation?.getActiveStoryLocator?.()?.storyType === 'headerFooterPart') return } catch { /* fall through to body focus */ }
+    try { editor.view?.focus() } catch { /* no view */ }
+  }
   const markDirty = () => { try { w.WC?.PM?.markDirty?.() } catch { /* none */ } }
   const converter = (): any => { try { return editor.converter } catch { return null } }
   const docApi = (): any => { try { return editor.doc } catch { return null } }
@@ -118,5 +124,98 @@ export function installHeaderFooter(editor: AnyEditor) {
   const getHeaderText = (): string => getSlotText('header')
   const getFooterText = (): string => getSlotText('footer')
 
-  return { setHeaderText, setFooterText, getHeaderText, getFooterText }
+  // ─── P1 (002): on-page enter/exit/state for the "Header & Footer Tools" tab ──────────────
+  // The paged PresentationEditor already PAINTS per-page header/footer bands (.superdoc-page-
+  // header / -footer) and supports double-click-to-edit; entry/exit/state are driven through
+  // its PUBLIC surface (no fork edit — spike-verified, specs/002-headers-footers/research.md):
+  //  - enter  = materialize the part if the band isn't painted yet (so there's something to
+  //             click), then synthesize the double-click the PE already handles on that band;
+  //  - close  = presentation.exitActiveStorySurface();
+  //  - state  = presentation.getActiveStoryLocator() (storyType 'headerFooterPart' ⇒ active) +
+  //             the 'headerFooterModeChanged' event ('header'/'footer'/'body') for the region.
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+  const presentation = (): any => { try { return w.WC?.presentation } catch { return null } }
+
+  // Track the active region from the PE event (drives the region + the contextual-tab signal).
+  let lastMode: 'header' | 'footer' | 'body' = 'body'
+  try {
+    const pres = presentation()
+    if (pres?.on && !pres.__wcHfModeWired) {
+      pres.__wcHfModeWired = true
+      pres.on('headerFooterModeChanged', (e: any) => {
+        const m = (e && (e.mode ?? e.region)) as string
+        if (m === 'header' || m === 'footer' || m === 'body') {
+          lastMode = m
+          try { window.dispatchEvent(new CustomEvent('wc:hf-mode', { detail: { mode: m } })) } catch { /* signal best-effort */ }
+        }
+      })
+    }
+  } catch { /* event wiring best-effort */ }
+
+  const bandEl = (kind: HFKind): HTMLElement | null =>
+    document.querySelector<HTMLElement>('.superdoc-page-' + kind)
+
+  // Replay the exact pointer sequence the PE's input manager treats as a header/footer double-
+  // click (two click cycles + dblclick; the second cycle carries detail:2). Spike-verified.
+  function synthDoubleClick(el: HTMLElement): void {
+    const r = el.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const cy = r.top + Math.max(2, Math.min(r.height / 2, 8))
+    const base = { bubbles: true, cancelable: true, composed: true, clientX: cx, clientY: cy, view: window, button: 0 }
+    const fire = (type: string, Ctor: any, extra: any) => { try { el.dispatchEvent(new Ctor(type, { ...base, ...extra })) } catch { /* event ctor guard */ } }
+    const pd = { pointerId: 1, pointerType: 'mouse', isPrimary: true }
+    fire('pointerdown', PointerEvent, pd); fire('mousedown', MouseEvent, { detail: 1 })
+    fire('pointerup', PointerEvent, pd); fire('mouseup', MouseEvent, { detail: 1 }); fire('click', MouseEvent, { detail: 1 })
+    fire('pointerdown', PointerEvent, pd); fire('mousedown', MouseEvent, { detail: 2 })
+    fire('pointerup', PointerEvent, pd); fire('mouseup', MouseEvent, { detail: 2 }); fire('click', MouseEvent, { detail: 2 }); fire('dblclick', MouseEvent, { detail: 2 })
+  }
+
+  const isActiveHF = (): boolean => {
+    try { const loc = presentation()?.getActiveStoryLocator?.(); return !!(loc && loc.storyType === 'headerFooterPart') } catch { return false }
+  }
+
+  // Enter on-page editing of the header/footer region. Paged-only (the PE paints the bands);
+  // returns false in overlay so the caller can keep the plain-text modal fallback.
+  async function enterHeaderFooter(kind: HFKind): Promise<boolean> {
+    const pres = presentation()
+    if (!pres || w.__WC_LAYOUT_MODE !== 'paged') return false
+    if (kind !== 'header' && kind !== 'footer') return false
+    try {
+      if (isActiveHF() && lastMode === kind) return true // already editing this region
+      if (!bandEl(kind)) {
+        // The band isn't painted. Two cases: (a) no part exists anywhere → materialize an EMPTY part
+        // so a band paints; (b) a part EXISTS with content but hasn't repainted yet (e.g. the rAF gap
+        // right after a paged Open) → must NOT write, that would clobber it — just wait for the paint.
+        // getSlotText is a non-destructive read; '' ⟹ nothing to lose, so the materialize only runs
+        // when there is genuinely no content to clobber (002 P1 review #2, fixes the open-race wipe).
+        if (!getSlotText(kind)) setSlotText(kind, '')
+        for (let i = 0; i < 25 && !bandEl(kind); i++) await sleep(40)
+      }
+      let el = bandEl(kind)
+      if (!el) return false
+      // The synthesized double-click derives its coords from the band's on-screen rect, so the band
+      // MUST be in the viewport or the PE's coordinate hit-test misses (off-screen → no page detected
+      // → un-centered X → region null → entry fails, or — switching region with a session already
+      // active — falls through to exitMode and kicks the user out). Scroll it in first (review #1).
+      try { el.scrollIntoView({ block: 'center', inline: 'nearest' }) } catch { /* best-effort */ }
+      await sleep(60)
+      el = bandEl(kind) || el
+      synthDoubleClick(el)
+      for (let i = 0; i < 25; i++) { if (isActiveHF() && lastMode === kind) return true; await sleep(40) }
+      return false
+    } catch { return false }
+  }
+
+  // Exit any active header/footer (or other story) editing surface → back to the body.
+  function closeHeaderFooter(): boolean {
+    try { presentation()?.exitActiveStorySurface?.(); return true } catch { return false }
+  }
+
+  // For the contextual-tab activation signal: { active, region? }.
+  function headerFooterState(): { active: boolean; region?: HFKind } {
+    if (!isActiveHF()) return { active: false }
+    return { active: true, region: lastMode === 'footer' ? 'footer' : 'header' }
+  }
+
+  return { setHeaderText, setFooterText, getHeaderText, getFooterText, enterHeaderFooter, closeHeaderFooter, headerFooterState }
 }
