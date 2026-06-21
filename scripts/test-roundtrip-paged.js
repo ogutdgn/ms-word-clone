@@ -42,7 +42,9 @@ const build = (mode) => {
 const probe = (evalfile, outName) => {
   const jpath = DOCX_DIR + '/' + outName;
   try { fs.unlinkSync(jpath); } catch (e) { /* glob-clean already removed it; belt-and-braces so a crash can't leave yesterday's JSON */ }
-  const r = spawnSync(electron, ['.', '--probe-out=' + jpath, '--shot-evalfile=' + evalfile], { cwd: repoRoot, stdio: 'inherit', timeout: 300000 });
+  // --user-data-dir isolates a throwaway Electron profile so probe runs never touch (or corrupt) the user's real
+  // app cache (%APPDATA%/Word); --disable-http-cache keeps that throwaway from accumulating a corruptible disk cache.
+  const r = spawnSync(electron, ['--user-data-dir=C:/tmp/wc-probe-profile', '--disable-http-cache', '.', '--probe-out=' + jpath, '--shot-evalfile=' + evalfile], { cwd: repoRoot, stdio: 'inherit', timeout: 300000 });
   let json = null;
   try { json = JSON.parse(fs.readFileSync(jpath, 'utf8')); } catch (e) { die('probe JSON missing/unparseable (' + jpath + '): ' + e.message + ' — electron exit=' + r.status + ' signal=' + r.signal); }
   return json;

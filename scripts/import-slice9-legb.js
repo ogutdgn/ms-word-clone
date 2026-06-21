@@ -35,7 +35,8 @@ try { fs.unlinkSync(probeOut); } catch { /* no stale probe is fine */ }
 
 console.log('1) electron probe: import real-Word references docx -> WC.PM.openDocx ...');
 const electron = require('electron'); // in plain Node this resolves to the binary path
-const run = spawnSync(electron, ['.', '--probe-out=' + probeOut, '--shot-evalfile=scripts/import-slice9-legb-probe.js'], {
+// isolated throwaway Electron profile (see test-roundtrip-pm.js) — never touch the user's real %APPDATA%/Word cache.
+const run = spawnSync(electron, ['--user-data-dir=C:/tmp/wc-probe-profile', '--disable-http-cache', '.', '--probe-out=' + probeOut, '--shot-evalfile=scripts/import-slice9-legb-probe.js'], {
   cwd: repoRoot,
   stdio: 'inherit',
   timeout: 300000,

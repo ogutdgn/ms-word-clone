@@ -35,7 +35,9 @@ for (const f of fs.readdirSync('/tmp').filter((n) => /^wc-rt-.*\.docx$/.test(n))
 
 console.log('1) electron probe: docx -> PM -> docx per fixture...');
 const electron = require('electron'); // in plain Node this resolves to the binary path
-const run = spawnSync(electron, ['.', '--probe-out=' + probeOut, '--shot-evalfile=scripts/test-roundtrip-pm-probe.js'], {
+// --user-data-dir isolates a throwaway Electron profile so this gate never touches (or corrupts) the user's real
+// app cache (%APPDATA%/Word); --disable-http-cache keeps that throwaway from accumulating a corruptible disk cache.
+const run = spawnSync(electron, ['--user-data-dir=C:/tmp/wc-probe-profile', '--disable-http-cache', '.', '--probe-out=' + probeOut, '--shot-evalfile=scripts/test-roundtrip-pm-probe.js'], {
   cwd: repoRoot,
   stdio: 'inherit',
   timeout: 300000,
