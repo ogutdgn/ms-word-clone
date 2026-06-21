@@ -131,8 +131,9 @@ export default defineConfig({
       ],
     },
     // Fixes the one unguarded process.env read at ProseMirrorRenderer.ts:966.
-    // __WC_LAYOUT_DEFAULT__ bakes the WC_LAYOUT toggle's build-time default (overlay unless
-    // `WC_LAYOUT=paged npm run build`); main.ts also honors a runtime localStorage override.
+    // __WC_LAYOUT_DEFAULT__ bakes the WC_LAYOUT toggle's build-time override ('' unless `WC_LAYOUT=<mode> npm run
+    // build`); empty falls through to main.ts's default, which is now PAGED (FR-013). Build overlay with
+    // `WC_LAYOUT=overlay npm run build`; main.ts also honors a runtime localStorage override.
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
       __WC_LAYOUT_DEFAULT__: JSON.stringify(process.env.WC_LAYOUT || ''),

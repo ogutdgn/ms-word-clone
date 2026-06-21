@@ -10,8 +10,9 @@ import { Pagination } from '@/pagination/pagination'
 import { ImageResize } from '@/imageresize/image-resize'
 // Option-B: SuperDoc's real per-page layout engine (PresentationEditor). Imported LAZILY
 // inside constructPresentationEditor (a dynamic import — Milestone 1) so the heavy engine
-// subgraph (presentation-editor + layout-engine + painter-dom + measuring-dom) is code-split
-// OUT of the default (overlay) bundle and fetched only when WC_LAYOUT=paged boots this path.
+// subgraph (presentation-editor + layout-engine + painter-dom + measuring-dom) stays code-split
+// into its own chunk (fetched at boot now that paged is the default — FR-013; the entry stays
+// under the bundle ceiling and a WC_LAYOUT=overlay build skips the chunk entirely).
 
 // Real shapes: docx → DocxFileEntry[] | Record<string,unknown> (EditorOptions.content),
 // mediaFiles → Record<string,unknown> (EditorOptions.mediaFiles),

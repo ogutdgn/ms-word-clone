@@ -24,13 +24,15 @@ w.__PM_NodeSelection = NodeSelection
 // the fixture (gen-fixture) keeps the test hermetic.
 w.__WC_FIXTURE_NEGATION = negationArrayBuffer
 
-// WC_LAYOUT toggle (strangler-fig): 'overlay' = the shipping decoration engine (DEFAULT);
-// 'paged' = the Option-B PresentationEditor standup. Renderer can't read process.env
-// (contextIsolation), so use a runtime localStorage override, else the build-time default.
+// WC_LAYOUT toggle (strangler-fig): 'paged' = the Option-B PresentationEditor — now the DEFAULT (FR-013 flip; all 6
+// fidelity milestones M1–M6 + paged open/new are done + the full suite passes in paged). 'overlay' = the legacy
+// decoration engine, still reachable via `WC_LAYOUT=overlay npm run build` or a localStorage override during the
+// transition. Renderer can't read process.env (contextIsolation), so use a runtime localStorage override, else the
+// build-time default, else paged.
 const layoutMode =
   (() => { try { return localStorage.getItem('WC_LAYOUT') } catch { return null } })() ||
   (typeof __WC_LAYOUT_DEFAULT__ !== 'undefined' ? __WC_LAYOUT_DEFAULT__ : '') ||
-  'overlay'
+  'paged'
 w.__WC_LAYOUT_MODE = layoutMode
 
 // SYNCHRONOUS (before the async mount): mode flag + page flip + D6 stub.
