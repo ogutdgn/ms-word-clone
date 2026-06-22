@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-06-22 (004 Line Numbers P2 — in-app margin-number overlay shipped)
+
+> **Branch:** `main` (`fe12e4b`, pushed; `feature/line-numbers-paged` re-pointed to it). ff-merge per phase.
+> **Phase:** POST-MIGRATION spec-kit feature **004 line-numbers — P1+P2 DONE, P3 next.** Ultracode ON.
+>
+> **State summary:** Line numbers now RENDER in-app (the margin-number overlay), matching the export. P3
+> (Options dialog + per-paragraph suppress) remains.
+>
+> **Done this session (P2):**
+> - The paged PE paints `.superdoc-line`s but no numbers → an OWNED overlay (the comments/ink pattern).
+> - **Built with ultracode workflows:** (1) a 5-reader parallel understanding sweep (overlay pattern /
+>   painted-DOM geometry / event plumbing / Word line-count semantics / probe harness) → architect synthesis;
+>   (2) a runtime DOM spike confirming the selectors (`.superdoc-page[data-page-index]`,
+>   `.superdoc-line[data-pm-start]`, footnote `data-block-id ^= footnote-`); (3) a 2nd workflow = an
+>   adversarial review (5 finder dimensions × 2 diverse refuters).
+> - **NEW `src/renderer/bridge/line-numbers-overlay.ts`** (a TS bridge module — corrected the spec-kit T012
+>   `public/js`+`<script>` mechanism to the bridge-module pattern, matching comments/ink/notes): mounts
+>   `#wc-linenum-overlay` into `#pages`, `render()` counts per `getLineNumbers()` (`n%countBy===0` display,
+>   per-page reset for newPage), positions a right-aligned `.wc-line-number` in the left-margin gutter,
+>   excludes header/footer/footnote/table/zero-height; 80ms debounce; `wc:paged-relayout` +
+>   `wc:linenumbers-changed` + resize + canvas-scroll; bound-once leak guard; READ-ONLY + paged-only.
+> - Wiring: `commands.js` `H.lineNumbers` dispatches `wc:linenumbers-changed` after a successful apply
+>   (setLineNumbers is a sectPr write with no relayout); `index.ts` install + a `replaceFile` open/new nudge;
+>   `index.html` CSS link; `line-numbers-pm.css`.
+> - **Adversarial review → 6 survivors:** 2 refuted (`n%countBy===0` IS Word-correct — multiples of countBy
+>   regardless of start; the 80ms throttle self-corrects because `wc:paged-relayout` fires after every paint)
+>   + 5 fixed (page-sort `||0`→engine-mirror; footnote regex→`/footnote|endnote/i`; narrow-margin collapse;
+>   tall-line centering; **line sort client-top→`data-pm-start` so multi-column lines number in reading order**).
+> - **Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `probe:linenumbers` paged 25 + overlay 21.**
+>
+> **Process note:** P2 commits landed directly on `main` (I stayed on main after the P1 merge rather than
+> switching back to the feature branch). Outcome identical — reviewed, gates green, ff + pushed; branch
+> re-pointed to main. Per merge-mode, prefer the short-lived branch next time, but no harm done.
+>
+> **Known v1 limitations (recorded):** table-cell lines not numbered (Word numbers them); an imported
+> `w:start>1` displays our value (the P1 `w:start`↔Word `StartingNumber` off-by-one still applies — P3);
+> pixel-exact gutter not yet oracle-calibrated.
+>
+> **Next:** **004 P3** — the Line Numbering Options dialog (start / count-by / from-text distance, incl. the
+> `w:start = userStart−1` off-by-one mapping) + per-paragraph `w:suppressLineNumbers` (SPIKE-gated: find a
+> no-fork `pPr` write, research.md Q1). Tasks T017–T022. Resume on `feature/line-numbers-paged`.
+>
+> **Blockers/notes:** none.
+
 ## 2026-06-22 (004 Line Numbers — planned + P1 (modes) shipped)
 
 > **Branch:** `feature/line-numbers-paged` (P1 `aaf0347`, ff-merged to `main` + pushed; `main == origin/main`).
