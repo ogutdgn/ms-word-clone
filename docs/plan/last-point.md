@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-22 (004 Line Numbers — planned + P1 (modes) shipped)
+
+> **Branch:** `feature/line-numbers-paged` (P1 `aaf0347`, ff-merged to `main` + pushed; `main == origin/main`).
+> ff-merge per phase. **Phase:** POST-MIGRATION spec-kit feature **004 line-numbers — P1 DONE, P2 next.**
+>
+> **State summary:** the next independent feature (Layout → Line Numbers) is planned + P1 (the modes) shipped,
+> all NO-FORK, real-Word-validated. P2 (the in-app margin overlay) + P3 (Options + suppress) remain.
+>
+> **Done this session:**
+> - **Feasibility spike** — `editor.doc.sections.setLineNumbering` exports real `sectPr/w:lnNumType` + reads
+>   back, but the paged PE paints **0** margin numbers → the in-app render must be an owned overlay (P2).
+> - **Spec-kit** `specs/004-line-numbers/` (spec/plan/research/data-model/contracts/quickstart/checklist/tasks).
+> - **P1 (`aaf0347`)** — None / Continuous / Restart Each Page / Restart Each Section. New
+>   `bridge/line-numbers.ts` (`setLineNumbers`/`getLineNumbers`, mirrors `columns.ts`); un-deferred
+>   `lineNumbers` in `ENGINE_READY`; rewired `commands.js` `H.lineNumbers` off the retired `E()`/`WC.Layout`
+>   → `WC.PM`; repointed the **three** D6 guards `lineNumbers`→`hyphenation`. New `probe:linenumbers`
+>   (paged 19 + overlay 19) + `validate-linenumbers-win.ps1` + `test:roundtrip:paged` C6.
+> - **REAL-WORD DISCOVERY (C6):** authored `w:lnNumType/@w:start="3"` reads back in Word as
+>   `StartingNumber=4` — an off-by-one → start-at deferred to P3 (write `w:start = userStart−1`; recorded in
+>   research.md Q2). P1 ships modes + count-by only (count-by round-trips cleanly — Word CountBy == authored).
+> - **`/code-review` high** → 2 fixes (the dropdown-block D6 comment honesty re the retired-`WC.Layout`
+>   `H.hyphenation` throw trap; probe restart-exclusivity) + 3 P3 notes.
+> - **Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 57 / `probe:linenumbers` paged 19 + overlay 19.**
+>
+> **Discovery worth keeping:** real-Word validation earns its keep — the `w:start`↔`StartingNumber` off-by-one
+> would never surface in our own export round-trip (we write 3, read 3); only the COM oracle caught it.
+>
+> **Next:** **004 P2** (the owned margin-number overlay `line-numbers-overlay.js` — the comments/ink pattern:
+> read painted `.superdoc-page .superdoc-line` rects + count per mode/countBy/restart, `wc:paged-relayout`;
+> tasks T012–T016) → **P3** (Line Numbering Options dialog + per-paragraph `w:suppressLineNumbers`, spike-gated,
+> T017–T022). Resume on `feature/line-numbers-paged`, read `specs/004-line-numbers/tasks.md`.
+>
+> **Blockers/notes:** none. ⚠️ When `hyphenation` is eventually un-deferred, its `H.hyphenation` handler MUST
+> be rewired off the retired `WC.Layout` first (it would throw, not toast).
+
 ## 2026-06-21 (🏁 003 Columns COMPLETE — P2 customize + P3 column break shipped)
 
 > **Branch:** `main` (`eff06c3`, pushed; `main == origin/main`). Work on `feature/columns-paged` (local),
