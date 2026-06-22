@@ -894,7 +894,20 @@
   }
 
   // ---- Layout tab ----
-  H.lineNumbers = (c, node) => WC.flyout(node, (fly) => { [['None', 'none'], ['Continuous', 'continuous'], ['Restart Each Page', 'page'], ['Restart Each Section', 'section']].forEach(([l, m]) => { const it = WC.flyItem((WC.Layout.lineMode === m ? '✓ ' : '   ') + l, { onClick: () => WC.Layout.setLineNumbers(m) }); fly.appendChild(it); }); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Suppress for Current Paragraph', { onClick: () => { E().selectedBlocks().forEach((b) => b.classList.toggle('wc-ln-suppress')); WC.Layout.renderLineNumbers(); } })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Line Numbering Options…', { onClick: () => WC.Dialogs.paragraph() })); });
+  // 004 Line Numbers — drives the paged engine via WC.PM.setLineNumbers (sectPr/w:lnNumType); checked
+  // state from getLineNumbers(). Modes map to the OOXML restart values (page→newPage, section→newSection).
+  // Suppress-for-paragraph + the Options dialog are P3 (honest placeholders until then). No E()/WC.Layout.
+  H.lineNumbers = (c, node) => WC.flyout(node, (fly) => {
+    const cur = (WC.PM.getLineNumbers && WC.PM.getLineNumbers()) || { active: false, mode: 'none' };
+    const on = (m) => (cur.active ? cur.mode === m : m === 'none');
+    [['None', 'none'], ['Continuous', 'continuous'], ['Restart Each Page', 'newPage'], ['Restart Each Section', 'newSection']].forEach(([l, m]) => {
+      fly.appendChild(WC.flyItem((on(m) ? '✓ ' : '   ') + l, { onClick: () => { if (WC.PM.setLineNumbers({ mode: m })) WC.toast('Line Numbers', l); else WC.toast('Line Numbers', 'Could not apply line numbering here.'); } }));
+    });
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Suppress for Current Paragraph', { onClick: () => WC.toast('Suppress for Current Paragraph', 'Per-paragraph line-number suppression is coming in a follow-up.') }));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Line Numbering Options…', { onClick: () => WC.toast('Line Numbering Options', 'Start / count-by / from-text distance are coming in a follow-up.') }));
+  });
   H.hyphenation = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyItem((WC.Layout.hyphenMode === 'none' || !WC.Layout.hyphenMode ? '✓ ' : '   ') + 'None', { onClick: () => WC.Layout.setHyphenation('none') }));
     fly.appendChild(WC.flyItem((WC.Layout.hyphenMode === 'auto' ? '✓ ' : '   ') + 'Automatic', { onClick: () => WC.Layout.setHyphenation('auto') }));

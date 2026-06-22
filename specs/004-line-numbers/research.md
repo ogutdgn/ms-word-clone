@@ -47,8 +47,24 @@ in-probe pre-check.
 
 ## SPIKE — P3 only (run before the per-paragraph suppress production code)
 
-P1 (model/export) is feasibility-proven; P2 (overlay) reuses the proven comments/ink pattern. The one open
-question is P3's per-paragraph suppress:
+P1 (model/export) is feasibility-proven; P2 (overlay) reuses the proven comments/ink pattern. The open
+P3 questions are the per-paragraph suppress and the start-at off-by-one:
+
+### Q2 — the `w:start` ↔ Word `StartingNumber` off-by-one (P3 start-at)
+**Discovered in P1's COM oracle (C6):** authoring `w:lnNumType/@w:start="3"` (our value round-trips through
+the bridge — export shows `w:start="3"`, `getLineNumbers().start===3`) reads back in real Word as
+`PageSetup.LineNumbering.StartingNumber = 4`. So Word interprets `w:start` off-by-one from its displayed
+StartingNumber. **Decision rule (P3):** confirm the exact mapping with ≥2 values (looks like
+`StartingNumber = w:start + 1`), then have the start-at control write `w:start = userStart − 1` (clamped
+≥0) so Word's StartingNumber equals what the user typed; validate via the COM oracle (StartingNumber ==
+authored). P1 ships modes + count-by only (count-by round-trips cleanly — Word `CountBy` == authored);
+start-at is deferred to the Options dialog (P3).
+
+**Also for P3 (from review):** `getLineNumbers().distance` defaults to `0.25` for BOTH the no-section case
+and an enabled `lnNumType` with NO `w:distance` (where Word means "auto"). P1 never consumes distance (the
+Options dialog is a placeholder), so this is inert now — but the P3 Options dialog must NOT write that
+synthesized `0.25` back as an explicit `w:distance` Word never had. Track an `distance: 'auto' | number`
+distinction (or only write `w:distance` when the user actually sets it) when wiring the dialog.
 
 ### Q1 — `w:suppressLineNumbers` (per-paragraph)
 **Question**: is setting the current paragraph's `w:suppressLineNumbers` reachable NO-FORK — a fork paragraph

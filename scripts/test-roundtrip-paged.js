@@ -94,7 +94,7 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
@@ -104,6 +104,7 @@ async function main() {
   const pagedHfP3 = probe('scripts/paged-export-hf-p3-probe.js', 'wc-hf-p3-paged.json'); // 002 P3 footer PAGE-field doc
   const pagedCols = probe('scripts/paged-export-columns-probe.js', 'wc-columns-paged.json'); // 003 P1 2-column doc
   const pagedColsP2 = probe('scripts/paged-export-columns-p2-probe.js', 'wc-columns-p2-paged.json'); // 003 P2 Left+line-between
+  const pagedLn = probe('scripts/paged-export-linenumbers-probe.js', 'wc-linenumbers-paged.json'); // 004 P1 line numbers
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -122,6 +123,8 @@ async function main() {
   check('paged columns probe ran in PAGED mode', pagedCols.summary && pagedCols.summary.mode === 'paged', 'mode=' + (pagedCols.summary && pagedCols.summary.mode));
   check('paged columns probe: fail===0', pagedCols.summary && pagedCols.summary.fail === 0, pagedCols.summary ? pagedCols.summary.fail + ' of ' + pagedCols.summary.total : 'no summary');
   check('paged columns-P2 probe: fail===0', pagedColsP2.summary && pagedColsP2.summary.fail === 0, pagedColsP2.summary ? pagedColsP2.summary.fail + ' of ' + pagedColsP2.summary.total : 'no summary');
+  check('paged line-numbers probe ran in PAGED mode', pagedLn.summary && pagedLn.summary.mode === 'paged', 'mode=' + (pagedLn.summary && pagedLn.summary.mode));
+  check('paged line-numbers probe: fail===0', pagedLn.summary && pagedLn.summary.fail === 0, pagedLn.summary ? pagedLn.summary.fail + ' of ' + pagedLn.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
@@ -131,6 +134,7 @@ async function main() {
     'paged HF-P3': DOCX_DIR + '/wc-paged-hf-p3.docx',
     'paged columns': DOCX_DIR + '/wc-paged-columns.docx',
     'paged columns P2': DOCX_DIR + '/wc-paged-columns-p2.docx',
+    'paged line-numbers': DOCX_DIR + '/wc-paged-linenumbers.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -210,6 +214,22 @@ async function main() {
     check('columns-P2: LineBetween === true', cl.ok && j.lineBetween === true, errDetail('lineBetween=' + JSON.stringify(j.lineBetween)));
     check('columns-P2: narrow-left (Width[0] < Width[1])', cl.ok && ws.length >= 2 && Number(ws[0]) < Number(ws[1]), errDetail('widths=' + JSON.stringify(ws)));
     check('columns-P2/P3: a column break (char 14) is present in the body', cl.ok && j.columnBreakPresent === true, errDetail('columnBreakPresent=' + JSON.stringify(j.columnBreakPresent)));
+  }
+
+  // ── 5f) 004 P1 line numbers: Active + RestartMode read-back (+ P3 CountBy/StartingNumber on the same doc) ──
+  console.log('\nC6) paged line-numbers read-back == authored (Sections(1).PageSetup.LineNumbering):');
+  {
+    const cl = comValidate('validate-linenumbers-win.ps1', DOCS['paged line-numbers']);
+    const j = cl.json || {};
+    const errDetail = (extra) => cl.ok ? extra : ((j.error) || cl.raw.slice(0, 140));
+    check('line-numbers: opened without repair', cl.ok && j.openedWithoutRepair === true, errDetail('open=' + JSON.stringify(j.openedWithoutRepair)));
+    check('line-numbers: RestartMode enum in range {0,1,2}', cl.ok && j.enumCheck === true, errDetail('enumCheck=' + JSON.stringify(j.enumCheck) + ' restartMode=' + JSON.stringify(j.restartMode)));
+    check('line-numbers: LineNumbering.Active === true', cl.ok && j.lineNumbersActive === true, errDetail('active=' + JSON.stringify(j.lineNumbersActive)));
+    check('line-numbers: RestartMode === continuous (0)', cl.ok && Number(j.restartMode) === 0, errDetail('restartMode=' + JSON.stringify(j.restartMode) + ' label=' + JSON.stringify(j.restartLabel)));
+    check('line-numbers: CountBy === 2 (authored)', cl.ok && Number(j.countBy) === 2, errDetail('countBy=' + JSON.stringify(j.countBy)));
+    // NB: StartingNumber (the start-at value) is P3 — Word reports it off-by-one from w:start
+    // (authored w:start=3 read back as StartingNumber=4), so the start-at control + its w:start mapping
+    // ship with the Line Numbering Options dialog (P3), validated there.
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

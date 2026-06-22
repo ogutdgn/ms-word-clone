@@ -28,7 +28,8 @@
     "probe:notes": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-notes.json --shot-evalfile=scripts/paged-notes-probe.js",
     "probe:headerfooter": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-hf.json --shot-evalfile=scripts/paged-headerfooter-probe.js",
     "probe:opennew": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-opennew.json --shot-evalfile=scripts/paged-opennew-probe.js",
-    "probe:columns": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-columns.json --shot-evalfile=scripts/paged-columns-probe.js"
+    "probe:columns": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-columns.json --shot-evalfile=scripts/paged-columns-probe.js",
+    "probe:linenumbers": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-ln.json --shot-evalfile=scripts/paged-linenumbers-probe.js"
   },
   "dependencies": {
     "@fluentui/svg-icons": "^1.1.328",

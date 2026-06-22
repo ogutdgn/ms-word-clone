@@ -16,6 +16,7 @@ import { installInsertExotica } from './insert-exotica'
 import { installDraw } from './draw'
 import { installInkOverlay } from './ink-overlay'
 import { installColumns } from './columns'
+import { installLineNumbers } from './line-numbers'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -155,8 +156,8 @@ const AREA: Record<string, string> = {
 // (already-working) bridge verbs. Image wrap = Phase 4c.1 (setImageWrap, wp:anchor
 // export), image z-order = Phase 4c.3 (setImageZOrder). Page setup margins/orientation/
 // size = Phase 4 page-setup export (dePageMargins/dePageSize -> body sectPr w:pgMar/w:pgSz,
-// Word-COM-validated). The other layout-page/arrange cmds (columns, breaks, lineNumbers,
-// hyphenation; position presets, align, group, rotate, selectionPane) still lack engine
+// Word-COM-validated). The other layout-page/arrange cmds (hyphenation;
+// position presets, align, group, rotate, selectionPane) still lack engine
 // support and MUST stay blocked. Per-command granularity keeps the coarse AREA flag honest
 // without re-exposing genuinely-unimplemented controls.
 // header/footer (002): the paged PE paints + edits header/footer regions; the "Header & Footer
@@ -164,7 +165,9 @@ const AREA: Record<string, string> = {
 // P1 delivers goToHeader/goToFooter/closeHeaderFooter (header/footer = the Insert dropdowns,
 // already ready). P2 adds differentFirstPage/differentOddEven; P3 adds pageNumber.
 // columns (003): the paged PE flows the body into N columns; WC.PM.setColumns writes sectPr/w:cols.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks'])
+// lineNumbers (004): WC.PM.setLineNumbers writes sectPr/w:lnNumType (the modes); the paged PE doesn't
+// paint the margin numbers, so the in-app render is an owned overlay (line-numbers-overlay.js, P2).
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -427,6 +430,8 @@ export function preinstallBridge() {
     insertPageNumber: () => false, removePageNumbers: () => false,
     // 003 columns pre-mount stubs (replaced by installColumns on mount)
     setColumns: () => false, getColumns: () => ({ count: 1, gap: 0.5, equalWidth: true, lineBetween: false }),
+    // 004 line-numbers pre-mount stubs (replaced by installLineNumbers on mount)
+    setLineNumbers: () => false, getLineNumbers: () => ({ active: false, mode: 'none', countBy: 1, start: 1, distance: 0.25 }),
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
@@ -524,7 +529,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor), installLineNumbers(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
