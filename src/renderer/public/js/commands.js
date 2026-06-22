@@ -916,25 +916,17 @@
     fly.appendChild(WC.flySep());
     fly.appendChild(WC.flyItem('Line Numbering Options…', { onClick: () => lineNumberingOptionsDialog() }));
   });
+  // 005 Hyphenation — drives the document via WC.PM.setHyphenation (document-level settings.xml/w:autoHyphenation);
+  // checked-state from getHyphenation(). Options dialog (P2) + Manual (P3) are honest placeholders until then.
+  // No WC.Layout/E().
   H.hyphenation = (c, node) => WC.flyout(node, (fly) => {
-    fly.appendChild(WC.flyItem((WC.Layout.hyphenMode === 'none' || !WC.Layout.hyphenMode ? '✓ ' : '   ') + 'None', { onClick: () => WC.Layout.setHyphenation('none') }));
-    fly.appendChild(WC.flyItem((WC.Layout.hyphenMode === 'auto' ? '✓ ' : '   ') + 'Automatic', { onClick: () => WC.Layout.setHyphenation('auto') }));
-    fly.appendChild(WC.flyItem('Manual…', { onClick: () => manualHyphenate() }));
+    const cur = (WC.PM.getHyphenation && WC.PM.getHyphenation()) || { auto: false };
+    fly.appendChild(WC.flyItem((!cur.auto ? '✓ ' : '   ') + 'None', { onClick: () => { if (WC.PM.setHyphenation({ mode: 'none' })) WC.toast('Hyphenation', 'None'); else WC.toast('Hyphenation', 'Could not change hyphenation here.'); } }));
+    fly.appendChild(WC.flyItem((cur.auto ? '✓ ' : '   ') + 'Automatic', { onClick: () => { if (WC.PM.setHyphenation({ mode: 'auto' })) WC.toast('Hyphenation', 'Automatic'); else WC.toast('Hyphenation', 'Could not change hyphenation here.'); } }));
+    fly.appendChild(WC.flyItem('Manual…', { onClick: () => WC.toast('Manual Hyphenation', 'Per-document manual hyphenation is coming in a follow-up.') }));
     fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Hyphenation Options…', { onClick: () => WC.toast('Hyphenation zone/limit options — automatic hyphenation is applied.') }));
+    fly.appendChild(WC.flyItem('Hyphenation Options…', { onClick: () => WC.toast('Hyphenation Options', 'Hyphenation zone / consecutive-hyphen limit / hyphenate words in CAPS are coming in a follow-up.') }));
   });
-  function manualHyphenate() {
-    // Word's Manual scans long words and proposes hyphenation points one at a time.
-    // We approximate by inserting soft hyphens (­) into long words so they break.
-    // Operate only on text nodes so element attributes (comment anchors etc.) survive.
-    let count = 0;
-    const walker = document.createTreeWalker(E().node, NodeFilter.SHOW_TEXT, null);
-    const targets = [];
-    let n; while ((n = walker.nextNode())) { if (/[A-Za-z]{8,}/.test(n.nodeValue)) targets.push(n); }
-    targets.forEach((t) => { t.nodeValue = t.nodeValue.replace(/([A-Za-z]{8,})/g, (w) => { count++; return w.replace(/(.{4})(?=.{3})/g, '$1­'); }); });
-    E().dirty = true; E().repaginate();
-    WC.toast('Manual Hyphenation complete — ' + count + ' word(s) marked.');
-  }
   H.position = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('In Line with Text')); fly.appendChild(WC.flyItem('In Line with Text', { onClick: () => WC.PM.setImageWrap('inline') })); fly.appendChild(WC.flyHeader('With Text Wrapping')); [['Top Left', 'tl'], ['Top Center', 'tc'], ['Top Right', 'tr'], ['Middle Left', 'ml'], ['Middle Center', 'mc'], ['Middle Right', 'mr'], ['Bottom Left', 'bl'], ['Bottom Center', 'bc'], ['Bottom Right', 'br']].forEach(([l, p]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.Layout.position(p) }))); });
   H.wrapText = (c, node) => WC.flyout(node, (fly) => { [['In Line with Text', 'inline'], ['Square', 'square'], ['Tight', 'tight'], ['Through', 'through'], ['Top and Bottom', 'topbottom'], ['Behind Text', 'behind'], ['In Front of Text', 'front']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.PM.setImageWrap(m) }))); });
   H.bringForward = () => WC.PM.setImageZOrder('forward');

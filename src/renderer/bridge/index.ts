@@ -18,6 +18,7 @@ import { installInkOverlay } from './ink-overlay'
 import { installColumns } from './columns'
 import { installLineNumbers } from './line-numbers'
 import { installLineNumbersOverlay } from './line-numbers-overlay'
+import { installHyphenation } from './hyphenation'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -168,7 +169,9 @@ const AREA: Record<string, string> = {
 // columns (003): the paged PE flows the body into N columns; WC.PM.setColumns writes sectPr/w:cols.
 // lineNumbers (004): WC.PM.setLineNumbers writes sectPr/w:lnNumType (the modes); the paged PE doesn't
 // paint the margin numbers, so the in-app render is an owned overlay (line-numbers-overlay.js, P2).
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers'])
+// hyphenation (005): WC.PM.setHyphenation writes document-level settings.xml (w:autoHyphenation etc.) via an
+// owned converter write (no fork translator); in-app mid-word hyphenation render is out of scope (export-faithful).
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers', 'hyphenation'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -437,6 +440,9 @@ export function preinstallBridge() {
     // 004 line-numbers pre-mount stubs (replaced by installLineNumbers on mount)
     setLineNumbers: () => false, getLineNumbers: () => ({ active: false, mode: 'none', countBy: 1, start: 1, distance: 0.25, distanceExplicit: false }),
     suppressLineNumbers: () => false, currentParagraphSuppressed: () => false,
+    // 005 hyphenation pre-mount stubs (replaced by installHyphenation on mount)
+    setHyphenation: () => false, getHyphenation: () => ({ auto: false, zone: 0.25, consecutiveLimit: 0, hyphenateCaps: true, zoneExplicit: false, limitExplicit: false }),
+    applyManualHyphenation: () => false,
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
@@ -534,7 +540,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor), installLineNumbers(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor), installLineNumbers(editor), installHyphenation(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
