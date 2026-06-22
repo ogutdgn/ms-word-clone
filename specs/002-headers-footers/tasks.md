@@ -84,9 +84,9 @@ document-write path. Doc model stays page-free. Prefer NO fork edits.
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T031 Grep-confirm NO remaining `E()` (= `WC.Editor`) or `WC.HeaderFooter` references in the header/footer paths (`commands.js` + anywhere); confirm `ribbon-data.js` was regenerated from `scripts/gen.js` (not hand-edited).
-- [ ] T032 Final docs reconciliation: update `docs/SCOPE.md` (Header & Footer row: Reconciling → ✅ for the delivered parts), `docs/FEATURES.md`, and `docs/LAYOUT_ENGINE.md` (#8 Headers/footers) to reflect what shipped; keep claims conservative (only what the oracle verified).
-- [ ] T033 Confirm `test:roundtrip:paged` includes the extended header/footer read-backs; full gate sweep green on `main` after the last merge.
+- [x] T031 Grep-confirm NO remaining `E()` (= `WC.Editor`) or `WC.HeaderFooter` references in the header/footer paths (`commands.js` + anywhere); confirm `ribbon-data.js` was regenerated from `scripts/gen.js` (not hand-edited).
+- [x] T032 Final docs reconciliation: update `docs/SCOPE.md` (Header & Footer row: Reconciling → ✅ for the delivered parts), `docs/FEATURES.md`, and `docs/LAYOUT_ENGINE.md` (#8 Headers/footers) to reflect what shipped; keep claims conservative (only what the oracle verified).
+- [x] T033 Confirm `test:roundtrip:paged` includes the extended header/footer read-backs; full gate sweep green on `main` after the last merge.
 
 ---
 

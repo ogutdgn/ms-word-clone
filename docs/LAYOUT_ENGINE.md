@@ -82,7 +82,7 @@ found 2026-06-15). The engine is "done" when these are demonstrably fixable and 
 | 5 | **Tables — relocate** | can't move a table | table **move handle**; reposition; (floating table = anchor, later) |
 | 6 | **Tables — page split** | a tall table can't split across pages | **row-level splitting** across page boundaries; repeat-header-row |
 | 7 | **Floating objects** | Shapes / Text Box / WordArt render **inline** | reuse #3's anchor/position/wrap frame layer |
-| 8 | **Headers / footers** | `isBlocked` (honest toast) | per-page **header/footer regions**; first-page / odd-even; field render (page #, date) |
+| 8 | **Headers / footers** | ✅ **002 (P1+P2+P3)** — on-page edit + tab, first-page/odd-even variants, real `PAGE`-field page numbers; all export-validated vs real Word. REMAINING: in-app render of a *freshly-inserted* field's per-page number (shows "0"; Word resolves it) + Date/Document-Info fields | per-page **header/footer regions**; first-page / odd-even; field render (page #, date) |
 | 9 | **Page borders** | `w:pgBorders` stores + exports, but **doesn't render** | draw the border **around the page margins**; border-art styles |
 | 10 | **Watermark** | visual SVG stand-in (not a real header construct) | watermark as a real **header** drawing, per page |
 | 11 | **Inside-Vertical border** | no paragraph OOXML equivalent | only meaningful inside a **table/columns** grid → falls out of #4 |

@@ -89,9 +89,12 @@ The default **paged** layout engine (SuperDoc PresentationEditor, the rendering 
 2026-06-21 paged-render migration) paints real per-page multi-page sheets. A few layout-coupled
 outcomes are still being reconciled against it **per-feature**:
 
-- **Real multi-page layout** is now LIVE in the default paged engine. Per-page **headers/footers**,
-  **on-page page-number fields**, and **multi-page View modes** are backed by the engine, but their
-  ribbon-command wiring is being reconciled per-feature — some may still show a deferral toast until wired.
+- **Real multi-page layout** is now LIVE in the default paged engine. Per-page **headers/footers**
+  are fully wired (spec-kit **002**): on-page edit + the "Header & Footer Tools" contextual tab,
+  **Different First Page / Odd & Even** variants, and real OOXML **`PAGE`-field page numbers** — all
+  Word-COM-validated. (Caveat: a *freshly-inserted* page-number field shows "0" in-app until the doc
+  is reopened; real Word resolves it per page.) **Multi-page View modes** are engine-backed; some
+  other layout ribbon commands (columns, breaks, floating-object position) are still being reconciled.
 - **Asymmetric column widths** (Left/Right) and **mirrored margins** render with the
   dominant value; **Side-to-Side** paging is approximate. (UI Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.
