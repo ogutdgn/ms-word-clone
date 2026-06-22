@@ -7,6 +7,57 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP started — constitution ratified + 🏁 005 Hyphenation COMPLETE)
+
+> **Branch:** `general-done` (the cleanup integration branch off `main` @ `89ed1b1`; **user merges general-done→main
+> at the very end** — nothing pushed/merged to main during the loop). 005 ff-merged in @ `22f682d`.
+> **Phase:** POST-MIGRATION **`general-done` cleanup loop** (autonomous `/loop`, self-paced). Ultracode ON.
+>
+> **State summary:** Per the user, the 5-item post-migration cleanup backlog is being driven as an autonomous
+> `/loop` into a `general-done` branch (NOT main), each item a spec-kit feature via the FULL chain
+> (specify→clarify→plan→tasks→analyze→spike→implement→gates+oracle→/code-review→ff-merge into general-done).
+> A project **constitution** was ratified first (`4b00681`, v1.0.0, 7 principles). **005 hyphenation COMPLETE.**
+> Loop order: 005 hyphenation ✅ → 006 section breaks → 007 paged test-coverage port → 008 overlay retirement
+> (after 007) → 009 M6 glyph tolerance→gate → 010 import fidelity → 011 pagination calibration → 012 frames group.
+> STOP-and-ask reserved for: 011 needing a fork edit, the destructive overlay deletion in 008, any spike proving a
+> feature not no-fork-achievable.
+>
+> **Done this session (005 hyphenation, NO-FORK):** Layout → Hyphenation wired onto the document via the `WC.PM`
+> bridge. The fork has **no** hyphenation translator, so the write is an **owned upsert into
+> `editor.converter.convertedXml['word/settings.xml']`** (the 003 `bodySectPr` pattern on the settings part) —
+> `bridge/hyphenation.ts` `setHyphenation({mode,zone?,consecutiveLimit?,hyphenateCaps?})` /`getHyphenation()`
+> /`applyManualHyphenation()`. **P1** None/Automatic (`w:autoHyphenation`), **P2** Options dialog (zone /
+> consecutive-limit / hyphenate-CAPS → `w:hyphenationZone`/`w:consecutiveHyphenLimit`/`w:doNotHyphenateCaps`;
+> CAPS inverted; zone/limit full-set-per-field with clear-on-null), **P3** Manual (best-effort U+00AD optional
+> hyphens). Un-deferred `hyphenation` in ENGINE_READY; the 3 D6 guards repointed `hyphenation`→`position`;
+> `commands.js` H.hyphenation rewired off `WC.Layout`/`E()`. SPIKE 14/14 (no-fork settings write confirmed).
+> **/code-review = an adversarial workflow (31 agents): 2 confirmed (+25 refuted) → both FIXED:** (1) the Manual
+> `applyManualHyphenation` reused UNMAPPED positions across the multi-node walk → corrupted/threw on the 2nd+
+> text node (each padded word is longer than its source) → now `tr.mapping.map(...)` + a 3-paragraph regression;
+> (2) hardened the probe's CT_Settings assertion to ABSOLUTE placement.
+>
+> **KEY FINDING (recorded, research.md Decision 7):** Word's COM **`ActiveDocument.HyphenationZone` is broken** —
+> it returns **9999999 (wdUndefined) for ANY value, even one Word itself authored**, and Word doesn't even persist
+> `w:hyphenationZone`. Our export DOES write a correct `<w:hyphenationZone w:val="360"/>` (MORE faithful than
+> Word's own COM round-trip) — so the zone is validated at the XML layer (the probe), NOT COM-asserted; the oracle
+> validates AutoHyphenation + ConsecutiveHyphensLimit + HyphenateCaps. Also: the CT_Settings child order is
+> load-bearing — Word SKIPS a misplaced `w:hyphenationZone`, so the bridge RELOCATES the hyphenation block to its
+> schema slot (`placeHyphenation`, after `w:defaultTabStop`).
+>
+> **Gates (005): pm 475 / smoke 9 / roundtrip 27 / bundle 4 / probe:hyphenation paged 28 + overlay 28 /
+> test:roundtrip:paged 68** (C7 real-Word read-back). Commits on general-done: `f704d6f` plan, `f5773f9` tasks+spike,
+> `b3640f2` P1, `63d711b` P2+P3+oracle, `22f682d` review-fixes+close-out.
+>
+> **Known v1 limitations:** in-app mid-word hyphenation not rendered (export-faithful); Manual = optional-hyphen
+> best-effort; HyphenationZone not COM-verifiable (Word bug); single document (no per-section).
+>
+> **Next:** **006 mid-doc section breaks** — fresh sub-branch off `general-done`, full spec-kit chain. ⚠️ likely
+> HEAVIER: the paged engine may not support multiple sections / rendering a section break — spike carefully; if it
+> needs a vendored-fork edit, STOP and ask the user (Principle-I exception).
+>
+> **Blockers/notes:** none. Loop is self-paced (ScheduleWakeup); each firing re-derives state from
+> `.specify/feature.json` + git log + the active `tasks.md`.
+
 ## 2026-06-22 (004 Line Numbers P3 — Options dialog + per-paragraph suppress shipped → 🏁 004 COMPLETE)
 
 > **Branch:** `main` (`02a54f7`, pushed; `feature/line-numbers-paged` ff-merged then deleted). ff-merge per phase.
