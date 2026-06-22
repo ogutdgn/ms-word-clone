@@ -109,6 +109,15 @@ outcomes are still being reconciled against it **per-feature**:
   `PageSetup.LineNumbering` (Active / RestartMode / CountBy / StartingNumber) + the suppressed-paragraph
   flag. (Note: `w:start` is written off-by-one — raw `userStart − 1` — because Word reads
   `StartingNumber = w:start + 1`; v1 single primary section; table-cell lines not numbered.)
+- **Hyphenation** is fully wired (spec-kit **005**): None / Automatic + **Hyphenation Options** (zone /
+  consecutive-hyphen limit / hyphenate words in CAPS) + **Manual** (best-effort optional-hyphen insertion)
+  — document-level OOXML `settings.xml` (`w:autoHyphenation` / `w:hyphenationZone` / `w:consecutiveHyphenLimit`
+  / `w:doNotHyphenateCaps`) written by an **owned converter write** through the `WC.PM` bridge (the fork has no
+  hyphenation translator — NO fork edit). Real Word reads back `AutoHyphenation` / `ConsecutiveHyphensLimit` /
+  `HyphenateCaps` (the CAPS toggle correctly inverted vs `w:doNotHyphenateCaps`). (Notes: Word's COM
+  `HyphenationZone` is a broken property — it reads 9999999 for *any* value, even Word's own — so the zone is
+  validated at the XML layer, not via COM; in-app mid-word hyphenation rendering is out of scope — the export +
+  Word read-back is the fidelity guarantee.)
 - **Mirrored margins** render with the dominant value; **Side-to-Side** paging is approximate. (UI
   Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.

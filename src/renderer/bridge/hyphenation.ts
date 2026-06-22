@@ -142,7 +142,10 @@ export function installHyphenation(editor: AnyEditor) {
         const text: string = node.text
         if (!/[A-Za-z]{8,}/.test(text) || text.indexOf(SOFT) >= 0) return true
         const next = text.replace(/([A-Za-z]{8,})/g, (word: string) => { marked++; return word.replace(/(.{4})(?=.{3})/g, '$1' + SOFT) })
-        if (next !== text) tr.insertText(next, pos, pos + text.length)
+        // MAP the original-doc positions through the accumulating transaction — each soft-hyphen-padded `next` is
+        // LONGER than its source, so a later text node's raw pos is stale once an earlier insert has run. (Mirrors
+        // bridge/commands.ts's tr.mapping.map usage; an unmapped pos corrupts/throws on the 2nd+ node — review.)
+        if (next !== text) tr.insertText(next, tr.mapping.map(pos), tr.mapping.map(pos + text.length))
         return true
       })
       if (marked > 0 && ed.view) { ed.view.dispatch(tr); markDirty() }

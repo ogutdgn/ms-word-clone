@@ -56,10 +56,17 @@
   await ta('export: w:doNotHyphenateCaps REMOVED (clean-clear)', async () => { const s = await settings(); return /<w:doNotHyphenateCaps\b/.test(s) ? ('still present' && false) : 'removed'; });
   t('getHyphenation().hyphenateCaps === true after clear', () => PM.getHyphenation().hyphenateCaps === true ? 'caps on' : ('got ' + JSON.stringify(PM.getHyphenation()) && false));
 
-  // ── CT_Settings child order: w:consecutiveHyphenLimit MUST precede w:hyphenationZone, else Word skips the
-  //    out-of-order element (reads HyphenationZone back as 9999999/undefined — caught by the C7 oracle). ──
+  // ── CT_Settings ABSOLUTE placement: the hyphenation block must sit in its schema slot — after w:defaultTabStop,
+  //    internally ordered, and BEFORE the first post-block element (w:characterSpacingControl). w:hyphenationZone is
+  //    the one element the COM oracle CANNOT validate (Word's HyphenationZone is broken), and Word SKIPS it if
+  //    misplaced — so this is the ONLY gate proving placeHyphenation positioned the block correctly (review). ──
   t('setHyphenation({mode:"auto", zone:0.25, consecutiveLimit:2}) (both, one call)', () => PM.setHyphenation({ mode: 'auto', zone: 0.25, consecutiveLimit: 2 }) === true);
-  await ta('export: <w:consecutiveHyphenLimit> precedes <w:hyphenationZone> (CT_Settings order)', async () => { const s = await settings(); const il = s.indexOf('<w:consecutiveHyphenLimit'); const iz = s.indexOf('<w:hyphenationZone'); return (il !== -1 && iz !== -1 && il < iz) ? 'ordered' : ('il=' + il + ' iz=' + iz && false); });
+  await ta('export: block in its CT_Settings slot (defaultTabStop < autoHyph < consecutiveLimit < zone < characterSpacingControl)', async () => {
+    const s = await settings();
+    const idt = s.indexOf('<w:defaultTabStop'); const iah = s.indexOf('<w:autoHyphenation'); const il = s.indexOf('<w:consecutiveHyphenLimit'); const iz = s.indexOf('<w:hyphenationZone'); const ics = s.indexOf('<w:characterSpacingControl');
+    const ok = idt !== -1 && iah !== -1 && il !== -1 && iz !== -1 && idt < iah && iah < il && il < iz && (ics === -1 || iz < ics);
+    return ok ? 'placed' : ('idt=' + idt + ' iah=' + iah + ' il=' + il + ' iz=' + iz + ' ics=' + ics && false);
+  });
 
   // ── Options clear-on-null (the dialog's Auto / No-limit must REMOVE a prior value, not leave it stale — the
   //    004 partial-update carryover lesson; zone/limit are full-set per field) ──
@@ -68,14 +75,23 @@
   t('setHyphenation({zone:null, consecutiveLimit:null}) accepted (clear)', () => PM.setHyphenation({ zone: null, consecutiveLimit: null }) === true);
   await ta('export: zone + limit REMOVED + getHyphenation *Explicit flags false', async () => { const s = await settings(); const g = PM.getHyphenation(); return (!/w:hyphenationZone\b/.test(s) && !/w:consecutiveHyphenLimit\b/.test(s) && g.zoneExplicit === false && g.limitExplicit === false) ? 'cleared' : ('s=' + s.slice(0, 160) + ' g=' + JSON.stringify(g) && false); });
 
-  // ── P3 Manual: optional hyphens (U+00AD) into long words, survive export ──
+  // ── P3 Manual: optional hyphens (U+00AD) into long words across MULTIPLE paragraphs / text nodes. This
+  //    exercises the transaction position-MAPPING in applyManualHyphenation — an UNMAPPED pos would target the
+  //    wrong range on the 2nd+ node (each padded replacement is longer than its source) and corrupt/throw,
+  //    silently dropping the op (review finding). ──
   try { await PM.newBlank(); } catch (e) {}
   await sleep(140);
-  try { W.editor.commands.insertContent('Internationalization counterproductive antidisestablishmentarianism wordy.'); } catch (e) {}
-  await sleep(160);
-  t('applyManualHyphenation() marks long words (>0)', () => { const n = PM.applyManualHyphenation(); return (typeof n === 'number' && n > 0) ? ('marked=' + n) : ('got ' + JSON.stringify(n) && false); });
-  await sleep(120);
-  await ta('export: optional hyphen present (softHyphen or U+00AD) in document.xml', async () => { const d = await docXml(); return (/<w:softHyphen\b/.test(d) || /­/.test(d)) ? (/<w:softHyphen/.test(d) ? 'w:softHyphen' : 'literal U+00AD') : ('no optional hyphen' && false); });
+  try { W.editor.commands.insertContent('<p>Internationalization alpha beta.</p><p>Counterproductive gamma delta.</p><p>Antidisestablishmentarianism epsilon.</p>'); } catch (e) {}
+  await sleep(180);
+  t('applyManualHyphenation() marks long words across 3 paragraphs (≥3)', () => { const n = PM.applyManualHyphenation(); return (typeof n === 'number' && n >= 3) ? ('marked=' + n) : ('got ' + JSON.stringify(n) && false); });
+  await sleep(140);
+  await ta('export: ≥3 optional hyphens + all 3 long words INTACT (no position-drift corruption)', async () => {
+    const d = await docXml();
+    const sh = (d.match(/­/g) || []).length + (d.match(/<w:softHyphen\b/g) || []).length;
+    const clean = d.replace(/­/g, '').replace(/<w:softHyphen\b[^>]*\/?>/g, '');
+    const intact = /Internationalization/.test(clean) && /Counterproductive/.test(clean) && /Antidisestablishmentarianism/.test(clean);
+    return (sh >= 3 && intact) ? ('hyphens=' + sh + ' intact') : ('hyphens=' + sh + ' intact=' + intact && false);
+  });
 
   try { await PM.newBlank(); } catch (e) {} // teardown
   return done();
