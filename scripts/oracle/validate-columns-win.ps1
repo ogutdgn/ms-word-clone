@@ -31,6 +31,12 @@ try {
     $out.columnCount = [int]$tc.Count
     $out.evenlySpaced = ([int]$tc.EvenlySpaced -ne 0)
     try { $out.spacing = [double]$tc.Spacing } catch {}  # inter-column spacing, in points
+    try { $out.lineBetween = ([int]$tc.LineBetween -ne 0) } catch {}  # the separator line (w:cols/@w:sep)
+    try {
+      $ws = @()
+      for ($i = 1; $i -le [int]$tc.Count; $i++) { $ws += [double]$tc.Item($i).Width }  # per-column widths (points)
+      $out.columnWidths = $ws
+    } catch {}
   }
 } catch {
   $out.ok = $false

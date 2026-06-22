@@ -23,9 +23,9 @@ only document-write path. Prefer NO fork edits.
 **Goal**: resolve research.md's 3 OPEN questions (unequal columns / line-between / column-break) before the
 P2/P3 production code. Throwaway probe scripts, deleted before each slice's commit. Records the no-fork reach.
 
-- [ ] T003 Write a throwaway spike probe `scripts/tmp-columns-spike.js` (real paged renderer) exercising: (a) `sections.setColumns` with a separator + unequal widths if any option exists; (b) inserting a `w:br w:type="column"`; export + read the painted columns.
-- [ ] T004 SPIKE Q1+Q2 (unequal + line-between): determine whether `<w:col>` children / `w:cols/@w:sep` are reachable NO-FORK (a `setColumns` option, an owned post-export `sectPr` write, or `sections.setPageSetup`). Record pass/fail + the chosen mechanism (or "honest-toast gap") into research.md.
-- [ ] T005 SPIKE Q3 (column break): confirm a no-fork insert of a `w:br w:type="column"` (a break command / `insertContent` of a column-break run) moves the painted text to the next column + exports `w:type="column"`. Record the mechanism. Delete the spike script; fold anything reusable into `scripts/paged-columns-probe.js`.
+- [x] T003 Write a throwaway spike probe `scripts/tmp-columns-spike.js` (real paged renderer) exercising: (a) `sections.setColumns` with a separator + unequal widths if any option exists; (b) inserting a `w:br w:type="column"`; export + read the painted columns.
+- [x] T004 SPIKE Q1+Q2 (unequal + line-between): determine whether `<w:col>` children / `w:cols/@w:sep` are reachable NO-FORK (a `setColumns` option, an owned post-export `sectPr` write, or `sections.setPageSetup`). Record pass/fail + the chosen mechanism (or "honest-toast gap") into research.md.
+- [x] T005 SPIKE Q3 (column break): confirm a no-fork insert of a `w:br w:type="column"` (a break command / `insertContent` of a column-break run) moves the painted text to the next column + exports `w:type="column"`. Record the mechanism. Delete the spike script; fold anything reusable into `scripts/paged-columns-probe.js`.
 
 **Checkpoint**: the unequal / line-between / column-break no-fork reach is decided + written into research.md. Any forced minimal fork accessor → plan.md Complexity Tracking.
 
@@ -55,12 +55,12 @@ P2/P3 production code. Throwaway probe scripts, deleted before each slice's comm
 **Goal**: count + spacing + equal-width via a More Columns dialog; Left/Right + line-between bounded by the spike.
 **Independent test**: More Columns → 2 cols, 1" spacing → export `w:space="1440"` + Word `Spacing≈72pt`; Left preset → unequal widths (to the spike's reach).
 
-- [ ] T015 [US2] Extend `src/renderer/bridge/columns.ts`: `setColumns` accepts `gap` (spacing) + `equalWidth` (already) + `lineBetween?` + `columns?[]` (unequal) — applying line-between/unequal ONLY via the spike-chosen no-fork mechanism (else ignore + the caller toasts). Extend `getColumns()` to read spacing/lineBetween.
-- [ ] T016 [US2] Add the "More Columns" dialog in `src/renderer/public/js/commands.js` (`WC.dialog`: number-of-columns, spacing input, "Equal column width" checkbox, "Line between" checkbox) → `WC.PM.setColumns(...)`; seed defaults from `getColumns()`. Wire the Left/Right preset items (equal-width false / unequal via the spike mechanism, else honest toast).
-- [ ] T017 [US2] Extend `scripts/paged-columns-probe.js`: 2 cols + 1" spacing → assert export `w:space="1440"` + the painted gap; equalWidth off → assert; Left/Right + line-between → assert per the spike's reach (or assert the honest-toast path if gapped).
-- [ ] T018 [US2] Extend `scripts/oracle/validate-columns-win.ps1`: read `.Spacing` (+ `.LineBetween` / per-column `.Item(n).Width` where reachable); assert spacing≈authored + even/uneven flag. Extend the roundtrip C-section.
-- [ ] T019 [US2] VERIFY P2: build + 4 gates + `probe:columns` + the COM oracle (count + spacing + flags) green; `/code-review` high; FIX; re-verify.
-- [ ] T020 [US2] CLOSE-OUT P2: commit; update runbook + memory; ff-merge → `main` + push.
+- [x] T015 [US2] Extend `src/renderer/bridge/columns.ts`: `setColumns` accepts `gap` (spacing) + `equalWidth` (already) + `lineBetween?` + `columns?[]` (unequal) — applying line-between/unequal ONLY via the spike-chosen no-fork mechanism (else ignore + the caller toasts). Extend `getColumns()` to read spacing/lineBetween.
+- [x] T016 [US2] Add the "More Columns" dialog in `src/renderer/public/js/commands.js` (`WC.dialog`: number-of-columns, spacing input, "Equal column width" checkbox, "Line between" checkbox) → `WC.PM.setColumns(...)`; seed defaults from `getColumns()`. Wire the Left/Right preset items (equal-width false / unequal via the spike mechanism, else honest toast).
+- [x] T017 [US2] Extend `scripts/paged-columns-probe.js`: 2 cols + 1" spacing → assert export `w:space="1440"` + the painted gap; equalWidth off → assert; Left/Right + line-between → assert per the spike's reach (or assert the honest-toast path if gapped).
+- [x] T018 [US2] Extend `scripts/oracle/validate-columns-win.ps1`: read `.Spacing` (+ `.LineBetween` / per-column `.Item(n).Width` where reachable); assert spacing≈authored + even/uneven flag. Extend the roundtrip C-section.
+- [x] T019 [US2] VERIFY P2: build + 4 gates + `probe:columns` + the COM oracle (count + spacing + flags) green; `/code-review` high; FIX; re-verify.
+- [x] T020 [US2] CLOSE-OUT P2: commit; update runbook + memory; ff-merge → `main` + push.
 
 **Checkpoint**: count + spacing + equal-width round-trip to real Word; Left/Right + line-between work to the recorded no-fork reach.
 

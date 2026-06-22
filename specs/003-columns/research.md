@@ -46,7 +46,30 @@ doc + read-back into `test:roundtrip:paged`.
 **Rationale**: the export must be **real-Word-validated**, not just XML-inspected — the project's fidelity
 standard (001/002). XML inspection stays as the fast in-probe pre-check.
 
-## SPIKE — Phase-0, real paged renderer (run before P2/P3 production code)
+## SPIKE RESULTS — RESOLVED 2026-06-21 (2 throwaway probe rounds, real paged renderer) — ALL NO-FORK
+
+- **Q1 UNEQUAL (Left/Right): owned `bodySectPr` write.** The public `sections.setColumns` input is only
+  `{count, gap, equalWidth, target}` (no per-column array; a `columns[]` arg is rejected); `equalWidth:false`
+  writes `w:equalWidth="0"` but NO `<w:col>` children (Word then auto-distributes equally). The NO-FORK path:
+  after `setColumns`, find the `w:cols` element in `editor.converter.bodySectPr` and push `<w:col w:w=.. w:space=..>`
+  children (widths computed from the text-column width) — the export carries them. (An owned converter write,
+  the plan's flagged option; NOT a fork-source edit.)
+- **Q2 LINE-BETWEEN (`w:sep`): owned `bodySectPr` write — clean + robust.** `setColumns` ignores a `sep`/
+  `lineBetween` option (NO_OP). Writing `w:sep="1"` onto `converter.bodySectPr`'s `w:cols` → export
+  `<w:cols … w:sep="1"/>`, and it **PERSISTS across a later `setColumns`** (which mutates the same element
+  in-place, keeping the sep attr). Verified both rounds.
+- **Q3 COLUMN BREAK: fully NO-FORK.** No public column-break command, BUT the `hardBreak` node already has a
+  `lineBreakType` attr; `editor.commands.insertContent({ type:'hardBreak', attrs:{ lineBreakType:'column' } })`
+  exports `<w:br w:type="column"/>`. Verified.
+
+**Decision**: P2 ships count + spacing + equalWidth (public `setColumns`) + line-between + Left/Right unequal
+(owned `bodySectPr` w:cols writes — `w:sep` / `<w:col>` children). P3 ships the column break via the hardBreak
+`lineBreakType:'column'` insert. All NO-FORK (no edits under `src/renderer/core/superdoc-fork/`). The owned
+`bodySectPr` write is confined to the columns bridge module and validated via the Word-COM oracle
+(`TextColumns.LineBetween` / per-column `.Width`). In-app render of the separator LINE may be a paged-engine gap
+(export + Word are correct) — recorded if so.
+
+## (historical) SPIKE plan — Phase-0, real paged renderer (resolved above)
 
 The MVP (P1) is feasibility-proven (Decision 1). Three open questions for P2/P3, resolved by a throwaway
 spike (deleted before the P1 commit), recorded here:

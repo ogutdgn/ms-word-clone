@@ -50,6 +50,56 @@
   if (mode === 'paged') await ta('paged paint: back to a single column band', async () => { const b = bands(); return b.length <= 1 ? ('bands=' + JSON.stringify(b)) : ('still ' + b.length + ' bands: ' + JSON.stringify(b) && false); });
   await ta('export: no multi-column w:cols (num<=1 or absent)', async () => { const { doc } = await exp(); const m = (doc.match(/<w:cols\b[^>]*\bw:num="(\d+)"/) || []); const n = m[1] ? parseInt(m[1], 10) : 1; return n <= 1 ? 'single column' : ('still num=' + n && false); });
 
+  // ── P2: equal-width toggle, line-between (owned w:cols/@w:sep), Left/Right unequal (<w:col>) ──
+  // EXPORT-level + getColumns round-trip (mode-agnostic). The owned bodySectPr writes are export-correct
+  // and real-Word-validated (oracle C4); the in-app paint of the separator line / unequal split is
+  // best-effort (the writes bypass the PM transaction, so the PE may not re-flow them live).
+  await author();
+  t('setColumns({count:2, equalWidth:false}) accepted', () => PM.setColumns({ count: 2, equalWidth: false }) === true);
+  await sleep(350);
+  await ta('export: w:equalWidth="0"', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:equalWidth="0"/.test(doc) ? 'equalWidth=0' : ('snippet=' + ((doc.match(/<w:cols\b[^>]*>/) || [''])[0]) && false); });
+
+  t('setColumns({count:2, lineBetween:true}) accepted', () => PM.setColumns({ count: 2, lineBetween: true }) === true);
+  await sleep(300);
+  await ta('export: line-between w:cols w:sep="1"', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:sep="1"/.test(doc) ? 'sep=1' : ('no w:sep; snippet=' + ((doc.match(/<w:cols\b[^>]*>/) || [''])[0]) && false); });
+  t('getColumns().lineBetween === true (round-trip)', () => PM.getColumns().lineBetween === true ? 'on' : ('got ' + JSON.stringify(PM.getColumns()) && false));
+  t('setColumns({count:2, lineBetween:false}) accepted', () => PM.setColumns({ count: 2, lineBetween: false }) === true);
+  await sleep(250);
+  await ta('export after clear: no w:sep', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:sep="1"/.test(doc) ? ('w:sep still present' && false) : 'cleared'; });
+
+  t('setColumns({unequal:"left"}) accepted', () => PM.setColumns({ unequal: 'left' }) === true);
+  await sleep(350);
+  await ta('export: Left = two <w:col> children, narrow-left (w1 < w2)', async () => {
+    const { doc } = await exp();
+    const ws = (doc.match(/<w:col\b[^>]*\bw:w="(\d+)"/g) || []).map((s) => parseInt((s.match(/w:w="(\d+)"/) || [])[1], 10));
+    if (ws.length < 2) return ('only ' + ws.length + ' <w:col>; snippet=' + ((doc.match(/<w:cols\b[\s\S]{0,180}?<\/w:cols>/) || [''])[0]).slice(0, 180)) && false;
+    return ws[0] < ws[1] ? ('cols=' + JSON.stringify(ws)) : ('not narrow-left: ' + JSON.stringify(ws) && false);
+  });
+  t('setColumns({unequal:"right"}) accepted', () => PM.setColumns({ unequal: 'right' }) === true);
+  await sleep(300);
+  await ta('export: Right = narrow-right (w1 > w2)', async () => {
+    const { doc } = await exp();
+    const ws = (doc.match(/<w:col\b[^>]*\bw:w="(\d+)"/g) || []).map((s) => parseInt((s.match(/w:w="(\d+)"/) || [])[1], 10));
+    return (ws.length >= 2 && ws[0] > ws[1]) ? ('cols=' + JSON.stringify(ws)) : ('not narrow-right: ' + JSON.stringify(ws) && false);
+  });
+  t('setColumns({count:2}) (equal) accepted', () => PM.setColumns({ count: 2 }) === true);
+  await sleep(300);
+  await ta('export: switching back to equal clears the <w:col> children', async () => { const { doc } = await exp(); return /<w:col\b/.test(doc) ? ('<w:col> still present' && false) : 'cleared to equal'; });
+
+  // ── P2 regression (review #1/#3/#5): partial updates must NOT clobber prior line-between / equalWidth ──
+  await author();
+  t('regress setup: count:2 + lineBetween:true', () => PM.setColumns({ count: 2, lineBetween: true }) === true);
+  await sleep(250);
+  t('preset Left after line-between is accepted', () => PM.setColumns({ unequal: 'left' }) === true);
+  await sleep(280);
+  await ta('export: w:sep="1" SURVIVES the preset click (not clobbered)', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:sep="1"/.test(doc) ? 'sep preserved' : ('w:sep lost on preset' && false); });
+  t('getColumns().lineBetween still true after the preset', () => PM.getColumns().lineBetween === true ? 'preserved' : ('lost' && false));
+  t('regress setup: count:2 + equalWidth:false', () => PM.setColumns({ count: 2, equalWidth: false }) === true);
+  await sleep(250);
+  t('lineBetween-only toggle is accepted', () => PM.setColumns({ lineBetween: true }) === true);
+  await sleep(250);
+  await ta('export: w:equalWidth="0" SURVIVES the lineBetween-only toggle', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:equalWidth="0"/.test(doc) ? 'equalWidth preserved' : ('equalWidth clobbered' && false); });
+
   try { await PM.newBlank(); } catch (e) {} // teardown
   return done();
 })();

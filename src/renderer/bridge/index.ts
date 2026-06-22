@@ -425,7 +425,7 @@ export function preinstallBridge() {
     getHeaderFooterOptions: () => ({ differentFirstPage: false, differentOddEven: false }),
     insertPageNumber: () => false, removePageNumbers: () => false,
     // 003 columns pre-mount stubs (replaced by installColumns on mount)
-    setColumns: () => false, getColumns: () => ({ count: 1, gap: 0.5, equalWidth: true }),
+    setColumns: () => false, getColumns: () => ({ count: 1, gap: 0.5, equalWidth: true, lineBetween: false }),
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
