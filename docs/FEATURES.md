@@ -94,13 +94,20 @@ outcomes are still being reconciled against it **per-feature**:
   **Different First Page / Odd & Even** variants, and real OOXML **`PAGE`-field page numbers** — all
   Word-COM-validated. (Caveat: a *freshly-inserted* page-number field shows "0" in-app until the doc
   is reopened; real Word resolves it per page.) **Multi-page View modes** are engine-backed; some
-  other layout ribbon commands (floating-object position, mid-doc section breaks) are
+  other layout ribbon commands (floating-object position) are
   still being reconciled.
 - **Columns** are fully wired (spec-kit **003**): One/Two/Three + More Columns (spacing / equal-width)
   + **Left/Right unequal** + **line between** + a **column break** — the paged engine flows the text
   and it round-trips to real Word (oracle-validated; Left/Right match Word's 1.83"/4.17" preset). The
   owned `bodySectPr` write for line-between/unequal is outside undo + best-effort in-app paint (export +
-  Word correct). Mid-doc **section** breaks remain a future feature.
+  Word correct).
+- **Section breaks** are wired (spec-kit **006**): Layout → Breaks → Section Breaks — **Next Page / Continuous /
+  Even Page / Odd Page** insert a real mid-doc section break (a paragraph-level `pPr/w:sectPr` via the public
+  `insertSectionBreakAtSelection` command; the typed variants add `<w:type>` on the BODY sectPr — the section
+  after the break — via an owned `state.doc.attrs.bodySectPr` write). Real Word reads `Sections.Count` + each
+  `PageSetup.SectionStart`. (Notes: the paged engine does not repaginate at the break in-app — export-faithful,
+  Word paginates on open; the owned write is outside undo; v1 supports a single *typed* break per document — a
+  2nd+ typed break is refused with a toast — while multiple Next Page breaks are fine.)
 - **Line Numbers** are fully wired (spec-kit **004**): None / Continuous / Restart Each Page / Restart
   Each Section + **Line Numbering Options** (start-at / count-by / from-text distance) + **Suppress for
   Current Paragraph** — real OOXML `sectPr/w:lnNumType` + per-paragraph `pPr/w:suppressLineNumbers`, all
