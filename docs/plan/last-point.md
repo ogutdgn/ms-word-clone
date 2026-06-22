@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-21 (🏁 003 Columns COMPLETE — P2 customize + P3 column break shipped)
+
+> **Branch:** `main` (`eff06c3`, pushed; `main == origin/main`). Work on `feature/columns-paged` (local),
+> ff-merged per phase. **Phase:** POST-MIGRATION — spec-kit feature **003 columns is DONE** (P1+P2+P3 + polish).
+>
+> **State summary:** the **003 columns** feature is fully shipped, all NO-FORK, all real-Word-validated.
+>
+> **Done this session (P2+P3 + polish):**
+> - **Phase-0 spike** — resolved the no-fork reach: count/spacing/equalWidth via the public `sections.setColumns`;
+>   **line-between** (`w:cols/@w:sep`) + **unequal Left/Right** (`<w:col>` children) via an OWNED write to
+>   `editor.converter.bodySectPr`'s w:cols (spike-proven to persist + round-trip; NOT a fork-source edit); the
+>   **column break** = `hardBreak{lineBreakType:'column'}`.
+> - **P2 (`63d94ee`)** — More Columns dialog (count/spacing/equalWidth/line-between) + Left/Right presets.
+>   `setColumns` is a safe PARTIAL update (a preset / lineBetween toggle no longer clobbers prior state);
+>   `bodyColsEl` = direct-child only; honest-fail when unreachable. `/code-review` 39-agent → 7 findings, 5 fixed
+>   (partial-update clobber ×3, direct-child, honest-fail) + 2 recorded (owned write outside PM undo; in-app paint
+>   best-effort). Oracle: Word reads `EvenlySpaced=false`, `LineBetween=true`, `columnWidths=[131.75,300.25]pt`
+>   (= Word's exact Left preset), opens without repair.
+> - **P3 (`eff06c3`)** — the column break (`insert.ts` `insertColumnBreak`/`insertLineBreak`). Un-deferred `breaks`,
+>   rewired the Breaks flyout OFF the retired `E()` (Column/Text-Wrapping/the local page-break helper/Continuous-toast).
+>   Repointed the three D6 guards `breaks`→`lineNumbers`. Oracle: a char-14 column break present. + Polish: docs
+>   reconciled (SCOPE/FEATURES/LAYOUT_ENGINE Columns ✅).
+> - **Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 49 / `probe:columns` paged 39 + overlay 36.**
+>
+> **Recurring lesson:** each ENGINE_READY un-defer (columns, then breaks) requires repointing the D6 guards
+> (`[0a]`×2 + `[11]`) to a still-deferred representative — a missed one leaves a stale flyout open and CASCADES
+> into ~8 unrelated dropdown-content `test:pm` failures (caught by the overlay suite).
+>
+> **Next:** **004+** (independent; user picks): overlay-retirement · residual-`isBlocked`-layout (position / align /
+> group / rotate / lineNumbers / hyphenation / mid-doc section breaks) · paged-test-coverage port ·
+> M6-tolerance→gate + pagination-calibration (PE 2 vs Word 3) · paged html/txt/csv-import fidelity · then the
+> COMPLETENESS PASS (`docs/bug-hunt/`). Start a fresh `/speckit-specify` for the chosen feature.
+>
+> **Blockers/notes:** none. `feature/columns-paged` is at `eff06c3`.
+
 ## 2026-06-21 (003 Columns — planned + P1 (presets) shipped)
 
 > **Branch:** `main` (`3326938`, pushed; `main == origin/main`). Work on `feature/columns-paged` (local),
