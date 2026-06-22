@@ -94,7 +94,7 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n) || /^wc-.*-hyphenation\.docx$/.test(n) || /^wc-hyphenation-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
@@ -105,6 +105,7 @@ async function main() {
   const pagedCols = probe('scripts/paged-export-columns-probe.js', 'wc-columns-paged.json'); // 003 P1 2-column doc
   const pagedColsP2 = probe('scripts/paged-export-columns-p2-probe.js', 'wc-columns-p2-paged.json'); // 003 P2 Left+line-between
   const pagedLn = probe('scripts/paged-export-linenumbers-probe.js', 'wc-linenumbers-paged.json'); // 004 P1 line numbers
+  const pagedHyph = probe('scripts/paged-export-hyphenation-probe.js', 'wc-hyphenation-paged.json'); // 005 hyphenation
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -125,6 +126,8 @@ async function main() {
   check('paged columns-P2 probe: fail===0', pagedColsP2.summary && pagedColsP2.summary.fail === 0, pagedColsP2.summary ? pagedColsP2.summary.fail + ' of ' + pagedColsP2.summary.total : 'no summary');
   check('paged line-numbers probe ran in PAGED mode', pagedLn.summary && pagedLn.summary.mode === 'paged', 'mode=' + (pagedLn.summary && pagedLn.summary.mode));
   check('paged line-numbers probe: fail===0', pagedLn.summary && pagedLn.summary.fail === 0, pagedLn.summary ? pagedLn.summary.fail + ' of ' + pagedLn.summary.total : 'no summary');
+  check('paged hyphenation probe ran in PAGED mode', pagedHyph.summary && pagedHyph.summary.mode === 'paged', 'mode=' + (pagedHyph.summary && pagedHyph.summary.mode));
+  check('paged hyphenation probe: fail===0', pagedHyph.summary && pagedHyph.summary.fail === 0, pagedHyph.summary ? pagedHyph.summary.fail + ' of ' + pagedHyph.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
@@ -135,6 +138,7 @@ async function main() {
     'paged columns': DOCX_DIR + '/wc-paged-columns.docx',
     'paged columns P2': DOCX_DIR + '/wc-paged-columns-p2.docx',
     'paged line-numbers': DOCX_DIR + '/wc-paged-linenumbers.docx',
+    'paged hyphenation': DOCX_DIR + '/wc-paged-hyphenation.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -232,6 +236,25 @@ async function main() {
     // P3: the SUPPRESSME paragraph was found (no import-drop) AND carries an ON pPr/w:suppressLineNumbers.
     check('line-numbers: suppress marker paragraph present after Word open', cl.ok && j.suppressMarkerFound === true, errDetail('suppressMarkerFound=' + JSON.stringify(j.suppressMarkerFound)));
     check('line-numbers: suppressed paragraph carries w:suppressLineNumbers', cl.ok && j.paragraphSuppressed === true, errDetail('paragraphSuppressed=' + JSON.stringify(j.paragraphSuppressed)));
+  }
+
+  // ── 5g) 005 hyphenation: AutoHyphenation + options read-back (ActiveDocument-level settings) ──
+  console.log('\nC7) paged hyphenation read-back == authored (ActiveDocument hyphenation settings):');
+  {
+    const ch = comValidate('validate-hyphenation-win.ps1', DOCS['paged hyphenation']);
+    const j = ch.json || {};
+    const errDetail = (extra) => ch.ok ? extra : ((j.error) || ch.raw.slice(0, 140));
+    check('hyphenation: opened without repair', ch.ok && j.openedWithoutRepair === true, errDetail('open=' + JSON.stringify(j.openedWithoutRepair)));
+    check('hyphenation: AutoHyphenation === true (authored Automatic)', ch.ok && j.autoHyphenation === true, errDetail('autoHyphenation=' + JSON.stringify(j.autoHyphenation)));
+    check('hyphenation: ConsecutiveHyphensLimit === 2 (authored)', ch.ok && Number(j.consecutiveHyphensLimit) === 2, errDetail('consecutiveHyphensLimit=' + JSON.stringify(j.consecutiveHyphensLimit)));
+    // CAPS OFF authored ⇒ w:doNotHyphenateCaps ⇒ Word HyphenateCaps false (the inverted mapping).
+    check('hyphenation: HyphenateCaps === false (authored CAPS-off ⇒ w:doNotHyphenateCaps)', ch.ok && j.hyphenateCaps === false, errDetail('hyphenateCaps=' + JSON.stringify(j.hyphenateCaps)));
+    // NB: HyphenationZone is NOT asserted via COM — Word's ActiveDocument.HyphenationZone is a broken/undefined
+    // property (it returns 9999999=wdUndefined for ANY value, even one Word itself authored, and Word does not
+    // persist <w:hyphenationZone>). Our export DOES write a correct <w:hyphenationZone w:val="360"/> (more
+    // faithful than Word's own COM round-trip) — that fidelity is validated at the XML layer by the paged probe
+    // (export carries w:hyphenationZone="360" + the CT_Settings order). Recorded: specs/005-hyphenation/research.md.
+    if (ch.ok) check('hyphenation: zone read = wdUndefined (Word COM HyphenationZone limitation, info)', Number(j.hyphenationZone) === 9999999 || Number.isFinite(Number(j.hyphenationZone)), 'hyphenationZone=' + JSON.stringify(j.hyphenationZone));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

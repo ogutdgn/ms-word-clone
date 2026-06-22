@@ -923,10 +923,43 @@
     const cur = (WC.PM.getHyphenation && WC.PM.getHyphenation()) || { auto: false };
     fly.appendChild(WC.flyItem((!cur.auto ? '✓ ' : '   ') + 'None', { onClick: () => { if (WC.PM.setHyphenation({ mode: 'none' })) WC.toast('Hyphenation', 'None'); else WC.toast('Hyphenation', 'Could not change hyphenation here.'); } }));
     fly.appendChild(WC.flyItem((cur.auto ? '✓ ' : '   ') + 'Automatic', { onClick: () => { if (WC.PM.setHyphenation({ mode: 'auto' })) WC.toast('Hyphenation', 'Automatic'); else WC.toast('Hyphenation', 'Could not change hyphenation here.'); } }));
-    fly.appendChild(WC.flyItem('Manual…', { onClick: () => WC.toast('Manual Hyphenation', 'Per-document manual hyphenation is coming in a follow-up.') }));
+    fly.appendChild(WC.flyItem('Manual…', { onClick: () => { const n = WC.PM.applyManualHyphenation && WC.PM.applyManualHyphenation(); if (typeof n === 'number' && n >= 0) WC.toast('Manual Hyphenation', n + ' word(s) marked with optional hyphens.'); else WC.toast('Manual Hyphenation', 'Could not apply manual hyphenation here.'); } }));
     fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Hyphenation Options…', { onClick: () => WC.toast('Hyphenation Options', 'Hyphenation zone / consecutive-hyphen limit / hyphenate words in CAPS are coming in a follow-up.') }));
+    fly.appendChild(WC.flyItem('Hyphenation Options…', { onClick: () => hyphenationOptionsDialog() }));
   });
+  // 005 P2: Hyphenation Options — automatically-hyphenate toggle + hyphenation zone + limit consecutive hyphens +
+  // hyphenate words in CAPS → WC.PM.setHyphenation (document settings). Seeds from getHyphenation(); zone/limit are
+  // sent as a number when entered or null when blank (Auto / No limit) so the bridge clears a prior value — never
+  // replays a synthesized default (the 004 lesson). CAPS checkbox is inverted vs w:doNotHyphenateCaps in the bridge.
+  function hyphenationOptionsDialog() {
+    const cur = (WC.PM && WC.PM.getHyphenation && WC.PM.getHyphenation()) || { auto: false, zone: 0.25, consecutiveLimit: 0, hyphenateCaps: true, zoneExplicit: false, limitExplicit: false };
+    const autoCb = el('input', { type: 'checkbox' }); autoCb.checked = cur.auto === true;
+    const zoneIn = el('input', { type: 'number', min: '0', step: '0.05', style: { width: '70px' } });
+    if (cur.zoneExplicit) zoneIn.value = String(cur.zone); else zoneIn.placeholder = 'Auto';
+    const limitIn = el('input', { type: 'number', min: '0', step: '1', style: { width: '70px' } });
+    if (cur.limitExplicit) limitIn.value = String(cur.consecutiveLimit); else limitIn.placeholder = 'No limit';
+    const capsCb = el('input', { type: 'checkbox' }); capsCb.checked = cur.hyphenateCaps !== false;
+    WC.dialog({ title: 'Hyphenation', width: '400px', body: el('div', {}, [
+      el('div', { class: 'row' }, [autoCb, el('label', { text: ' Automatically hyphenate document', style: { marginLeft: '6px' } })]),
+      el('div', { class: 'row' }, [el('label', { text: 'Hyphenation zone (in):', style: { width: '190px' } }), zoneIn]),
+      el('div', { class: 'row' }, [el('label', { text: 'Limit consecutive hyphens to:', style: { width: '190px' } }), limitIn]),
+      el('div', { class: 'row' }, [capsCb, el('label', { text: ' Hyphenate words in CAPS', style: { marginLeft: '6px' } })]),
+    ]), footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const zv = zoneIn.value.trim(); const z = parseFloat(zv);
+        const lv = limitIn.value.trim(); const lim = parseInt(lv, 10);
+        const opts = {
+          mode: autoCb.checked ? 'auto' : 'none',
+          hyphenateCaps: capsCb.checked,
+          zone: (zv !== '' && isFinite(z) && z >= 0) ? z : null, // null ⇒ Auto (clear)
+          consecutiveLimit: (lv !== '' && isFinite(lim) && lim >= 0) ? lim : null, // null ⇒ no limit (clear)
+        };
+        if (WC.PM && WC.PM.setHyphenation && WC.PM.setHyphenation(opts)) WC.toast('Hyphenation', 'Applied.');
+        else WC.toast('Hyphenation', 'Could not apply hyphenation here.');
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
   H.position = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('In Line with Text')); fly.appendChild(WC.flyItem('In Line with Text', { onClick: () => WC.PM.setImageWrap('inline') })); fly.appendChild(WC.flyHeader('With Text Wrapping')); [['Top Left', 'tl'], ['Top Center', 'tc'], ['Top Right', 'tr'], ['Middle Left', 'ml'], ['Middle Center', 'mc'], ['Middle Right', 'mr'], ['Bottom Left', 'bl'], ['Bottom Center', 'bc'], ['Bottom Right', 'br']].forEach(([l, p]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.Layout.position(p) }))); });
   H.wrapText = (c, node) => WC.flyout(node, (fly) => { [['In Line with Text', 'inline'], ['Square', 'square'], ['Tight', 'tight'], ['Through', 'through'], ['Top and Bottom', 'topbottom'], ['Behind Text', 'behind'], ['In Front of Text', 'front']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.PM.setImageWrap(m) }))); });
   H.bringForward = () => WC.PM.setImageZOrder('forward');

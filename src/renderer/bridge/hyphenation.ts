@@ -47,9 +47,33 @@ export function installHyphenation(editor: AnyEditor) {
   function removeEl(root: XmlEl, name: string): void {
     if (Array.isArray(root.elements)) root.elements = root.elements.filter((e) => !(e && e.name === name))
   }
+  // CT_Settings (ECMA-376 §17.15.1.78) requires a strict child order. The hyphenation block is
+  // autoHyphenation → consecutiveHyphenLimit → hyphenationZone → doNotHyphenateCaps, positioned immediately
+  // AFTER w:defaultTabStop. Word's import is sequential: a block at the WRONG position (our generic upsert pushes
+  // new elements to the END, after compat/rsids/etc.) makes Word SKIP the measurement element — w:hyphenationZone
+  // read back as 9999999/undefined. So after upserting, RELOCATE the whole hyphenation block (internally ordered)
+  // to its correct schema position. Non-hyphenation siblings keep their relative order.
+  const HYPH_ORDER = ['w:autoHyphenation', 'w:consecutiveHyphenLimit', 'w:hyphenationZone', 'w:doNotHyphenateCaps']
+  // CT_Settings elements that the schema places AFTER the hyphenation block (the fallback anchor when
+  // w:defaultTabStop is absent — insert the block BEFORE the first of these).
+  const AFTER_HYPH = new Set<string>(['w:characterSpacingControl', 'w:showEnvelope', 'w:summaryLength', 'w:clickAndTypeStyle', 'w:defaultTableStyle', 'w:evenAndOddHeaders', 'w:noPunctuationKerning', 'w:printTwoOnOne', 'w:savePreviewPicture', 'w:updateFields', 'w:hdrShapeDefaults', 'w:footnotePr', 'w:endnotePr', 'w:compat', 'w:compatSetting', 'w:docVars', 'w:rsids', 'w:themeFontLang', 'w:clrSchemeMapping', 'w:decimalSymbol', 'w:listSeparator'])
+  function placeHyphenation(root: XmlEl): void {
+    if (!Array.isArray(root.elements)) return
+    const isHyph = (e: XmlEl) => !!e && HYPH_ORDER.indexOf(e.name || '') !== -1
+    const block = root.elements.filter(isHyph).sort((a, b) => HYPH_ORDER.indexOf(a.name || '') - HYPH_ORDER.indexOf(b.name || ''))
+    if (!block.length) return
+    const rest = root.elements.filter((e) => !isHyph(e))
+    // Insert immediately after w:defaultTabStop (the hyphenation block's schema predecessor); else before the
+    // first element the schema places after the block; else at the end.
+    const dt = rest.findIndex((e) => e && e.name === 'w:defaultTabStop')
+    let idx: number
+    if (dt !== -1) idx = dt + 1
+    else { const a = rest.findIndex((e) => e && AFTER_HYPH.has(e.name || '')); idx = a !== -1 ? a : rest.length }
+    root.elements = rest.slice(0, idx).concat(block, rest.slice(idx))
+  }
   const truthy = (v: any): boolean => v === 'true' || v === '1' || v === true || v === 1 || v == null /* bare element ⇒ on */
 
-  type HyphOpts = { mode?: 'none' | 'auto'; zone?: number; consecutiveLimit?: number; hyphenateCaps?: boolean }
+  type HyphOpts = { mode?: 'none' | 'auto'; zone?: number | null; consecutiveLimit?: number | null; hyphenateCaps?: boolean }
 
   // Write the hyphenation settings (idempotent; each field written only when provided). `mode:'none'` writes an
   // EXPLICIT w:autoHyphenation w:val="false" (not just omit) so a prior "on" can't linger (the 004 clean-clear
@@ -61,9 +85,15 @@ export function installHyphenation(editor: AnyEditor) {
       const mode = opts?.mode
       if (mode === 'auto') upsert(root, 'w:autoHyphenation', { 'w:val': 'true' })
       else if (mode === 'none') upsert(root, 'w:autoHyphenation', { 'w:val': 'false' })
-      const z = Number(opts?.zone); if (Number.isFinite(z) && z >= 0) upsert(root, 'w:hyphenationZone', { 'w:val': String(Math.round(z * 1440)) })
-      const cl = Math.round(Number(opts?.consecutiveLimit)); if (Number.isFinite(cl) && cl >= 0) upsert(root, 'w:consecutiveHyphenLimit', { 'w:val': String(cl) })
+      // zone/consecutiveLimit are FULL-SET per field: present-and-valid ⇒ upsert; present-but-null/blank ⇒ CLEAR
+      // (the Options dialog's "Auto"/"No limit"); ABSENT ⇒ preserve (a plain mode switch keeps the options). This
+      // avoids the 004 partial-update carryover (a value cleared to Auto on a re-edit would otherwise linger).
+      const has = (k: string) => !!opts && Object.prototype.hasOwnProperty.call(opts, k)
+      // NB: check null/undefined BEFORE Number() — Number(null) === 0 (would wrongly write a 0 value, not clear).
+      if (has('zone')) { const zv = opts!.zone; if (zv == null) removeEl(root, 'w:hyphenationZone'); else { const z = Number(zv); if (Number.isFinite(z) && z >= 0) upsert(root, 'w:hyphenationZone', { 'w:val': String(Math.round(z * 1440)) }); else removeEl(root, 'w:hyphenationZone') } }
+      if (has('consecutiveLimit')) { const lv = opts!.consecutiveLimit; if (lv == null) removeEl(root, 'w:consecutiveHyphenLimit'); else { const cl = Math.round(Number(lv)); if (Number.isFinite(cl) && cl >= 0) upsert(root, 'w:consecutiveHyphenLimit', { 'w:val': String(cl) }); else removeEl(root, 'w:consecutiveHyphenLimit') } }
       if (typeof opts?.hyphenateCaps === 'boolean') { if (opts.hyphenateCaps) removeEl(root, 'w:doNotHyphenateCaps'); else upsert(root, 'w:doNotHyphenateCaps', {}) }
+      placeHyphenation(root) // relocate the block to its CT_Settings position — Word skips a misplaced hyphenationZone
       markDirty()
       return true
     } catch { return false }

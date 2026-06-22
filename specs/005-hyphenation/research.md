@@ -73,6 +73,23 @@ the on/off state + the exported settings + Word's read-back are the fidelity gua
 hyphenation is a recorded known-limitation (no overlay, no render work). This keeps 005 a pure
 settings-write + ribbon feature — no layout-engine dependency.
 
+## Decision 7 — `HyphenationZone` is XML-validated, NOT COM-validated (a Word COM limitation, discovered)
+
+**Discovered (2026-06-22, COM diagnostic):** Word's `ActiveDocument.HyphenationZone` property is broken for
+read-back — it returns **9999999 (wdUndefined) for ANY value**, even one Word itself authored
+(`$doc.HyphenationZone = 36/50/360` all read back 9999999), and Word does **not** persist a
+`<w:hyphenationZone>` element at all when you set it via COM. Two more findings from Word's own authored doc:
+Word writes `<w:autoHyphenation/>` bare (we write `w:val="true"` — both are ON and Word reads ours as true), and
+it correctly persists `w:consecutiveHyphenLimit` + `w:doNotHyphenateCaps` (which the COM oracle DOES read back).
+
+**Decision:** keep writing a correct `<w:hyphenationZone w:val="360"/>` (twips) — our export is **more faithful**
+than Word's own COM round-trip, which drops it. Validate the zone at the **XML layer** (the paged probe asserts
+`w:hyphenationZone="360"` + the CT_Settings child order); do **NOT** assert `HyphenationZone` in the C7 Word-COM
+block (it would always read 9999999). The COM oracle still validates `AutoHyphenation` + `ConsecutiveHyphensLimit`
++ `HyphenateCaps` in real Word. Also discovered: the CT_Settings child order is load-bearing — `w:hyphenationZone`
+must sit in the hyphenation block right after `w:defaultTabStop` (a generic upsert-to-end made Word skip it), so
+`bridge/hyphenation.ts` RELOCATES the block to its schema position (`placeHyphenation`).
+
 ## Decision 6 — Manual hyphenation (P3) = best-effort optional hyphens
 
 **Decision**: Manual inserts optional hyphens (U+00AD) into long words (≥ a threshold) in the document body via

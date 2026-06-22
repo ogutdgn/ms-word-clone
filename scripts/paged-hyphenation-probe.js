@@ -56,6 +56,18 @@
   await ta('export: w:doNotHyphenateCaps REMOVED (clean-clear)', async () => { const s = await settings(); return /<w:doNotHyphenateCaps\b/.test(s) ? ('still present' && false) : 'removed'; });
   t('getHyphenation().hyphenateCaps === true after clear', () => PM.getHyphenation().hyphenateCaps === true ? 'caps on' : ('got ' + JSON.stringify(PM.getHyphenation()) && false));
 
+  // ── CT_Settings child order: w:consecutiveHyphenLimit MUST precede w:hyphenationZone, else Word skips the
+  //    out-of-order element (reads HyphenationZone back as 9999999/undefined — caught by the C7 oracle). ──
+  t('setHyphenation({mode:"auto", zone:0.25, consecutiveLimit:2}) (both, one call)', () => PM.setHyphenation({ mode: 'auto', zone: 0.25, consecutiveLimit: 2 }) === true);
+  await ta('export: <w:consecutiveHyphenLimit> precedes <w:hyphenationZone> (CT_Settings order)', async () => { const s = await settings(); const il = s.indexOf('<w:consecutiveHyphenLimit'); const iz = s.indexOf('<w:hyphenationZone'); return (il !== -1 && iz !== -1 && il < iz) ? 'ordered' : ('il=' + il + ' iz=' + iz && false); });
+
+  // ── Options clear-on-null (the dialog's Auto / No-limit must REMOVE a prior value, not leave it stale — the
+  //    004 partial-update carryover lesson; zone/limit are full-set per field) ──
+  t('setHyphenation({zone:0.4, consecutiveLimit:3}) accepted', () => PM.setHyphenation({ zone: 0.4, consecutiveLimit: 3 }) === true);
+  await ta('export: zone="576" (0.4in) + limit="3" present', async () => { const s = await settings(); return (/w:hyphenationZone[^>]*w:val="576"/.test(s) && /w:consecutiveHyphenLimit[^>]*w:val="3"/.test(s)) ? 'present' : ('head=' + s.slice(0, 200) && false); });
+  t('setHyphenation({zone:null, consecutiveLimit:null}) accepted (clear)', () => PM.setHyphenation({ zone: null, consecutiveLimit: null }) === true);
+  await ta('export: zone + limit REMOVED + getHyphenation *Explicit flags false', async () => { const s = await settings(); const g = PM.getHyphenation(); return (!/w:hyphenationZone\b/.test(s) && !/w:consecutiveHyphenLimit\b/.test(s) && g.zoneExplicit === false && g.limitExplicit === false) ? 'cleared' : ('s=' + s.slice(0, 160) + ' g=' + JSON.stringify(g) && false); });
+
   // ── P3 Manual: optional hyphens (U+00AD) into long words, survive export ──
   try { await PM.newBlank(); } catch (e) {}
   await sleep(140);
