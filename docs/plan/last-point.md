@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-06-21 (003 Columns — planned + P1 (presets) shipped)
+
+> **Branch:** `main` (`3326938`, pushed; `main == origin/main`). Work on `feature/columns-paged` (local),
+> ff-merged. **Phase:** POST-MIGRATION — spec-kit feature **003 columns**, P1 done.
+>
+> **State summary:** picked **003 columns** as the next feature (justified: overlay-retirement is blocked on
+> the test-coverage port; M6 calibration needs a fork edit; columns is a feasibility-proven no-fork win).
+> Ran the spec-kit flow: `/speckit-specify` + `/speckit-plan` + `/speckit-tasks` → `specs/003-columns/`
+> (spec/plan/research/data-model/contracts/quickstart/tasks, `a2bc298`). Then implemented **P1 (One/Two/Three
+> presets)**.
+>
+> **Done this session:**
+> - **003 plan (`a2bc298`)** — full spec-kit artifacts; `.specify/feature.json` → `specs/003-columns`.
+> - **003 P1 (`3326938`)** — `bridge/columns.ts` (NEW): `WC.PM.setColumns({count,gap,equalWidth})`→
+>   `editor.doc.sections.setColumns` (renders columns live + exports `sectPr/w:cols`); `getColumns()`. Un-deferred
+>   `columns`; rewired the dead `E()`/CSS-multicol `columnsMenu` + More Columns dialog → `WC.PM.setColumns`.
+>   Repointed the **three** D6 guards (`[0a]` run + `[0a]` dropdown + `[11]`) off `columns`→`breaks` (cascade
+>   lesson: a missed `[0a]` left a stale `columnsMenu` flyout open → 8 unrelated dropdown-content tests failed;
+>   the overlay `test:pm` caught it). New `probe:columns` + `validate-columns-win.ps1` (`PageSetup.TextColumns`)
+>   + `paged-export-columns-probe.js` → `test:roundtrip:paged` C4. `/code-review` 36-agent → 1 fix.
+>   **Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 42 / `probe:columns` paged 15 + overlay 12.**
+>   Real Word: `TextColumns.Count==2`, `EvenlySpaced`, opens without repair.
+>
+> **Next:** **003 P2** (More Columns: spacing/equalWidth + Left/Right unequal + line-between — Phase-0 spike
+> bounds the no-fork reach of `<w:col>`/`w:sep`; tasks T015–T020) → **003 P3** (column break, T021–T026). Then
+> 004+ (overlay-retirement / residual-`isBlocked`-layout / paged-test-coverage / M6-gate+pagination-calibration
+> / import-fidelity). Resume on `feature/columns-paged`, read `specs/003-columns/tasks.md` (T015→).
+>
+> **Blockers/notes:** none. `feature/columns-paged` is at `main`'s tip (3326938).
+
 ## 2026-06-21 (🏁 002 Headers & Footers COMPLETE — P2 variants + P3 page numbers shipped)
 
 > **Branch:** `main` (`5d86503`, pushed; `main == origin/main`). Work was on `feature/headers-footers-paged`
