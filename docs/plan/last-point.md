@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-06-21 (🏁 002 Headers & Footers COMPLETE — P2 variants + P3 page numbers shipped)
+
+> **Branch:** `main` (`5d86503`, pushed; `main == origin/main`). Work was on `feature/headers-footers-paged`
+> (kept local), ff-merged per phase. **Phase:** POST-MIGRATION — spec-kit feature **002 headers-footers is DONE**.
+>
+> **State summary:** The **002 headers-footers** feature is fully shipped (P1 + P2 + P3 + Phase-6 polish), all
+> NO-FORK, all Word-COM-validated. P1 (on-page edit + the "Header & Footer Tools" contextual tab) shipped earlier
+> (`a3e46da`); this session added P2 + P3 + polish.
+>
+> **Done this session:**
+> - **P2 (`fefbbf9`)** — Different First Page + Different Odd & Even header/footer variants. `bridge/header-footer.ts`:
+>   `setHeaderText/getHeaderText` (+footer) take `opts.variant∈{default,first,even}`+`opts.section` (via the story-runtime
+>   `HeaderFooterSlotStoryLocator.variant`; write=effective+materializeIfInherited, read=explicit for first/even);
+>   `setDifferentFirstPage`→`sections.setTitlePage` (sectPr titlePg), `setDifferentOddEven`→`sections.setOddEvenHeadersFooters`
+>   (settings evenAndOddHeaders), `getHeaderFooterOptions`→`sections.get`. UI = an "Options" group on the H&F Tools tab
+>   (`header-footer-tools-pm.js`, checked-state via `refreshOptionToggles`). Paged PE paints the first-page variant LIVE.
+> - **P3 (`4bfb442`)** — page-number `PAGE` fields. `insertPageNumber({position})`→`editor.doc.fields.insert PAGE` on the
+>   slot story editor → a real fldChar/instrText field; `removePageNumbers` (slotHasPageField guard); `ensureInlineTarget`
+>   mints an sdBlockId (K-risk-1). UI = Page Number flyout + un-defer `pageNumber` (repointed D6 guards [0a]/[11]→columns/docInfo).
+> - **Phase-6 polish (`5d86503`)** — doc reconciliation (SCOPE/FEATURES/LAYOUT_ENGINE #8).
+> - **Oracle + gates:** new `paged-export-hf-p{2,3}-probe.js` + hardened `validate-headerfooter-win.ps1` (OpenAndRepair:=false,
+>   `.Index` enum self-check, PageSetup flags + Headers(2/3)/Footers(2/3) + `Get-PageField` wdFieldPage=33) wired into
+>   `test:roundtrip:paged` C2+C3 → **36/0** (all P2 flags+variant text + the P3 page field read back == authored vs REAL Word).
+>   Also fixed a **pre-existing** flip-fallout gate bug: `test-roundtrip-paged.js` `build('overlay')` set `WC_LAYOUT=''` which
+>   post-FR-013 boots PAGED (`main.ts:35`) → now explicit `'overlay'`. `/code-review` (40-/36-agent) per slice → 2 fixes.
+>   **Gates: pm 475 (overlay) · smoke 9 · roundtrip 27 · bundle 4 · `test:roundtrip:paged` 36 · `probe:headerfooter` paged 52 + overlay 45.**
+>
+> **KNOWN LIMITATION (fork-gated, recorded):** the paged PE does NOT resolve a *freshly-inserted* footer PAGE field's
+> per-page number in-app (renders the empty `resolvedNumber` as "0"); real Word + a reopen render it correctly — the COM
+> oracle (C3: wdFieldPage=33 → number) carries the per-page-correctness proof. A future no-fork attempt or a NOTICE'd
+> minimal fork accessor could close it.
+>
+> **Next:** the next spec-kit feature (003+, user picks): overlay-retirement · residual-`isBlocked`-layout reconciliation
+> (layout-page/layout-arrange) · paged-test-coverage port · M6-tolerance→gate + pagination-calibration (PE 2 vs Word 3) ·
+> paged html/txt/csv-import fidelity · then the COMPLETENESS PASS (`docs/bug-hunt/`). Resume per execution-map CURRENT PHASE.
+>
+> **Blockers/notes:** none. `feature/headers-footers-paged` is at `main`'s tip (5d86503) — safe to delete or reuse.
+
 ## 2026-06-21 (🚢 PAGED-RENDER MIGRATION COMPLETE & SHIPPED — now POST-MIGRATION; 002 headers/footers P1 done)
 
 > **Branch:** `main` (`a3e46da`, pushed). **Phase:** POST-MIGRATION (per-feature reconciliation + cleanup) —

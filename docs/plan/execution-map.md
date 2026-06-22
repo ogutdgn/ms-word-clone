@@ -53,12 +53,13 @@
 > (coords/pointer/statusbar/overlays/imageresize/ink/notes/headerfooter/opennew + `report:glyphgeom`,
 > `test:roundtrip:paged` — dev-box-only).
 >
-> **IN PROGRESS — 002 Headers & Footers** (`specs/002-headers-footers/`): **P1 DONE + MERGED** (`a3e46da`) —
-> on-page header/footer editing on the paged engine + the "Header & Footer Tools" contextual tab, fully no-fork.
-> **NEXT: P2** (Different First Page / Different Odd & Even variants) → **P3** (page-number fields), `tasks.md`
-> T018–T033, same no-fork story-runtime bridge + the Word-COM oracle.
+> **✅ DONE — 002 Headers & Footers** (`specs/002-headers-footers/`): **P1+P2+P3 + Phase-6 polish COMPLETE + MERGED**
+> (`5d86503`, pushed). P1 = on-page edit + the "Header & Footer Tools" tab; P2 = Different First Page / Different Odd &
+> Even variants; P3 = real `PAGE`-field page numbers. All NO-FORK, all Word-COM-validated (`test:roundtrip:paged` 36/0,
+> C2+C3 read-backs). KNOWN fork-gated gap: in-app render of a *freshly-inserted* page-number field shows "0" (Word
+> resolves per page). **NEXT: pick the next spec-kit feature (003+)** from the backlog below.
 >
-> **POST-MIGRATION BACKLOG** (independent; user picks order): finish **002 P2+P3** · **overlay retirement** (remove
+> **POST-MIGRATION BACKLOG** (independent; user picks order): **overlay retirement** (remove
 > the decoration-overlay engine + the `WC_LAYOUT=overlay` path) · **more per-feature reconciliation** (the residual
 > `isBlocked` gates on layout-page/layout-arrange/text-effects — un-block + wire vs the oracle) · **port the ~70
 > overlay-only `test:pm` tests** to paged-aware variants (real paged-suite coverage) · **M6 → pass/fail gate** + the
@@ -72,7 +73,7 @@
 > unchecked `[ ]` tasks). `.specify/feature.json` points at the active feature dir.
 >
 > **THE SPEC-KIT FEATURE SEQUENCE (post-migration roadmap):**
-> 1. **002 headers-footers** — P1 ✅ · P2 (variants) · P3 (page numbers). ← **ACTIVE**; resume from `specs/002-headers-footers/tasks.md` (T018→).
+> 1. **002 headers-footers** — P1 ✅ · P2 ✅ (variants) · P3 ✅ (page numbers) · Phase-6 ✅. **COMPLETE + MERGED** (`5d86503`).
 > 2. **003+ cleanup features** — one spec-kit feature each (scope decided at `/speckit-specify`): overlay-retirement ·
 >    residual-`isBlocked`-layout reconciliation · paged-test-coverage port · M6→gate+pagination-calibration · import-fidelity.
 > 3. **THE COMPLETENESS PASS — fix ALL bugs + implement ALL features, SPEC-DRIVEN** (the big final post-migration phase):
@@ -499,7 +500,10 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **002 Headers & Footers P1** (`specs/002-headers-footers/`) — on-page header/footer editing on the paged engine + the "Header & Footer Tools" contextual tab, **fully no-fork** (probe-first spike found the entry/exit/state on the PE's public surface); 52-agent `/code-review` → 4 fixes; **merged to `main`** (`a3e46da`).
 - [x] **Gate fix** — found the migration's "paged test:pm 475" was a **FALSE GREEN** (a stale `localStorage WC_LAYOUT` made paged builds boot overlay; `test:pm` is an overlay-rendering suite — ~70 overlay-only tests). Pinned `test:pm` to overlay via a boot-guard (`0f828a7`); paged covered by the `probe:*` probes. Memory `paged-testpm-overlay-suite`.
 - [x] **Plan docs renewed** (plan-tracking): the layout engine (Phase 4) is DONE → **POST-MIGRATION phase**; CURRENT PHASE + gate baseline corrected.
-- [ ] **NEXT: 002 P2** (Different First Page / Different Odd & Even variants) → **P3** (page-number fields).
+- [x] **002 Headers & Footers P2** (`fefbbf9`) — Different First Page + Different Odd & Even header/footer variants (story-runtime `variant` locator + `sections.setTitlePage`/`setOddEvenHeadersFooters`); "Options" toggles on the H&F Tools tab; **no-fork**, Word-COM-validated; 40-agent `/code-review` → 1 fix + a pre-existing gate-`build('overlay')`bug. Merged to `main`.
+- [x] **002 Headers & Footers P3** (`4bfb442`) — real OOXML `PAGE`-field page numbers (`fields.insert` on the slot story editor); Page Number flyout; `ensureInlineTarget` (K-risk-1); **no-fork**; oracle C3 (wdFieldPage=33). **KNOWN fork-gated gap:** in-app render of a freshly-inserted field shows "0" (Word resolves per page). 36-agent `/code-review` → 1 fix. Merged to `main`.
+- [x] **002 Phase-6 polish** (`5d86503`) — doc reconciliation (SCOPE/FEATURES/LAYOUT_ENGINE). **🏁 002 COMPLETE.** Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 36 / `probe:headerfooter` paged 52 + overlay 45.
+- [ ] **NEXT: pick the next spec-kit feature (003+)** — overlay-retirement / residual-`isBlocked`-layout / paged-test-coverage port / M6→gate+pagination-calibration / import-fidelity, then the COMPLETENESS PASS (`docs/bug-hunt/`).
 
 ### 2026-06-17 (ITEM 4 keystone carve-out DONE — drag-reposition; STEERING INFLECTION on the render tier)
 - [x] **Keystone scope-workflow** audited 4a-4f: MODEL/EXPORT tier ~90% done; the remainder is the
