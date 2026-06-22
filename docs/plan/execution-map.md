@@ -53,11 +53,19 @@
 > (coords/pointer/statusbar/overlays/imageresize/ink/notes/headerfooter/opennew + `report:glyphgeom`,
 > `test:roundtrip:paged` — dev-box-only).
 >
-> **✅ DONE — 002 Headers & Footers** (`specs/002-headers-footers/`): **P1+P2+P3 + Phase-6 polish COMPLETE + MERGED**
-> (`5d86503`, pushed). P1 = on-page edit + the "Header & Footer Tools" tab; P2 = Different First Page / Different Odd &
-> Even variants; P3 = real `PAGE`-field page numbers. All NO-FORK, all Word-COM-validated (`test:roundtrip:paged` 36/0,
-> C2+C3 read-backs). KNOWN fork-gated gap: in-app render of a *freshly-inserted* page-number field shows "0" (Word
-> resolves per page). **NEXT: pick the next spec-kit feature (003+)** from the backlog below.
+> **✅ DONE — 002 Headers & Footers** (`5d86503`) · **003 Columns** (`eff06c3`) · **004 Line Numbers** (`02a54f7`). All
+> three post-migration spec-kit features are **COMPLETE + MERGED** to `main`, all NO-FORK, all Word-COM-validated:
+> - **002** (`specs/002-headers-footers/`): on-page edit + the "Header & Footer Tools" tab; Different First Page /
+>   Odd & Even variants; real `PAGE`-field page numbers. (KNOWN fork-gated gap: a *freshly-inserted* page-number
+>   field renders "0" in-app until reopen — Word resolves per page.)
+> - **003** (`specs/003-columns/`): One/Two/Three + More Columns + Left/Right unequal + line-between + column break
+>   (real `w:cols`/`<w:col>`/`w:sep` + `w:br w:type="column"`; an owned `bodySectPr` write for unequal/line-between).
+> - **004** (`specs/004-line-numbers/`): None/Continuous/Restart-Each-Page/Restart-Each-Section + an owned
+>   margin-number overlay + the Line Numbering Options dialog (start/count-by/distance) + per-paragraph
+>   `w:suppressLineNumbers`. (`test:roundtrip:paged` C6: StartingNumber via the `w:start = userStart−1` off-by-one,
+>   CountBy, the suppressed-paragraph flag — all read back from real Word.)
+>
+> **NEXT: pick the next spec-kit feature (005+)** from the backlog below.
 >
 > **POST-MIGRATION BACKLOG** (independent; user picks order): **overlay retirement** (remove
 > the decoration-overlay engine + the `WC_LAYOUT=overlay` path) · **more per-feature reconciliation** (the residual
@@ -74,8 +82,12 @@
 >
 > **THE SPEC-KIT FEATURE SEQUENCE (post-migration roadmap):**
 > 1. **002 headers-footers** — P1 ✅ · P2 ✅ (variants) · P3 ✅ (page numbers) · Phase-6 ✅. **COMPLETE + MERGED** (`5d86503`).
-> 2. **003+ cleanup features** — one spec-kit feature each (scope decided at `/speckit-specify`): overlay-retirement ·
->    residual-`isBlocked`-layout reconciliation · paged-test-coverage port · M6→gate+pagination-calibration · import-fidelity.
+> 2. **003 columns** — P1 ✅ · P2 ✅ (unequal + line-between) · P3 ✅ (column break). **COMPLETE + MERGED** (`eff06c3`).
+> 3. **004 line-numbers** — P1 ✅ (modes) · P2 ✅ (margin overlay) · P3 ✅ (Options dialog + per-paragraph suppress).
+>    **COMPLETE + MERGED** (`02a54f7`).
+> 4. **005+ cleanup features** — one spec-kit feature each (scope decided at `/speckit-specify`): overlay-retirement ·
+>    residual-`isBlocked`-layout reconciliation (position/align/group/rotate/hyphenation/section-breaks) ·
+>    paged-test-coverage port · M6→gate+pagination-calibration · import-fidelity. **USER PICKS the order.**
 > 3. **THE COMPLETENESS PASS — fix ALL bugs + implement ALL features, SPEC-DRIVEN** (the big final post-migration phase):
 >    SOURCE = `docs/bug-hunt/` — **BUG-LEDGER.md (65 numbered bugs)** + the **feature / 321-control audit (76 features)**.
 >    Turn them into spec-kit features (group related bugs/features per spec) and work each through the loop until the
@@ -507,7 +519,8 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **003 columns COMPLETE** (P2 `63d94ee`, P3+polish `eff06c3`): P2 = More Columns (count/spacing/equalWidth) + Left/Right unequal + line-between (owned `bodySectPr` w:cols write — `<w:col>`/`w:sep`); P3 = a column break (`hardBreak{lineBreakType:'column'}`); un-deferred columns+breaks, rewired the dead-`E()` columnsMenu + Breaks flyout. Real Word: `TextColumns` Count/even/spacing/LineBetween/per-col Width (= Word's Left preset) + column break. Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 49 / `probe:columns` paged 39 + overlay 36.
 - [x] **004 line-numbers P1 DONE** (`aaf0347`): Layout→Line Numbers modes (None/Continuous/Restart-Each-Page/Restart-Each-Section) → `bridge/line-numbers.ts` `setLineNumbers`→`sections.setLineNumbering` (real `sectPr/w:lnNumType`); un-deferred `lineNumbers`, rewired `H.lineNumbers` off the retired `E()`/`WC.Layout`, repointed 3 D6 guards →`hyphenation`. Real Word (C6): Active + RestartMode=continuous + CountBy=2, no repair. DISCOVERY: `w:start=3`→Word `StartingNumber=4` (off-by-one) → start-at deferred to P3. Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 57 / `probe:linenumbers` paged 19 + overlay 19.
 - [x] **004 line-numbers P2 DONE** (`fe12e4b`): the in-app owned margin-number overlay `bridge/line-numbers-overlay.ts` — draws `.wc-line-number` beside each painted body line (count `n%countBy===0`, per-page reset for newPage, excludes header/footer/footnote/table), `#pages`-local geometry, `wc:linenumbers-changed`+`wc:paged-relayout` triggers, READ-ONLY + paged-only. Built via ultracode workflows (understanding sweep + adversarial review → 2 refuted + 5 fixed, incl. multi-column line ordering via `data-pm-start`). Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `probe:linenumbers` paged 25 + overlay 21.
-- [ ] **NEXT: 004 P3** (Line Numbering Options dialog start/count-by/distance incl. the `w:start=userStart−1` mapping + per-paragraph `w:suppressLineNumbers`, spike-gated; tasks T017–T022). Then 005+ (overlay-retirement / residual-`isBlocked`-layout / paged-test-coverage / M6→gate / import-fidelity), then the COMPLETENESS PASS (`docs/bug-hunt/`).
+- [x] **004 line-numbers P3 DONE → 🏁 004 COMPLETE** (`02a54f7`): the Line Numbering Options dialog (mode/start/count-by/from-text distance, `replace:true` full-set) + per-paragraph suppress (`updateAttributes('paragraph', {'paragraphProperties.suppressLineNumbers': true|null})` — spike-proven no-fork) + the overlay skipping suppressed paragraphs. `start` is USER-FACING (bridge writes raw `w:start=userStart−1`, the P1 off-by-one). Ultracode: spike workflow + a 28-agent adversarial review → 2 confirmed (the SAME bug: partial-update **carryover** — lowering start/distance left the stale attr) + 21 refuted; FIXED via the `replace:true` drop-then-recreate. Real Word (C6): StartingNumber===5, CountBy 2, the suppressed paragraph carries `w:suppressLineNumbers`. Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `test:roundtrip:paged` 60 / `probe:linenumbers` paged 52 + overlay 45.
+- [ ] **NEXT: 005+ (USER PICKS)** — overlay-retirement / residual-`isBlocked`-layout (position/align/group/rotate/hyphenation/section-breaks) / paged-test-coverage port / M6→gate+pagination-calibration / import-fidelity. Then the COMPLETENESS PASS (`docs/bug-hunt/`). Each a spec-kit feature off `main`, NO-FORK, oracle-validated.
 
 ### 2026-06-17 (ITEM 4 keystone carve-out DONE — drag-reposition; STEERING INFLECTION on the render tier)
 - [x] **Keystone scope-workflow** audited 4a-4f: MODEL/EXPORT tier ~90% done; the remainder is the

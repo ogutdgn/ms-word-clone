@@ -7,6 +7,54 @@
 
 ---
 
+## 2026-06-22 (004 Line Numbers P3 — Options dialog + per-paragraph suppress shipped → 🏁 004 COMPLETE)
+
+> **Branch:** `main` (`02a54f7`, pushed; `feature/line-numbers-paged` ff-merged then deleted). ff-merge per phase.
+> **Phase:** POST-MIGRATION spec-kit feature **004 line-numbers — P1+P2+P3 DONE → 🏁 004 COMPLETE.** Ultracode ON.
+>
+> **State summary:** The last slice of 004 shipped — the Line Numbering Options dialog + per-paragraph suppress,
+> all NO-FORK, real-Word-validated. **004 line-numbers is COMPLETE** (modes + in-app overlay + options + suppress).
+>
+> **Done this session (P3):**
+> - **SPIKE (Q1, ultracode workflow + a throwaway runtime probe):** the no-fork per-paragraph suppress =
+>   `editor.commands.updateAttributes('paragraph', { 'paragraphProperties.suppressLineNumbers': true|null })`
+>   (dot-notation merge into the paragraph node's `rendered:false` paragraphProperties bag → the V3 pPr exporter
+>   emits `<w:suppressLineNumbers/>`). Runtime-confirmed: `true`→one bare flag in the caret paragraph's pPr (no
+>   leak); `null`→clean-drop; `false`→`w:val="0"`. `styles.apply` RULED OUT (docDefaults-only, not per-paragraph).
+>   Overlay suppress-detection = resolve a painted line's `data-pm-start` in `editor.state.doc` → paragraph →
+>   `attrs.paragraphProperties.suppressLineNumbers` (spike-confirmed reliable). NO fork edit. (research.md Q1.)
+> - **bridge/line-numbers.ts:** `start` is now USER-FACING (write raw `w:start = userStart−1`; read inverts) so
+>   the dialog AND overlay both speak user-facing numbers (the P1 off-by-one: Word StartingNumber = w:start + 1);
+>   `distanceExplicit` (Auto vs explicit); NEW `suppressLineNumbers(on?)` + `currentParagraphSuppressed()`; NEW
+>   `replace` option (the dialog's FULL-SET apply drops the stale lnNumType first → clears omitted attrs).
+> - **bridge/line-numbers-overlay.ts:** SKIPS suppressed paragraphs' lines from the count (Word semantics).
+> - **commands.js:** H.lineNumbers wires "Suppress for Current Paragraph" (toggle + ✓) + a real "Line Numbering
+>   Options" dialog (mode / start / count-by / from-text distance, seeded from getLineNumbers, `replace:true`).
+> - **Probe/oracle/roundtrip:** P3 export+model+overlay-skip+**carryover** regression in the probe; the export
+>   probe authors start 5 + a suppressed marker paragraph; `validate-linenumbers-win.ps1` reads StartingNumber +
+>   the marker paragraph's `w:suppressLineNumbers`; C6 asserts StartingNumber===5 + the suppress flag.
+> - **Adversarial review (ultracode, 28 agents): 2 confirmed (the SAME bug) + 21 refuted.** Confirmed =
+>   **partial-update carryover**: lowering start to 1 (or distance→Auto) on a LIVE section OMITTED the attr and
+>   left the stale value → Word read the OLD value. **FIXED** via the `replace:true` full-set (drop-then-recreate
+>   the lnNumType) on the dialog path; the modes dropdown stays partial (preserves settings, as Word does).
+>   Added a carryover regression test (re-apply 5→1 clears `w:start`; distance 0.5→Auto clears `w:distance`).
+> - **Gates: pm 475 / smoke 9 / roundtrip 27 / bundle 4 / `probe:linenumbers` paged 52 + overlay 45 /
+>   `test:roundtrip:paged` 60/0** (real Word: StartingNumber===5 via the off-by-one, CountBy 2, continuous,
+>   the suppressed paragraph carries `w:suppressLineNumbers`, opens without repair, PID-safe).
+>
+> **Known v1 limitations (recorded):** table-cell lines not numbered (Word numbers them); pixel-exact gutter not
+> oracle-calibrated; v1 = single primary section.
+>
+> **Next: the 005+ post-migration backlog (USER PICKS the order)** — overlay-retirement (remove the decoration
+> overlay engine + the `WC_LAYOUT=overlay` path) · residual `isBlocked` layout reconciliation (position / align /
+> group / rotate / hyphenation / mid-doc section breaks) · port the ~70 overlay-only `test:pm` tests to
+> paged-aware variants · M6 tolerance → a pass/fail gate + the multi-page pagination calibration (PE 2 vs Word 3)
+> · paged html/txt/csv import fidelity. Then THE COMPLETENESS PASS (docs/bug-hunt → spec-kit features). All
+> spec-kit, all NO-FORK, all oracle-validated. Branch fresh off `main` per feature.
+>
+> **Blockers/notes:** none. (Process: P3 was done on a synced `feature/line-numbers-paged` then ff-merged to
+> `main` + the branch deleted — back to the short-lived-branch flow.)
+
 ## 2026-06-22 (004 Line Numbers P2 — in-app margin-number overlay shipped)
 
 > **Branch:** `main` (`fe12e4b`, pushed; `feature/line-numbers-paged` re-pointed to it). ff-merge per phase.
