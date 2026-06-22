@@ -13,8 +13,8 @@ only document-write path. Prefer NO fork edits.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm on `feature/columns-paged` (off `main`); `npm run build` clean (paged default); baseline gates green — `test:pm` 475 (overlay) / `test:smoke` 9 / `test:roundtrip` 27 / `test:bundle` 4. Record the baseline.
-- [ ] T002 Commit the spec-kit planning artifacts (spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md, checklists/, tasks.md, `.specify/feature.json`) on the feature branch.
+- [x] T001 Confirm on `feature/columns-paged` (off `main`); `npm run build` clean (paged default); baseline gates green — `test:pm` 475 (overlay) / `test:smoke` 9 / `test:roundtrip` 27 / `test:bundle` 4. Record the baseline.
+- [x] T002 Commit the spec-kit planning artifacts (spec.md, plan.md, research.md, data-model.md, contracts/, quickstart.md, checklists/, tasks.md, `.specify/feature.json`) on the feature branch.
 
 ---
 
@@ -36,15 +36,15 @@ P2/P3 production code. Throwaway probe scripts, deleted before each slice's comm
 **Goal**: One/Two/Three render N equal columns + export `w:cols` + open in Word with `TextColumns.Count==N`.
 **Independent test**: Columns → Two splits the text into two columns; save → reopen (and Word) shows two columns; Columns → One restores single.
 
-- [ ] T006 [US1] Create the owned bridge module `src/renderer/bridge/columns.ts`: `setColumns({count, gap?, equalWidth?})` → `editor.doc.sections.setColumns({count, gap*1440→twips, equalWidth, target: section-0 addr})` (markDirty; NO_OP counts as success; `count:1` normalizes to single) + `getColumns()` → `{count, gap, equalWidth}` from `sections.get`/`list`. Mirror `bridge/header-footer.ts` structure.
-- [ ] T007 [US1] Merge the verbs onto `WC.PM` in `src/renderer/bridge/index.ts` (+ pre-mount no-op fallbacks: `setColumns`→false, `getColumns`→`{count:1,gap:0.5,equalWidth:true}`); UN-DEFER `columns` by adding it to `ENGINE_READY` (and reconcile `AREA`/`DEFERRED`) so the `isBlocked` gate no longer toasts it.
-- [ ] T008 [US1] REWIRE `src/renderer/public/js/commands.js` `columnsMenu`: the One/Two/Three items call `WC.PM.setColumns({count})`; show the active preset's checked state from `getColumns()`. Keep "More Columns" as a placeholder item (wired in P2). Remove any dead `E()`/legacy refs in the columns handler.
-- [ ] T009 [US1] Repoint any D6 guard that uses `columns` as a still-deferred representative (`scripts/test-suite-pm.js` `[0a]`/`[11]`) to a different still-deferred command (e.g. `breaks`/`docInfo`) — un-deferring `columns` will otherwise fail those tests (the 002 P3 lesson).
-- [ ] T010 [US1] Create `scripts/paged-columns-probe.js` (real renderer): setColumns count 2 → assert the painted body renders at ≥2 distinct line-x bands + the export `sectPr` carries `<w:cols w:num="2">`; count 3 → 3 bands + `w:num="3"`; count 1 → single band + no multi-column `w:cols`; `getColumns()` round-trips. Add a `probe:columns` npm script.
-- [ ] T011 [US1] Create `scripts/oracle/validate-columns-win.ps1` (PID-safe, `OpenAndRepair:=false`): read `Sections(1).PageSetup.TextColumns.Count` + `.EvenlySpaced`; result shape `{ok, openedWithoutRepair, sectionCount, columnCount, evenlySpaced}`. Create `scripts/paged-export-columns-probe.js` (author a 2-column doc, save `C:/tmp/wc-<mode>-columns.docx`).
-- [ ] T012 [US1] Wire the columns doc + read-back into `scripts/test-roundtrip-paged.js` (a `paged-export-columns-probe.js` run + a C-section: validate-open no-repair + `columnCount==2`).
-- [ ] T013 [US1] VERIFY P1: `npm run build` + 4 core gates green; `probe:columns` green; the COM oracle (`TextColumns.Count==2`, opens-without-repair) green. Run `/code-review` (high) on the slice; FIX every finding; re-verify until clean.
-- [ ] T014 [US1] CLOSE-OUT P1: commit (commit-style; explicit `git add`; what/why; no AI trailer); update `docs/plan/layout-engine-runbook.md` + memory; ff-merge `feature/columns-paged` → `main` + push.
+- [x] T006 [US1] Create the owned bridge module `src/renderer/bridge/columns.ts`: `setColumns({count, gap?, equalWidth?})` → `editor.doc.sections.setColumns({count, gap*1440→twips, equalWidth, target: section-0 addr})` (markDirty; NO_OP counts as success; `count:1` normalizes to single) + `getColumns()` → `{count, gap, equalWidth}` from `sections.get`/`list`. Mirror `bridge/header-footer.ts` structure.
+- [x] T007 [US1] Merge the verbs onto `WC.PM` in `src/renderer/bridge/index.ts` (+ pre-mount no-op fallbacks: `setColumns`→false, `getColumns`→`{count:1,gap:0.5,equalWidth:true}`); UN-DEFER `columns` by adding it to `ENGINE_READY` (and reconcile `AREA`/`DEFERRED`) so the `isBlocked` gate no longer toasts it.
+- [x] T008 [US1] REWIRE `src/renderer/public/js/commands.js` `columnsMenu`: the One/Two/Three items call `WC.PM.setColumns({count})`; show the active preset's checked state from `getColumns()`. Keep "More Columns" as a placeholder item (wired in P2). Remove any dead `E()`/legacy refs in the columns handler.
+- [x] T009 [US1] Repoint any D6 guard that uses `columns` as a still-deferred representative (`scripts/test-suite-pm.js` `[0a]`/`[11]`) to a different still-deferred command (e.g. `breaks`/`docInfo`) — un-deferring `columns` will otherwise fail those tests (the 002 P3 lesson).
+- [x] T010 [US1] Create `scripts/paged-columns-probe.js` (real renderer): setColumns count 2 → assert the painted body renders at ≥2 distinct line-x bands + the export `sectPr` carries `<w:cols w:num="2">`; count 3 → 3 bands + `w:num="3"`; count 1 → single band + no multi-column `w:cols`; `getColumns()` round-trips. Add a `probe:columns` npm script.
+- [x] T011 [US1] Create `scripts/oracle/validate-columns-win.ps1` (PID-safe, `OpenAndRepair:=false`): read `Sections(1).PageSetup.TextColumns.Count` + `.EvenlySpaced`; result shape `{ok, openedWithoutRepair, sectionCount, columnCount, evenlySpaced}`. Create `scripts/paged-export-columns-probe.js` (author a 2-column doc, save `C:/tmp/wc-<mode>-columns.docx`).
+- [x] T012 [US1] Wire the columns doc + read-back into `scripts/test-roundtrip-paged.js` (a `paged-export-columns-probe.js` run + a C-section: validate-open no-repair + `columnCount==2`).
+- [x] T013 [US1] VERIFY P1: `npm run build` + 4 core gates green; `probe:columns` green; the COM oracle (`TextColumns.Count==2`, opens-without-repair) green. Run `/code-review` (high) on the slice; FIX every finding; re-verify until clean.
+- [x] T014 [US1] CLOSE-OUT P1: commit (commit-style; explicit `git add`; what/why; no AI trailer); update `docs/plan/layout-engine-runbook.md` + memory; ff-merge `feature/columns-paged` → `main` + push.
 
 **Checkpoint**: One/Two/Three columns render + export + read back in real Word; `columns` is un-deferred.
 

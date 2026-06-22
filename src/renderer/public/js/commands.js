@@ -2158,24 +2158,21 @@
       fly.appendChild(WC.flyItem('More Columns…', { onClick: () => moreColumnsDialog() }));
     });
   }
+  // 003 P1: One/Two/Three via the paged engine (real sectPr/w:cols, re-flowed live + exported).
+  // `side` (Left/Right unequal widths) is a P2 refinement — for P1 it applies an EQUAL N-column layout
+  // (the count is correct; unequal width arrives in P2 via individual <w:col>). No legacy E()/CSS-multicol.
   function setColumns(n, side) {
-    const ed = E().node;
-    ed.style.columnGap = '36px';
-    ed.removeAttribute('data-col-preset');
-    if (n === 1) { ed.style.columnCount = ''; return; }
-    ed.style.columnCount = n;
-    // Word's Left = narrow-left/wide-right, Right = the mirror. CSS multicol is
-    // equal-width, so flag the preset and let CSS skew the gutter to approximate it.
-    if (side === 'left' || side === 'right') ed.dataset.colPreset = side;
+    if (WC.PM && WC.PM.setColumns) WC.PM.setColumns({ count: n });
   }
   function moreColumnsDialog() {
-    const num = el('input', { type: 'number', min: '1', max: '6', value: '2', style: { width: '60px' } });
-    const gap = el('input', { type: 'number', min: '0', value: '0.5', step: '0.1', style: { width: '60px' } });
+    const cur = (WC.PM && WC.PM.getColumns) ? WC.PM.getColumns() : { count: 2, gap: 0.5 };
+    const num = el('input', { type: 'number', min: '1', max: '6', value: String(cur.count || 2), style: { width: '60px' } });
+    const gap = el('input', { type: 'number', min: '0', value: String(cur.gap != null ? cur.gap : 0.5), step: '0.1', style: { width: '60px' } });
     WC.dialog({ title: 'Columns', width: '380px', body: el('div', {}, [
       el('div', { class: 'row' }, [el('label', { text: 'Number of columns:', style: { width: '150px' } }), num]),
       el('div', { class: 'row' }, [el('label', { text: 'Spacing (in):', style: { width: '150px' } }), gap]),
     ]), footer: [
-      { label: 'OK', primary: true, onClick: () => { const n = parseInt(num.value, 10) || 1; E().node.style.columnCount = n === 1 ? '' : n; E().node.style.columnGap = (parseFloat(gap.value) * 96 || 36) + 'px'; } },
+      { label: 'OK', primary: true, onClick: () => { const n = parseInt(num.value, 10) || 1; const g = parseFloat(gap.value); if (WC.PM && WC.PM.setColumns) WC.PM.setColumns({ count: n, gap: isFinite(g) ? g : 0.5 }); } },
       { label: 'Cancel' },
     ] });
   }

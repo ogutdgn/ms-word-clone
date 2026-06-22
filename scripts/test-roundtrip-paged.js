@@ -94,7 +94,7 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
@@ -102,6 +102,7 @@ async function main() {
   const pagedInk = probe('scripts/paged-export-m5-ink-probe.js', 'wc-m5-ink-paged.json');
   const pagedHfP2 = probe('scripts/paged-export-hf-p2-probe.js', 'wc-hf-p2-paged.json'); // 002 P2 variants/flags doc
   const pagedHfP3 = probe('scripts/paged-export-hf-p3-probe.js', 'wc-hf-p3-paged.json'); // 002 P3 footer PAGE-field doc
+  const pagedCols = probe('scripts/paged-export-columns-probe.js', 'wc-columns-paged.json'); // 003 P1 2-column doc
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -117,6 +118,8 @@ async function main() {
   check('paged HF-P2 probe: fail===0', pagedHfP2.summary && pagedHfP2.summary.fail === 0, pagedHfP2.summary ? pagedHfP2.summary.fail + ' of ' + pagedHfP2.summary.total : 'no summary');
   check('paged HF-P3 probe ran in PAGED mode', pagedHfP3.summary && pagedHfP3.summary.mode === 'paged', 'mode=' + (pagedHfP3.summary && pagedHfP3.summary.mode));
   check('paged HF-P3 probe: fail===0', pagedHfP3.summary && pagedHfP3.summary.fail === 0, pagedHfP3.summary ? pagedHfP3.summary.fail + ' of ' + pagedHfP3.summary.total : 'no summary');
+  check('paged columns probe ran in PAGED mode', pagedCols.summary && pagedCols.summary.mode === 'paged', 'mode=' + (pagedCols.summary && pagedCols.summary.mode));
+  check('paged columns probe: fail===0', pagedCols.summary && pagedCols.summary.fail === 0, pagedCols.summary ? pagedCols.summary.fail + ' of ' + pagedCols.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
@@ -124,6 +127,7 @@ async function main() {
     'paged ink': DOCX_DIR + '/wc-paged-m5-ink.docx',
     'paged HF-P2': DOCX_DIR + '/wc-paged-hf-p2.docx',
     'paged HF-P3': DOCX_DIR + '/wc-paged-hf-p3.docx',
+    'paged columns': DOCX_DIR + '/wc-paged-columns.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -178,6 +182,17 @@ async function main() {
     check('HF-P3: opened without repair', hf3.ok && j.openedWithoutRepair === true, errDetail('open=' + JSON.stringify(j.openedWithoutRepair)));
     check('HF-P3: footer carries a wdFieldPage field (type 33, code ~ PAGE)', hf3.ok && pf.present === true && Number(pf.type) === 33 && /PAGE/i.test(String(pf.code || '')), errDetail('footerPageField=' + JSON.stringify(pf)));
     check('HF-P3: the PAGE field result is a number (Word resolved it per page)', hf3.ok && pf.present === true && /^\d+$/.test(String(pf.result || '')) && Number(pf.result) >= 1, errDetail('result=' + JSON.stringify(pf.result)));
+  }
+
+  // ── 5d) 003 Columns read-back: real Word reads the section's column layout ──
+  console.log('\nC4) paged columns read-back == authored (Sections(1).PageSetup.TextColumns):');
+  {
+    const cl = comValidate('validate-columns-win.ps1', DOCS['paged columns']);
+    const j = cl.json || {};
+    const errDetail = (extra) => cl.ok ? extra : ((j.error) || cl.raw.slice(0, 140));
+    check('columns: opened without repair', cl.ok && j.openedWithoutRepair === true, errDetail('open=' + JSON.stringify(j.openedWithoutRepair)));
+    check('columns: TextColumns.Count === 2', cl.ok && Number(j.columnCount) === 2, errDetail('columnCount=' + JSON.stringify(j.columnCount)));
+    check('columns: EvenlySpaced === true', cl.ok && j.evenlySpaced === true, errDetail('evenlySpaced=' + JSON.stringify(j.evenlySpaced)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

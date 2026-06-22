@@ -15,6 +15,7 @@ import { installDesign } from './design'
 import { installInsertExotica } from './insert-exotica'
 import { installDraw } from './draw'
 import { installInkOverlay } from './ink-overlay'
+import { installColumns } from './columns'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -162,7 +163,8 @@ const AREA: Record<string, string> = {
 // Tools" tab drives entry/exit through the bridge verbs (enterHeaderFooter/closeHeaderFooter).
 // P1 delivers goToHeader/goToFooter/closeHeaderFooter (header/footer = the Insert dropdowns,
 // already ready). P2 adds differentFirstPage/differentOddEven; P3 adds pageNumber.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber'])
+// columns (003): the paged PE flows the body into N columns; WC.PM.setColumns writes sectPr/w:cols.
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -422,6 +424,8 @@ export function preinstallBridge() {
     setDifferentFirstPage: () => false, setDifferentOddEven: () => false,
     getHeaderFooterOptions: () => ({ differentFirstPage: false, differentOddEven: false }),
     insertPageNumber: () => false, removePageNumbers: () => false,
+    // 003 columns pre-mount stubs (replaced by installColumns on mount)
+    setColumns: () => false, getColumns: () => ({ count: 1, gap: 0.5, equalWidth: true }),
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
@@ -519,7 +523,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
