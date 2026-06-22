@@ -467,7 +467,15 @@
   }
   H.header = (c, node) => headerFooterDialog('header');
   H.footer = (c, node) => headerFooterDialog('footer');
-  H.pageNumber = () => WC.toast('Page numbers in the header/footer are coming in a later update.');
+  // P3 (002): Page Number flyout — inserts a REAL OOXML PAGE field (fldChar/instrText) into the
+  // header (Top) / footer (Bottom) / active region (Current); Remove clears the page-number band(s).
+  H.pageNumber = (c, node) => WC.flyout(node, (fly) => {
+    fly.appendChild(WC.flyItem('Top of Page', { onClick: () => { WC.PM.insertPageNumber({ position: 'top' }); } }));
+    fly.appendChild(WC.flyItem('Bottom of Page', { onClick: () => { WC.PM.insertPageNumber({ position: 'bottom' }); } }));
+    fly.appendChild(WC.flyItem('Current Position', { onClick: () => { WC.PM.insertPageNumber({ position: 'current' }); } }));
+    fly.appendChild(WC.flySep());
+    fly.appendChild(WC.flyItem('Remove Page Numbers', { onClick: () => { WC.PM.removePageNumbers(); } }));
+  });
   H.quickParts = (c, node) => WC.Insert.quickPartsMenu(node);
   H.wordart = (c, node) => WC.Insert.wordArtMenu(node);
   H.signatureLine = () => WC.Insert.signatureLine();

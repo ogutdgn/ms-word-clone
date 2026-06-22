@@ -71,12 +71,12 @@ document-write path. Doc model stays page-free. Prefer NO fork edits.
 
 **Goal**: real page-number fields in the header/footer. **Independent test**: insert a page number into the footer, each page shows its own number; add a page → numbers update; remove; save → Word shows a live page-number field.
 
-- [ ] T025 [US3] Add `insertPageNumber({position})` (`top`/`bottom`/`current`) to `src/renderer/bridge/header-footer.ts` — insert a REAL OOXML `PAGE` field (`w:fldSimple w:instr=" PAGE "` or `fldChar`+`instrText`), NOT plain text — and `removePageNumbers(opts?)`; merge onto `WC.PM` with no-op fallbacks.
-- [ ] T026 [US3] Wire the Page Number flyout in `src/renderer/public/js/header-footer-tools-pm.js` + rewrite `commands.js:457` `H.pageNumber` (DELETE the dead `WC.HeaderFooter.pageNumberMenu`) → `insertPageNumber`/`removePageNumbers`; add the flyout controls via `scripts/gen.js`; un-defer `pageNumber` in `bridge/index.ts`.
-- [ ] T027 [US3] Extend `scripts/paged-headerfooter-probe.js`: insert a page number, assert each page paints its own number; add/remove a page and assert numbers update; assert the exported `PAGE` field (not static text); Remove clears it.
-- [ ] T028 [US3] Extend `scripts/oracle/validate-headerfooter-win.ps1`: self-verify `wdFieldPage=33`; assert the header/footer `Range.Fields` contains a live `wdFieldPage` field whose result is a number; opens-without-repair.
-- [ ] T029 [US3] VERIFY P3: build + 4 gates + `probe:headerfooter` + the COM oracle (live PAGE field) green; `/code-review` xhigh; FIX; re-verify.
-- [ ] T030 [US3] CLOSE-OUT P3: commit; update runbook + memory; ff-merge → `main` + push.
+- [x] T025 [US3] Add `insertPageNumber({position})` (`top`/`bottom`/`current`) to `src/renderer/bridge/header-footer.ts` — insert a REAL OOXML `PAGE` field (`w:fldSimple w:instr=" PAGE "` or `fldChar`+`instrText`), NOT plain text — and `removePageNumbers(opts?)`; merge onto `WC.PM` with no-op fallbacks.
+- [x] T026 [US3] Wire the Page Number flyout in `src/renderer/public/js/header-footer-tools-pm.js` + rewrite `commands.js:457` `H.pageNumber` (DELETE the dead `WC.HeaderFooter.pageNumberMenu`) → `insertPageNumber`/`removePageNumbers`; add the flyout controls via `scripts/gen.js`; un-defer `pageNumber` in `bridge/index.ts`.
+- [x] T027 [US3] Extend `scripts/paged-headerfooter-probe.js`: insert a page number, assert each page paints its own number; add/remove a page and assert numbers update; assert the exported `PAGE` field (not static text); Remove clears it.
+- [x] T028 [US3] Extend `scripts/oracle/validate-headerfooter-win.ps1`: self-verify `wdFieldPage=33`; assert the header/footer `Range.Fields` contains a live `wdFieldPage` field whose result is a number; opens-without-repair.
+- [x] T029 [US3] VERIFY P3: build + 4 gates + `probe:headerfooter` + the COM oracle (live PAGE field) green; `/code-review` xhigh; FIX; re-verify.
+- [x] T030 [US3] CLOSE-OUT P3: commit; update runbook + memory; ff-merge → `main` + push.
 
 **Checkpoint**: page numbers render per page and export as a live Word field.
 

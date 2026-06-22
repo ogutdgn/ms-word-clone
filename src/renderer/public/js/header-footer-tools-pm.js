@@ -31,6 +31,7 @@
           controls: [
             { cmd: 'header', label: 'Header', type: 'dropdown' },
             { cmd: 'footer', label: 'Footer', type: 'dropdown' },
+            { cmd: 'pageNumber', label: 'Page Number', type: 'dropdown' }, // P3 (002): PAGE-field flyout
           ],
         },
         {

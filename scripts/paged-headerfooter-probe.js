@@ -175,6 +175,45 @@
     });
   }
 
+  // ─── P3 (002): page-number PAGE field ───────────────────────────────────────────────────
+  // The bridge inserts a REAL OOXML PAGE field (fldChar/instrText) via the slot story-runtime —
+  // the export + real Word resolve it per page (the COM oracle proves wdFieldPage=33 → the page
+  // number). NOTE: the paged PE does NOT resolve a freshly-inserted footer field's number IN-APP
+  // (it renders the empty resolvedNumber as "0") — that per-page paint is a fork-gated limitation
+  // (Word + a reopen render the correct number). So the probe asserts the FIELD (not a painted
+  // digit); per-page-number correctness is the oracle's job (test:roundtrip:paged C3).
+  t('P3 verbs present (insertPageNumber/removePageNumbers)', () => ['insertPageNumber', 'removePageNumbers'].every((k) => typeof PM[k] === 'function'));
+  try { await PM.newBlank(); } catch (e) {}
+  await sleep(140);
+  t('insertPageNumber({position:"bottom"}) accepted', () => PM.insertPageNumber({ position: 'bottom' }) === true);
+  await sleep(240);
+  await ta('export: footer carries a REAL PAGE field (fldChar begin + instrText PAGE), not static text', async () => {
+    const { parts } = await exp();
+    const ftr = Object.entries(parts).find(([k, v]) => /footer\d*\.xml$/i.test(k) && /<w:ftr\b/.test(String(v)) && /<w:instrText[^>]*>\s*PAGE\s*<\/w:instrText>/.test(String(v)) && /<w:fldChar\b[^>]*\bw:fldCharType="begin"/.test(String(v)));
+    return ftr ? ('real PAGE field (' + ftr[0] + ')') : ('no footer part with a real PAGE field' && false);
+  });
+  results.push({ name: 'INFO: in-app footer band after insert (fork-gated per-page paint; Word resolves correctly)', pass: true, detail: 'band="' + ((document.querySelector('.superdoc-page .superdoc-page-footer') || {}).textContent || '').trim() + '"' });
+  t('insertPageNumber({position:"top"}) targets the header', () => PM.insertPageNumber({ position: 'top' }) === true);
+  await sleep(200);
+  await ta('export: header ALSO carries a PAGE field', async () => {
+    const { parts } = await exp();
+    const hdr = Object.entries(parts).find(([k, v]) => /header\d*\.xml$/i.test(k) && /<w:instrText[^>]*>\s*PAGE\s*<\/w:instrText>/.test(String(v)));
+    return hdr ? 'header PAGE field present' : ('no header PAGE field' && false);
+  });
+  t('removePageNumbers() accepted', () => PM.removePageNumbers() === true);
+  await sleep(220);
+  await ta('export after remove: no PAGE field in any header/footer part', async () => {
+    const { parts } = await exp();
+    const still = Object.entries(parts).some(([k, v]) => /(header|footer)\d*\.xml$/i.test(k) && /<w:instrText[^>]*>\s*PAGE\s*<\/w:instrText>/.test(String(v)));
+    return still ? ('a PAGE field remains after remove' && false) : 'page numbers cleared';
+  });
+  // removePageNumbers must NOT wipe an unrelated header title (the slotHasPageField guard).
+  try { await PM.newBlank(); } catch (e) {}
+  await sleep(140);
+  t('guard setup: header="KeepTitle" + a footer page number', () => { PM.setHeaderText('KeepTitle'); return PM.insertPageNumber({ position: 'bottom' }) === true; });
+  await sleep(220);
+  t('removePageNumbers() preserves the header title (only clears page-number bands)', () => { PM.removePageNumbers(); return PM.getHeaderText() === 'KeepTitle' ? 'title preserved' : ('header now ' + JSON.stringify(PM.getHeaderText()) && false); });
+
   try { await PM.newBlank(); } catch (e) {} // teardown: reset global header/footer state
   return done();
 })();

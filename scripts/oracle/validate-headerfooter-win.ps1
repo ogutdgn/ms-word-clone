@@ -27,6 +27,18 @@ $out = @{ path = $abs; ok = $false; openedWithoutRepair = $false; enumCheck = $f
 if (-not (Test-Path $abs)) { $out.error = 'file not found'; Write-Output ($out | ConvertTo-Json -Compress); exit 1 }
 
 function Get-HFText($hf) { try { return ([string]$hf.Range.Text).TrimEnd([char]13, [char]10, [char]7) } catch { return '' } }
+# P3: the first PAGE field (wdFieldPage=33) in a header/footer + its live result. 33 is empirically
+# pinned; the returned `code` (~ "PAGE") cross-verifies the constant so the Node driver can assert both.
+function Get-PageField($hf) {
+  try {
+    foreach ($f in $hf.Range.Fields) {
+      if ([int]$f.Type -eq 33) {
+        return @{ present = $true; type = [int]$f.Type; code = ([string]$f.Code.Text).Trim(); result = ([string]$f.Result.Text).Trim() }
+      }
+    }
+  } catch {}
+  return @{ present = $false }
+}
 
 $pidsBefore = @(Get-Process WINWORD -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
 $word = $null; $doc = $null; $spawnedPid = $null
@@ -71,6 +83,10 @@ try {
     $out.firstFooter = Get-HFText $ftrFirst
     $out.evenHeader = Get-HFText $hdrEven
     $out.evenFooter = Get-HFText $ftrEven
+
+    # P3 page-number field (wdFieldPage=33 → result is the resolved page number).
+    $out.footerPageField = Get-PageField $ftrPrimary
+    $out.headerPageField = Get-PageField $hdrPrimary
   }
 } catch {
   $out.ok = $false

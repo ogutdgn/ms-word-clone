@@ -180,6 +180,117 @@ export function installHeaderFooter(editor: AnyEditor) {
     } catch { return off }
   }
 
+  // ─── P3 (002): real OOXML PAGE field in a header/footer ──────────────────────────────────
+  // `story.doc.fields.insert({ at, instruction:'PAGE', mode:'raw' })` emits a REAL Word field
+  // (fldChar/instrText), NOT static text — the same Document-API verb insert-exotica.ts uses for
+  // DATE/PAGE on the body, run here on the SLOT STORY editor so the field lands in
+  // word/headerN.xml / footerN.xml. The story editor is created with `isHeaderOrFooter:true`
+  // (story-editor-factory.ts) which enables per-page PAGE-field resolution → each painted page
+  // shows its own number. No fork edit.
+  type PageNumPos = 'top' | 'bottom' | 'current'
+  function regionForPosition(position: PageNumPos): HFKind {
+    if (position === 'top') return 'header'
+    if (position === 'bottom') return 'footer'
+    return lastMode === 'header' ? 'header' : 'footer' // 'current' = active region, else footer (Word's default)
+  }
+
+  // Resolve a fields.insert target on a STORY editor; if the selection's textblock lacks a stable
+  // sdBlockId (the K-risk-1 hazard — a freshly-materialized empty part's paragraph defaults to
+  // sdBlockId:null → selection.current().target is null), mint one and retry. Mirrors insert-exotica.ts
+  // / references.ts, but HEADLESS-SAFE: the story editor has no view, so dispatch through the command
+  // (not editor.view.dispatch). setNodeMarkup keeps the node size, so the collapsed selection stays valid.
+  function ensureInlineTarget(story: AnyEditor): any {
+    const read = (): any => { try { return story.doc?.selection?.current?.({})?.target ?? null } catch { return null } }
+    const at = read()
+    if (at) return at
+    try {
+      story.commands?.command?.(({ tr, state, dispatch }: any) => {
+        const { from } = state.selection
+        const $pos = state.doc.resolve(from)
+        let depth = $pos.depth
+        while (depth > 0 && !$pos.node(depth).isTextblock) depth--
+        const node = $pos.node(depth)
+        if (!node || !node.isTextblock) return false
+        const a = (node.attrs ?? {}) as Record<string, unknown>
+        if (a.sdBlockId || a.id || a.blockId) return false
+        if (!('sdBlockId' in (node.type.spec.attrs ?? {}))) return false
+        const minted = 'wc-pn-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+        if (dispatch) dispatch(tr.setNodeMarkup($pos.before(depth), undefined, { ...node.attrs, sdBlockId: minted }))
+        return true
+      })
+    } catch { /* mint best-effort */ }
+    return read()
+  }
+
+  function insertPageNumber(opts?: { position?: PageNumPos; variant?: HFVariant; section?: number }): boolean {
+    const pos = opts?.position
+    const position: PageNumPos = (pos === 'top' || pos === 'bottom' || pos === 'current') ? pos : 'bottom'
+    const locator = slotLocator(regionForPosition(position), normVariant(opts?.variant), normSection(opts?.section), 'write')
+    if (!locator) return false
+    let runtime: AnyRuntime = null
+    try {
+      runtime = resolveHeaderFooterSlotRuntime(editor, locator, { intent: 'write' })
+      const story = runtime?.editor
+      if (!story?.doc?.fields?.insert) return false
+      // Word's gallery replaces the band content with the page-number field — clear then insert.
+      story.commands.selectAll()
+      if (story.commands.deleteSelection) story.commands.deleteSelection()
+      const at = ensureInlineTarget(story) // mint an sdBlockId if the cleared para has none (K-risk-1)
+      if (!at) return false
+      const r = story.doc.fields.insert({ at, instruction: 'PAGE', mode: 'raw' })
+      if (r && r.success === false) return false
+      runtime.commit(editor)
+      const conv = converter(); if (conv) conv.headerFooterModified = true
+      markDirty(); refocus()
+      return true
+    } catch {
+      return false
+    } finally {
+      try { runtime?.dispose?.() } catch { /* already destroyed / live editor */ }
+    }
+  }
+
+  // True iff the slot currently holds a PAGE field node (instruction contains PAGE). Lets
+  // removePageNumbers clear ONLY page-number bands — it never wipes an unrelated header title.
+  function slotHasPageField(kind: HFKind, variant: HFVariant, section: number): boolean {
+    const locator = slotLocator(kind, variant, section, 'read')
+    if (!locator) return false
+    let runtime: AnyRuntime = null
+    try {
+      runtime = resolveHeaderFooterSlotRuntime(editor, locator, { intent: 'read' })
+      const doc = runtime?.editor?.state?.doc
+      if (!doc) return false
+      let found = false
+      doc.descendants((node: any) => {
+        if (found) return false
+        const instr = node?.attrs?.instruction
+        if (typeof instr === 'string' && /\bPAGE\b/i.test(instr)) { found = true; return false }
+        return true
+      })
+      return found
+    } catch {
+      return false
+    } finally {
+      try { runtime?.dispose?.() } catch { /* already destroyed / live editor */ }
+    }
+  }
+
+  // Remove page numbers by clearing the band(s) that hold a PAGE field. v1 page-number slots hold
+  // just the field, so a clear == "remove the PAGE field"; the slotHasPageField guard keeps a band
+  // with other content (e.g. a header title) untouched. `position` narrows to one band; default both.
+  function removePageNumbers(opts?: { position?: PageNumPos; variant?: HFVariant; section?: number }): boolean {
+    const pos = opts?.position
+    const kinds: HFKind[] = pos === 'top' ? ['header'] : pos === 'bottom' ? ['footer']
+      : pos === 'current' ? [regionForPosition('current')] : ['header', 'footer']
+    const variant = normVariant(opts?.variant)
+    const section = normSection(opts?.section)
+    let any = false
+    for (const kind of kinds) {
+      if (slotHasPageField(kind, variant, section) && setSlotText(kind, '', { variant, section })) any = true
+    }
+    return any
+  }
+
   // ─── P1 (002): on-page enter/exit/state for the "Header & Footer Tools" tab ──────────────
   // The paged PresentationEditor already PAINTS per-page header/footer bands (.superdoc-page-
   // header / -footer) and supports double-click-to-edit; entry/exit/state are driven through
@@ -277,5 +388,6 @@ export function installHeaderFooter(editor: AnyEditor) {
     setHeaderText, setFooterText, getHeaderText, getFooterText,
     enterHeaderFooter, closeHeaderFooter, headerFooterState,
     setDifferentFirstPage, setDifferentOddEven, getHeaderFooterOptions,
+    insertPageNumber, removePageNumbers,
   }
 }

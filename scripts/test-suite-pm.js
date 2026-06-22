@@ -167,9 +167,10 @@
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    // Repointed: `header`/`footer` were unblocked (header/footer text ships — ENGINE_READY), so the
-    // dropdown-block probe moves to `pageNumber` (AREA header-footer, still Phase-7-gated, a dropdown).
-    window.WC.Commands.dropdown({ cmd: 'pageNumber', type: 'dropdown' }, document.body);
+    // Repointed (002 P3): `pageNumber` shipped (ENGINE_READY) — the dropdown-block probe moves to
+    // `columns` (AREA layout-page, still Phase-7-gated; H.columns WOULD open a flyout if reached, so
+    // the block is meaningfully verified by open===0).
+    window.WC.Commands.dropdown({ cmd: 'columns', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -6540,10 +6541,12 @@
   await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
   await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
   await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
-  // NB: margins/orientation/size (layout-page) AND header/footer (header-footer) are now UNBLOCKED as
-  // their engine support shipped (ENGINE_READY). `columns` is the still-blocked layout-page representative;
-  // `pageNumber` is the still-blocked header-footer representative (page numbers are keystone-gated).
-  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('pageNumber') === true && window.WC.PM.isBlocked('columns') === true);
+  // NB: margins/orientation/size (layout-page) AND header/footer text + variants + page numbers
+  // (goToHeader/goToFooter/closeHeaderFooter/differentFirstPage/differentOddEven/pageNumber) are now
+  // UNBLOCKED as their engine support shipped (ENGINE_READY). `columns` is the still-blocked layout-page
+  // representative; `docInfo` is the still-blocked header-footer representative (Document Info fields are
+  // not implemented — AREA header-footer, not in ENGINE_READY).
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('columns') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------

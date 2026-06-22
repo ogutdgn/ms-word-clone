@@ -94,13 +94,14 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p2\.docx$/.test(n) || /^wc-hf-p2-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
   const pagedKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-paged.json');
   const pagedInk = probe('scripts/paged-export-m5-ink-probe.js', 'wc-m5-ink-paged.json');
   const pagedHfP2 = probe('scripts/paged-export-hf-p2-probe.js', 'wc-hf-p2-paged.json'); // 002 P2 variants/flags doc
+  const pagedHfP3 = probe('scripts/paged-export-hf-p3-probe.js', 'wc-hf-p3-paged.json'); // 002 P3 footer PAGE-field doc
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -114,12 +115,15 @@ async function main() {
   check('paged ink probe: fail===0', pagedInk.summary && pagedInk.summary.fail === 0, pagedInk.summary ? pagedInk.summary.fail + ' of ' + pagedInk.summary.total : 'no summary');
   check('paged HF-P2 probe ran in PAGED mode', pagedHfP2.summary && pagedHfP2.summary.mode === 'paged', 'mode=' + (pagedHfP2.summary && pagedHfP2.summary.mode));
   check('paged HF-P2 probe: fail===0', pagedHfP2.summary && pagedHfP2.summary.fail === 0, pagedHfP2.summary ? pagedHfP2.summary.fail + ' of ' + pagedHfP2.summary.total : 'no summary');
+  check('paged HF-P3 probe ran in PAGED mode', pagedHfP3.summary && pagedHfP3.summary.mode === 'paged', 'mode=' + (pagedHfP3.summary && pagedHfP3.summary.mode));
+  check('paged HF-P3 probe: fail===0', pagedHfP3.summary && pagedHfP3.summary.fail === 0, pagedHfP3.summary ? pagedHfP3.summary.fail + ' of ' + pagedHfP3.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
     'overlay kitchen-sink': DOCX_DIR + '/wc-overlay-m5-kitchensink.docx',
     'paged ink': DOCX_DIR + '/wc-paged-m5-ink.docx',
     'paged HF-P2': DOCX_DIR + '/wc-paged-hf-p2.docx',
+    'paged HF-P3': DOCX_DIR + '/wc-paged-hf-p3.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -161,6 +165,19 @@ async function main() {
     check('HF-P2: first footer ~ P2FIRSTF', hf2.ok && /P2FIRSTF/.test(String(j.firstFooter || '')), errDetail('got ' + JSON.stringify(j.firstFooter)));
     check('HF-P2: even header ~ P2EVENH', hf2.ok && /P2EVENH/.test(String(j.evenHeader || '')), errDetail('got ' + JSON.stringify(j.evenHeader)));
     check('HF-P2: even footer ~ P2EVENF', hf2.ok && /P2EVENF/.test(String(j.evenFooter || '')), errDetail('got ' + JSON.stringify(j.evenFooter)));
+  }
+
+  // ── 5c) P3 (002) page-number read-back: real Word resolves the footer's PAGE field to a number ──
+  console.log('\nC3) paged HF-P3 read-back == a live wdFieldPage field whose result is the page number:');
+  {
+    const p3 = DOCS['paged HF-P3'];
+    const hf3 = comValidate('validate-headerfooter-win.ps1', p3);
+    const j = hf3.json || {};
+    const pf = j.footerPageField || {};
+    const errDetail = (extra) => hf3.ok ? extra : ((j.error) || hf3.raw.slice(0, 140));
+    check('HF-P3: opened without repair', hf3.ok && j.openedWithoutRepair === true, errDetail('open=' + JSON.stringify(j.openedWithoutRepair)));
+    check('HF-P3: footer carries a wdFieldPage field (type 33, code ~ PAGE)', hf3.ok && pf.present === true && Number(pf.type) === 33 && /PAGE/i.test(String(pf.code || '')), errDetail('footerPageField=' + JSON.stringify(pf)));
+    check('HF-P3: the PAGE field result is a number (Word resolved it per page)', hf3.ok && pf.present === true && /^\d+$/.test(String(pf.result || '')) && Number(pf.result) >= 1, errDetail('result=' + JSON.stringify(pf.result)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──
