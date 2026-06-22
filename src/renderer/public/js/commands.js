@@ -558,10 +558,11 @@
       fly.appendChild(WC.flyItem('Text Wrapping', { onClick: () => { if (WC.PM.insertLineBreak) WC.PM.insertLineBreak(); } }));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyHeader('Section Breaks'));
-      fly.appendChild(WC.flyItem('Next Page', { onClick: () => insertPageBreak() }));
-      fly.appendChild(WC.flyItem('Continuous', { onClick: () => WC.toast('Continuous section breaks are not available in this version.') }));
-      fly.appendChild(WC.flyItem('Even Page', { onClick: () => insertPageBreak() }));
-      fly.appendChild(WC.flyItem('Odd Page', { onClick: () => insertPageBreak() }));
+      // 006: real mid-doc section breaks — a paragraph pPr/w:sectPr (+ w:type) via WC.PM.insertSectionBreak.
+      // (Was a page-break stand-in / honest toast.) No E()/WC.Layout. The paged engine doesn't repaginate at the
+      // break in-app (known limitation); Word paginates on open.
+      [['Next Page', 'nextPage'], ['Continuous', 'continuous'], ['Even Page', 'evenPage'], ['Odd Page', 'oddPage']].forEach(([label, t]) =>
+        fly.appendChild(WC.flyItem(label, { onClick: () => { if (WC.PM.insertSectionBreak && WC.PM.insertSectionBreak(t)) WC.toast('Section Break', label); else WC.toast('Section Break', 'Could not insert a section break here.'); } })));
     });
   }
   // Page Color opens the colour picker (Theme/Standard/No Color/More Colors) — it

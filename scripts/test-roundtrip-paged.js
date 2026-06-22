@@ -94,7 +94,7 @@ const loadParts = async (file) => {
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
-  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n) || /^wc-.*-hyphenation\.docx$/.test(n) || /^wc-hyphenation-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n) || /^wc-.*-hyphenation\.docx$/.test(n) || /^wc-hyphenation-.*\.json$/.test(n) || /^wc-.*-sectionbreaks(-cont)?\.docx$/.test(n) || /^wc-sectionbreaks-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
   // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
   build('paged');
@@ -106,6 +106,7 @@ async function main() {
   const pagedColsP2 = probe('scripts/paged-export-columns-p2-probe.js', 'wc-columns-p2-paged.json'); // 003 P2 Left+line-between
   const pagedLn = probe('scripts/paged-export-linenumbers-probe.js', 'wc-linenumbers-paged.json'); // 004 P1 line numbers
   const pagedHyph = probe('scripts/paged-export-hyphenation-probe.js', 'wc-hyphenation-paged.json'); // 005 hyphenation
+  const pagedSb = probe('scripts/paged-export-sectionbreaks-probe.js', 'wc-sectionbreaks-paged.json'); // 006 section breaks
   // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
   build('overlay');
   const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
@@ -128,6 +129,8 @@ async function main() {
   check('paged line-numbers probe: fail===0', pagedLn.summary && pagedLn.summary.fail === 0, pagedLn.summary ? pagedLn.summary.fail + ' of ' + pagedLn.summary.total : 'no summary');
   check('paged hyphenation probe ran in PAGED mode', pagedHyph.summary && pagedHyph.summary.mode === 'paged', 'mode=' + (pagedHyph.summary && pagedHyph.summary.mode));
   check('paged hyphenation probe: fail===0', pagedHyph.summary && pagedHyph.summary.fail === 0, pagedHyph.summary ? pagedHyph.summary.fail + ' of ' + pagedHyph.summary.total : 'no summary');
+  check('paged section-breaks probe ran in PAGED mode', pagedSb.summary && pagedSb.summary.mode === 'paged', 'mode=' + (pagedSb.summary && pagedSb.summary.mode));
+  check('paged section-breaks probe: fail===0', pagedSb.summary && pagedSb.summary.fail === 0, pagedSb.summary ? pagedSb.summary.fail + ' of ' + pagedSb.summary.total : 'no summary');
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
@@ -139,6 +142,8 @@ async function main() {
     'paged columns P2': DOCX_DIR + '/wc-paged-columns-p2.docx',
     'paged line-numbers': DOCX_DIR + '/wc-paged-linenumbers.docx',
     'paged hyphenation': DOCX_DIR + '/wc-paged-hyphenation.docx',
+    'paged section-breaks': DOCX_DIR + '/wc-paged-sectionbreaks.docx',
+    'paged section-breaks cont': DOCX_DIR + '/wc-paged-sectionbreaks-cont.docx',
   };
 
   // ── 4) real-Word validate-open on every saved .docx (CORE: opens with no repair; OpenAndRepair:=false) ──
@@ -255,6 +260,27 @@ async function main() {
     // faithful than Word's own COM round-trip) — that fidelity is validated at the XML layer by the paged probe
     // (export carries w:hyphenationZone="360" + the CT_Settings order). Recorded: specs/005-hyphenation/research.md.
     if (ch.ok) check('hyphenation: zone read = wdUndefined (Word COM HyphenationZone limitation, info)', Number(j.hyphenationZone) === 9999999 || Number.isFinite(Number(j.hyphenationZone)), 'hyphenationZone=' + JSON.stringify(j.hyphenationZone));
+  }
+
+  // ── 5h) 006 section breaks: Sections.Count + per-type SectionStart read-back (Next Page + Continuous) ──
+  console.log('\nC8) paged section-breaks read-back == authored (ActiveDocument.Sections):');
+  {
+    // Next-Page break: 2 sections, the second section starts NewPage (2).
+    const cn = comValidate('validate-sectionbreaks-win.ps1', DOCS['paged section-breaks']);
+    const jn = cn.json || {};
+    const ssN = Array.isArray(jn.sectionStarts) ? jn.sectionStarts : [];
+    const errN = (extra) => cn.ok ? extra : ((jn.error) || cn.raw.slice(0, 140));
+    check('section-breaks(nextPage): opened without repair + enum in range', cn.ok && jn.openedWithoutRepair === true && jn.enumCheck === true, errN('open=' + JSON.stringify(jn.openedWithoutRepair) + ' enum=' + JSON.stringify(jn.enumCheck)));
+    check('section-breaks(nextPage): Sections.Count === 2', cn.ok && Number(jn.sectionCount) === 2, errN('sectionCount=' + JSON.stringify(jn.sectionCount)));
+    check('section-breaks(nextPage): the 2nd section starts NewPage (2)', cn.ok && Number(ssN[1]) === 2, errN('sectionStarts=' + JSON.stringify(ssN)));
+    // Continuous break: 2 sections, the second section starts Continuous (0) — proves the owned w:type write.
+    const cc = comValidate('validate-sectionbreaks-win.ps1', DOCS['paged section-breaks cont']);
+    const jc = cc.json || {};
+    const ssC = Array.isArray(jc.sectionStarts) ? jc.sectionStarts : [];
+    const errC = (extra) => cc.ok ? extra : ((jc.error) || cc.raw.slice(0, 140));
+    check('section-breaks(continuous): opened without repair', cc.ok && jc.openedWithoutRepair === true, errC('open=' + JSON.stringify(jc.openedWithoutRepair)));
+    check('section-breaks(continuous): Sections.Count === 2', cc.ok && Number(jc.sectionCount) === 2, errC('sectionCount=' + JSON.stringify(jc.sectionCount)));
+    check('section-breaks(continuous): the 2nd section starts Continuous (0) — owned w:type write', cc.ok && Number(ssC[1]) === 0, errC('sectionStarts=' + JSON.stringify(ssC)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──
