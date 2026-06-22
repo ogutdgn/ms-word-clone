@@ -48,15 +48,30 @@ export function installSectionBreaks(editor: AnyEditor) {
 
   const norm = (t: unknown): SectionStartType => (t === 'continuous' || t === 'evenPage' || t === 'oddPage' || t === 'nextPage') ? t : 'nextPage'
 
+  // Count paragraphs already carrying a mid-doc sectPr (= existing section breaks) in the live doc.
+  function midDocSectPrCount(): number {
+    let n = 0
+    try { (editor as any)?.state?.doc?.descendants?.((node: any) => { if (node?.type?.name === 'paragraph' && node?.attrs?.paragraphProperties?.sectPr) n++ }) } catch { /* none */ }
+    return n
+  }
+
   // Insert a section break of `type` at the caret. nextPage = a bare sectPr (Word's default start); the others
   // add a w:type. Fails honestly when there's no insertion point (e.g. the very first paragraph — the fork
   // command guards paraPos>0).
+  //
+  // v1 GUARD (review): a TYPED break writes w:type to the BODY sectPr, which only types the LAST section — correct
+  // for a SINGLE break (oracle-validated: section 2 == the body section). A 2nd+ TYPED break would OVERWRITE the
+  // prior type AND leave both mid-doc sectPrs bare → Word reads the wrong section starts (silent wrong output). So
+  // refuse a 2nd+ typed break LOUDLY (the flyout toasts "Could not insert…"). Multiple nextPage breaks ARE allowed
+  // (no w:type written; every bare mid-doc sectPr correctly defaults to NewPage). Per-section typing across
+  // multiple breaks (write w:type onto each break's NEXT-section sectPr) is a future feature.
   function insertSectionBreak(type: SectionStartType): boolean {
     try {
       const cmd = editor?.commands
       if (typeof cmd?.insertSectionBreakAtSelection !== 'function') return false
-      if (cmd.insertSectionBreakAtSelection() !== true) return false
       const t = norm(type)
+      if (t !== 'nextPage' && midDocSectPrCount() >= 1) return false // v1: only ONE typed break per document
+      if (cmd.insertSectionBreakAtSelection() !== true) return false
       if (t !== 'nextPage') { if (!setSectionType(t)) return false }
       markDirty()
       return true

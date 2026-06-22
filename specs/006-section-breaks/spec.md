@@ -83,7 +83,12 @@ Even Page → `wdSectionEvenPage`; Odd Page → `wdSectionOddPage`.
 
 - **Caret at the very end / in the last (trailing-sectPr) paragraph**: the break still produces a valid sectPr;
   Word may show a short trailing section — acceptable; must open without repair.
-- **Multiple breaks**: inserting two section breaks yields three sections (each break adds one); export stays valid.
+- **Multiple breaks**: multiple **Next Page** breaks are supported (each adds a bare mid-doc `sectPr`, all default
+  to NewPage — export stays valid). A **2nd+ TYPED** break (Continuous/Even/Odd) is **refused with a toast** in v1:
+  the type is written to the BODY `sectPr` (which types only the last section), so a second typed break would
+  overwrite the first's type and silently mis-type the sections. Per-section typing across multiple breaks (write
+  each break's type onto its own next-section `sectPr`) is a future feature — the guard keeps v1 from emitting
+  silent Word-wrong output.
 - **Reopen**: a section-broken document round-trips (the importer reads the paragraph `sectPr`).
 - **In-app render**: the paged engine does not repaginate at the break (known limitation); the document is still
   Word-correct (Word paginates on open).

@@ -55,6 +55,16 @@
     });
   }
 
+  // ── v1 guard (review): a TYPED break writes w:type to the BODY sectPr (types only the last section), so a 2nd+
+  //    TYPED break would corrupt the 1st → it is REFUSED (returns false). A 2nd nextPage break IS allowed (bare). ──
+  await author(); caretToPara2();
+  t('setup: a 1st continuous break is accepted', () => PM.insertSectionBreak('continuous') === true);
+  await sleep(120);
+  const para3 = () => { let p = null, c = 0; ed.state.doc.descendants((n, pos) => { if (n.type.name === 'paragraph') { c++; if (c === 3) { p = pos + 1; return false; } } return true; }); if (p != null) { try { ed.commands.setTextSelection({ from: p, to: p }); } catch (e) {} } return p; };
+  t('v1 guard: a 2nd TYPED break (oddPage) is REFUSED (returns false, no silent corruption)', () => { para3(); return PM.insertSectionBreak('oddPage') === false; });
+  t('v1 guard: a 2nd nextPage break IS allowed (returns true)', () => { para3(); return PM.insertSectionBreak('nextPage') === true; });
+  await ta('export after the guard: still 3 <w:sectPr> (1st continuous typed on body + 2 mid-doc breaks)', async () => { const d = await docXml(); return sectPrCount(d) === 3 ? 'three' : ('count=' + sectPrCount(d) && false); });
+
   try { await PM.newBlank(); } catch (e) {} // teardown
   return done();
 })();
