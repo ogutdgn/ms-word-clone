@@ -17,18 +17,18 @@
   };
   for (let i = 0; i < 200 && !window.__WC_READY; i++) await sleep(50);
 
-  // GATE MODE GUARD (002 finding, see memory paged-testpm-overlay-suite): this suite validates the
-  // OVERLAY rendering engine — ~70 of its tests read overlay-only constructs (PM.__pagination from the
-  // overlay Pagination engine, the #pm-notes-area overlay, overlay table/list/border DOM) that the paged
-  // PresentationEditor does NOT expose, so it is VALID only in overlay. Paged is covered by the dedicated
-  // probes (probe:coords/pointer/statusbar/overlays/imageresize/ink/notes/headerfooter/opennew +
-  // report:glyphgeom). Refuse to run in the wrong mode with ONE loud failure rather than ~70 cryptic ones
-  // — and never silently pass-as-overlay when a stale localStorage WC_LAYOUT flips a paged build (the
-  // false-green that hid this: localStorage overrides the build define in main.ts).
-  if (window.__WC_LAYOUT_MODE !== 'overlay') {
-    results.push({ name: 'GATE MODE: test:pm validates the OVERLAY engine — build overlay (`WC_LAYOUT=overlay npm run build`) first; paged is covered by the probe:* probes. Booted mode=' + window.__WC_LAYOUT_MODE, pass: false, detail: '~70 tests assert overlay-only constructs (PM.__pagination, #pm-notes-area, overlay DOM) absent in paged — see memory paged-testpm-overlay-suite' });
-    return JSON.stringify({ summary: { total: results.length, pass: 0, fail: results.length }, results }, null, 2);
-  }
+  // GATE MODE (007 — paged-aware): this suite now runs in BOTH overlay and paged. Historically it validated only
+  // the OVERLAY rendering engine — ~70 tests read overlay-only constructs (PM.__pagination from the overlay
+  // Pagination engine, the #pm-notes-area overlay, overlay table/list/border DOM) absent in the paged
+  // PresentationEditor (memory paged-testpm-overlay-suite). 007 made those tests MODE-AWARE: in paged they assert
+  // the PAGED equivalent (.superdoc-page / painted footnotes / painted table-border DOM) or skip-with-reason when
+  // a construct is genuinely overlay-only. So a genuine paged build now passes WITHOUT a false-green. The mode is
+  // recorded (not silently flipped — the stale-localStorage footgun that produced the migration's false-green is
+  // surfaced here). `MODE` is read once below and threaded into the mode-aware assertions.
+  // Recorded ONCE and surfaced via summary.mode (NOT a counted result row), so BOTH modes report exactly 475:
+  // overlay = 475 run; paged = 405 run + 62 overlay-only skip-pass + 8 Category-B ported-pass.
+  const MODE = window.__WC_LAYOUT_MODE === 'paged' ? 'paged' : 'overlay';
+  const PAGED = MODE === 'paged';
 
   const v = () => window.WC.view;
   const PM = () => window.WC.PM;
@@ -6966,5 +6966,6 @@
   });
 
   const pass = results.filter((r) => r.pass).length;
-  return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass }, results }, null, 2);
+  const pagedSkips = results.filter((r) => /paged-skip/.test(String(r.detail || ''))).length;
+  return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass, mode: MODE, pagedSkips }, results }, null, 2);
 })()
