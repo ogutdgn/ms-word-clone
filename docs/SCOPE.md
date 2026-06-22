@@ -121,7 +121,8 @@ _TBD._
 |---|---|---|---|
 | Page Setup | Margins / Orientation / Size | ✅ Done | rendered by the paged engine + exported to `sectPr` (Word-COM-validated) |
 | Page Setup | **Columns** (One/Two/Three / More Columns / Left/Right / line between / column break) | ✅ Done (003 P1+P2+P3, Word-COM-validated) | the paged engine flows the text into columns; real OOXML `w:cols` (+ `<w:col>` unequal, `w:sep` line-between) + a `w:br w:type="column"` column break; real Word reads `TextColumns` count/spacing/even/line-between + per-column widths (= Word's Left preset 1.83"/4.17"). KNOWN (v1): the owned `bodySectPr` write for line-between/unequal is outside PM undo + the in-app paint of those is best-effort (export + Word correct). Section breaks (Continuous/Next-Page) remain a future feature. |
-| Page Setup | Line numbers / Hyphenation / mid-doc section breaks | 🕗 Deferred | still `isBlocked` (AREA layout-page, not yet wired) |
+| Page Setup | **Line Numbers** (None / Continuous / Restart Each Page / Restart Each Section / Suppress for Current Paragraph / Line Numbering Options) | ✅ Done (004 P1+P2+P3, Word-COM-validated) | real OOXML `sectPr/w:lnNumType` (countBy/start/distance/restart) + per-paragraph `pPr/w:suppressLineNumbers`, all via the `WC.PM` bridge (NO fork edit); an owned margin-number overlay paints the numbers in-app (the paged engine doesn't). Real Word reads back `PageSetup.LineNumbering` Active/RestartMode/CountBy/StartingNumber + the suppressed-paragraph flag. KNOWN: `w:start` is written off-by-one (raw `userStart−1`) because Word reads `StartingNumber = w:start + 1`; v1 single primary section; table-cell lines not numbered. |
+| Page Setup | Hyphenation / mid-doc section breaks | 🕗 Deferred | still `isBlocked` (AREA layout-page, not yet wired) |
 
 ## References
 _TBD._

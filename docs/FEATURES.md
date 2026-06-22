@@ -94,13 +94,21 @@ outcomes are still being reconciled against it **per-feature**:
   **Different First Page / Odd & Even** variants, and real OOXML **`PAGE`-field page numbers** — all
   Word-COM-validated. (Caveat: a *freshly-inserted* page-number field shows "0" in-app until the doc
   is reopened; real Word resolves it per page.) **Multi-page View modes** are engine-backed; some
-  other layout ribbon commands (floating-object position, line numbers, mid-doc section breaks) are
+  other layout ribbon commands (floating-object position, mid-doc section breaks) are
   still being reconciled.
 - **Columns** are fully wired (spec-kit **003**): One/Two/Three + More Columns (spacing / equal-width)
   + **Left/Right unequal** + **line between** + a **column break** — the paged engine flows the text
   and it round-trips to real Word (oracle-validated; Left/Right match Word's 1.83"/4.17" preset). The
   owned `bodySectPr` write for line-between/unequal is outside undo + best-effort in-app paint (export +
   Word correct). Mid-doc **section** breaks remain a future feature.
+- **Line Numbers** are fully wired (spec-kit **004**): None / Continuous / Restart Each Page / Restart
+  Each Section + **Line Numbering Options** (start-at / count-by / from-text distance) + **Suppress for
+  Current Paragraph** — real OOXML `sectPr/w:lnNumType` + per-paragraph `pPr/w:suppressLineNumbers`, all
+  through the `WC.PM` bridge (NO fork edit). An owned margin-number **overlay** paints the numbers in-app
+  (the paged engine doesn't paint them) and skips suppressed paragraphs. Real Word reads back
+  `PageSetup.LineNumbering` (Active / RestartMode / CountBy / StartingNumber) + the suppressed-paragraph
+  flag. (Note: `w:start` is written off-by-one — raw `userStart − 1` — because Word reads
+  `StartingNumber = w:start + 1`; v1 single primary section; table-cell lines not numbered.)
 - **Mirrored margins** render with the dominant value; **Side-to-Side** paging is approximate. (UI
   Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.

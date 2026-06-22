@@ -435,7 +435,8 @@ export function preinstallBridge() {
     // 003 columns pre-mount stubs (replaced by installColumns on mount)
     setColumns: () => false, getColumns: () => ({ count: 1, gap: 0.5, equalWidth: true, lineBetween: false }),
     // 004 line-numbers pre-mount stubs (replaced by installLineNumbers on mount)
-    setLineNumbers: () => false, getLineNumbers: () => ({ active: false, mode: 'none', countBy: 1, start: 1, distance: 0.25 }),
+    setLineNumbers: () => false, getLineNumbers: () => ({ active: false, mode: 'none', countBy: 1, start: 1, distance: 0.25, distanceExplicit: false }),
+    suppressLineNumbers: () => false, currentParagraphSuppressed: () => false,
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,

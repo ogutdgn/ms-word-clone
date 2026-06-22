@@ -66,6 +66,36 @@ Options dialog is a placeholder), so this is inert now — but the P3 Options di
 synthesized `0.25` back as an explicit `w:distance` Word never had. Track an `distance: 'auto' | number`
 distinction (or only write `w:distance` when the user actually sets it) when wiring the dialog.
 
+**RESOLVED (2026-06-22, spike).** Confirmed in `sections-xml.ts:283-294` (`writeSectPrLineNumbering`):
+`w:start` / `w:distance` are each written **only when provided** (`!== undefined`), verbatim (start) /
+inches→twips (distance); the reader returns `distance: undefined` when `w:distance` is absent. **Design
+(off-by-one encapsulated in the bridge — `start` is USER-FACING):**
+- `WC.PM.setLineNumbers({ start })` treats `start` as the **displayed StartingNumber** (what the user types
+  and what Word shows). Internally it writes raw `w:start = start − 1` and **omits `w:start` for `start ≤ 1`**
+  (Word defaults StartingNumber to 1; avoids an odd `w:start="0"`). `getLineNumbers().start` inverts:
+  `userStart = rawStart + 1` (default 1). This keeps the off-by-one in ONE place, so the **dialog** AND the
+  **overlay** both speak user-facing numbers (overlay's first number == Word's StartingNumber — no divergence,
+  SC-003). Two-point confirmation: P1 discovery (raw `w:start=3` → Word `StartingNumber=4`) + P3 oracle
+  (`setLineNumbers({start:5})` → raw `w:start="4"` → Word `StartingNumber=5`).
+  **NOTE:** spec.md Acceptance Scenario 1 says "export carries `w:start="5"`" — that pre-dates the discovery
+  and is stale; the validated truth (and the user directive) is raw `w:start = userStart − 1`.
+- **Distance "auto":** `getLineNumbers()` adds `distanceExplicit:boolean` (true iff the section has a real
+  `w:distance`). The Options dialog seeds the distance field blank/"Auto" when NOT explicit and sends
+  `distance` to `setLineNumbers` **only when the field parses to a number** — it never replays the
+  synthesized `0.25`, so an untouched dialog leaves `w:distance` absent.
+
+**Partial-update carryover (found by the P3 adversarial review, fixed).** `setLineNumbering` is a PARTIAL
+update — it only WRITES provided attrs, never CLEARS (the fork `writeSectPrLineNumbering` reuses the existing
+`w:lnNumType` via `ensureChild` and guards each attr on `!== undefined`). So a RE-EDIT that lowers start to 1
+(or returns distance to Auto) on a LIVE section would OMIT the attr and leave the stale `w:start="4"` /
+`w:distance` behind → Word reads the OLD value. **Fix:** `setLineNumbers` takes a `replace?:boolean`; the
+**Options dialog passes `replace:true`** (a FULL-SET apply) which first `setLineNumbering({enabled:false})`
+(drops the whole `lnNumType`) then re-enables with exactly the chosen attrs — so omitted attrs are CLEARED. The
+**modes dropdown omits `replace`** and stays partial (a restart-mode switch preserves count-by/start/distance,
+as Word does). Regression-tested in `paged-linenumbers-probe.js` (re-apply 5→1 clears `w:start`; distance 0.5→Auto
+clears `w:distance`). The review's own suggested fix (`input.start = undefined`) was wrong — the fork skips on
+`!== undefined` identically, so `undefined` can't clear; the drop-then-recreate is the no-fork clear.
+
 ### Q1 — `w:suppressLineNumbers` (per-paragraph)
 **Question**: is setting the current paragraph's `w:suppressLineNumbers` reachable NO-FORK — a fork paragraph
 command, an `editor.doc` paragraph-attr API, or an owned `pPr` write (like the 003 columns `bodySectPr`
@@ -73,3 +103,30 @@ write)? **Decision rule**: probe a no-fork write + confirm the export carries `<
 the paragraph's `pPr` and real Word excludes that paragraph from the count. If unreachable no-fork → record +
 an honest toast (P3's suppress is the only spike-gated bit; the Options dialog start/count-by/distance go
 through `setLineNumbering`, already no-fork).
+
+**RESOLVED (2026-06-22, spike — multi-agent understanding sweep + a throwaway runtime probe).** NO-FORK and
+clean. Three candidate paths were investigated; the winner is the **PM paragraph node-attr write via the
+fork's existing `updateAttributes` command + dot-notation**:
+
+```js
+editor.commands.updateAttributes('paragraph', { 'paragraphProperties.suppressLineNumbers': true })  // ON
+editor.commands.updateAttributes('paragraph', { 'paragraphProperties.suppressLineNumbers': null })  // CLEAR (drops the element)
+```
+
+- **Why this path:** the paragraph node carries pPr props in a `rendered:false` `paragraphProperties` bag
+  (`extensions/paragraph/paragraph.js:172`); the V3 pPr exporter (`pPr-translator.js` →
+  `suppressLineNumbers-translator.js`, `createSingleBooleanPropertyHandler`) reads
+  `node.attrs.paragraphProperties.suppressLineNumbers` and emits `<w:suppressLineNumbers/>`. The fork's
+  `core/commands/updateAttributes.js` deep-clones existing attrs and supports **dot-notation nested keys**
+  (`assignNestedValue`), applying `setNodeMarkup` to every `paragraph` in the selection — so a collapsed caret
+  = the current paragraph, a multi-paragraph selection = each. This is the **same no-fork pattern the repo
+  already uses** for shading/borders/spacing in `commands.js`. NO fork edit; NO `editor.doc.styles.apply`
+  (that path is **docDefaults-only** — it would suppress the document default, not the current paragraph).
+- **Runtime-confirmed (throwaway spike):** `true` → exactly one **bare** `<w:suppressLineNumbers/>` in the
+  caret paragraph's `pPr`, **no leak** to the other paragraphs; `null` → the element is **dropped entirely**
+  (clean un-suppress); `false` → `<w:suppressLineNumbers w:val="0"/>` (explicit off). The bridge uses
+  **`true`/`null`** (set / clean-remove).
+- **Overlay suppress-detection (P2 overlay → P3):** resolve each painted `.superdoc-line`'s `data-pm-start`
+  in `editor.state.doc`, walk up to the paragraph, read `attrs.paragraphProperties.suppressLineNumbers` — a
+  suppressed paragraph's lines are **skipped** (counter does NOT increment, no number drawn), matching Word.
+  Runtime-confirmed reliable (the line→position→paragraph map resolved ALPHA/BETA/GAMMA correctly).

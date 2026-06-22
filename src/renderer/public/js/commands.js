@@ -896,21 +896,25 @@
   // ---- Layout tab ----
   // 004 Line Numbers — drives the paged engine via WC.PM.setLineNumbers (sectPr/w:lnNumType); checked
   // state from getLineNumbers(). Modes map to the OOXML restart values (page→newPage, section→newSection).
-  // Suppress-for-paragraph + the Options dialog are P3 (honest placeholders until then). No E()/WC.Layout.
+  // P3: Suppress-for-paragraph → pPr/w:suppressLineNumbers (per-paragraph); Options dialog → start/count-by/
+  // from-text distance. No E()/WC.Layout. After ANY apply, dispatch wc:linenumbers-changed so the owned
+  // margin-number overlay re-reads state (setLineNumbers/suppress are sectPr/pPr writes with NO relayout of
+  // their own, which the overlay's wc:paged-relayout listener alone would miss).
   H.lineNumbers = (c, node) => WC.flyout(node, (fly) => {
     const cur = (WC.PM.getLineNumbers && WC.PM.getLineNumbers()) || { active: false, mode: 'none' };
     const on = (m) => (cur.active ? cur.mode === m : m === 'none');
+    const lnChanged = () => { try { window.dispatchEvent(new Event('wc:linenumbers-changed')); } catch (_) { /* best-effort */ } };
     [['None', 'none'], ['Continuous', 'continuous'], ['Restart Each Page', 'newPage'], ['Restart Each Section', 'newSection']].forEach(([l, m]) => {
-      // P2: after a successful apply, dispatch wc:linenumbers-changed so the owned margin-number overlay
-      // re-reads getLineNumbers() — setLineNumbers is a sectPr/w:lnNumType write and triggers NO relayout of
-      // its own, so the overlay's wc:paged-relayout listener alone would miss the toggle. (A future P3
-      // Options-dialog apply that calls setLineNumbers MUST dispatch this event too.)
-      fly.appendChild(WC.flyItem((on(m) ? '✓ ' : '   ') + l, { onClick: () => { if (WC.PM.setLineNumbers({ mode: m })) { WC.toast('Line Numbers', l); try { window.dispatchEvent(new Event('wc:linenumbers-changed')); } catch (_) { /* best-effort */ } } else WC.toast('Line Numbers', 'Could not apply line numbering here.'); } }));
+      fly.appendChild(WC.flyItem((on(m) ? '✓ ' : '   ') + l, { onClick: () => { if (WC.PM.setLineNumbers({ mode: m })) { WC.toast('Line Numbers', l); lnChanged(); } else WC.toast('Line Numbers', 'Could not apply line numbering here.'); } }));
     });
     fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Suppress for Current Paragraph', { onClick: () => WC.toast('Suppress for Current Paragraph', 'Per-paragraph line-number suppression is coming in a follow-up.') }));
+    const supp = !!(WC.PM.currentParagraphSuppressed && WC.PM.currentParagraphSuppressed());
+    fly.appendChild(WC.flyItem((supp ? '✓ ' : '   ') + 'Suppress for Current Paragraph', { onClick: () => {
+      if (WC.PM.suppressLineNumbers && WC.PM.suppressLineNumbers()) { WC.toast('Suppress for Current Paragraph', supp ? 'Line numbering restored for this paragraph.' : 'This paragraph is excluded from line numbering.'); lnChanged(); }
+      else WC.toast('Suppress for Current Paragraph', 'Could not change suppression here.');
+    } }));
     fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Line Numbering Options…', { onClick: () => WC.toast('Line Numbering Options', 'Start / count-by / from-text distance are coming in a follow-up.') }));
+    fly.appendChild(WC.flyItem('Line Numbering Options…', { onClick: () => lineNumberingOptionsDialog() }));
   });
   H.hyphenation = (c, node) => WC.flyout(node, (fly) => {
     fly.appendChild(WC.flyItem((WC.Layout.hyphenMode === 'none' || !WC.Layout.hyphenMode ? '✓ ' : '   ') + 'None', { onClick: () => WC.Layout.setHyphenation('none') }));
@@ -2196,6 +2200,40 @@
       el('div', { class: 'row' }, [sep, el('label', { text: ' Line between', style: { marginLeft: '6px' } })]),
     ]), footer: [
       { label: 'OK', primary: true, onClick: () => { const n = parseInt(num.value, 10) || 1; const g = parseFloat(gap.value); if (WC.PM && WC.PM.setColumns) WC.PM.setColumns({ count: n, gap: isFinite(g) ? g : 0.5, equalWidth: eq.checked, lineBetween: sep.checked }); } },
+      { label: 'Cancel' },
+    ] });
+  }
+  // 004 P3: Line Numbering Options — numbering mode + start-at + count-by + from-text distance →
+  // WC.PM.setLineNumbers (sectPr/w:lnNumType). start/countBy are USER-FACING (the bridge maps the w:start
+  // off-by-one). distance is sent ONLY when the user enters a number (seeded "Auto" when the section has no
+  // explicit w:distance) — never replay the synthesized 0.25 default. Dispatch wc:linenumbers-changed so the
+  // owned overlay re-reads. Seeds from getLineNumbers().
+  function lineNumberingOptionsDialog() {
+    const cur = (WC.PM && WC.PM.getLineNumbers && WC.PM.getLineNumbers()) || { active: false, mode: 'continuous', countBy: 1, start: 1, distance: 0.25, distanceExplicit: false };
+    const effMode = cur.active ? cur.mode : 'continuous';
+    const modeSel = el('select', { style: { width: '170px' } });
+    [['Continuous', 'continuous'], ['Restart Each Page', 'newPage'], ['Restart Each Section', 'newSection']].forEach(([label, m]) => { const o = el('option', { value: m, text: label }); if (m === effMode) o.selected = true; modeSel.appendChild(o); });
+    const startIn = el('input', { type: 'number', min: '1', value: String(cur.start || 1), style: { width: '70px' } });
+    const countIn = el('input', { type: 'number', min: '1', value: String(cur.countBy || 1), style: { width: '70px' } });
+    const distIn = el('input', { type: 'number', min: '0', step: '0.05', style: { width: '70px' } });
+    if (cur.distanceExplicit) distIn.value = String(cur.distance); else distIn.placeholder = 'Auto';
+    WC.dialog({ title: 'Line Numbers', width: '360px', body: el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Start at:', style: { width: '150px' } }), startIn]),
+      el('div', { class: 'row' }, [el('label', { text: 'Count by:', style: { width: '150px' } }), countIn]),
+      el('div', { class: 'row' }, [el('label', { text: 'From text (in):', style: { width: '150px' } }), distIn]),
+      el('div', { class: 'row' }, [el('label', { text: 'Numbering:', style: { width: '150px' } }), modeSel]),
+    ]), footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const mode = modeSel.value || 'continuous';
+        let start = parseInt(startIn.value, 10); if (!isFinite(start) || start < 1) start = 1;
+        let countBy = parseInt(countIn.value, 10); if (!isFinite(countBy) || countBy < 1) countBy = 1;
+        // replace:true ⇒ a FULL-SET apply: clears any prior w:start/w:distance so lowering start to 1 or
+        // returning distance to Auto actually takes effect (setLineNumbering is otherwise a partial write).
+        const opts = { mode, start, countBy, replace: true };
+        const d = parseFloat(distIn.value); if (isFinite(d) && d >= 0) opts.distance = d; // omit ⇒ Word's Auto gutter
+        if (WC.PM && WC.PM.setLineNumbers && WC.PM.setLineNumbers(opts)) { WC.toast('Line Numbers', 'Applied.'); try { window.dispatchEvent(new Event('wc:linenumbers-changed')); } catch (_) { /* best-effort */ } }
+        else WC.toast('Line Numbers', 'Could not apply line numbering here.');
+      } },
       { label: 'Cancel' },
     ] });
   }

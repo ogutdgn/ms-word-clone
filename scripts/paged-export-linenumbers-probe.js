@@ -1,7 +1,8 @@
 /* 004 Line-Numbers export probe (mode-aware). The driver (test-roundtrip-paged.js) runs it under
-   WC_LAYOUT=paged. It authors a Continuous-line-numbers doc (body + sectPr/w:lnNumType restart=continuous)
-   and saves it to C:/tmp/wc-<mode>-linenumbers.docx for validate-linenumbers-win.ps1 (real Word
-   PageSetup.LineNumbering read-back). */
+   WC_LAYOUT=paged. It authors a Continuous-line-numbers doc (body + sectPr/w:lnNumType restart=continuous,
+   countBy 2, start-at 5 user-facing ⇒ raw w:start=4) with one SUPPRESSME paragraph carrying
+   pPr/w:suppressLineNumbers, and saves it to C:/tmp/wc-<mode>-linenumbers.docx for validate-linenumbers-win.ps1
+   (real Word PageSetup.LineNumbering read-back: Active/RestartMode/CountBy/StartingNumber + the suppressed flag). */
 (async () => {
   const results = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -13,19 +14,28 @@
   const summary = () => { const p = results.filter((r) => r.pass).length; return JSON.stringify({ summary: { total: results.length, pass: p, fail: results.length - p, mode, savedPath: window.__lnSaved }, results }, null, 2); };
 
   t('mode (info)', () => 'mode=' + mode);
-  const ok = t('verbs present (setLineNumbers + exportDocxBytes + wordAPI.saveBytes)', () => (typeof PM.setLineNumbers === 'function' && typeof PM.exportDocxBytes === 'function' && typeof PM.newBlank === 'function' && window.wordAPI && typeof window.wordAPI.saveBytes === 'function') || ('missing' && false));
+  const ok = t('verbs present (setLineNumbers + suppressLineNumbers + exportDocxBytes + wordAPI.saveBytes)', () => (typeof PM.setLineNumbers === 'function' && typeof PM.suppressLineNumbers === 'function' && typeof PM.exportDocxBytes === 'function' && typeof PM.newBlank === 'function' && window.wordAPI && typeof window.wordAPI.saveBytes === 'function') || ('missing' && false));
   if (!ok) return summary();
 
   try { await PM.newBlank(); } catch (e) {}
   await sleep(140);
-  let big = ''; for (let i = 1; i <= 40; i++) big += 'Line-numbered body word ' + i + ' lorem ipsum dolor sit amet. ';
-  try { W.editor.commands.insertContent(big); } catch (e) {}
+  // Body paragraphs for line numbering; the LAST one (SUPPRESSME) is the suppress target — the caret lands in it
+  // after insert, so suppressing the "current" paragraph is deterministic. Earlier paragraphs are multi-sentence
+  // so the page carries several numbered body lines.
+  let body = '';
+  for (let p = 1; p <= 4; p++) { let s = ''; for (let i = 1; i <= 12; i++) s += 'numbered body word ' + i + ' lorem ipsum dolor sit. '; body += '<p>' + s + '</p>'; }
+  body += '<p>SUPPRESSME this paragraph is excluded from line numbering in Word.</p>';
+  try { W.editor.commands.insertContent(body); } catch (e) {}
+  await sleep(220);
+  // Continuous, countBy 2, start-at 5 (USER-FACING ⇒ the bridge writes raw w:start=4; Word reads StartingNumber=5).
+  // replace:true mirrors the Options-dialog full-set apply.
+  t('setLineNumbers({mode:"continuous", countBy:2, start:5}) accepted', () => PM.setLineNumbers({ mode: 'continuous', countBy: 2, start: 5, replace: true }) === true);
+  await sleep(300);
+  t('model: getLineNumbers().active && mode==="continuous" && start===5', () => { const g = PM.getLineNumbers(); return (g.active === true && g.mode === 'continuous' && g.start === 5) ? 'on' : ('got ' + JSON.stringify(g) && false); });
+  // Suppress the current (SUPPRESSME) paragraph → pPr/w:suppressLineNumbers.
+  t('suppressLineNumbers() on the marker paragraph accepted', () => PM.suppressLineNumbers(true) === true);
   await sleep(200);
-  // Continuous with countBy:2 (round-trips cleanly to Word). start-at is P3 — Word reports StartingNumber
-  // off-by-one from w:start, so its mapping ships with the Line Numbering Options dialog.
-  t('setLineNumbers({mode:"continuous", countBy:2}) accepted', () => PM.setLineNumbers({ mode: 'continuous', countBy: 2 }) === true);
-  await sleep(350);
-  t('model: getLineNumbers().active && mode==="continuous"', () => { const g = PM.getLineNumbers(); return (g.active === true && g.mode === 'continuous') ? 'on' : ('got ' + JSON.stringify(g) && false); });
+  t('model: currentParagraphSuppressed() === true', () => PM.currentParagraphSuppressed() === true ? 'suppressed' : ('got ' + PM.currentParagraphSuppressed() && false));
 
   let bytes = null; try { bytes = await PM.exportDocxBytes(); } catch (e) {}
   t('exportDocxBytes produced bytes', () => bytes && bytes.byteLength > 0 ? ('bytes=' + bytes.byteLength) : ('export failed' && false));

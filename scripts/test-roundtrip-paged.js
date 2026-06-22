@@ -227,9 +227,11 @@ async function main() {
     check('line-numbers: LineNumbering.Active === true', cl.ok && j.lineNumbersActive === true, errDetail('active=' + JSON.stringify(j.lineNumbersActive)));
     check('line-numbers: RestartMode === continuous (0)', cl.ok && Number(j.restartMode) === 0, errDetail('restartMode=' + JSON.stringify(j.restartMode) + ' label=' + JSON.stringify(j.restartLabel)));
     check('line-numbers: CountBy === 2 (authored)', cl.ok && Number(j.countBy) === 2, errDetail('countBy=' + JSON.stringify(j.countBy)));
-    // NB: StartingNumber (the start-at value) is P3 — Word reports it off-by-one from w:start
-    // (authored w:start=3 read back as StartingNumber=4), so the start-at control + its w:start mapping
-    // ship with the Line Numbering Options dialog (P3), validated there.
+    // P3: StartingNumber == authored user-facing 5 (the bridge wrote raw w:start=4; Word's off-by-one read = 5).
+    check('line-numbers: StartingNumber === 5 (authored user-facing; off-by-one raw w:start=4)', cl.ok && Number(j.startingNumber) === 5, errDetail('startingNumber=' + JSON.stringify(j.startingNumber)));
+    // P3: the SUPPRESSME paragraph was found (no import-drop) AND carries an ON pPr/w:suppressLineNumbers.
+    check('line-numbers: suppress marker paragraph present after Word open', cl.ok && j.suppressMarkerFound === true, errDetail('suppressMarkerFound=' + JSON.stringify(j.suppressMarkerFound)));
+    check('line-numbers: suppressed paragraph carries w:suppressLineNumbers', cl.ok && j.paragraphSuppressed === true, errDetail('paragraphSuppressed=' + JSON.stringify(j.paragraphSuppressed)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

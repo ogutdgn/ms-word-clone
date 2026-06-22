@@ -90,6 +90,24 @@ function render() {
     .sort((a, b) => a.key - b.key)
     .map((x) => x.el)
 
+  // P3: paragraphs flagged pPr/w:suppressLineNumbers are EXCLUDED from the count entirely (Word skips them —
+  // no number, no increment). Collect their position ranges from the source doc once; a painted line is
+  // suppressed when its data-pm-start (a PM position inside its source paragraph) falls in one of them.
+  const suppressedRanges: Array<[number, number]> = []
+  try {
+    const doc = editor?.state?.doc
+    if (doc) doc.descendants((node: any, pos: number) => {
+      if (node?.type?.name === 'paragraph' && node?.attrs?.paragraphProperties?.suppressLineNumbers === true) suppressedRanges.push([pos, pos + node.nodeSize])
+      return true
+    })
+  } catch { /* best-effort — no suppression info ⇒ count every body line */ }
+  const isSuppressedLine = (line: HTMLElement): boolean => {
+    if (!suppressedRanges.length) return false
+    const s = Number(line.dataset.pmStart)
+    if (!Number.isFinite(s)) return false
+    return suppressedRanges.some(([a, b]) => s >= a && s < b)
+  }
+
   let n = start - 1 // the first COUNTED body line becomes `start`
   for (const pg of pages) {
     if (perPageReset) n = start - 1
@@ -105,6 +123,7 @@ function render() {
       .sort((a, b) => { const d = (Number(a.dataset.pmStart) || 0) - (Number(b.dataset.pmStart) || 0); return d !== 0 ? d : a.getBoundingClientRect().top - b.getBoundingClientRect().top })
 
     for (const line of lines) {
+      if (isSuppressedLine(line)) continue // suppressed paragraph: excluded from the count (no increment, no number)
       n += 1 // EVERY counted body line increments the running number
       if (n % countBy !== 0) continue // DISPLAY only multiples of countBy (Word's predicate)
       const lBox = toLocal(line.getBoundingClientRect(), g)

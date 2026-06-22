@@ -28,6 +28,26 @@
   const pageOfClientY = (cy) => { for (const p of document.querySelectorAll('.superdoc-page')) { const pr = p.getBoundingClientRect(); if (cy >= pr.top - 2 && cy <= pr.bottom + 2) return parseInt(p.getAttribute('data-page-index'), 10); } return null; };
   const applyLn = async (opts, ms) => { const ok = PM.setLineNumbers(opts); try { window.dispatchEvent(new Event('wc:linenumbers-changed')); } catch (e) {} await sleep(ms || 350); return ok; };
   const authorMulti = async () => { try { await PM.newBlank(); } catch (e) {} await sleep(160); try { W.editor.commands.insertContent('Lorem ipsum dolor sit amet consectetur adipiscing elit. '.repeat(500)); } catch (e) {} let np = -1; for (let i = 0; i < 240; i++) { np = document.querySelectorAll('.superdoc-page').length; if (np > 1) break; await sleep(50); } await sleep(350); return np; };
+  // ── P3 helpers. authorParas: several body paragraphs, the LAST carrying a SUPPRESSME marker (caret lands there
+  //    after insert, so suppressing the "current" paragraph is deterministic). lastIsLong wraps the marker
+  //    paragraph onto multiple lines so the overlay-skip test exercises a multi-line suppressed paragraph. ──
+  const SUPP = 'SUPPRESSME';
+  const authorParas = async (lastIsLong) => {
+    try { await PM.newBlank(); } catch (e) {} await sleep(160);
+    const tail = lastIsLong ? (SUPP + ' ' + 'wibble wobble wuzzle frobnicate quuxify '.repeat(12)) : (SUPP + ' marker paragraph');
+    const html = '<p>First numbered line alpha.</p><p>Second numbered line beta.</p><p>Third numbered line gamma.</p><p>' + tail + '</p>';
+    try { W.editor.commands.insertContent(html); } catch (e) {}
+    await sleep(350);
+  };
+  // Identify ALL painted lines of a paragraph by its PM range (a wrapped paragraph only has the marker word on
+  // its FIRST line, so textContent matching is unreliable). Mirrors the overlay's own data-pm-start → range map.
+  const paraRange = (pred) => { let r = null; try { W.editor.state.doc.descendants((node, pos) => { if (node.type.name === 'paragraph' && pred(node)) { r = [pos, pos + node.nodeSize]; return false; } return true; }); } catch (e) {} return r; };
+  const markerParaRange = () => paraRange((n) => /SUPPRESSME/.test(n.textContent || ''));
+  const suppressedRange = () => paraRange((n) => n.attrs && n.attrs.paragraphProperties && n.attrs.paragraphProperties.suppressLineNumbers === true);
+  const linesInRange = (range) => Array.from(document.querySelectorAll('.superdoc-page .superdoc-line')).filter((l) => { const s = Number(l.dataset.pmStart); return range && Number.isFinite(s) && s >= range[0] && s < range[1]; });
+  // count .wc-line-number elements whose vertical center sits beside any of `lines`
+  const numbersBesideLines = (lines) => { let hit = 0; for (const el of lnEls()) { const er = el.getBoundingClientRect(); const c = (er.top + er.bottom) / 2; if (lines.some((l) => { const lr = l.getBoundingClientRect(); return c >= lr.top - 2 && c <= lr.bottom + 2; })) hit++; } return hit; };
+  const suppParaTag = (doc) => { const paras = doc.match(/<w:p\b[\s\S]*?<\/w:p>/g) || []; const supp = paras.find((p) => /SUPPRESSME/.test(p)) || ''; const others = paras.filter((p) => !/SUPPRESSME/.test(p)); return { inMarker: /<w:suppressLineNumbers\b/.test(supp), leaked: others.some((p) => /<w:suppressLineNumbers\b/.test(p)), count: (doc.match(/<w:suppressLineNumbers\b/g) || []).length }; };
 
   t('WC_READY sentinel', () => window.__WC_READY === true);
   t('layout mode (info)', () => 'mode=' + mode);
@@ -71,6 +91,61 @@
   t('setLineNumbers({mode:"none"}) again is a safe no-op (true)', () => PM.setLineNumbers({ mode: 'none' }) === true);
   await ta('export: document still well-formed (has a body)', async () => { const { doc } = await exp(); return /<w:body\b/.test(doc) ? 'body intact' : ('no w:body' && false); });
 
+  // ── P3 Options dialog model (mode-agnostic, export-based). start/countBy are USER-FACING — the bridge maps the
+  //    w:start off-by-one (raw w:start = userStart−1; ≤1 omitted) and getLineNumbers() inverts back. Each scenario
+  //    re-authors a fresh section (setLineNumbering is a PARTIAL update — unprovided attrs persist otherwise). ──
+  await author();
+  t('P3: setLineNumbers({continuous, start:5, countBy:2}) accepted', () => PM.setLineNumbers({ mode: 'continuous', start: 5, countBy: 2 }) === true);
+  await sleep(300);
+  await ta('P3: export raw w:start="4" (=userStart 5 − 1) + w:countBy="2"', async () => { const { doc } = await exp(); const tag = lnTag(doc); return (/\bw:start="4"/.test(tag) && /\bw:countBy="2"/.test(tag)) ? ('tag=' + tag) : ('snippet=' + tag && false); });
+  t('P3: getLineNumbers().start===5 (user-facing round-trips the off-by-one)', () => { const g = PM.getLineNumbers(); return g.start === 5 ? 'start=5' : ('got ' + JSON.stringify(g) && false); });
+
+  await author();
+  t('P3: setLineNumbers({continuous, start:1}) accepted', () => PM.setLineNumbers({ mode: 'continuous', start: 1 }) === true);
+  await sleep(250);
+  await ta('P3: start===1 OMITS w:start (Word default StartingNumber=1; no odd w:start="0")', async () => { const { doc } = await exp(); const tag = lnTag(doc); return /\bw:start=/.test(tag) ? ('unexpected ' + tag && false) : 'omitted'; });
+  t('P3: getLineNumbers().start===1 when omitted', () => PM.getLineNumbers().start === 1 ? 'start=1' : ('got ' + JSON.stringify(PM.getLineNumbers()) && false));
+
+  await author();
+  t('P3: setLineNumbers({continuous, distance:0.5}) accepted', () => PM.setLineNumbers({ mode: 'continuous', distance: 0.5 }) === true);
+  await sleep(250);
+  await ta('P3: explicit distance ⇒ w:distance="720" (0.5in) + distanceExplicit', async () => { const { doc } = await exp(); const tag = lnTag(doc); const g = PM.getLineNumbers(); return (/\bw:distance="720"/.test(tag) && g.distanceExplicit === true && Math.abs(g.distance - 0.5) < 1e-6) ? ('tag=' + tag) : ('tag=' + tag + ' g=' + JSON.stringify(g) && false); });
+
+  await author();
+  t('P3: setLineNumbers({continuous}) with NO distance accepted', () => PM.setLineNumbers({ mode: 'continuous' }) === true);
+  await sleep(250);
+  await ta('P3: no distance ⇒ no w:distance + distanceExplicit===false (Auto)', async () => { const { doc } = await exp(); const tag = lnTag(doc); const g = PM.getLineNumbers(); return (!/\bw:distance=/.test(tag) && g.distanceExplicit === false) ? 'auto' : ('tag=' + tag + ' g=' + JSON.stringify(g) && false); });
+
+  // ── P3 partial-update CARRYOVER (the dialog's replace:true full-set must CLEAR omitted attrs on a RE-EDIT of
+  //    a LIVE section — setLineNumbering only writes, never clears). Emulates the Options dialog applied twice. ──
+  await author();
+  t('P3 carryover: first apply start:5 (raw w:start=4)', () => PM.setLineNumbers({ mode: 'continuous', start: 5, countBy: 2, replace: true }) === true);
+  await sleep(250);
+  await ta('P3 carryover: raw w:start="4" present after first apply', async () => { const { doc } = await exp(); return /\bw:start="4"/.test(lnTag(doc)) ? 'w:start=4' : ('snippet=' + lnTag(doc) && false); });
+  t('P3 carryover: re-apply start:1 on the SAME section (replace:true)', () => PM.setLineNumbers({ mode: 'continuous', start: 1, countBy: 1, replace: true }) === true);
+  await sleep(250);
+  await ta('P3 carryover: stale w:start CLEARED (no w:start) + getLineNumbers().start===1', async () => { const { doc } = await exp(); const tag = lnTag(doc); const g = PM.getLineNumbers(); return (!/\bw:start=/.test(tag) && g.start === 1) ? 'cleared→1' : ('tag=' + tag + ' g=' + JSON.stringify(g) && false); });
+  // distance carryover: explicit 0.5 then a replace:true apply with NO distance must CLEAR the prior w:distance.
+  await author();
+  t('P3 carryover: first apply distance:0.5 (raw w:distance=720)', () => PM.setLineNumbers({ mode: 'continuous', distance: 0.5, replace: true }) === true);
+  await sleep(250);
+  await ta('P3 carryover: w:distance="720" present after first apply', async () => { const { doc } = await exp(); return /\bw:distance="720"/.test(lnTag(doc)) ? 'w:distance=720' : ('snippet=' + lnTag(doc) && false); });
+  t('P3 carryover: re-apply with NO distance (Auto) on the SAME section (replace:true)', () => PM.setLineNumbers({ mode: 'continuous', replace: true }) === true);
+  await sleep(250);
+  await ta('P3 carryover: stale w:distance CLEARED (Auto) + distanceExplicit===false', async () => { const { doc } = await exp(); const tag = lnTag(doc); const g = PM.getLineNumbers(); return (!/\bw:distance=/.test(tag) && g.distanceExplicit === false) ? 'cleared→auto' : ('tag=' + tag + ' g=' + JSON.stringify(g) && false); });
+
+  // ── P3 per-paragraph suppress (mode-agnostic, export + model). Author paragraphs (last = SUPPRESSME marker);
+  //    the caret lands in it, so suppressing the "current" paragraph is deterministic. ──
+  await authorParas(false);
+  t('P3: suppressLineNumbers() on the marker paragraph accepted', () => PM.suppressLineNumbers() === true);
+  await sleep(200);
+  t('P3: currentParagraphSuppressed() === true', () => PM.currentParagraphSuppressed() === true ? 'suppressed' : ('got ' + PM.currentParagraphSuppressed() && false));
+  await ta('P3: export carries exactly one bare <w:suppressLineNumbers/> in the marker pPr (no leak)', async () => { const { doc } = await exp(); const r = suppParaTag(doc); return (r.count === 1 && r.inMarker === true && r.leaked === false) ? ('count=1 inMarker') : ('r=' + JSON.stringify(r) && false); });
+  t('P3: suppressLineNumbers() again accepted (toggles OFF)', () => PM.suppressLineNumbers() === true);
+  await sleep(150);
+  t('P3: currentParagraphSuppressed() === false after toggle-off', () => PM.currentParagraphSuppressed() === false ? 'restored' : ('got ' + PM.currentParagraphSuppressed() && false));
+  await ta('P3: after toggle-off the export drops <w:suppressLineNumbers> (null clear)', async () => { const { doc } = await exp(); return /<w:suppressLineNumbers\b/.test(doc) ? ('still present' && false) : 'cleared'; });
+
   // ── P2: the in-app owned margin-number overlay (paged-only render; overlay-mode no-op parity) ──
   if (mode === 'paged') {
     await author();
@@ -102,6 +177,17 @@
       const p1min = Math.min.apply(null, p1), p1max = Math.max.apply(null, p1);
       return (p1min === 1 && p1max <= p1.length) ? ('p1 restarts 1..' + p1max + ' (p0 max=' + Math.max.apply(null, p0) + ')') : ('p1=[' + p1min + '..' + p1max + '] len=' + p1.length && false);
     });
+    // ── P3 overlay: a suppressed (multi-line) paragraph is EXCLUDED from the count — no number beside any of its
+    //    lines, and the running count == the non-suppressed body-line count (continuous, countBy 1). ──
+    await authorParas(true); // last paragraph (SUPPRESSME) wraps onto several lines
+    await applyLn({ mode: 'continuous' }, 500);
+    const beforeMax = (() => { const v = lnVals(); return v.length ? Math.max.apply(null, v) : 0; })();
+    const markerLineCount = linesInRange(markerParaRange()).length; // ALL wrapped lines of the marker paragraph (by PM range)
+    results.push({ name: 'P3 overlay setup: marker paragraph wrapped to ≥2 lines + numbered before suppress', pass: markerLineCount >= 2 && beforeMax >= 4, detail: 'markerLines=' + markerLineCount + ' maxBefore=' + beforeMax });
+    PM.suppressLineNumbers(true); // suppress the current (marker) paragraph
+    await applyLn({ mode: 'continuous' }, 500); // re-render the overlay (dispatches wc:linenumbers-changed)
+    t('P3 overlay: 0 numbers beside ANY line of the suppressed paragraph (excluded)', () => { const hit = numbersBesideLines(linesInRange(suppressedRange())); return hit === 0 ? 'none beside suppressed' : (hit + ' numbers leaked onto the suppressed paragraph' && false); });
+    t('P3 overlay: numbers still painted for non-suppressed lines + count drops (suppressed lines uncounted)', () => { const v = lnVals(); const suppLines = linesInRange(suppressedRange()).length; const allLines = Array.from(document.querySelectorAll('.superdoc-page .superdoc-line')).filter((l) => l.getBoundingClientRect().height > 0).length; const nonSupp = allLines - suppLines; const maxN = v.length ? Math.max.apply(null, v) : 0; return (v.length >= 1 && maxN === v.length && maxN <= nonSupp && maxN < beforeMax) ? ('max=' + maxN + ' nonSupp=' + nonSupp + ' before=' + beforeMax) : ('vals=' + JSON.stringify(v) + ' suppLines=' + suppLines + ' nonSupp=' + nonSupp + ' before=' + beforeMax && false); });
   } else {
     // overlay mode: the engine paints no .superdoc-page sheets, so the line-numbers overlay must NO-OP. Assert
     // BOTH (no sheets AND no numbers while continuous is active) so a failed-to-apply can't masquerade as a no-op.

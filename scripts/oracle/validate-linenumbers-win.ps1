@@ -41,6 +41,24 @@ try {
     try { $out.startingNumber = [int]$lnum.StartingNumber } catch {}
     try { $out.distanceFromText = [double]$lnum.DistanceFromText } catch {}  # points
   }
+  # P3: per-paragraph suppress — find the SUPPRESSME marker paragraph; read its pPr (Range.WordOpenXML) and assert
+  # it carries an ON w:suppressLineNumbers (bare, NOT w:val="0"). suppressMarkerFound guards against a silent
+  # import-drop of the whole paragraph.
+  $out.suppressMarkerFound = $false
+  $out.paragraphSuppressed = $false
+  try {
+    foreach ($p in $doc.Paragraphs) {
+      $txt = ''
+      try { $txt = [string]$p.Range.Text } catch {}
+      if ($txt -like '*SUPPRESSME*') {
+        $out.suppressMarkerFound = $true
+        $xml = ''
+        try { $xml = [string]$p.Range.WordOpenXML } catch {}
+        if ($xml -match '<w:suppressLineNumbers(?![^>]*w:val="0")') { $out.paragraphSuppressed = $true }
+        break
+      }
+    }
+  } catch {}
 } catch {
   $out.ok = $false
   $out.error = $_.Exception.Message

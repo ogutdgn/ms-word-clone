@@ -82,7 +82,9 @@ its lines in the count.
 **Acceptance Scenarios**:
 
 1. **Given** Line Numbering Options, **When** the user sets start-at 5 and count-by 2, **Then** the export
-   carries `w:start="5" w:countBy="2"` and Word reads StartingNumber 5 / CountBy 2.
+   carries `w:countBy="2"` and raw `w:start="4"` and Word reads StartingNumber 5 / CountBy 2.
+   *(Word reads `w:start` off-by-one — `StartingNumber = w:start + 1` — so the bridge writes raw
+   `w:start = userStart − 1`; see research.md Q2. The original "`w:start="5"`" pre-dated that discovery.)*
 2. **Given** the caret in a paragraph, **When** the user chooses Suppress for Current Paragraph, **Then** that
    paragraph's properties carry `w:suppressLineNumbers` and Word excludes its lines from the count.
 3. **Given** a from-text distance set, **When** exported, **Then** `w:distance` carries the value and Word
