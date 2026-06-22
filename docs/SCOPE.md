@@ -116,7 +116,12 @@ _TBD._
 _TBD._
 
 ## Layout
-_TBD — margins/columns/orientation/size visuals are now rendered by the default paged layout engine (no longer layout-gated); per-feature reconciliation pending._
+
+| Section | Feature | Status | Note |
+|---|---|---|---|
+| Page Setup | Margins / Orientation / Size | ✅ Done | rendered by the paged engine + exported to `sectPr` (Word-COM-validated) |
+| Page Setup | **Columns** (One/Two/Three / More Columns / Left/Right / line between / column break) | ✅ Done (003 P1+P2+P3, Word-COM-validated) | the paged engine flows the text into columns; real OOXML `w:cols` (+ `<w:col>` unequal, `w:sep` line-between) + a `w:br w:type="column"` column break; real Word reads `TextColumns` count/spacing/even/line-between + per-column widths (= Word's Left preset 1.83"/4.17"). KNOWN (v1): the owned `bodySectPr` write for line-between/unequal is outside PM undo + the in-app paint of those is best-effort (export + Word correct). Section breaks (Continuous/Next-Page) remain a future feature. |
+| Page Setup | Line numbers / Hyphenation / mid-doc section breaks | 🕗 Deferred | still `isBlocked` (AREA layout-page, not yet wired) |
 
 ## References
 _TBD._

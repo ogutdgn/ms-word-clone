@@ -229,6 +229,20 @@ export function installInsert(editor: AnyEditor) {
     return ok !== false
   }
 
+  // 003 P3: a column break = a hardBreak carrying lineBreakType 'column' (exports <w:br w:type="column"/>,
+  // moving following text to the next column); the hardBreak node already has the lineBreakType attr —
+  // no fork edit (spike-verified). insertLineBreak = a plain text-wrapping (Shift+Enter) line break.
+  function insertColumnBreak(): boolean {
+    const ok = editor.chain().insertContent({ type: 'hardBreak', attrs: { lineBreakType: 'column' } }).run()
+    refocus()
+    return ok !== false
+  }
+  function insertLineBreak(): boolean {
+    const ok = editor.chain().insertContent({ type: 'hardBreak' }).run()
+    refocus()
+    return ok !== false
+  }
+
   function insertHr(): boolean {
     const ok = editor.chain().insertHorizontalRule().run()
     refocus()
@@ -577,6 +591,8 @@ export function installInsert(editor: AnyEditor) {
     insertEquation,
     insertPageBreak,
     insertBlankPage,
+    insertColumnBreak,
+    insertLineBreak,
     insertHr,
   }
 }

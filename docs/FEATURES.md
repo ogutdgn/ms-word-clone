@@ -94,9 +94,15 @@ outcomes are still being reconciled against it **per-feature**:
   **Different First Page / Odd & Even** variants, and real OOXML **`PAGE`-field page numbers** — all
   Word-COM-validated. (Caveat: a *freshly-inserted* page-number field shows "0" in-app until the doc
   is reopened; real Word resolves it per page.) **Multi-page View modes** are engine-backed; some
-  other layout ribbon commands (columns, breaks, floating-object position) are still being reconciled.
-- **Asymmetric column widths** (Left/Right) and **mirrored margins** render with the
-  dominant value; **Side-to-Side** paging is approximate. (UI Fidelity Audit, "Known approximations".)
+  other layout ribbon commands (floating-object position, line numbers, mid-doc section breaks) are
+  still being reconciled.
+- **Columns** are fully wired (spec-kit **003**): One/Two/Three + More Columns (spacing / equal-width)
+  + **Left/Right unequal** + **line between** + a **column break** — the paged engine flows the text
+  and it round-trips to real Word (oracle-validated; Left/Right match Word's 1.83"/4.17" preset). The
+  owned `bodySectPr` write for line-between/unequal is outside undo + best-effort in-app paint (export +
+  Word correct). Mid-doc **section** breaks remain a future feature.
+- **Mirrored margins** render with the dominant value; **Side-to-Side** paging is approximate. (UI
+  Fidelity Audit, "Known approximations".)
 - **Spelling** uses a built-in common-misspellings dictionary, not a full dictionary.
 - **`.docx` export** is a structural rebuild (the fork `super-converter`), not a
   byte-identical round-trip. (`NOT_IMPLEMENTED.md`; guarded by `test:roundtrip`.)

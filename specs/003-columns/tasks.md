@@ -71,12 +71,12 @@ P2/P3 production code. Throwaway probe scripts, deleted before each slice's comm
 **Goal**: a Column break moves following text to the next column + exports `w:br w:type="column"`.
 **Independent test**: in a 2-column doc, insert a Column break → following text starts the next column; export carries `w:type="column"`; Word honors it.
 
-- [ ] T021 [US3] Add `insertColumnBreak()` to `src/renderer/bridge/columns.ts` (the spike-chosen no-fork insert of a `w:br w:type="column"` run); merge onto `WC.PM` + no-op fallback; un-defer the `columnBreak` command in `bridge/index.ts`.
-- [ ] T022 [US3] Wire the Column break item under the Layout → Breaks dropdown in `src/renderer/public/js/commands.js` → `WC.PM.insertColumnBreak()`.
-- [ ] T023 [US3] Extend `scripts/paged-columns-probe.js`: in a 2-column doc insert a column break → assert the following text paints in the next column + the export carries `<w:br w:type="column"/>`.
-- [ ] T024 [US3] Extend `scripts/oracle/validate-columns-win.ps1`: assert the body Range carries a `w:type="column"` break (a break boundary); opens-without-repair. Extend the roundtrip C-section.
-- [ ] T025 [US3] VERIFY P3: build + 4 gates + `probe:columns` + the COM oracle green; `/code-review` high; FIX; re-verify.
-- [ ] T026 [US3] CLOSE-OUT P3: commit; update runbook + memory; ff-merge → `main` + push.
+- [x] T021 [US3] Add `insertColumnBreak()` to `src/renderer/bridge/columns.ts` (the spike-chosen no-fork insert of a `w:br w:type="column"` run); merge onto `WC.PM` + no-op fallback; un-defer the `columnBreak` command in `bridge/index.ts`.
+- [x] T022 [US3] Wire the Column break item under the Layout → Breaks dropdown in `src/renderer/public/js/commands.js` → `WC.PM.insertColumnBreak()`.
+- [x] T023 [US3] Extend `scripts/paged-columns-probe.js`: in a 2-column doc insert a column break → assert the following text paints in the next column + the export carries `<w:br w:type="column"/>`.
+- [x] T024 [US3] Extend `scripts/oracle/validate-columns-win.ps1`: assert the body Range carries a `w:type="column"` break (a break boundary); opens-without-repair. Extend the roundtrip C-section.
+- [x] T025 [US3] VERIFY P3: build + 4 gates + `probe:columns` + the COM oracle green; `/code-review` high; FIX; re-verify.
+- [x] T026 [US3] CLOSE-OUT P3: commit; update runbook + memory; ff-merge → `main` + push.
 
 **Checkpoint**: column break renders + exports + Word honors it.
 
@@ -84,9 +84,9 @@ P2/P3 production code. Throwaway probe scripts, deleted before each slice's comm
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T027 Grep-confirm NO `E()` (= `WC.Editor`) or legacy refs remain in the columns/`columnsMenu` path; confirm `ribbon-data.js` was NOT hand-edited (the Columns dropdown is from `raw-research.json`).
-- [ ] T028 Final docs reconciliation: update `docs/SCOPE.md` (Columns row) + `docs/FEATURES.md` + `docs/LAYOUT_ENGINE.md` to reflect what shipped; keep claims conservative (only what the oracle verified; record any unequal/line-between gap).
-- [ ] T029 Confirm `test:roundtrip:paged` includes the columns read-backs; full gate sweep green on `main` after the last merge.
+- [x] T027 Grep-confirm NO `E()` (= `WC.Editor`) or legacy refs remain in the columns/`columnsMenu` path; confirm `ribbon-data.js` was NOT hand-edited (the Columns dropdown is from `raw-research.json`).
+- [x] T028 Final docs reconciliation: update `docs/SCOPE.md` (Columns row) + `docs/FEATURES.md` + `docs/LAYOUT_ENGINE.md` to reflect what shipped; keep claims conservative (only what the oracle verified; record any unequal/line-between gap).
+- [x] T029 Confirm `test:roundtrip:paged` includes the columns read-backs; full gate sweep green on `main` after the last merge.
 
 ---
 

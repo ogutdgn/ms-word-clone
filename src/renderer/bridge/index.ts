@@ -164,7 +164,7 @@ const AREA: Record<string, string> = {
 // P1 delivers goToHeader/goToFooter/closeHeaderFooter (header/footer = the Insert dropdowns,
 // already ready). P2 adds differentFirstPage/differentOddEven; P3 adds pageNumber.
 // columns (003): the paged PE flows the body into N columns; WC.PM.setColumns writes sectPr/w:cols.
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns'])
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -383,6 +383,7 @@ export function preinstallBridge() {
     removeBookmark: () => false, renameBookmark: () => false,
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
+    insertColumnBreak: () => false, insertLineBreak: () => false,
     setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, setImageTransform: () => false, setImagePosition: () => false, setImageGrayscale: () => false, // Phase 4b/4c pre-mount stubs (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
     insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,

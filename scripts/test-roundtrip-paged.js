@@ -209,6 +209,7 @@ async function main() {
     check('columns-P2: Count === 2 + EvenlySpaced === false (unequal)', cl.ok && Number(j.columnCount) === 2 && j.evenlySpaced === false, errDetail('count=' + JSON.stringify(j.columnCount) + ' even=' + JSON.stringify(j.evenlySpaced)));
     check('columns-P2: LineBetween === true', cl.ok && j.lineBetween === true, errDetail('lineBetween=' + JSON.stringify(j.lineBetween)));
     check('columns-P2: narrow-left (Width[0] < Width[1])', cl.ok && ws.length >= 2 && Number(ws[0]) < Number(ws[1]), errDetail('widths=' + JSON.stringify(ws)));
+    check('columns-P2/P3: a column break (char 14) is present in the body', cl.ok && j.columnBreakPresent === true, errDetail('columnBreakPresent=' + JSON.stringify(j.columnBreakPresent)));
   }
 
   // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──

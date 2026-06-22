@@ -160,17 +160,17 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // Repointed (003 P1): `columns` shipped (ENGINE_READY) — the run-block probe moves to `breaks`
+    // Repointed (003 P3): `breaks` shipped (ENGINE_READY) — the run-block probe moves to `lineNumbers`
     // (AREA layout-page, still Phase-7-gated, NOT in ENGINE_READY — stays blocked, so dispatching it
     // toasts and opens no flyout/modal).
-    window.WC.Commands.run({ cmd: 'breaks', label: 'Breaks' });
+    window.WC.Commands.run({ cmd: 'lineNumbers', label: 'Line Numbers' });
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    // Repointed (003 P1): `columns` shipped (ENGINE_READY) — the dropdown-block probe moves to
-    // `breaks` (AREA layout-page, still Phase-7-gated; H.breaks WOULD open a flyout if reached, so
-    // the block is meaningfully verified by open===0).
-    window.WC.Commands.dropdown({ cmd: 'breaks', type: 'dropdown' }, document.body);
+    // Repointed (003 P3): `breaks` shipped (ENGINE_READY) — the dropdown-block probe moves to
+    // `lineNumbers` (AREA layout-page, still Phase-7-gated; H.lineNumbers WOULD open a flyout if
+    // reached, so the block is meaningfully verified by open===0).
+    window.WC.Commands.dropdown({ cmd: 'lineNumbers', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -6541,11 +6541,11 @@
   await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
   await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
   await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
-  // NB: margins/orientation/size + columns (layout-page) AND header/footer text + variants + page numbers
-  // are now UNBLOCKED as their engine support shipped (ENGINE_READY). `breaks` is the still-blocked
-  // layout-page representative (section/column breaks are not wired yet — AREA layout-page, not in
+  // NB: margins/orientation/size + columns + breaks (layout-page) AND header/footer text + variants +
+  // page numbers are now UNBLOCKED as their engine support shipped (ENGINE_READY). `lineNumbers` is the
+  // still-blocked layout-page representative (line numbering is not wired — AREA layout-page, not in
   // ENGINE_READY); `docInfo` is the still-blocked header-footer representative (Document Info fields).
-  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('breaks') === true);
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('lineNumbers') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------

@@ -100,6 +100,15 @@
   await sleep(250);
   await ta('export: w:equalWidth="0" SURVIVES the lineBetween-only toggle', async () => { const { doc } = await exp(); return /<w:cols\b[^>]*\bw:equalWidth="0"/.test(doc) ? 'equalWidth preserved' : ('equalWidth clobbered' && false); });
 
+  // ── P3: column break (a real w:br w:type="column", inserted at the caret) ──
+  t('P3 verb present (insertColumnBreak)', () => typeof PM.insertColumnBreak === 'function');
+  await author();
+  t('setColumns({count:2}) for the break context', () => PM.setColumns({ count: 2 }) === true);
+  await sleep(300);
+  t('insertColumnBreak() accepted', () => PM.insertColumnBreak() === true);
+  await sleep(250);
+  await ta('export: body carries a real <w:br w:type="column"/>', async () => { const { doc } = await exp(); return /<w:br\b[^>]*\bw:type="column"/.test(doc) ? 'column break exported' : ('no w:type="column"; brs=' + JSON.stringify((doc.match(/<w:br\b[^>]*\/?>/g) || []).slice(0, 4)) && false); });
+
   try { await PM.newBlank(); } catch (e) {} // teardown
   return done();
 })();

@@ -20,6 +20,10 @@
   let big = ''; for (let i = 1; i <= 40; i++) big += 'P2 columns word ' + i + ' lorem ipsum dolor sit amet. ';
   try { W.editor.commands.insertContent(big); } catch (e) {}
   await sleep(200);
+  // P3: a column break in the body (a real w:br w:type="column"), then more text.
+  t('insertColumnBreak() in the body', () => PM.insertColumnBreak() === true);
+  try { W.editor.commands.insertContent('Text after the column break flows to the next column. '); } catch (e) {}
+  await sleep(150);
   // Left (unequal) + line-between, both via the owned bodySectPr write.
   t('setColumns({unequal:"left"}) accepted', () => PM.setColumns({ unequal: 'left' }) === true);
   await sleep(250);

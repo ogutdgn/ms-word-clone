@@ -86,7 +86,7 @@ found 2026-06-15). The engine is "done" when these are demonstrably fixable and 
 | 9 | **Page borders** | `w:pgBorders` stores + exports, but **doesn't render** | draw the border **around the page margins**; border-art styles |
 | 10 | **Watermark** | visual SVG stand-in (not a real header construct) | watermark as a real **header** drawing, per page |
 | 11 | **Inside-Vertical border** | no paragraph OOXML equivalent | only meaningful inside a **table/columns** grid → falls out of #4 |
-| 12 | **Columns / sections** | single column only | multi-**column** text flow; section breaks change geometry mid-doc |
+| 12 | **Columns / sections** | ✅ **003 columns (P1+P2+P3)** — One/Two/Three + More Columns (spacing/equal-width) + Left/Right unequal + line-between + a column break; the paged engine flows the text + it round-trips to real Word (oracle: `TextColumns` count/spacing/even/line-between + per-column widths = Word's Left preset). REMAINING: mid-doc **section** breaks change geometry (separate feature) | multi-**column** text flow; section breaks change geometry mid-doc |
 | 13 | **Diagonal cell borders / Shadow-3D borders** | greyed / flattened | need the table layout pass (#4) / a depth render |
 
 **Already RESOLVED in continuous flow (no engine needed)** — recorded so we don't re-do them:

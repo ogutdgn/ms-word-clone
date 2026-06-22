@@ -553,12 +553,13 @@
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyHeader('Page Breaks'));
       fly.appendChild(WC.flyItem('Page', { icon: 'pageBreak', key: 'Ctrl+Enter', onClick: () => insertPageBreak() }));
-      fly.appendChild(WC.flyItem('Column', { onClick: () => { E().insertHTML('<span class="wc-colbreak" style="break-after:column;display:block;height:0"></span>'); WC.toast('Column break inserted.'); } }));
-      fly.appendChild(WC.flyItem('Text Wrapping', { onClick: () => E().insertHTML('<br>') }));
+      // 003 P3: real OOXML column break (w:br w:type="column"); Text Wrapping = a line break. No legacy E().
+      fly.appendChild(WC.flyItem('Column', { onClick: () => { if (WC.PM.insertColumnBreak) WC.PM.insertColumnBreak(); } }));
+      fly.appendChild(WC.flyItem('Text Wrapping', { onClick: () => { if (WC.PM.insertLineBreak) WC.PM.insertLineBreak(); } }));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyHeader('Section Breaks'));
       fly.appendChild(WC.flyItem('Next Page', { onClick: () => insertPageBreak() }));
-      fly.appendChild(WC.flyItem('Continuous', { onClick: () => { E().insertHTML('<hr class="wc-section-break" style="border:none;border-top:1px dotted #aaa;margin:6px 0">'); WC.toast('Continuous section break inserted.'); } }));
+      fly.appendChild(WC.flyItem('Continuous', { onClick: () => WC.toast('Continuous section breaks are not available in this version.') }));
       fly.appendChild(WC.flyItem('Even Page', { onClick: () => insertPageBreak() }));
       fly.appendChild(WC.flyItem('Odd Page', { onClick: () => insertPageBreak() }));
     });
@@ -2082,7 +2083,7 @@
   }
 
   function insertPageBreak() {
-    E().insertHTML('<div class="manual-break" contenteditable="false" style="break-after:page;page-break-after:always"></div><p><br></p>');
+    if (WC.PM && WC.PM.insertPageBreak) WC.PM.insertPageBreak(); // no legacy E(); the paged engine paginates
   }
   function insertWordArt() {
     const sel = window.getSelection();

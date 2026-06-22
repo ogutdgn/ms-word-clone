@@ -37,6 +37,8 @@ try {
       for ($i = 1; $i -le [int]$tc.Count; $i++) { $ws += [double]$tc.Item($i).Width }  # per-column widths (points)
       $out.columnWidths = $ws
     } catch {}
+    # P3: a manual column break is character 14 (wdColumnBreak) in the body content.
+    try { $out.columnBreakPresent = ([string]$doc.Content.Text).Contains([char]14) } catch {}
   }
 } catch {
   $out.ok = $false
