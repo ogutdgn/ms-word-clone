@@ -901,7 +901,11 @@
     const cur = (WC.PM.getLineNumbers && WC.PM.getLineNumbers()) || { active: false, mode: 'none' };
     const on = (m) => (cur.active ? cur.mode === m : m === 'none');
     [['None', 'none'], ['Continuous', 'continuous'], ['Restart Each Page', 'newPage'], ['Restart Each Section', 'newSection']].forEach(([l, m]) => {
-      fly.appendChild(WC.flyItem((on(m) ? '✓ ' : '   ') + l, { onClick: () => { if (WC.PM.setLineNumbers({ mode: m })) WC.toast('Line Numbers', l); else WC.toast('Line Numbers', 'Could not apply line numbering here.'); } }));
+      // P2: after a successful apply, dispatch wc:linenumbers-changed so the owned margin-number overlay
+      // re-reads getLineNumbers() — setLineNumbers is a sectPr/w:lnNumType write and triggers NO relayout of
+      // its own, so the overlay's wc:paged-relayout listener alone would miss the toggle. (A future P3
+      // Options-dialog apply that calls setLineNumbers MUST dispatch this event too.)
+      fly.appendChild(WC.flyItem((on(m) ? '✓ ' : '   ') + l, { onClick: () => { if (WC.PM.setLineNumbers({ mode: m })) { WC.toast('Line Numbers', l); try { window.dispatchEvent(new Event('wc:linenumbers-changed')); } catch (_) { /* best-effort */ } } else WC.toast('Line Numbers', 'Could not apply line numbering here.'); } }));
     });
     fly.appendChild(WC.flySep());
     fly.appendChild(WC.flyItem('Suppress for Current Paragraph', { onClick: () => WC.toast('Suppress for Current Paragraph', 'Per-paragraph line-number suppression is coming in a follow-up.') }));

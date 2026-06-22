@@ -1,0 +1,20 @@
+/* 004 Line Numbers P2 — the owned margin-number overlay (#wc-linenum-overlay) painted by
+   src/renderer/bridge/line-numbers-overlay.ts. The container spans #pages (which carries the zoom transform);
+   each .wc-line-number is absolutely positioned in #pages-local coords. Read-only decoration (pointer-events
+   off); z-index 28 sits under track-chrome (29) + comments (30). Paged-only — the module never creates this
+   layer in overlay mode. */
+#wc-linenum-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 28;
+}
+
+.wc-line-number {
+  position: absolute;
+  font-size: 9pt;
+  line-height: 1;
+  color: #555;
+  user-select: none;
+  white-space: nowrap;
+}

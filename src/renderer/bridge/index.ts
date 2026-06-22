@@ -17,6 +17,7 @@ import { installDraw } from './draw'
 import { installInkOverlay } from './ink-overlay'
 import { installColumns } from './columns'
 import { installLineNumbers } from './line-numbers'
+import { installLineNumbersOverlay } from './line-numbers-overlay'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installNotesArea } from './notes-area'
@@ -263,6 +264,9 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
         w.WC.view = pres.editor.view // identity-stable across replaceFile, but keep the WC seam in sync
         w.WC.PM.setClean()
         try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
+        // 004 P2: the paged replaceFile leg does NOT re-run installBridge, so nudge the line-numbers overlay to
+        // re-read getLineNumbers() for the swapped doc (a freshly-opened .docx may already carry w:lnNumType).
+        try { setTimeout(() => { try { window.dispatchEvent(new Event('wc:linenumbers-changed')) } catch { /* best-effort */ } }, 60) } catch { /* best-effort */ }
         pres.editor.view?.focus()
         return true
       }
@@ -701,6 +705,7 @@ export function installBridge(editor: AnyEditor) {
   // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
   // page sheet).
   installNotesArea(editor)
+  installLineNumbersOverlay(editor) // 004 P2: paged-only owned margin-number overlay (no-op in overlay mode)
   installFocusGuards()
   // M3: in paged mode PresentationEditor re-paginates WITHOUT a doc transaction (zoom, reflow),
   // so the transaction/selection-driven status-bar refresh (state-sync.ts) misses it and "Page X
