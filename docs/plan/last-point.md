@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP — 🏁 006 Section Breaks COMPLETE; 2 of 8 done)
+
+> **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; **user merges general-done→main at
+> the END** — nothing pushed during the loop). 006 ff-merged in @ `008db22`. **Phase:** POST-MIGRATION
+> `general-done` cleanup loop (autonomous `/loop`, self-paced). Ultracode ON.
+>
+> **State summary:** 2 of 8 cleanup features COMPLETE — 005 hyphenation ✅, **006 mid-doc section breaks ✅**.
+> Loop order remaining: 007 paged test-coverage port → 008 overlay retirement (after 007) → 009 M6→gate → 010
+> import fidelity → 011 pagination calibration → 012 frames group.
+>
+> **Done this session (006 section breaks, NO-FORK):** Layout → Breaks → Section Breaks (Next Page / Continuous /
+> Even Page / Odd Page). `bridge/section-breaks.ts` `insertSectionBreak(type)` = the PUBLIC fork command
+> `editor.commands.insertSectionBreakAtSelection()` (sets a paragraph-level `pPr/w:sectPr` — the mid-doc break,
+> Next Page by default) + for typed variants an OWNED in-place write of `<w:type w:val="…"/>` onto
+> `state.doc.attrs.bodySectPr`. Breaks flyout rewired (was a page-break stand-in). `breaks` already un-deferred
+> (003) → no D6 change. **EARLY FEASIBILITY SPIKE** (this feature was flagged as possibly fork-gated — 003 called
+> section breaks "a future feature") PROVED no-fork: real Word reads `Sections.Count == 2`.
+>
+> **3 KEY FINDINGS (debugged):** (1) the section TYPE goes on the **BODY sectPr** (the section AFTER the break),
+> NOT the mid-doc paragraph sectPr — confirmed by having Word author a Continuous break + inspecting its OOXML
+> (`w:type` on the body sectPr → `Sections(2).SectionStart=Continuous`); `converter.bodySectPr` is null until a
+> sections-adapter mutation, so write `state.doc.attrs.bodySectPr` (the live source the exporter reads, in place).
+> (2) a programmatic caret needs `setTextSelection({from,to})` — the **number form silently no-ops**, which was
+> landing the break on the LAST paragraph (degenerate 1-section doc). (3) the mid-doc break sectPr exports
+> **self-closing** (`<w:sectPr/>`) — fooled a probe regex.
+>
+> **/code-review (adversarial workflow, 14 agents): 1 confirmed (+10 refuted) → FIXED:** the **multi-break typed
+> corruption** — a typed break writes `w:type` to the BODY sectPr (types only the LAST section); a 2nd+ TYPED break
+> would overwrite the 1st's type → Word-wrong (silent). FIXED with a v1 GUARD (refuse a 2nd+ typed break loudly —
+> the flyout toasts; multiple Next Page breaks stay allowed). Per-section multi-break typing = a future feature.
+>
+> **Gates (006): pm 475 / smoke 9 / roundtrip 27 / bundle 4 / probe:sectionbreaks 16 / test:roundtrip:paged 78**
+> (C8 real Word: Next Page → 2 sections + section 2 NewPage; Continuous → 2 sections + section 2 Continuous).
+> Commits on general-done: `0c0e5a5` plan+spike, `1f7cc4e` impl, `2cdf537` review-fix (guard), `008db22` close-out.
+>
+> **Known v1 limitations:** no in-app repagination at the break (export-faithful — Word paginates on open); owned
+> write outside PM undo; a SINGLE typed break per doc (multiple Next Page fine).
+>
+> **Next: 007 paged test-coverage port** — port the ~70 overlay-only `test:pm` assertions to paged-aware variants
+> (TEST INFRA, NO Word oracle — not a fidelity feature; the enabler for 008 overlay retirement). Read memory
+> `paged-testpm-overlay-suite` first (genuine paged `test:pm` = 405/475; ~70 tests assert overlay-only constructs:
+> `__pagination`, the disabled notes-area, overlay table/list/border DOM).
+>
+> **Blockers/notes:** none. Loop self-paced (ScheduleWakeup); each firing re-derives state from feature.json + git.
+
 ## 2026-06-22 (general-done cleanup LOOP started — constitution ratified + 🏁 005 Hyphenation COMPLETE)
 
 > **Branch:** `general-done` (the cleanup integration branch off `main` @ `89ed1b1`; **user merges general-done→main
