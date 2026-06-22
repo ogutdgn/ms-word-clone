@@ -21,12 +21,26 @@ the element).
 hyphenation translator — rejected (Principle I). (c) a public `editor.doc.settings.*` API — none exists for
 hyphenation. Rejected.
 
-**SPIKE (run before production code)**: in a throwaway probe confirm — (1) `editor.converter.convertedXml`
-(or the equivalent live settings tree) is reachable from the bridge; (2) an owned upsert of
-`<w:autoHyphenation w:val="true"/>` survives `editor.exportDocx()` (appears in `word/settings.xml`); (3) a
-re-import of that `.docx` reads the flag back. If (2) fails (export regenerates settings.xml ignoring the
-edit), fall back to whatever live settings object the exporter DOES serialize, or record a documented
-last-resort accessor (Constitution Check exception). Delete the spike script.
+**SPIKE — RESOLVED (2026-06-22, throwaway probe, 14/14 paged).** NO-FORK and clean. Confirmed:
+- `editor.converter.convertedXml['word/settings.xml']` is reachable from the bridge — an xml-js **doc wrapper
+  whose root element is `w:settings`** (a blank doc already carries it, 14 existing children). `findSettingsRoot`
+  (mirror `document-settings.ts`: `part.name==='w:settings'` else `part.elements.find(name==='w:settings')`)
+  resolves the root; create-if-absent works.
+- An owned upsert (find-or-replace-or-push, the `document-settings.ts` shape) of
+  `<w:autoHyphenation w:val="true"/>` **survives `editor.exportDocx({getUpdatedDocs:true})`** — it appears in
+  the exported `word/settings.xml`; flipping to `w:val="false"` **replaces** the element (single tag, no dup).
+- The options shapes export too: `w:hyphenationZone w:val="360"`, `w:consecutiveHyphenLimit w:val="2"`,
+  `<w:doNotHyphenateCaps/>`.
+- Read-back from the tree works (the `getHyphenation` path).
+- P3 optional hyphen: an inserted U+00AD survives export as a **literal U+00AD** in `document.xml` (Word reads it
+  as a soft hyphen) — no fork edit, a plain `insertContent` text write.
+
+**Caveat (validate in the real probe + COM oracle, not the spike):** the re-import leg was inconclusive in the
+spike (`PM.openDocx` wasn't exercised). The mechanism is sound — the importer preserves `settings.xml` into
+`convertedXml` (round-trip of unknown settings), so `getHyphenation` reads it back after open — but T007 (open a
+saved hyphenated `.docx` → `getHyphenation()`) + the **Word-COM oracle** (real Word reads `AutoHyphenation`) are
+the authoritative round-trip proofs. Implement `bridge/hyphenation.ts` operating on the LIVE converter each call
+(open/newBlank swaps `convertedXml`), exactly like `columns.ts`'s `bodySectPr`.
 
 ## Decision 2 — OOXML element shapes + value mapping
 
