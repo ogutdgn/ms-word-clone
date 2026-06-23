@@ -25,20 +25,25 @@ without a false-green**, while **overlay stays 475/475**. Concretely:
 
 1. **Replace the halting boot-guard** with a soft mode-record: the suite runs in BOTH overlay and paged; the
    booted mode is surfaced (so the stale-localStorage footgun can never silently flip a build again).
-2. For each of the **70 paged failures**, do ONE of (final split — see research Decision 2):
-   - **(A) honest skip-with-reason** (`PAGED_SKIP`, **65**) when the assertion targets a genuinely overlay-only
+2. For each of the **70 paged failures**, do ONE of (final split — see research Decision 2 + Decision 5):
+   - **(A) honest skip-with-reason** (`PAGED_SKIP`, **59**) when the assertion targets a genuinely overlay-only
      rendering construct (absent in paged; a named dedicated probe gives the real paged coverage). Recorded as a
      PASS carrying `⊘ paged-skip (overlay-only): <reason> — paged covered by <probe>` — NOT a silent pass.
    - **(B) a paged-aware port** (**1**: `[0a]`) when the behaviour is functional and only the *assertion
      mechanism* was overlay-specific — assert the paged equivalent (e.g. `v().dom` survival vs the `.ProseMirror`
      mount). Genuinely passes.
-   - **(C) a deferred known-gap** (`PAGED_KNOWN_GAP`, **4**: `[7]`, `[8]`, `[11]`×2) when investigation proves a
-     REAL paged FUNCTIONAL gap (not overlay-only). Recorded as a VISIBLE pass carrying `⚠️ paged known-gap
-     (deferred): <reason> — tracked: <feature>` — never hidden, never silently skipped. The gap + its tracker are
-     surfaced (`summary.pagedKnownGaps`) and fed to the owning feature (010 import-fidelity / the open-path fix).
-3. **No real paged gap is hidden**: every Category-B (functional) failure was investigated — `[0a]` ported (real
-   pass); `[7]` (html import dumps raw text) and `[8]`/`[11]`×2 (downstream of `PM().openDocx()` tearing down the
-   paged world) are explicit, tracked known-gaps, NOT skips.
+   - **(C) a deferred known-gap** (`PAGED_KNOWN_GAP`, **10**) when investigation proves a REAL paged FUNCTIONAL
+     gap (not overlay-only): `[7]` (html import), `[8]`+`[11]`×2 (downstream of `PM().openDocx()` teardown), and
+     **6×`[4d]`** table-ribbon ops (row-height / column-width / autofit / page-align / vertical-align / cell-
+     margins — the ribbon command no-ops against the paged PE cell selection; **caught by the adversarial review
+     `w4szfpzey` as an over-skip** — they assert only model+export, fail at the model read, NOT overlay-only).
+     Recorded as a VISIBLE pass carrying `⚠️ paged known-gap (deferred): <reason> — tracked: <feature>` — never
+     hidden. Surfaced via `summary.pagedKnownGaps`.
+3. **No real paged gap is hidden**: every functional failure was investigated; the 6 `[4d]` table-ribbon tests
+   that the review proved were over-skipped were moved SKIP→KNOWN_GAP with accurate per-symptom reasons.
+4. **Mode-assertion is symmetric** (review Defect B): BOTH gates run a fresh-profile runner that asserts the
+   booted mode (`run-pm-overlay.js` → `mode=overlay`; `run-pm-paged.js` → `mode=paged`) + `fail===0`, so a stale
+   `localStorage WC_LAYOUT` can no longer false-green EITHER direction.
 
 **Out of scope**: changing any production code (this is test infra); the Word-COM oracle (not a fidelity
 feature); fixing paged *rendering* gaps the probes already own; deleting the overlay engine (that is 008).
@@ -68,14 +73,15 @@ feature); fixing paged *rendering* gaps the probes already own; deleting the ove
 
 ## Success criteria
 
-- **SC-001**: Overlay `test:pm` = **475/475** ✅.
-- **SC-002**: Paged `test:pm:paged` = **475/475, 0 hard fails** (405 run-pass + 65 skip + 1 port + 4 known-gap),
-  `mode=paged` surfaced ✅.
-- **SC-003**: `summary.pagedSkips=65` (each names a construct + covering probe) + `summary.pagedKnownGaps=4`
+- **SC-001**: Overlay `test:pm` = **475/475**, `mode=overlay` asserted ✅.
+- **SC-002**: Paged `test:pm:paged` = **475/475, 0 hard fails** (406 run-pass incl. the `[0a]` port + 59 skip +
+  10 known-gap), `mode=paged` surfaced ✅.
+- **SC-003**: `summary.pagedSkips=59` (each names a construct + covering probe) + `summary.pagedKnownGaps=10`
   (each names the gap + owning feature) — fully auditable ✅.
 - **SC-004**: `test:smoke` 9 / `test:roundtrip` 27 / `test:bundle` 4 unaffected ✅.
-- **SC-005**: `test:pm:paged` runs a FRESH profile + asserts `mode=paged` → a stale `localStorage WC_LAYOUT`
-  can no longer produce a false-green ✅.
+- **SC-005**: BOTH `test:pm` (→ `run-pm-overlay.js`) and `test:pm:paged` (→ `run-pm-paged.js`) run a FRESH profile
+  + assert the booted mode → a stale `localStorage WC_LAYOUT` can no longer produce a false-green in EITHER
+  direction (review Defect B) ✅.
 
 ## Empirical baseline (genuine paged run, fresh profile)
 

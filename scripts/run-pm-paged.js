@@ -2,8 +2,8 @@
 // `localStorage WC_LAYOUT` can override the paged build define (the footgun that produced the migration's
 // false-green — see memory paged-testpm-overlay-suite). Asserts the booted mode is paged (guards the footgun)
 // and that there are 0 HARD failures (paged-skips of overlay-only constructs + deferred known-gaps count as
-// pass; the auditable counts are surfaced). Build paged first: `npm run build` (paged is the default) — or use
-// the npm `test:pm:paged` which chains the build.
+// pass; the auditable counts are surfaced). Build paged FIRST (`npm run build` — paged is the default); this
+// runner does NOT build, it only runs + asserts (symmetric to run-pm-overlay.js).
 const cp = require('child_process');
 const fs = require('fs');
 const PROFILE = 'C:/tmp/wc-paged-pm';

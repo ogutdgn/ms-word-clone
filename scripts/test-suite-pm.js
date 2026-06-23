@@ -1,10 +1,11 @@
-/* PM-world functional suite (Phase 2). Validates the OVERLAY rendering engine — build OVERLAY first:
-     WC_LAYOUT=overlay npm run build && npx electron . --probe-out=/tmp/wc-pm.json --shot-evalfile=scripts/test-suite-pm.js
-   ~70 tests read overlay-only constructs (PM.__pagination, the #pm-notes-area overlay, overlay DOM) that the
-   default PAGED engine does NOT expose; paged is covered by the dedicated probes (probe:* + report:glyphgeom).
-   A boot-mode guard (below) fails loudly if run against a non-overlay build — see memory
-   paged-testpm-overlay-suite (a stale localStorage WC_LAYOUT silently flipped a paged build → the false-green).
-   Sentinel-gated (NEVER --shot-delay-dependent). Same JSON contract as test-suite.js. */
+/* PM-world functional suite (Phase 2). MODE-AWARE since 007 — runs in BOTH overlay and paged:
+     overlay gate:  WC_LAYOUT=overlay npm run build && npm run test:pm   (→ run-pm-overlay.js, asserts mode=overlay)
+     paged gate:    npm run build && npm run test:pm:paged               (→ run-pm-paged.js,   asserts mode=paged)
+   65 overlay-only tests (PM.__pagination, the #pm-notes-area overlay, overlay table/list/border/image DOM) are
+   skip-passed in paged via PAGED_SKIP (each naming the covering probe); real paged functional gaps found while
+   porting are visible deferred passes via PAGED_KNOWN_GAP. Both runners use a FRESH user-data-dir + a mode
+   assertion so a stale localStorage WC_LAYOUT can't silently flip the build (the false-green this killed — see
+   memory paged-testpm-overlay-suite). Sentinel-gated. Same JSON contract as test-suite.js. */
 (async () => {
   const results = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,7 +38,8 @@
   // recorded (not silently flipped — the stale-localStorage footgun that produced the migration's false-green is
   // surfaced here). `MODE` is read once below and threaded into the mode-aware assertions.
   // Recorded ONCE and surfaced via summary.mode (NOT a counted result row), so BOTH modes report exactly 475:
-  // overlay = 475 run; paged = 405 run + 62 overlay-only skip-pass + 8 Category-B ported-pass.
+  // overlay = 475 run; paged = 406 run (incl. the [0a] paged-aware port) + 59 PAGED_SKIP (overlay-only) +
+  // 10 PAGED_KNOWN_GAP (real deferred gaps: [7] html-import, [8]+[11]×2 openDocx-teardown, 6×[4d] table-ribbon).
   const MODE = window.__WC_LAYOUT_MODE === 'paged' ? 'paged' : 'overlay';
   const PAGED = MODE === 'paged';
 
@@ -83,14 +85,10 @@
     ["[4b] Picture Format Grayscale: setImageGrayscale → grayscale attr + CSS filter + <a:grayscl> in a:blip; OFF clears (Word COM ColorType=2)", { reason: "overlay image-resize handles + #pm-editor <img> render", probe: "probe:imageresize" }],
     // [4c] (1) — overlay image float/wrap render (the wrap export is mode-agnostic)
     ["[4c] setImageWrap(\"square\") floats the image (wrap=Square + anchor + float render)", { reason: "overlay image float/wrap render (the wrap export is mode-agnostic)", probe: "probe:imageresize + test:roundtrip" }],
-    // [4d] (7) — ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)
-    ["[4d] column resize is armed: hovering a column border sets the resize handle", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] ribbon Row Height control sets the row + exports w:trHeight (via flyout preset)", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] ribbon Column Width control sets the column + exports w:gridCol (via flyout preset)", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] ribbon AutoFit Window fills the table (full flyout path)", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] table page-alignment: tblAlignCenter/Right/Left → justification attr + w:tblPr/w:jc export", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] table cell vertical-align: tblVAlignMid → CSS attr \"middle\" but exports OOXML w:vAlign \"center\"; top/bottom passthrough; round-trips", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
-    ["[4d] cell margins: tblCellMargins ribbon flyout (4 distinct sides) → <w:tcMar> twips + re-open PREFILLS current", { reason: "ribbon→table ops asserted via overlay table DOM (the exports are mode-agnostic)", probe: "test:roundtrip" }],
+    // [4d] (1) — column-resize handle is genuinely overlay-DOM. The other 6 [4d] ribbon-op tests were RE-TRIAGED
+    // out of PAGED_SKIP (review w4szfpzey): they assert only the PM model + export XML (no overlay DOM) and fail
+    // functionally in paged → moved to PAGED_KNOWN_GAP (a real paged ribbon-table command gap), not hidden here.
+    ["[4d] column resize is armed: hovering a column border sets the resize handle", { reason: "overlay column-resize handle (#pm-editor .ProseMirror columnResizing plugin + rendered cell border)", probe: "test:roundtrip + the PE .superdoc-page paint" }],
     // [6b] (8) — overlay-rendered table DOM (#pm-editor table geometry)
     ["[6b] AutoFit Fixed undoes the Window stretch", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
     ["[6b] tableSetStyle visibly changes the table (bake)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
@@ -131,6 +129,19 @@
   // counts these; the audit (FR-005) confirms each is genuinely a deferred product gap, not a porting cop-out.
   const PAGED_KNOWN_GAP = new Map([
     ['[7] open .html imports headings/bold/list onto the engine (path+format bound)', { reason: "WC.Files.open('*.html') dumps the raw HTML as literal text instead of parsing it (the super-converter html→doc path is not wired into the paged open flow; overlay parses it correctly)", tracker: 'feature 010 (paged import fidelity)' }],
+    // [4d] (6) — RE-TRIAGED from PAGED_SKIP (review w4szfpzey): a REAL paged functional gap, NOT overlay-only.
+    // These assert ONLY the PM model (doc().descendants → n.attrs.*) + export XML (no overlay DOM), yet fail at
+    // the MODEL read in a genuine paged build (empirically: rowHeight=null, gridCol unchanged, justification=
+    // undefined, verticalAlign=null, cell-margins flyout did not open). Root cause: the ribbon table command
+    // (caret→target-cell via setTextSelection(cellPos+2) + the flyout dispatch) does not resolve/apply against
+    // the paged PresentationEditor cell selection, so the attr is never written. test:roundtrip does NOT cover
+    // this (it greps pre-authored fixtures; it never drives the ribbon command). NO probe:table exists yet.
+    ['[4d] ribbon Row Height control sets the row + exports w:trHeight (via flyout preset)', { reason: 'paged ribbon table-op no-op: tblRowHeight does not apply against the PE cell selection (model rowHeight stays null)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
+    ['[4d] ribbon Column Width control sets the column + exports w:gridCol (via flyout preset)', { reason: 'paged ribbon table-op no-op: tblColWidth does not apply against the PE cell selection (gridCol unchanged)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
+    ['[4d] ribbon AutoFit Window fills the table (full flyout path)', { reason: 'paged ribbon table-op no-op: tblAutoFit (Window) does not apply against the PE table selection (grid unchanged)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
+    ['[4d] table page-alignment: tblAlignCenter/Right/Left → justification attr + w:tblPr/w:jc export', { reason: 'paged ribbon table-op no-op: tblAlign* does not apply against the PE table selection (justification stays undefined)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
+    ['[4d] table cell vertical-align: tblVAlignMid → CSS attr "middle" but exports OOXML w:vAlign "center"; top/bottom passthrough; round-trips', { reason: 'paged ribbon table-op no-op: tblVAlignMid does not apply against the PE cell selection (verticalAlign stays null)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
+    ['[4d] cell margins: tblCellMargins ribbon flyout (4 distinct sides) → <w:tcMar> twips + re-open PREFILLS current', { reason: 'paged ribbon table-op no-op: the tblCellMargins flyout does not open against the PE table selection (no flyout)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
     // [8] + [11]×2 are DOWNSTREAM victims (not themselves gaps): an earlier round-trip test's programmatic
     // re-open `PM().openDocx(bytes)` (e.g. [4b] Picture Format Crop) tears down the paged world via the
     // overlay-only teardown path → failBridge clears `pm-active` + sets `PM.active=false` (instead of the

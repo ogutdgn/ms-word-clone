@@ -92,3 +92,34 @@ mode record), not a `src` change — preserving the no-production-change invaria
 (the features it covers were already oracle-validated in their own slices). Verification = overlay 475 + paged
 0-hard-fail + smoke/roundtrip/bundle unaffected. (Constitution Principle IV applies to *fidelity claims*; 007
 makes none.)
+
+## Decision 5 — Adversarial review (`w4szfpzey`) reclassification: final split 59 skip + 10 known-gap + 1 port
+
+The 20-agent review (focused on over-skips hiding real gaps) confirmed **2 defects**, both fixed in the same
+feature:
+
+- **Defect A — 6 `[4d]` table-ribbon tests were OVER-SKIPPED.** They sat in `PAGED_SKIP` with the reason
+  "ribbon→table ops asserted via overlay table DOM", but their bodies assert **only** the PM model
+  (`doc().descendants → n.attrs.*`) + `exportDocx` XML — **zero overlay-DOM**. An instrumented genuine-paged run
+  (skip bypassed) proved all 6 fail at the **model read**: Row Height `rowHeight=null`, Column Width `gridCol`
+  unchanged `[4680,4680]`, AutoFit `grid unchanged`, page-align `justification=undefined`, vertical-align
+  `verticalAlign=null`, cell-margins `flyout did not open`. Root cause: the ribbon table command (caret→target
+  cell via `setTextSelection(cellPos+2)` + the flyout dispatch) does **not** resolve/apply against the paged PE
+  cell selection. `test:roundtrip` does NOT cover this (it greps pre-authored fixtures; it never drives the
+  ribbon command) and there is no `probe:table`. The non-skipped twin `[4d] a set row height exports as
+  w:trHeight` PASSES because it writes the model **directly** via `setNodeMarkup`, isolating the gap to the
+  ribbon caret→cell path. → all 6 moved SKIP→`PAGED_KNOWN_GAP` with accurate per-symptom reasons + the tracker
+  *"paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)"*.
+  This is a **real paged functional gap** (ribbon table formatting is broken in the shipping engine) — now
+  VISIBLE, not masked as "already covered, overlay-only" ahead of 008. Only `[4d] column resize is armed`
+  (genuinely reads `#pm-editor .ProseMirror` columnResizing) stays in `PAGED_SKIP`.
+- **Defect B — the overlay `test:pm` gate lost its mode assertion.** 007 replaced the hard boot-guard (which
+  failed loudly on a non-overlay build) with a soft mode-record, and re-added the mode check ONLY for paged
+  (`run-pm-paged.js`). The bare overlay `test:pm` against the shared persistent profile could then boot paged
+  (stale `localStorage WC_LAYOUT`) and report green `mode:paged` — the exact false-green 007 exists to kill. Fix:
+  a symmetric `scripts/run-pm-overlay.js` (fresh profile + asserts `mode=overlay` + `fail===0`); `test:pm` now
+  points at it. Verified: `test:pm` against a paged build now exits non-zero with "NOT OVERLAY — booted mode=paged".
+
+**Final split**: 475 = 406 run-pass (incl. the `[0a]` port) + **59** `PAGED_SKIP` (overlay-only) + **10**
+`PAGED_KNOWN_GAP` (`[7]` html-import, `[8]`+`[11]`×2 openDocx-teardown, 6×`[4d]` table-ribbon). The planning
+estimate (62/8) and the first-pass split (65/4) were both corrected by the review.
