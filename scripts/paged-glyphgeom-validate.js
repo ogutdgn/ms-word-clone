@@ -22,15 +22,14 @@ const pct = (arr, p) => { if (!arr.length) return null; const a = [...arr].sort(
 const dist = (arr) => arr.length ? { min: pct(arr, 0), median: pct(arr, 0.5), p95: pct(arr, 0.95), max: pct(arr, 1) } : { min: null, median: null, p95: null, max: null };
 
 const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
-const build = (mode) => { console.log('  build WC_LAYOUT=' + (mode || 'overlay') + ' ...'); const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, env: Object.assign({}, process.env, { WC_LAYOUT: mode === 'paged' ? 'paged' : '' }), stdio: 'inherit', shell: true, timeout: 600000 }); if (r.status !== 0) die('build (' + mode + ') exited ' + r.status); };
+const build = () => { console.log('  build (paged) ...'); const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit', shell: true, timeout: 600000 }); if (r.status !== 0) die('build exited ' + r.status); };
 
 function main() {
   // 1) clean stale artifacts
   try { for (const f of fs.readdirSync(DIR).filter((n) => /^wc-m6-.*\.(docx|json)$/.test(n))) fs.unlinkSync(path.join(DIR, f)); } catch (e) {}
 
-  // 2) PAGED build → PE probe. Everything after the build is wrapped so build('overlay') in the finally ALWAYS runs —
-  //    a probe/COM error must never leave the dev box on a paged build.
-  build('paged');
+  // 2) build → PE probe (008: paged is the only engine).
+  build();
   let report = null, fatal = null;
   try {
     const peOut = DIR + '/wc-m6-pe.json';
@@ -105,7 +104,7 @@ function main() {
 
     report = { ok: enumVerified && fontVerified && scaleVerified && leaked.length === 0, enumVerified, fontVerified, scaleVerified, pidSafe: leaked.length === 0, leaked, fontsDetected: pe.fontsDetected, perFixture, perFontSummary };
   } catch (e) { fatal = e; }
-  finally { build('overlay'); }   // ALWAYS restore the default (overlay) build — even on error
+  // (008: nothing to restore — paged is the only build; build('paged') above already left the dist paged.)
 
   if (fatal || !report) { console.error('FATAL: ' + (fatal && (fatal.stack || fatal.message) || 'no report')); process.exit(1); }
   const outPath = DIR + '/wc-m6-report.json';

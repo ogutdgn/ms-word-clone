@@ -86,12 +86,11 @@
 }
 #editor:focus { outline: none; }
 
-/* In-flow page separators: a full-width spacer (bottom margin + gap + top
-   margin) inserted between pages by repaginate(). The transparent body lets the
-   page sheet's white margins show; the .wc-gap-band paints the gray gap and the
-   two sheet edges' shadows, so the flow reads as discrete pages like Word. */
-.wc-page-gap, .manual-break {
-  display: block;               /* .wc-page-gap is a <span> so it can sit mid-paragraph */
+/* A manual page-break marker div (mail-merge / cover page / envelope insert it as a
+   break-after:page element). (008: the overlay in-flow page-separator styling .wc-page-gap /
+   .wc-gap-band was retired with the overlay pagination engine — the PE paints page breaks.) */
+.manual-break {
+  display: block;
   position: relative;
   width: calc(100% + 2 * var(--page-margin));
   margin-left: calc(-1 * var(--page-margin));
@@ -100,13 +99,6 @@
   pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
-}
-.wc-gap-band {
-  position: absolute;
-  left: 0; right: 0;
-  background: var(--canvas);
-  box-shadow: 0 -6px 7px -4px rgba(0,0,0,0.18), 0 6px 7px -4px rgba(0,0,0,0.18);
-  z-index: 2;
 }
 
 /* Document selection color */
@@ -326,11 +318,6 @@ body.pm-active #pm-editor.pm-hide-ink ~ .wc-ink-layer { display: none; }
 #workarea.view-web #editor { box-shadow: none; min-height: auto; width: 100%; max-width: 1100px; padding: 24px 40px; }
 #workarea.view-web #ruler { display: none; }
 #workarea.view-web .pagebreak-guide { display: none; }
-/* Page-gap spacers belong only to Print Layout; never paint them in continuous views. */
-#workarea.view-web .wc-page-gap, #workarea.view-web .wc-gap-band,
-#workarea.view-draft .wc-page-gap, #workarea.view-draft .wc-gap-band,
-#workarea.view-outline .wc-page-gap, #workarea.view-outline .wc-gap-band,
-#workarea.view-read .wc-page-gap, #workarea.view-read .wc-gap-band { display: none; }
 
 /* Read mode */
 #workarea.view-read #editor { box-shadow: 0 1px 4px var(--page-shadow); }
@@ -442,32 +429,8 @@ body.pm-active #pm-editor {
    IS in the document still renders; only the phantom default is removed. */
 body.pm-active #pm-editor .ProseMirror p { margin-top: 0; margin-bottom: 0; }
 
-/* ===== Phase 4a: pagination spacers (src/renderer/pagination/pagination.ts) =====
-   Widget decorations painted INSIDE .ProseMirror at page boundaries. The body is
-   transparent so the white #pm-editor shows through as the page margins; the
-   .pm-gap-band paints the gray inter-sheet gap and the two sheet-edge shadows, so
-   one continuous white box reads as discrete sheets (a faithful port of the
-   retired engine's .wc-page-gap / .wc-gap-band — see docs/PAGINATION.md §5). The
-   full-bleed width + negative margins are set inline (driven by the model's L/R
-   margin). Non-editable + non-selectable: pure layout, never document content. */
-body.pm-active #pm-editor .pm-page-spacer {
-  display: block;
-  position: relative;
-  background: transparent;
-  pointer-events: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-body.pm-active #pm-editor .pm-page-spacer .pm-gap-band {
-  position: absolute;
-  left: 0; right: 0;
-  background: var(--canvas);
-  box-shadow: 0 -6px 7px -4px rgba(0, 0, 0, 0.18), 0 6px 7px -4px rgba(0, 0, 0, 0.18);
-  z-index: 2;
-}
-/* Continuous views never paint sheets (the plugin also clears the seams there). */
-#workarea.view-web .pm-page-spacer, #workarea.view-draft .pm-page-spacer,
-#workarea.view-outline .pm-page-spacer, #workarea.view-read .pm-page-spacer { display: none; }
+/* (008: the overlay pagination spacer styling .pm-page-spacer / .pm-gap-band was retired with the
+   overlay pagination engine — the paged PresentationEditor paints real per-page sheets itself.) */
 body.pm-active #pm-editor .ProseMirror:focus { outline: none; }
 
 /* Selected inline object (a picture or a video thumbnail): show a Word-like
@@ -527,42 +490,6 @@ body.pm-active #pm-editor .ProseMirror s > span[style*="vertical-align: super"] 
 body.pm-active #pm-editor.show-marks p::after { content: '¶'; color: #2b8aef; margin-left: 2px; }
 body.pm-active #pm-editor.show-grid { background-image: linear-gradient(#e9eef5 1px, transparent 1px), linear-gradient(90deg, #e9eef5 1px, transparent 1px); background-size: 24px 24px; }
 
-/* ===== Slice 9 task 4 (D9.1): the footnote/endnote NOTES REGION (notes-area.ts).
-   A clone-owned, continuous-flow card BELOW the page sheet (sibling of #pm-editor in
-   the #pages column flex). NOT inside the editable .ProseMirror content — the note
-   bodies live in word/footnotes.xml and are edited via the bridge. Page-foot placement
-   is Phase 7; this region is the read/edit surface meanwhile. Visual parity with the
-   legacy .wc-notes (editor.css): a titled section + [number] + body. PM-only — every
-   rule is gated under body.pm-active so --legacy is untouched. ===== */
-body.pm-active #pm-notes-area {
-  width: var(--page-w);
-  background: var(--page);
-  box-shadow: 0 1px 4px var(--page-shadow);
-  padding: 16px var(--page-margin, 1in);
-  font-family: var(--doc-font);
-  font-size: 10pt;
-  color: #000;
-  box-sizing: border-box;
-}
-body.pm-active .pm-notes-section { border-top: 1px solid #000; padding-top: 8px; margin-top: 12px; }
-body.pm-active .pm-notes-section:first-child { margin-top: 0; }
-body.pm-active .pm-notes-title { font-weight: 600; font-size: 9pt; color: #666; margin-bottom: 4px; }
-body.pm-active .pm-note { display: flex; align-items: baseline; gap: 2px; margin: 3px 0; }
-body.pm-active .pm-note-num { color: var(--word-blue); flex: none; }
-body.pm-active .pm-note-body {
-  flex: 1;
-  min-width: 0;
-  outline: none;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  cursor: text;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-body.pm-active .pm-note-body:focus { box-shadow: inset 0 0 0 1px var(--word-blue); }
-/* FIX 5: in Side-to-Side page-movement mode #pages becomes a ROW flex (editor.css:373),
-   which would lay the notes region BESIDE the page sheet. Force it onto its own full-width
-   row below the page (wrap + flex-basis:100% + order after the page). #pages needs flex-wrap
-   for the basis:100% to push to a new line. Pagination-mode-only cosmetic. */
-#workarea.movement-side #pages { flex-wrap: wrap; }
-body.pm-active #workarea.movement-side #pm-notes-area { flex-basis: 100%; order: 1; }
+/* (008: the overlay footnote/endnote NOTES REGION styling (#pm-notes-area / .pm-notes-section /
+   .pm-note-body, from the retired notes-area.ts) was deleted — the paged PresentationEditor paints
+   footnote/endnote bodies per-page at the page foot.) */

@@ -5,21 +5,15 @@
    DEV-BOX ONLY — needs real foreground Word (Word COM hangs at `New-Object` in a sandbox), so this can NOT run in
    headless CI. Invoke via the dangerously-disable-sandbox path:  npm run test:roundtrip:paged
 
-   What it proves:
-     • TIER 1 (4 SHARED-model constructs: image, comment+track, footnote/endnote, header/footer) — the PAGED saved
-       .docx STRUCTURALLY EQUALS the OVERLAY saved .docx of the same edit. It UNZIPS BOTH SAVED FILES (the exact bytes
-       the COM oracle opens — not a re-export) and diffs every part: binary parts (word/media/*) BYTE-equal; xml parts
-       equal after normalizing the handful of per-run values exportDocx mints (comment w:date/internalId/paraId, the
-       comment rId-bridge id, drawing docPr/cNvPr ids). Referential ids (rId-bridge, paraId, internalId…) are remapped
-       to a STABLE per-doc token by first-occurrence order, so a mis-wire (a cross-reference pointing at a DIFFERENT id
-       than its definition) still diffs — the normalization can NOT hide a dropped/duplicated/reordered/mis-wired part.
+   What it proves (008: paged is the sole engine — the former TIER-1 paged-vs-overlay byte-equality was retired):
+     • real-Word READ-BACKS (C1–C8): every paged-saved .docx opens with NO repair, and each construct (comments,
+       footnotes/endnotes, header/footer + the 002 P2/P3 variants & page-field, 003 columns, 004 line-numbers,
+       005 hyphenation, 006 section-breaks) reads back == the authored markers via Word COM.
      • TIER 2 (INK, M4c) — Word-valid (opens with no repair) + lands on the correct page at a page-local offset.
-   Mode is BUILD-TIME (electron.vite __WC_LAYOUT_DEFAULT__ ← WC_LAYOUT), so the driver builds PAGED then OVERLAY,
-   ENDING on overlay (the default) → no leaked paged build. {RESULT: N pass / M fail}; exit 1 on any fail. */
+   {RESULT: N pass / M fail}; exit 1 on any fail. */
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const JSZip = require('jszip');
 const { comValidate, winwordPids } = require('./oracle/com-validate');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -33,13 +27,11 @@ let pass = 0, fail = 0;
 const check = (name, ok, detail) => { console.log('   ' + (ok ? 'PASS' : 'FAIL') + ' ' + name + (!ok && detail ? ' — ' + detail : '')); ok ? pass++ : fail++; };
 const die = (msg) => { console.error('FATAL: ' + msg); console.log('RESULT: ' + pass + ' pass / ' + (fail + 1) + ' fail'); process.exit(1); };
 
-// ── build + probe helpers ──
-const build = (mode) => {
-  console.log('  build WC_LAYOUT=' + (mode || 'overlay') + ' ...');
-  // NB: overlay must be set EXPLICITLY — post-FR-013 (paged-default flip) an empty WC_LAYOUT falls back to 'paged'
-  // (main.ts:35), so the old `: ''` built paged-as-overlay → the overlay probe booted paged. 'overlay' is explicit.
-  const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, env: Object.assign({}, process.env, { WC_LAYOUT: mode === 'paged' ? 'paged' : 'overlay' }), stdio: 'inherit', shell: true, timeout: 600000 });
-  if (r.status !== 0) die('build (' + mode + ') exited ' + r.status);
+// ── build + probe helpers ── (008: paged is the only engine, so a plain build.)
+const build = () => {
+  console.log('  build (paged) ...');
+  const r = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit', shell: true, timeout: 600000 });
+  if (r.status !== 0) die('build exited ' + r.status);
 };
 const probe = (evalfile, outName) => {
   const jpath = DOCX_DIR + '/' + outName;
@@ -52,52 +44,13 @@ const probe = (evalfile, outName) => {
   return json;
 };
 
-// ── id/timestamp normalization for the xml-part diff ──────────────────────────────────────────────────────────────
-// REFERENTIAL ids are captured (group 1) + remapped to a STABLE per-doc token by first-occurrence order: the SAME
-// value → the SAME token everywhere (integrity kept), but a DIFFERENT value at a cross-reference site → a DIFFERENT
-// token → a real mis-wire still diffs. FLAT masks blunt purely-unique values (no cross-reference to preserve).
-const REF_PATTERNS = [
-  /rId-bridge-([A-Za-z0-9]+)/g,            // comment relationship id (document.xml r:id ref ↔ .rels def)
-  /(?:w14|w15|w16cid):paraId="([^"]*)"/g,  // comment paraId (comments.xml ↔ commentsExtended/commentsIds)
-  /custom:internalId="([^"]*)"/g,          // per-run comment UUID
-  /custom:trackedId="([^"]*)"/g,           // per-run tracked-comment UUID (if present)
-  /\bw16cid:durableId="([^"]*)"/g,         // commentsIds durableId (if present)
-];
-const FLAT_MASKS = [
-  [/\bw:date="[^"]*"/g, 'w:date="@D"'],                  // comment wall-clock timestamp (non-referential)
-  [/\bw16cid:dateUtc="[^"]*"/g, 'w16cid:dateUtc="@D"'],  // commentsExtensible date (non-referential)
-  [/(<wp:docPr\b[^>]*?\bid=")[^"]*(")/g, '$1@N$2'],      // drawing id (random int, non-referential)
-  [/(<pic:cNvPr\b[^>]*?\bid=")[^"]*(")/g, '$1@N$2'],     // picture id (random int, non-referential)
-];
-const buildNormalizer = (textParts) => {
-  const corpus = textParts.join(' ');
-  const maps = REF_PATTERNS.map((re) => { const m = new Map(); const g = new RegExp(re.source, 'g'); let x; let i = 0; while ((x = g.exec(corpus))) { const v = x[1]; if (v && !m.has(v)) m.set(v, '@V' + (i++)); } return { re, m }; });
-  return (s) => {
-    let out = String(s == null ? '' : s);
-    for (const { re, m } of maps) out = out.replace(new RegExp(re.source, 'g'), (whole, val) => (val ? whole.replace(val, m.get(val) || '@V?') : whole));
-    for (const [re, to] of FLAT_MASKS) out = out.replace(re, to);
-    return out;
-  };
-};
-const allPatterns = REF_PATTERNS.concat(FLAT_MASKS.map(([re]) => re));
-const maskHits = (s) => allPatterns.reduce((sum, re) => sum + ((String(s == null ? '' : s).match(new RegExp(re.source, 'g')) || []).length), 0);
-
-// unzip a .docx → { '<part>': {text} | {bin:Buffer} }  (xml/rels = text, everything else = raw bytes)
-const loadParts = async (file) => {
-  const zip = await JSZip.loadAsync(fs.readFileSync(file));
-  const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir).sort();
-  const out = {};
-  for (const n of names) out[n] = /\.(xml|rels)$/i.test(n) ? { text: await zip.files[n].async('string') } : { bin: await zip.files[n].async('nodebuffer') };
-  return out;
-};
-
 async function main() {
   // ── 1) glob-CLEAN stale artifacts (BOTH the .docx AND the probe JSONs) so a previous run can't green-light this one ──
   try { if (!fs.existsSync(DOCX_DIR)) fs.mkdirSync(DOCX_DIR, { recursive: true }); } catch (e) {}
   for (const f of fs.readdirSync(DOCX_DIR).filter((n) => /^wc-.*-m5-.*\.docx$/.test(n) || /^wc-m5-.*\.json$/.test(n) || /^wc-.*-hf-p[23]\.docx$/.test(n) || /^wc-hf-p[23]-.*\.json$/.test(n) || /^wc-.*-columns(-p2)?\.docx$/.test(n) || /^wc-columns-.*\.json$/.test(n) || /^wc-.*-linenumbers\.docx$/.test(n) || /^wc-linenumbers-.*\.json$/.test(n) || /^wc-.*-hyphenation\.docx$/.test(n) || /^wc-hyphenation-.*\.json$/.test(n) || /^wc-.*-sectionbreaks(-cont)?\.docx$/.test(n) || /^wc-sectionbreaks-.*\.json$/.test(n))) { try { fs.unlinkSync(path.join(DOCX_DIR, f)); } catch (e) {} }
 
-  // ── 2) PAGED build → paged kitchen-sink + paged multi-page ink ──
-  build('paged');
+  // ── 2) build → paged kitchen-sink + paged multi-page ink + the per-feature export probes ──
+  build();
   const pagedKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-paged.json');
   const pagedInk = probe('scripts/paged-export-m5-ink-probe.js', 'wc-m5-ink-paged.json');
   const pagedHfP2 = probe('scripts/paged-export-hf-p2-probe.js', 'wc-hf-p2-paged.json'); // 002 P2 variants/flags doc
@@ -107,16 +60,11 @@ async function main() {
   const pagedLn = probe('scripts/paged-export-linenumbers-probe.js', 'wc-linenumbers-paged.json'); // 004 P1 line numbers
   const pagedHyph = probe('scripts/paged-export-hyphenation-probe.js', 'wc-hyphenation-paged.json'); // 005 hyphenation
   const pagedSb = probe('scripts/paged-export-sectionbreaks-probe.js', 'wc-sectionbreaks-paged.json'); // 006 section breaks
-  // ── 3) OVERLAY build → overlay kitchen-sink (ENDS on overlay → leak-free) ──
-  build('overlay');
-  const ovlKS = probe('scripts/paged-export-m5-probe.js', 'wc-m5-ks-overlay.json');
 
   console.log('\nA) probe self-checks (right mode + the renderer edits + saves succeeded):');
-  check('paged kitchen-sink ran in PAGED mode', pagedKS.summary && pagedKS.summary.mode === 'paged', 'mode=' + (pagedKS.summary && pagedKS.summary.mode) + ' (stale localStorage WC_LAYOUT or mislabeled build?)');
-  check('overlay kitchen-sink ran in OVERLAY mode', ovlKS.summary && ovlKS.summary.mode === 'overlay', 'mode=' + (ovlKS.summary && ovlKS.summary.mode));
+  check('paged kitchen-sink ran in PAGED mode', pagedKS.summary && pagedKS.summary.mode === 'paged', 'mode=' + (pagedKS.summary && pagedKS.summary.mode) + ' (mislabeled build?)');
   check('paged ink ran in PAGED mode', pagedInk.summary && pagedInk.summary.mode === 'paged', 'mode=' + (pagedInk.summary && pagedInk.summary.mode));
   check('paged kitchen-sink probe: fail===0', pagedKS.summary && pagedKS.summary.fail === 0, pagedKS.summary ? pagedKS.summary.fail + ' of ' + pagedKS.summary.total : 'no summary');
-  check('overlay kitchen-sink probe: fail===0', ovlKS.summary && ovlKS.summary.fail === 0, ovlKS.summary ? ovlKS.summary.fail + ' of ' + ovlKS.summary.total : 'no summary');
   check('paged ink probe: fail===0', pagedInk.summary && pagedInk.summary.fail === 0, pagedInk.summary ? pagedInk.summary.fail + ' of ' + pagedInk.summary.total : 'no summary');
   check('paged HF-P2 probe ran in PAGED mode', pagedHfP2.summary && pagedHfP2.summary.mode === 'paged', 'mode=' + (pagedHfP2.summary && pagedHfP2.summary.mode));
   check('paged HF-P2 probe: fail===0', pagedHfP2.summary && pagedHfP2.summary.fail === 0, pagedHfP2.summary ? pagedHfP2.summary.fail + ' of ' + pagedHfP2.summary.total : 'no summary');
@@ -134,7 +82,6 @@ async function main() {
 
   const DOCS = {
     'paged kitchen-sink': DOCX_DIR + '/wc-paged-m5-kitchensink.docx',
-    'overlay kitchen-sink': DOCX_DIR + '/wc-overlay-m5-kitchensink.docx',
     'paged ink': DOCX_DIR + '/wc-paged-m5-ink.docx',
     'paged HF-P2': DOCX_DIR + '/wc-paged-hf-p2.docx',
     'paged HF-P3': DOCX_DIR + '/wc-paged-hf-p3.docx',
@@ -283,34 +230,10 @@ async function main() {
     check('section-breaks(continuous): the 2nd section starts Continuous (0) — owned w:type write', cc.ok && Number(ssC[1]) === 0, errC('sectionStarts=' + JSON.stringify(ssC)));
   }
 
-  // ── 6) TIER 1 — paged-vs-overlay equality of the SAVED .docx bytes (unzip both; xml normalized, binary byte-equal) ──
-  console.log('\nD) paged-vs-overlay SAVED .docx equality (unzip both files — the exact bytes Word opens):');
-  const pParts = await loadParts(DOCS['paged kitchen-sink']);
-  const oParts = await loadParts(DOCS['overlay kitchen-sink']);
-  const pKeys = Object.keys(pParts).sort(), oKeys = Object.keys(oParts).sort();
-  const textP = pKeys.filter((k) => pParts[k].text != null).map((k) => pParts[k].text);
-  const textO = oKeys.filter((k) => oParts[k].text != null).map((k) => oParts[k].text);
-  const normP = buildNormalizer(textP), normO = buildNormalizer(textO);
-  const diffs = [];
-  for (const k of Array.from(new Set([...pKeys, ...oKeys])).sort()) {
-    const pp = pParts[k], op = oParts[k];
-    if (!pp || !op) { diffs.push(k + ' (present only in ' + (pp ? 'paged' : 'overlay') + ')'); continue; }
-    if (pp.text != null && op.text != null) {
-      const va = normP(pp.text), vb = normO(op.text);
-      if (va !== vb) { let i = 0; const n = Math.min(va.length, vb.length); while (i < n && va[i] === vb[i]) i++; diffs.push(k + ' @' + i + ' | paged:' + JSON.stringify(va.slice(Math.max(0, i - 15), i + 55)) + ' overlay:' + JSON.stringify(vb.slice(Math.max(0, i - 15), i + 55))); }
-    } else if (pp.bin && op.bin) {
-      if (!pp.bin.equals(op.bin)) diffs.push(k + ' (binary differs: ' + pp.bin.length + ' vs ' + op.bin.length + ' bytes)');
-    } else { diffs.push(k + ' (type mismatch: paged=' + (pp.text != null ? 'text' : 'bin') + ' overlay=' + (op.text != null ? 'text' : 'bin') + ')'); }
-  }
-  const hitsP = textP.reduce((s, t) => s + maskHits(t), 0), hitsO = textO.reduce((s, t) => s + maskHits(t), 0);
-  check('both .docx unzipped to >=10 parts each', pKeys.length >= 10 && oKeys.length >= 10, 'paged=' + pKeys.length + ' overlay=' + oKeys.length);
-  check('paged + overlay saved .docx have the SAME part set', JSON.stringify(pKeys) === JSON.stringify(oKeys), 'paged-only/overlay-only parts: ' + diffs.filter((d) => /present only/.test(d)).join(', '));
-  // honesty guard: the masks must hit the SAME total on both sides — an asymmetric count means a construct (and its
-  // per-run ids) was dropped/added, which value-normalization would otherwise paper over. >0 rejects an all-zero pass.
-  check('mask-hit counts match (no construct dropped/added)', hitsP === hitsO && hitsP > 0, 'paged=' + hitsP + ' overlay=' + hitsO);
-  check('paged SAVED .docx STRUCTURALLY EQUALS overlay (0 differing parts after id/ts normalize)', diffs.length === 0, diffs.length + ' differing part(s): ' + diffs.slice(0, 3).join(' || '));
+  // (008: the TIER-1 paged-vs-overlay SAVED-.docx byte-equality was retired with the overlay engine — there is no
+  // overlay comparand. The paged export fidelity is now carried directly by the real-Word read-backs above (C1–C8).)
 
-  // ── 7) TIER 2 — INK: Word-valid (validate-open above) + page-correct page-local posOffset (from the probe) ──
+  // ── 6) TIER 2 — INK: Word-valid (validate-open above) + page-correct page-local posOffset (from the probe) ──
   console.log('\nE) ink page-correctness (Word-valid + page-local posOffset on the right page):');
   {
     const r = pagedInk.results || [];
