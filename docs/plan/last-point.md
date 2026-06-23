@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-06-23 (POST-LOOP — npm-start fix + page-break deep-dive; general-done READY to merge → main)
+
+> **Branch:** `general-done` @ `e621b18` (off `main` @ `89ed1b1`). **READY for the user's `general-done` → `main`
+> ff-merge** (39 commits: the 8 cleanup features 005–012, the constitution, the npm-start fix, the page-break
+> root-cause doc — all reviewed + gated). Phase: post-loop session work.
+>
+> **MERGE GUIDANCE:** `git checkout main && git merge --ff-only general-done` (then push if desired). Do NOT merge
+> the page-break FIX (it's a separate branch, not live-verified — see below).
+>
+> **Two things shipped to `general-done` after the loop:**
+> 1. **`npm start` fix** (`a92740b`): `npm start` was `electron-vite dev`, which serves the renderer UNBUNDLED — the
+>    ~8.5MB vendored fork stalls the editor mount so the page looks blank (ribbon paints, document doesn't).
+>    Repointed `start` → `electron-vite preview` (build + run the bundle); `npm run dev` still gives the HMR dev
+>    server for chrome-only iteration. The app now SHOWS via `npm start`.
+> 2. **Page-break deep-dive + root-cause doc** (`e621b18` → `docs/PAGE_BREAK_ROOT_CAUSE.md`): the user reported the
+>    paged engine's page-break / Insert-Blank-Page / empty-page caret bugs (no new page until you type; can't
+>    click/see the cursor on a new page; Blank Page grows "2 by 2"; focus jumps). A 7-agent deep-dive nailed the ONE
+>    root cause: **a manual page break is an inline `hardBreak{pageBreakType:'page'}` that never ends its paragraph,
+>    so the new page owns no paragraph → no painted line → no caret/click target → pruned.** (Two of my fix attempts
+>    shipped + were reverted — making the page APPEAR without an editable line is worse; both reverted to baseline.)
+>
+> **THE PAGE-BREAK FIX (candidate, NOT merged — on branch `fix-pagebreak-optionB` @ `f9ba2cf`):** a NO-FORK fix that
+> makes `insertPageBreak` append a REAL empty paragraph carrying `pageBreakBefore` on the new page + moves the caret
+> into it (`bridge/insert.ts`). A real paragraph paints a caret-bearing `.superdoc-line` natively → the new page is
+> visible/clickable/editable; Word reads `<w:pageBreakBefore/>` as a page break (COM-verified: 2 pages,
+> round-trip-faithful). `insertBlankPage` re-modeled (one blank page, no "2 by 2"). `test:pm [6]/[4a]` updated to the
+> new model (inline-`<w:br>` was an overlay-era hit-test constraint; the overlay engine is retired). **Verified
+> headlessly: blank/content breaks → 2 pages each with a real line + caret on page 2, typing lands there; gates
+> test:pm 416 / smoke 9 / roundtrip 27 / bundle 4.** ⚠️ **PENDING the user's LIVE click/cursor test** (headless can't
+> prove a human click lands a visible caret — that's what burned the 2 reverted attempts). **Trade-off:** the
+> page-break OOXML changes inline-`<w:br>` → `pageBreakBefore` (both valid Word page breaks). **KNOWN GAP:** docs
+> IMPORTED from Word with an inline `<w:br w:type="page"/>` still need a converter-level fix (Option B) to be
+> editable — documented in `PAGE_BREAK_ROOT_CAUSE.md`.
+>
+> **Branches:** `fix-pagebreak-optionB` @ `f9ba2cf` = the current page-break candidate (resume here next session,
+> live-test, then `/code-review` + ff-merge into general-done if good). `fix-pagebreak-v2` @ `9f9e4c3` = a superseded
+> earlier candidate (can be deleted).
+>
+> **NEXT (next session):** live-test the page-break fix on `fix-pagebreak-optionB`; if good, `/code-review` + merge.
+> Then the imported-inline-`<w:br>` converter fix (Option B), and the focus-jump recheck. Otherwise: the loop's
+> remaining backlog (completeness pass `docs/bug-hunt/`).
+>
+> **Blockers/notes:** the page-break fix needs the user's eyes (live click). `general-done` itself is clean + ready
+> for main.
+
 ## 2026-06-23 (general-done cleanup LOOP — 🏁🏁 ALL 8 COMPLETE — 012 Frames Group done; LOOP FINISHED)
 
 > **Branch:** `general-done` @ `979bb86` (off `main` @ `89ed1b1`). **🏁 THE LOOP IS COMPLETE — all 8 cleanup
