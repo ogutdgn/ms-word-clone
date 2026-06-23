@@ -424,6 +424,7 @@ function calculateTypographyMetrics(
   const resolvedFontSize = normalizeFontSize(fontSize);
   let ascent: number;
   let descent: number;
+  let naturalLineBox: number; // 011: the font's natural line box (≥ tight ascent+descent) for the line-height max
 
   if (
     fontInfo &&
@@ -436,13 +437,21 @@ function calculateTypographyMetrics(
     const metrics = getFontMetrics(ctx, fontInfo, measurementConfig.mode, measurementConfig.fonts);
     ascent = roundValue(metrics.ascent);
     descent = roundValue(metrics.descent);
+    // 011 (pagination calibration): feed the font's NATURAL line box into the line-height max. The tight
+    // ascent+descent under-counts Word's "single" line height for tall-metric fonts (e.g. Calibri 11pt: tight
+    // box ≈ 13px but Word's single = 18px = 13.5pt), so the flat 1.15× floor always won and lines ran short,
+    // fitting too many per page (PE under-paginated tall paragraphs vs Word). Using max(tight, fontBox) lets a
+    // taller-metric font claim its real height (Calibri → 18px), while fonts whose box ≤ 1.15× keep the floor
+    // unchanged (no regression). resolveLineHeight already maxes this against the 1.15× floor.
+    naturalLineBox = Math.max(ascent + descent, roundValue(metrics.fontBoxHeight ?? 0));
   } else {
     // Fallback approximations for empty paragraphs or missing font info
     ascent = roundValue(resolvedFontSize * 0.8);
     descent = roundValue(resolvedFontSize * 0.2);
+    naturalLineBox = ascent + descent;
   }
 
-  const lineHeight = resolveLineHeight(spacing, fontSize, ascent + descent);
+  const lineHeight = resolveLineHeight(spacing, fontSize, naturalLineBox);
 
   return {
     ascent,

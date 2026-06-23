@@ -115,12 +115,16 @@ function main() {
     for (const pf of perFixture) {
       if (pf.error) { gateChecks.push({ fixture: pf.fixtureId || pf.id, name: 'fixture produced a record', pass: false, detail: String(pf.error) }); continue; }
       const id = pf.fixtureId;
-      // The exemption is keyed on FIXTURE IDENTITY (the one dedicated 'multipage' fixture), NOT on the data-derived
-      // page count — otherwise a single-para fixture that REGRESSED into a page split would silently escape into
-      // known-gaps instead of failing. The contract scopes the deferral to the dedicated multi-page fixture only.
+      // The 'multipage' fixture is keyed on FIXTURE IDENTITY (not the data-derived page count — a single-para
+      // fixture that REGRESSED into a split must FAIL, not escape into a deferral). 011 (pagination calibration)
+      // CLOSED the former PE-2-vs-Word-3 divergence: feeding the font's natural line box (fontBoundingBox) into
+      // the line-height max made the multi-page fixture paginate exactly like Word (PE 3 == Word 3, lines 48/48/2).
+      // So ASSERT the page-count now (a future regression that re-shrinks the line height re-fails the gate). Per-line
+      // Y/X are still not compared across the long fixture (the line-index alignment drifts), so this contributes
+      // ONLY the page-count check.
       if (id === 'multipage') {
-        if (!pf.pageCount.equal) knownGaps.push({ fixture: id, reason: 'multi-page page-count divergence: PE ' + pf.pageCount.pe + ' vs Word ' + pf.pageCount.word + ' pages (same body text) — the line-index alignment drifts a full page, so per-line metrics are not compared', tracker: 'feature 011 (pagination calibration — the measuring-dom systematic-offset hook)' });
-        continue; // the dedicated multi-page fixture contributes only the page/line counts; the divergence is the known-gap above
+        gateChecks.push({ fixture: id, name: 'multi-page page-count exact (PE == Word)', pass: pf.pageCount.equal === true, detail: 'pe=' + pf.pageCount.pe + ' word=' + pf.pageCount.word + ' [011 calibration: was PE 2 vs Word 3 — now closed]' });
+        continue;
       }
       // ANY OTHER fixture is intended SINGLE-PAGE → an unexpected page split is a REAL pagination regression, not a
       // deferral. Assert page-count exact (per-line Y/X are not compared across a split, but the page-count is the signal).

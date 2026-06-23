@@ -56,14 +56,18 @@ M6 deliverable — the tolerance the data yields.
 **Headline:** the paged engine's typesetting matches Word remarkably well on body text — **wrap points exact, start-X
 exact to the 1px grid, line-Y within ⅓ of a line** across the full Office font set.
 
-**Multi-page finding (page-count divergence — flagged for a calibration follow-up, NOT failed here):** the multi-page
-fixture (one 98-line paragraph) paginated to **PE = 2 pages, Word = 3 pages** (same 98 total lines). Per-line Y/X is not
-compared across a page-count divergence (the line-index alignment drifts a full page). This is the single place the
-engine and Word disagree materially, and is the natural target of a FUTURE calibration milestone (the systematic-offset
-hook at `measuring-dom/src/index.ts:139-143`) — out of report-only M6 scope.
+**Multi-page finding — ✅ CLOSED by feature 011 (pagination calibration, 2026-06-22).** The multi-page fixture (one
+98-line paragraph) originally paginated to **PE = 2 pages, Word = 3 pages**. 011's deeper-spike pinned the root cause:
+PE's "single" line spacing was a flat **1.15× font-size** floor, which fed the *tight* glyph box (`actualBoundingBox`)
+into the line-height max so the floor always won — but Word's single spacing is the font's NATURAL box. Canvas
+`fontBoundingBox` for Calibri 11pt = 18px = **13.5pt = Word's exact pitch** (PE was 12.65pt). The fix feeds
+`max(tightBox, fontBoundingBox)` into `resolveLineHeight` (`measuring-dom/src/{fontMetricsCache,index}.ts`) — a
+user-authorized Constitution P1 exception. Result: the fixture now paginates **PE 3 == Word 3** (lines 48/48/2 @
+13.5pt), AND single-page line-Y p95 IMPROVED (Segoe UI 4.91→1.5pt, Calibri 1.69→0.75pt). The 009 gate now **ASSERTS**
+the multi-page page-count (65/65), so a regression re-fails it. See `specs/011-pagination-calibration/`.
 
-> A FUTURE milestone turns these numbers into a red/green gate (page count exact for single-page; wrap 100%; start-X ≤
-> 1px; line-Y ≤ per-font p95, or 5pt universal) and tackles the multi-page pagination divergence. Out of M6 scope.
+> 009 turned these numbers into a red/green gate (page count exact for single-page; wrap 100%; start-X ≤ 1px; line-Y
+> p95 ≤ 6pt); 011 then closed the multi-page pagination divergence (PE 3 == Word 3, now asserted by the gate).
 
 ## Invariants
 - **No `src`/fork edit** — probe = pure painted-DOM read; ps1 = COM read; driver = diff. The engine is unchanged.

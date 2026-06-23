@@ -27,6 +27,10 @@ export type FontInfo = {
 export type FontMetricsResult = {
   ascent: number;
   descent: number;
+  // 011 (pagination calibration): the font's NATURAL line box (fontBoundingBoxAscent+Descent), i.e. Word's
+  // "single" line height. Distinct from the tight per-glyph ascent/descent above (which stay for baseline
+  // positioning). Optional — absent on legacy browsers without fontBoundingBox metrics.
+  fontBoxHeight?: number;
 };
 
 /**
@@ -219,7 +223,20 @@ export function getFontMetrics(
     descent = fontInfo.fontSize * 0.2;
   }
 
-  const result: FontMetricsResult = { ascent, descent };
+  // 011: also capture the font's NATURAL line box (fontBoundingBox). Word's "single" line spacing is the
+  // font's natural line height, NOT the tight glyph box above — e.g. Calibri 11pt: tight box ≈ 13px but the
+  // font box = 18px (= Word's 13.5pt). resolveLineHeight feeds this into its max so tall-metric fonts paginate
+  // like Word. (Left undefined on legacy browsers → the existing 1.15× floor still applies.)
+  let fontBoxHeight: number | undefined;
+  if (
+    typeof textMetrics.fontBoundingBoxAscent === 'number' &&
+    typeof textMetrics.fontBoundingBoxDescent === 'number' &&
+    textMetrics.fontBoundingBoxAscent + textMetrics.fontBoundingBoxDescent > 0
+  ) {
+    fontBoxHeight = textMetrics.fontBoundingBoxAscent + textMetrics.fontBoundingBoxDescent;
+  }
+
+  const result: FontMetricsResult = { ascent, descent, ...(fontBoxHeight !== undefined ? { fontBoxHeight } : {}) };
 
   // Cache the result (with size limit)
   if (fontMetricsCache.size >= MAX_CACHE_SIZE) {
