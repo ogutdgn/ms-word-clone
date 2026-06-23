@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP — 🏁 011 Pagination Calibration COMPLETE; 7 of 8 done)
+
+> **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
+> 011 ff-merged in @ `2f188c1`. **Phase:** POST-MIGRATION `general-done` cleanup loop (autonomous `/loop`). Ultracode ON.
+>
+> **State:** 7 of 8 COMPLETE — 005–010 ✅ + **011 pagination calibration ✅**. Remaining: **012 frames group (NEXT —
+> the LAST feature: position/align/group/rotate, the residual isBlocked layout controls)**.
+>
+> **011 = closed the M6/009 multi-page page-count divergence (PE 2 vs Word 3 for the 98-line fixture) — ⚠️ a
+> user-AUTHORIZED Constitution-P1 FORK EDIT** (the loop's designated stop-and-ask point). The spike proved NO no-fork
+> seam exists (the line-height math is entirely in `_vendor/superdoc/measuring-dom/`; `configureMeasurement` controls
+> only font mode/cache; the PE ctor takes no calibration option; the model's page geometry can't be touched without
+> corrupting the doc). At the stop-and-ask the user chose "Deeper spike first" → then "Authorize the fork edit".
+>
+> **The deeper-spike root cause (measured PE-painted-DOM vs Word-COM):** PE's "single" line spacing was a flat
+> **1.15× font-size** floor that fed the TIGHT glyph box (Canvas `actualBoundingBox`, ~13px Calibri 11pt) into the
+> line-height max, so the floor (12.65pt) always won. **Word's single spacing = the font's NATURAL box.** Canvas
+> `fontBoundingBox` for Calibri 11pt = 18px = **13.5pt = Word's exact pitch**. The 0.85pt/line shortfall let PE fit 51
+> lines/page vs Word's 48 → tipped 98 lines 3→2 pages.
+>
+> **The fix (2-file fork edit + a gate update):** `measuring-dom/src/fontMetricsCache.ts` captures `fontBoxHeight`
+> (`fontBoundingBoxAscent+Descent`); `measuring-dom/src/index.ts` `calculateTypographyMetrics` passes
+> `max(ascent+descent, fontBoxHeight)` into `resolveLineHeight` (which already maxes vs the 1.15× floor). Monotonic
+> (taller-or-equal → no shrink-corruption); fonts whose box ≤ 1.15× (Arial/Times/Georgia/Courier) UNCHANGED; baseline
+> ascent/descent + empty-para metrics untouched. `paged-glyphgeom-validate.js`: the multipage branch now ASSERTS
+> page-count exact (009's known-gap → a green check).
+>
+> **Result:** the fixture paginates PE 3 == Word 3 (lines 48/48/2 @ 13.5pt). Single-page fidelity IMPROVED, not
+> regressed: **Segoe UI line-Y p95 4.91→1.5pt, Calibri 1.69→0.75pt**; all 15 fonts page-count exact. **009 gate 65/65
+> PASS** (was 64/64 + 1 known-gap). 4 core gates green (test:pm 416 / smoke 9 / roundtrip 27 / test:bundle 4).
+>
+> **/code-review (1-agent adversarial, the fork edit): 0 confirmed defects — SOUND + SAFE.** All 7 axes hold
+> (confined to line-pitch; baseline untouched via CSS half-leading; provably monotonic; cache correct; gate genuinely
+> asserts the multipage). **One informational out-of-scope item → tracked as a follow-up (`task_689a9083`):** empty
+> paragraphs (separate `calculateEmptyParagraphMetrics` path) now render 0.85pt shorter than text lines for
+> tall-metric fonts (documented v1 known limitation; needs its own Word-COM check to reconcile).
+>
+> **Commits: `c507e5b` fork edit+gate+artifacts, `2f188c1` close-out.**
+>
+> **Next: 012 (frames group) — the LAST loop feature.** The residual `isBlocked` layout controls
+> (position/align/group/rotate of floating objects). Likely NO-FORK (bridge writes to the floating-object/drawing
+> anchor attrs), but SPIKE to confirm. Full spec-kit chain. When 012 merges → ALL 8 done → PushNotification + report.
+>
+> **Blockers/notes:** none. 011 was the one authorized fork edit; 012 should return to the no-fork norm (confirm via spike).
+
 ## 2026-06-22 (general-done cleanup LOOP — 🏁 010 Paged Import Fidelity COMPLETE; 6 of 8 done)
 
 > **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
