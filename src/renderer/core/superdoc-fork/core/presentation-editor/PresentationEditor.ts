@@ -4702,7 +4702,7 @@ export class PresentationEditor extends EventEmitter {
         this.#editorInputManager?.clearCellAnchor();
       }
     };
-    const handleSelection = () => {
+    const handleSelection = (event?: { transaction?: Transaction }) => {
       // User-initiated selection change — scroll caret/head into view once, except during
       // pointer drag: EditorInputManager edge auto-scroll must not fight #scrollActiveEndIntoView.
       if (!this.#editorInputManager?.isDragging) {
@@ -4711,10 +4711,20 @@ export class PresentationEditor extends EventEmitter {
       // Use immediate rendering for selection-only changes (clicks, arrow keys).
       // Without immediate, the render is RAF-deferred — leaving a window where
       // a remote collaborator's edit can cancel the pending render via
-      // setDocEpoch → cancelScheduledRender. Immediate rendering is safe here:
-      // if layout is updating (due to a concurrent doc change), flushNow()
-      // is a no-op and the render will be picked up after layout completes.
-      this.#scheduleSelectionUpdate({ immediate: true });
+      // setDocEpoch → cancelScheduledRender.
+      //
+      // BUT: 'selectionUpdate' is emitted BEFORE 'update' (see Editor.#dispatchTransaction —
+      // selectionUpdate at the selectionHasChanged branch, update afterwards). For a
+      // doc-changing transaction (e.g. pressing Enter), handleUpdate has not yet run
+      // setDocEpoch()/onLayoutStart(), so at this moment the coordinator still believes
+      // layoutEpoch === docEpoch && !layoutUpdating → flushNow() is NOT a no-op. It would
+      // render the NEW caret position against the STALE (pre-edit) layout, resolving the
+      // caret rect to the wrong Y and scrolling the viewport away from the caret. Defer to
+      // the post-relayout render (#rerender → selectionSync.requestRender after paint), which
+      // honors the preserved #shouldScrollSelectionIntoView flag and scrolls to the correct,
+      // freshly-laid-out caret. Only selection-only changes flush immediately.
+      const isDocChange = event?.transaction?.docChanged === true;
+      this.#scheduleSelectionUpdate({ immediate: !isDocChange });
       // Update local cursor in awareness for collaboration
       // This bypasses y-prosemirror's focus check which may fail for hidden PM views
       this.#updateLocalAwarenessCursor();
@@ -7471,9 +7481,11 @@ export class PresentationEditor extends EventEmitter {
   }
 
   /**
-   * Scrolls the scroll container minimally so that a screen-space rect is visible,
-   * keeping a small margin (20px) for comfortable viewing. No-ops when the rect
-   * is already within the visible bounds.
+   * Scrolls the scroll container so a screen-space rect becomes visible. The BOTTOM edge lands the rect a
+   * comfortable chunk inside (≈ a quarter of the viewport, min 20px) so typing/Enter at the bottom does not
+   * re-scroll on every line; the TOP edge keeps a small fixed 20px margin so up-navigation does not jump a
+   * quarter viewport. The downward scroll is capped so a rect taller than the viewport never pushes its own
+   * top out of view. No-ops when the rect is already comfortably within bounds.
    */
   #scrollScreenRectIntoView(screenTop: number, screenBottom: number): void {
     const scrollContainer = this.#scrollContainer;
@@ -7491,22 +7503,34 @@ export class PresentationEditor extends EventEmitter {
       containerBottom = r.bottom;
     }
 
-    const SCROLL_MARGIN = 20;
-
-    if (screenBottom > containerBottom - SCROLL_MARGIN) {
-      const delta = screenBottom - containerBottom + SCROLL_MARGIN;
+    // Trigger scrolling once the rect comes within TRIGGER px of an edge. For the BOTTOM edge, land the rect a
+    // comfortable chunk (COMFORT ≈ a quarter of the viewport) inside the edge — not right at it: if the landing
+    // equalled the trigger (the old behavior: both 20px), every keystroke at the bottom re-scrolled by one line,
+    // pinning the caret to the very edge and making the viewport "crawl" on each Enter (dwelling on the inter-page
+    // gap). A chunk inside leaves a buffer so the view STAYS PUT for many lines, then scrolls once (scrolloff).
+    // The TOP edge keeps the small fixed margin — up-navigation (ArrowUp/Shift-ArrowUp/find-back) must NOT jump a
+    // quarter viewport. The bottom scroll is also capped so a rect taller than the viewport never pushes its own
+    // top out of view (which would otherwise oscillate against the top branch on the next selection update).
+    const TRIGGER = 20;
+    const viewportHeight = Math.max(0, containerBottom - containerTop);
+    const COMFORT = Math.max(TRIGGER, Math.round(viewportHeight * 0.25));
+    const scrollByTop = (delta: number) => {
       if (scrollContainer instanceof Window) {
         scrollContainer.scrollBy({ top: delta });
       } else {
         (scrollContainer as Element).scrollTop += delta;
       }
-    } else if (screenTop < containerTop + SCROLL_MARGIN) {
-      const delta = containerTop + SCROLL_MARGIN - screenTop;
-      if (scrollContainer instanceof Window) {
-        scrollContainer.scrollBy({ top: -delta });
-      } else {
-        (scrollContainer as Element).scrollTop -= delta;
-      }
+    };
+
+    if (screenBottom > containerBottom - TRIGGER) {
+      let delta = screenBottom - (containerBottom - COMFORT);
+      // Don't scroll so far down that a tall rect's top leaves the viewport (keep the rect's top ≥ TRIGGER below the top edge).
+      const maxDelta = screenTop - (containerTop + TRIGGER);
+      if (delta > maxDelta) delta = maxDelta;
+      if (delta > 0) scrollByTop(delta);
+    } else if (screenTop < containerTop + TRIGGER) {
+      const delta = containerTop + TRIGGER - screenTop;
+      if (delta > 0) scrollByTop(-delta);
     }
   }
 

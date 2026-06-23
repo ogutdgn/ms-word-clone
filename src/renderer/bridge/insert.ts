@@ -238,11 +238,12 @@ export function installInsert(editor: AnyEditor) {
   }
 
   function insertBlankPage(): boolean {
-    // Word's Insert > Blank Page = one blank page with the caret on the page after it. Append a blank page-starting
-    // paragraph, then another (the page the caret continues on), and leave the caret in the second.
-    appendPageBreakParagraph()        // the blank page
-    const at = appendPageBreakParagraph() // the page after it (caret here)
-    if (at != null) { try { editor.commands.setTextSelection(at + 1) } catch { /* best-effort */ } }
+    // Insert exactly ONE new blank page (net +1). Word's "Blank Page" building block is two page breaks, which
+    // nets +2 and surprises users (a second, unexpected blank page) — so we insert a single pageBreakBefore
+    // paragraph: one new page, painted with a visible/clickable caret natively, with the caret on it ready to
+    // type. (The old two-append version grew pages "2 by 2" — that was the reported bug.)
+    const at = appendPageBreakParagraph()
+    if (at != null) { try { editor.commands.setTextSelection(at + 1) } catch { /* best-effort caret move */ } }
     refocus()
     return at != null
   }

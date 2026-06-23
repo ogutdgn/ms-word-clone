@@ -54,6 +54,12 @@ export const splitBlock =
       newAttrs = deleteAttributes(newAttrs, attrsToRemoveOverride);
     }
 
+    // A split (Enter) must NEVER carry a manual page break onto the continuation paragraph. Our manual
+    // page break is modeled as a paragraph with paragraphProperties.pageBreakBefore; without this, pressing
+    // Enter inside a page-break paragraph makes every new line start its own page (the new paragraph inherits
+    // pageBreakBefore). Word's manual break is an inline character that does not inherit — we match that intent.
+    newAttrs = deleteAttributes(newAttrs, ['paragraphProperties.pageBreakBefore']);
+
     if (selection instanceof NodeSelection && selection.node.isBlock) {
       if (!$from.parentOffset || !canSplit(doc, $from.pos)) return false;
       if (dispatch) {
@@ -94,7 +100,13 @@ export const splitBlock =
           const first = tr.mapping.map($from.before());
           const $first = tr.doc.resolve(first);
           const shouldChangeType = $from.parent.type !== deflt;
-          const normalizedAttrs = clearHeadingStyleId($from.parent.attrs);
+          let normalizedAttrs = clearHeadingStyleId($from.parent.attrs);
+          // atStart split: `types` is undefined, so the new (content) node copies the original attrs INCLUDING
+          // pageBreakBefore; the leading empty node here also keeps it — which would net TWO page breaks (an
+          // extra page). Strip the break from the leading empty paragraph so exactly ONE half keeps it.
+          if (normalizedAttrs?.paragraphProperties?.pageBreakBefore) {
+            normalizedAttrs = deleteAttributes(normalizedAttrs, ['paragraphProperties.pageBreakBefore']);
+          }
           const shouldNormalizeAttrs = normalizedAttrs !== $from.parent.attrs;
 
           if (

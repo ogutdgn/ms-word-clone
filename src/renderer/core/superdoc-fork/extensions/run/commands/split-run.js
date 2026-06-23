@@ -231,6 +231,16 @@ export function splitBlockPatch(state, dispatch, editor) {
         paragraphAttrs = Attribute.getSplittedAttributes(extensionAttrs, node.type.name, node.attrs);
         paragraphAttrs = clearInheritedLinkedStyleId(paragraphAttrs, editor, { emptyParagraph: atEnd });
 
+        // A split (Enter) must NEVER carry a manual page break onto the continuation paragraph. Our manual
+        // page break is a paragraph with paragraphProperties.pageBreakBefore; without stripping it here,
+        // pressing Enter inside that paragraph makes every new line start its own page (the new paragraph
+        // inherits pageBreakBefore). Word's manual break is an inline char that does not inherit — match that.
+        if (paragraphAttrs?.paragraphProperties && 'pageBreakBefore' in paragraphAttrs.paragraphProperties) {
+          const nextPp = { ...paragraphAttrs.paragraphProperties };
+          delete nextPp.pageBreakBefore;
+          paragraphAttrs = { ...paragraphAttrs, paragraphProperties: nextPp };
+        }
+
         // When splitting at the end (creating an empty new paragraph), store the
         // current run's runProperties on the new paragraph so the toolbar and
         // wrapTextInRunsPlugin know which inline formatting to inherit.

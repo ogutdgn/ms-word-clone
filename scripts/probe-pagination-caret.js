@@ -154,12 +154,12 @@
     ed().commands.insertContent('MidAfter continues on the next page');
   }, 2, ['MidAfter', 'MidAnchor']);
 
-  // 3. Blank page (two breaks): content after lands on page 3.
+  // 3. Blank page (one break, net +1 page since 2026-06-23): content after lands on page 2.
   await run('blank-page', () => {
     setDoc('<p>BpAlpha first</p><p>BpBravo middle</p><p>BpCharlie last word</p>');
     caretToEndOf('BpAlpha first');
     PM().insertBlankPage();
-  }, 3, ['BpBravo', 'BpCharlie']);
+  }, 2, ['BpBravo', 'BpCharlie']);
 
   return JSON.stringify(out, null, 2);
 })();

@@ -2580,6 +2580,46 @@
     let pb = false; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pb = true; });
     return pb === true;
   });
+  await t('[6] insertBlankPage adds exactly ONE blank page (a single pageBreakBefore paragraph, net +1)', async () => {
+    // Bug fix (2026-06-23): insertBlankPage used to append TWO pageBreakBefore paragraphs → it grew pages "2 by 2"
+    // (net +2). Word's "Blank Page" building block is two page breaks (+2) which users find surprising; the desired
+    // behavior is exactly ONE new blank page. Assert exactly one pageBreakBefore paragraph is added.
+    setDoc('blank page base');
+    await sleep(40);
+    PM().insertBlankPage(); await sleep(80);
+    let pbb = 0; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pbb++; });
+    return pbb === 1 || ('expected exactly 1 pageBreakBefore paragraph (net +1 page), got ' + pbb);
+  });
+  await t('[6] Enter inside a page-break paragraph does NOT inherit pageBreakBefore (no runaway pages)', async () => {
+    // Regression (2026-06-23): a manual page break is a paragraph carrying paragraphProperties.pageBreakBefore.
+    // Splitting it (Enter) used to copy that attr onto the continuation paragraph → EVERY Enter started a new
+    // page. A split's continuation must never inherit the page break (split-run.js splitBlockPatch + core
+    // splitBlock.js). Assert: after typing in the break paragraph and pressing Enter 3x, exactly ONE paragraph
+    // still carries pageBreakBefore (the original) — the 3 Enter-created paragraphs must not.
+    setDoc('pb base');
+    PM().insertPageBreak(); await sleep(120);                 // caret lands in the new pageBreakBefore paragraph
+    window.WC.editor.commands.insertContent('typed'); await sleep(80);
+    v().focus();
+    const enter = () => v().dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    enter(); await sleep(80); enter(); await sleep(80); enter(); await sleep(80);
+    let pbb = 0; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pbb++; });
+    return pbb === 1 || ('expected exactly 1 pageBreakBefore paragraph after 3 Enters, got ' + pbb);
+  });
+  await t('[6] Enter at the START of a page-break paragraph nets ONE page break, not two (atStart split)', async () => {
+    // Regression (2026-06-23): the atStart split (Home+Enter) used to leave pageBreakBefore on BOTH the new
+    // leading empty paragraph AND the content → an extra page. Exactly one half must keep the break.
+    setDoc('pb base');
+    PM().insertPageBreak(); await sleep(120);
+    window.WC.editor.commands.insertContent('typed'); await sleep(80);
+    // caret to the START of the page-break paragraph's text (inside the run — the real Home position)
+    try { v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), doc().firstChild.nodeSize + 2))); } catch (e) {}
+    await sleep(60);
+    v().focus();
+    v().dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    await sleep(120);
+    let pbb = 0; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pbb++; });
+    return pbb === 1 || ('expected exactly 1 pageBreakBefore paragraph after Home+Enter, got ' + pbb);
+  });
   await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
     setDoc('above line');
     PM().insertHr(); await sleep(80);
@@ -6044,6 +6084,32 @@
     await sleep(200);
     const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
     return /<w:pageBreakBefore/.test(xml) || 'no <w:pageBreakBefore/> in exported XML';
+  });
+
+  await t('[4a] Enter while editing the UPPER page does NOT scroll the view to the bottom (deferred-scroll regression)', async () => {
+    // Regression (2026-06-23): handleSelection used to flush an IMMEDIATE scroll for a doc-changing transaction
+    // (Enter) against the STALE pre-edit layout, resolving the caret to a wrong (bottom) Y and scrolling the
+    // viewport away from the caret. The fix defers the scroll for docChanged transactions to the post-relayout
+    // render. Make 2 pages, edit on PAGE 1, press Enter, and assert the view does not jump down.
+    setDocs(['ScrollReg upper page content']);
+    await sleep(150);
+    caretToEndOf('upper page content');            // caret on page 1
+    PM().insertPageBreak();                          // append pbb paragraph -> caret moves to page 2
+    await sleep(180);
+    // nearest scrollable ancestor of the painted pages
+    let scr = null; let n = document.querySelector('[data-page-index="0"]');
+    while (n && n !== document.body) { if (n.scrollHeight > n.clientHeight + 4 && getComputedStyle(n).overflowY !== 'visible') { scr = n; break; } n = n.parentElement; }
+    if (!scr) return true;                           // both pages fit without scrolling -> no jump is possible
+    caretToEndOf('upper page content');             // put the caret back on PAGE 1
+    await sleep(80);
+    scr.scrollTop = 0; await sleep(100);             // view at the top (page 1 visible)
+    const before = Math.round(scr.scrollTop);
+    v().focus();
+    v().dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    await sleep(280);
+    const after = Math.round(scr.scrollTop);
+    // the old bug jumped scrollTop by hundreds of px (a full page); the fix keeps it ~0.
+    return Math.abs(after - before) < 80 || ('view jumped on Enter while editing page 1: scrollTop ' + before + ' -> ' + after);
   });
 
   // ---- Phase 4a caret/click integrity (regression for the inline-block-spacer bug) ----
