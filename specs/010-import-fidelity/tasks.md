@@ -28,11 +28,11 @@
   `test:bundle` 4 unaffected. Clean up the throwaway spike script.
 
 ## Phase 3: Review + close-out
-- [ ] T008 `/code-review` (adversarial-review workflow) — focus: is the parse genuinely no-fork (public helper, not a
+- [x] T008 `/code-review` (adversarial-review workflow) — focus: is the parse genuinely no-fork (public helper, not a
   fork edit); does the full-body `replaceWith` preserve the doc attrs (sectPr) + not corrupt the PE; is the data-loss
   guard intact; do txt/csv still import; any edge (empty html, parse throw) handled. FIX confirmed findings.
-- [ ] T009 Docs: note the `[7]` gap is FIXED (removed from PAGED_KNOWN_GAP). Tick this tasks.md.
-- [ ] T010 ff-merge `010-import-fidelity` → `general-done` (NOT main, no push). plan-tracking checkpoint. Then 011.
+- [x] T009 Docs: note the `[7]` gap is FIXED (removed from PAGED_KNOWN_GAP). Tick this tasks.md.
+- [x] T010 ff-merge `010-import-fidelity` → `general-done` (NOT main, no push). plan-tracking checkpoint. Then 011.
 
 ---
 ## Notes
