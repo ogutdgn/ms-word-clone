@@ -31,13 +31,13 @@
 - [x] T009 4 core gates: test:pm 416 / smoke 9 / roundtrip 27 / test:bundle 4 — all green.
 
 ## Phase 3: Review + close-out
-- [ ] T010 `/code-review` (adversarial-review workflow) — focus: is the edit confined to the line-HEIGHT path (no
+- [x] T010 `/code-review` (adversarial-review workflow) — focus: is the edit confined to the line-HEIGHT path (no
   baseline/glyph-position drift); is it monotonic (no shrink-corruption); does the empty-paragraph path stay correct;
   any font where fontBox overshoots Word and breaks a single-page page-count; the gate genuinely asserts the multipage.
   FIX confirmed findings.
-- [ ] T011 Docs: update `contracts/m6-glyph-tolerance.md` (the multipage divergence is CLOSED, not a future gap) +
+- [x] T011 Docs: update `contracts/m6-glyph-tolerance.md` (the multipage divergence is CLOSED, not a future gap) +
   reconcile the 009 known-gap references. Tick this tasks.md.
-- [ ] T012 ff-merge `011-pagination-calibration` → `general-done` (NOT main, no push). plan-tracking checkpoint.
+- [x] T012 ff-merge `011-pagination-calibration` → `general-done` (NOT main, no push). plan-tracking checkpoint.
   Then 012.
 
 ---

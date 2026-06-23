@@ -62,6 +62,15 @@ descent (kept for baseline). The fix is font-metric-driven, not a magic constant
   0.75pt; all 15 fonts page-count exact.
 - **SC-004**: The 4 core gates stay green.
 
+## Known limitation (v1, out of scope — follow-up)
+
+The fix applies to the **populated-line** path (`calculateTypographyMetrics`); `calculateEmptyParagraphMetrics` is
+unchanged. So for a tall-metric font, an EMPTY paragraph now renders ~0.85pt shorter than a populated line (Calibri
+11pt: empty 12.65pt vs text 13.5pt) — they matched before 011. This is a documented, deliberately-out-of-scope
+limitation (the empty-para path is a separate sub-case that needs its own Word-COM validation — does Word render an
+empty Calibri para at 13.5 or 12.65pt? — before reconciling). Not covered by the 009 gate (no empty-para fixture).
+The /code-review flagged it as informational, NOT a blocking defect. Tracked as a follow-up.
+
 ## Assumptions
 
 - Canvas `fontBoundingBox` ≈ Word's "single" line height per font (verified: Calibri 18px = Word 13.5pt exact).
