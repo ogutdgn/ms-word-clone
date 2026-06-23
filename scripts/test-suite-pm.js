@@ -5955,10 +5955,10 @@
   await t('[11] Insert menu UI shell survives', () => !!window.WC.Insert && typeof window.WC.Insert === 'object');
   await t('[11] Thesaurus data survives (WC.Review.THES)', () => !!window.WC.Review && !!window.WC.Review.THES && typeof window.WC.Review.THES === 'object');
   await t('[11] Office Clipboard store survives', () => !!window.WC.Clipboard && Array.isArray(window.WC.Clipboard.items) && typeof window.WC.Clipboard.pasteAll === 'function');
-  // NB: margins/orientation/size + columns + breaks + lineNumbers + hyphenation (layout-page) AND header/footer
-  // text + variants + page numbers are now UNBLOCKED as their engine support shipped (ENGINE_READY). `position`
-  // is the still-blocked layout-ARRANGE representative (floating-object position — AREA layout-arrange, not in
-  // ENGINE_READY); `docInfo` is the still-blocked header-footer representative (Document Info fields).
+  // NB: margins/orientation/size + columns + breaks + lineNumbers + hyphenation (layout-page) + position/align/rotate
+  // (012) AND header/footer text + variants + page numbers are now UNBLOCKED as their engine support shipped
+  // (ENGINE_READY). `group` is the still-blocked layout-ARRANGE representative (multi-object grouping — AREA
+  // layout-arrange, not in ENGINE_READY); `docInfo` is the still-blocked header-footer representative (Doc Info).
   await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('group') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 

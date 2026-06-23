@@ -28,12 +28,12 @@
   no repair. 4 core gates green (test:pm 416 / smoke 9 / roundtrip 27 / test:bundle 4).
 
 ## Phase 3: Review + close-out
-- [ ] T009 `/code-review` (adversarial-review workflow) — focus: no dead `WC.Layout` call sites; no fork edit; the
+- [x] T009 `/code-review` (adversarial-review workflow) — focus: no dead `WC.Layout` call sites; no fork edit; the
   un-defer is complete (D6 guards repointed, [4b]/[11] updated); setImageAlign offset math correct; group/
   selectionPane genuinely still blocked. FIX confirmed findings.
-- [ ] T010 Docs reconcile (FEATURES/SCOPE/LAYOUT_ENGINE — frames group wired; note vertical/group/selectionPane
+- [x] T010 Docs reconcile (FEATURES/SCOPE/LAYOUT_ENGINE — frames group wired; note vertical/group/selectionPane
   deferred). Tick this tasks.md.
-- [ ] T011 ff-merge `012-frames-group` → `general-done` (NOT main, no push). plan-tracking checkpoint. ALL 8 DONE →
+- [x] T011 ff-merge `012-frames-group` → `general-done` (NOT main, no push). plan-tracking checkpoint. ALL 8 DONE →
   PushNotification + report to the user (general-done ready for THEIR final merge to main).
 
 ---
