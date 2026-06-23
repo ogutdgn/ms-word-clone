@@ -115,9 +115,18 @@ function main() {
     for (const pf of perFixture) {
       if (pf.error) { gateChecks.push({ fixture: pf.fixtureId || pf.id, name: 'fixture produced a record', pass: false, detail: String(pf.error) }); continue; }
       const id = pf.fixtureId;
-      if (pf.kind === 'multi-page') {
+      // The exemption is keyed on FIXTURE IDENTITY (the one dedicated 'multipage' fixture), NOT on the data-derived
+      // page count — otherwise a single-para fixture that REGRESSED into a page split would silently escape into
+      // known-gaps instead of failing. The contract scopes the deferral to the dedicated multi-page fixture only.
+      if (id === 'multipage') {
         if (!pf.pageCount.equal) knownGaps.push({ fixture: id, reason: 'multi-page page-count divergence: PE ' + pf.pageCount.pe + ' vs Word ' + pf.pageCount.word + ' pages (same body text) — the line-index alignment drifts a full page, so per-line metrics are not compared', tracker: 'feature 011 (pagination calibration — the measuring-dom systematic-offset hook)' });
-        continue; // multi-page fixtures contribute only the page/line counts; the divergence is the known-gap above
+        continue; // the dedicated multi-page fixture contributes only the page/line counts; the divergence is the known-gap above
+      }
+      // ANY OTHER fixture is intended SINGLE-PAGE → an unexpected page split is a REAL pagination regression, not a
+      // deferral. Assert page-count exact (per-line Y/X are not compared across a split, but the page-count is the signal).
+      if (pf.kind === 'multi-page') {
+        gateChecks.push({ fixture: id, name: 'page-count exact (PE == Word)', pass: pf.pageCount.equal === true, detail: 'pe=' + pf.pageCount.pe + ' word=' + pf.pageCount.word + ' (UNEXPECTED multi-page for a single-para fixture — pagination regression)' });
+        continue;
       }
       // single-page: the real-fidelity tolerance assertions
       gateChecks.push({ fixture: id, name: 'page-count exact (PE == Word)', pass: pf.pageCount.equal === true, detail: 'pe=' + pf.pageCount.pe + ' word=' + pf.pageCount.word });
