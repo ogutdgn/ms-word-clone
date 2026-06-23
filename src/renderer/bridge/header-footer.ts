@@ -341,11 +341,10 @@ export function installHeaderFooter(editor: AnyEditor) {
     try { const loc = presentation()?.getActiveStoryLocator?.(); return !!(loc && loc.storyType === 'headerFooterPart') } catch { return false }
   }
 
-  // Enter on-page editing of the header/footer region. Paged-only (the PE paints the bands);
-  // returns false in overlay so the caller can keep the plain-text modal fallback.
+  // Enter on-page editing of the header/footer region (the PE paints the bands).
   async function enterHeaderFooter(kind: HFKind): Promise<boolean> {
     const pres = presentation()
-    if (!pres || w.__WC_LAYOUT_MODE !== 'paged') return false
+    if (!pres) return false
     if (kind !== 'header' && kind !== 'footer') return false
     try {
       if (isActiveHF() && lastMode === kind) return true // already editing this region

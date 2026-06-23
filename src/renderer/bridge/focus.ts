@@ -11,9 +11,7 @@
 // spinners, search field, zoom range slider, dialog inputs) — those instead get
 // a focusin capture that snapshots the PM selection (spec §7.1-4: a blocked
 // command must never cost the user their selection).
-import { Selection } from '@/pm'
-
-let installed = false // idempotent: replaceEditor() re-runs installBridge on Open/New
+let installed = false // idempotent: installBridge re-runs on Open/New
 export function installFocusGuards() {
   if (installed) return
   installed = true
@@ -50,56 +48,6 @@ export function installFocusGuards() {
     },
     true,
   )
-  // Page-region click → place the caret (Word: clicking the page MARGINS or the
-  // empty area below the last paragraph drops the caret at the nearest text). The
-  // page sheet `#pm-editor` realizes the margins as padding (fork print-layout
-  // inline styles) and the editable `.ProseMirror` only covers the content box, so
-  // those regions are non-editable: a bare click there places NO caret and blurs
-  // the view (the user's "can't re-activate the cursor"). Bubble-phase, PM-only;
-  // reads the LIVE editor so it survives replaceEditor (the listener binds once).
-  document.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return // left only — right-click keeps the context menu
-    const t = e.target as Element | null
-    if (!(t instanceof Element)) return
-    const w = window as any
-    if (!w.WC?.PM?.active) return
-    // Paged renderer owns ALL clicks: PresentationEditor's EditorInputManager handles painted-page,
-    // margin, and below-text clicks with correct per-page geometry. This overlay margin heuristic
-    // (#pm-editor && !.ProseMirror) mis-fires on EVERY painted-page click — the editable .ProseMirror
-    // is hidden off-screen in paged mode — and would clobber PE's selection. Bail entirely in paged.
-    if (w.__WC_LAYOUT_MODE === 'paged') return
-    if (!t.closest('#pm-editor')) return // not on the page sheet
-    if (t.closest('.ProseMirror')) return // editable content handles its own clicks
-    const editor = w.WC?.editor
-    const view = editor?.view
-    if (!view) return
-    const max = view.state.doc.content.size - 1
-    if (max < 1) return
-    const prose = (t.closest('#pm-editor') as HTMLElement).querySelector('.ProseMirror') as HTMLElement | null
-    const box = (prose || (t.closest('#pm-editor') as HTMLElement)).getBoundingClientRect()
-    if (prose && e.clientY > box.bottom) {
-      // Clicked in the BLANK area below all text → caret to the document END (the
-      // last written position), regardless of horizontal position — what you want
-      // when you click the empty canvas to keep typing. (posAtCoords-nearest would
-      // instead drop the caret at the start of whatever wrapped line sits nearest
-      // the click x — not the end.)
-      view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)))
-    } else {
-      // Beside the text (side margins / within the content's vertical span): CLAMP
-      // the click into the .ProseMirror box, then hit-test — a left-margin click
-      // maps to that line's start, a top-margin click to the first row. Clamping
-      // beats a null-fallback heuristic (a short doc sits at the TOP of a tall page).
-      const clamp = (val: number, lo: number, hi: number) => Math.max(lo, Math.min(val, hi))
-      const x = clamp(e.clientX, box.left + 1, box.right - 1)
-      const y = clamp(e.clientY, box.top + 1, box.bottom - 1)
-      // M2: route through the M1 coordinate seam instead of calling view.* directly. This path
-      // runs only in overlay (paged bailed above), where clientToPos delegates to
-      // view.posAtCoords({left,top}) identically (M1 overlay-parity proven).
-      const hit = w.WC?.PM?.coords?.clientToPos(x, y)
-      const pos = Math.max(1, Math.min(hit ? hit.pos : max, max))
-      editor.commands.setTextSelection({ from: pos, to: pos })
-    }
-    view.focus()
-    e.preventDefault() // keep our caret — the browser's own mousedown would clear it
-  })
+  // (008: the overlay page-region margin-click caret handler was retired. The paged PresentationEditor's
+  // EditorInputManager owns ALL clicks — painted-page, margin, and below-text — with correct per-page geometry.)
 }

@@ -34,8 +34,6 @@ const EMU = 9525 // px → EMU (1px = 9525 EMU at 96dpi)
 const w = () => window as any
 // Live-bridge accessor (NOT a captured closure): probes/tests may swap PM impls.
 const PM = () => { const pm = w().WC?.PM; return pm && pm.active && pm.ready ? pm : null }
-// M4c — paged vs overlay discriminator. EVERY paged-specific branch gates on this so overlay is byte-identical.
-const isPaged = () => w().__WC_LAYOUT_MODE === 'paged'
 
 // ---- module singletons (installInkOverlay re-runs on Open/New) ----
 let editor: AnyEditor = null
@@ -200,11 +198,11 @@ function onDown(e: PointerEvent) {
     layer.appendChild(lassoPath)
     return
   }
-  // pen / pencil / highlighter — start a temp in-progress stroke
-  if (isPaged()) {
-    // M4c: resolve the draw page ONCE (clamp the stroke to it) + the #pages-local page origin + the doc position
-    // to re-anchor the node to — so a page-2+ stroke EXPORTS on its page (page-local posOffset). + pointer capture
-    // so a stroke that crosses an inter-page gap keeps delivering move/up.
+  // pen / pencil / highlighter — start a temp in-progress stroke.
+  // M4c: resolve the draw page ONCE (clamp the stroke to it) + the #pages-local page origin + the doc position
+  // to re-anchor the node to — so a page-2+ stroke EXPORTS on its page (page-local posOffset). + pointer capture
+  // so a stroke that crosses an inter-page gap keeps delivering move/up.
+  {
     const C = w().WC?.PM?.coords
     let pi = 0, origin = { left: 0, top: 0 }, docPos: number | null = null
     try { const lp = C?.clientToOverlayLocalPt?.(e.clientX, e.clientY); if (lp && Number.isFinite(lp.pageIndex)) pi = lp.pageIndex } catch { /* page 0 */ }
@@ -212,8 +210,6 @@ function onDown(e: PointerEvent) {
     try { const h = C?.clientToPos?.(e.clientX, e.clientY); if (h && typeof h.pos === 'number') docPos = h.pos } catch { /* anchor at caret */ }
     pageClamp = { pageIndex: pi, origin, docPos }
     try { layer.setPointerCapture(e.pointerId) } catch { /* capture best-effort */ }
-  } else {
-    pageClamp = null
   }
   drawing = true; curPts = [p]
   curPath = svgPath('pm-ink-stroke in-progress')
@@ -259,7 +255,7 @@ function onUp() {
   let insertPos: number | undefined
   const clamp = pageClamp
   pageClamp = null
-  if (isPaged() && clamp) {
+  if (clamp) {
     pos = { x: Math.max(0, Math.round(minX - clamp.origin.left)), y: Math.max(0, Math.round(minY - clamp.origin.top)) }
     insertPos = clamp.docPos != null ? clamp.docPos : undefined
   }
@@ -350,9 +346,9 @@ function renderInk() {
     if (/\bin-progress\b/.test(cls) || /\bpm-ink-lasso\b/.test(cls)) return
     lyr.removeChild(c)
   })
-  // M4c: the per-stroke page-origin re-add only matters in paged with >1 page (single-page/overlay → page-0 origin
-  // (0,0), a no-op). Compute the gate ONCE per render so single-page docs skip the per-node computeCaretLayoutRect.
-  const pagedMulti = isPaged() && (() => { try { const n = w().WC?.PM?.coords?.getPageCount?.(); return typeof n === 'number' ? n > 1 : true } catch { return true } })()
+  // M4c: the per-stroke page-origin re-add only matters with >1 page (single-page → page-0 origin (0,0), a no-op).
+  // Compute the gate ONCE per render so single-page docs skip the per-node computeCaretLayoutRect.
+  const pagedMulti = (() => { try { const n = w().WC?.PM?.coords?.getPageCount?.(); return typeof n === 'number' ? n > 1 : true } catch { return true } })()
   editor.state.doc.descendants((node: any, pos: number) => {
     if (node.type?.name !== 'vectorShape') return
     const a = node.attrs || {}

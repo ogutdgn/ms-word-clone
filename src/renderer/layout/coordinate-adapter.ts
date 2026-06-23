@@ -139,18 +139,10 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       try {
         const editor = deps.getEditor()
         if (!editor || typeof editor.posAtCoords !== 'function') return null
-        // Editor.posAtCoords branches on `presentationEditor` — and the two branches need
-        // DIFFERENT coordinate keys:
-        //  • layout (paged) → presentationEditor.hitTest(clientX, clientY). On a MISS it
-        //    falls through to the HIDDEN off-screen view.posAtCoords(coords); passing
-        //    {left,top} there maps a viewport point into the off-screen host and returns a
-        //    BOGUS pos. So in layout mode pass clientX/clientY ONLY → a miss yields null
-        //    (the off-screen view cannot resolve undefined left/top).
-        //  • overlay → view.posAtCoords(coords), which REQUIRES {left,top}; supplying them
-        //    keeps the result byte-identical to the direct view.posAtCoords({left,top}) today.
-        const layout = !!editor.presentationEditor
-        const coords = layout ? { clientX, clientY } : { clientX, clientY, left: clientX, top: clientY }
-        const hit = editor.posAtCoords(coords)
+        // Editor.posAtCoords → presentationEditor.hitTest(clientX, clientY). Pass clientX/clientY ONLY: on a
+        // MISS it falls through to the HIDDEN off-screen view.posAtCoords, where supplying {left,top} would map
+        // the viewport point into the off-screen host and return a BOGUS pos — so a miss must yield null.
+        const hit = editor.posAtCoords({ clientX, clientY })
         if (!hit || typeof hit.pos !== 'number') return null
         return { pos: hit.pos, inside: typeof hit.inside === 'number' ? hit.inside : -1 }
       } catch {
@@ -238,22 +230,15 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       }
     },
 
-    // M4b — the selected image's box in #pages-local space. Mode-branched on the ELEMENT source:
-    //  • overlay → editor.view.nodeDOM(pos) (the image node's own DOM element) — the LEGACY boxFor path,
-    //    so overlay output is byte-identical. (Editor.getElementAtPos's overlay path uses domAtPos, which
-    //    returns the CONTAINER not the image, so it is NOT usable here.)
-    //  • paged → editor.getElementAtPos(pos) (PE's [data-pm-start][data-pm-end] index → the PAINTED image;
-    //    null off-page). Then the same #pages-local formula as the M4a overlay helpers.
+    // M4b — the selected image's box in #pages-local space. The element source is the PE's painted image:
+    // editor.getElementAtPos(pos) ([data-pm-start][data-pm-end] index → the PAINTED image; null off-page).
+    // Then the same #pages-local formula as the M4a overlay helpers.
     nodeBoxFor(pos: number): { left: number; top: number; width: number; height: number } | null {
       try {
         const editor = deps.getEditor()
-        if (!editor) return null
+        if (!editor || typeof editor.getElementAtPos !== 'function') return null
         let el: any = null
-        if (editor.presentationEditor && typeof editor.getElementAtPos === 'function') {
-          try { el = editor.getElementAtPos(pos) } catch { el = null }
-        } else {
-          try { el = editor.view.nodeDOM(pos) } catch { el = null }
-        }
+        try { el = editor.getElementAtPos(pos) } catch { el = null }
         if (!el || typeof el.getBoundingClientRect !== 'function') return null
         const c = el.getBoundingClientRect()
         if (![c.left, c.top, c.width, c.height].every((n: number) => Number.isFinite(n))) return null

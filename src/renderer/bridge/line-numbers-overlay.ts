@@ -13,7 +13,6 @@ type AnyEditor = any
 const GUTTER_PX = Math.round(0.25 * 96) // ≈18px @96dpi — Word's "Auto" w:distance default gutter (number→text gap)
 
 const w = (): any => window as any
-const isPaged = (): boolean => w().__WC_LAYOUT_MODE === 'paged'
 const PMref = (): any => { try { return w().WC?.PM || null } catch { return null } }
 
 let editor: AnyEditor = null
@@ -67,8 +66,6 @@ function render() {
   const ov = ensureBox()
   if (!ov) return
   ov.replaceChildren() // clear the last paint
-  if (!isPaged()) return // defensive paged gate (overlay mode never reaches here — no listeners bound)
-
   const ln = PMref()?.getLineNumbers?.()
   if (!ln || ln.active !== true || ln.mode === 'none') return
 
@@ -160,7 +157,6 @@ function destroy() {
 // no-op (no listeners, no DOM). Idempotent across remounts (bound flag keeps the live-reading listeners singleton).
 export function installLineNumbersOverlay(ed: AnyEditor) {
   editor = ed
-  if (!isPaged()) return
   if (!bound) {
     bound = true
     window.addEventListener('wc:paged-relayout', schedule) // zoom / scroll / edit / page-reflow

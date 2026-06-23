@@ -276,37 +276,24 @@ export function installReferences(editor: AnyEditor) {
     } catch { return false }
   }
 
-  // refShowNotes: reveal + scroll the clone-owned notes area and focus the first note
-  // body (task 4, notes-area.ts owns the DOM + focus/scroll). The notes-area module
-  // exposes WC.NotesArea.showNotes(); degrade honestly to false when there are no notes
-  // (showNotes returns false when the region is hidden / absent).
+  // refShowNotes: Word's References ▸ Show Notes — scroll the first locatable painted note body into view.
+  // The paged PresentationEditor paints footnote/endnote bodies per-page at the page foot (the overlay
+  // #pm-notes-area region was retired in 008). PE gives no footnote-classed element, so locate the note by
+  // its body text under .superdoc-page; iterate ALL notes (skip empty bodies), and among matches prefer the
+  // LOWEST on screen (notes paint at the page FOOT, so a coincidental occurrence higher up does not win).
   function refShowNotes(): boolean {
     try {
-      // M4d (paged): the #pm-notes-area overlay is DISABLED — PE paints footnote/endnote bodies per-page at the page
-      // foot. Word's References ▸ Show Notes jumps to the note area, so scroll the first locatable painted note body
-      // into view. PE gives no footnote-classed element, so locate it by the note's body text under .superdoc-page.
-      // Iterate ALL notes (skip empty bodies + the case where notes[0] is an unlocatable endnote), and among the
-      // matches prefer the LOWEST on screen (PE paints notes at the page FOOT — so a coincidental body occurrence of
-      // the same text higher up does not win).
-      if ((window as any).__WC_LAYOUT_MODE === 'paged') {
-        const pages = document.getElementById('pages')
-        if (!pages) return false
-        const els = Array.from(pages.querySelectorAll('.superdoc-page .superdoc-line, .superdoc-page .superdoc-fragment')) as HTMLElement[]
-        for (const note of refListFootnotes()) {
-          const needle = String((note && note.content) || '').trim()
-          if (!needle) continue
-          let best: HTMLElement | null = null, bestTop = -Infinity
-          for (const el of els) { if ((el.textContent || '').indexOf(needle) !== -1) { const top = el.getBoundingClientRect().top; if (top > bestTop) { bestTop = top; best = el } } }
-          if (best) { best.scrollIntoView({ block: 'nearest' }); return true }
-        }
-        return false // no note body locatable (e.g. all-empty bodies) — documented inert
+      const pages = document.getElementById('pages')
+      if (!pages) return false
+      const els = Array.from(pages.querySelectorAll('.superdoc-page .superdoc-line, .superdoc-page .superdoc-fragment')) as HTMLElement[]
+      for (const note of refListFootnotes()) {
+        const needle = String((note && note.content) || '').trim()
+        if (!needle) continue
+        let best: HTMLElement | null = null, bestTop = -Infinity
+        for (const el of els) { if ((el.textContent || '').indexOf(needle) !== -1) { const top = el.getBoundingClientRect().top; if (top > bestTop) { bestTop = top; best = el } } }
+        if (best) { best.scrollIntoView({ block: 'nearest' }); return true }
       }
-      const na = (window as any).WC?.NotesArea
-      if (na && typeof na.showNotes === 'function') return na.showNotes() === true
-      // Fallback (notes-area not installed — e.g. mid-replace): degrade to "any notes?".
-      const el = document.getElementById('pm-notes-area')
-      if (el && el.style.display !== 'none') { el.scrollIntoView?.({ block: 'nearest' }); return true }
-      return refListFootnotes().length > 0
+      return false // no note body locatable (e.g. all-empty bodies) — documented inert
     } catch { return false }
   }
 
