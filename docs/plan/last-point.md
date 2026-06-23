@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-06-23 (general-done cleanup LOOP — 🏁🏁 ALL 8 COMPLETE — 012 Frames Group done; LOOP FINISHED)
+
+> **Branch:** `general-done` @ `979bb86` (off `main` @ `89ed1b1`). **🏁 THE LOOP IS COMPLETE — all 8 cleanup
+> features (005–012) merged into `general-done`. Awaiting the USER's final `general-done` → `main` merge (NOT done
+> by the loop; the user owns that merge + any push).** Phase: POST-MIGRATION cleanup loop — FINISHED.
+>
+> **All 8 features (005–012):**
+> - 🏁 **005 Hyphenation** (`bridge/hyphenation.ts`, owned settings.xml upsert)
+> - 🏁 **006 Section Breaks** (`bridge/section-breaks.ts`, pPr sectPr + body w:type)
+> - 🏁 **007 Paged Test-Coverage** (`test:pm` mode-aware; PAGED_KNOWN_GAP)
+> - 🏁 **008 Overlay Retirement** (the legacy overlay engine deleted; paged is the SOLE engine)
+> - 🏁 **009 M6 Glyph-Tolerance Gate** (`report:glyphgeom`/`test:glyphgeom` = a pass/fail gate)
+> - 🏁 **010 Paged Import Fidelity** (html/txt/csv parse via `createDocFromHTML`)
+> - 🏁 **011 Pagination Calibration** (⚠️ the ONE authorized fork edit — font-natural line height)
+> - 🏁 **012 Frames Group** (position/align/rotate wired onto WC.PM)
+>
+> **012 = un-deferred the LAST `layout-arrange` controls (Position, Align, Rotate) — NO-FORK.** They were `isBlocked`
+> + routed to the retired `WC.Layout` (would throw). The bridge already shipped the machinery (`setImageTransform` =
+> rotate/flip → `a:xfrm rot/flipH/flipV`; `setImagePosition` = offset → `wp:positionH/V posOffset`, Phase 4); a spike
+> confirmed both export correct OOXML + read back in Word. So 012 = wiring + one helper: new `setImageAlign({h})` in
+> `bridge/insert.ts` (column-relative margin offset from getPageStyles − imgWidth → setImagePosition); add
+> position/align/rotate to `ENGINE_READY`; rewire `H.position` (9-grid → square wrap + align per column), `H.align`
+> (L/C/R → setImageAlign; vertical/distribute → toast), `H.rotate` (→ setImageTransform); `H.selectionPane` →
+> deferred toast. D6 guards repointed position→group; `[4b]`/`[11]` updated. **DEFERRED (documented v1):**
+> group/ungroup (multi-object a:grpSp), selectionPane (UI pane), vertical align + distribute, imported-picture
+> reposition.
+>
+> **Verify:** `probe:frames` 13/13 (rotate=90, flipH, align center=252/right=504/left=0); **Word-COM oracle**
+> (`validate-frames-win.ps1`): shapes=1, rotation=90, horizontalFlip=msoTrue, leftPt=75, topPt=37.5, relHPos=column,
+> wrapType=square, shapeType=picture — no repair. 4 core gates green (test:pm 416 / smoke 9 / roundtrip 27 /
+> test:bundle 4). **/code-review (1-agent adversarial): 0 confirmed defects — SOUND + SAFE** (all 6 axes: no dead
+> WC.Layout; un-defer complete + no throw path; setImageAlign NaN-safe; the two-dispatch selection holds
+> synchronously; group/selectionPane genuinely deferred; tests honest). Commits: `9d9fd5a` impl, `979bb86` close-out.
+>
+> **NEXT (USER): merge `general-done` → `main`** (the loop never touched main or pushed). After that, the next phase
+> (user's pick) is the COMPLETENESS PASS (`docs/bug-hunt/`) or further per-feature reconciliation. Open follow-ups
+> spun off as background tasks: `task_689a9083` (empty-paragraph line height, from 011), `task_cb2781a7` (paged
+> ribbon table commands), `task_3436e431` (counts().pages always 1 in paged).
+>
+> **Blockers/notes:** none. The loop is done; the autonomous `/loop` has stopped (no further ScheduleWakeup).
+
 ## 2026-06-22 (general-done cleanup LOOP — 🏁 011 Pagination Calibration COMPLETE; 7 of 8 done)
 
 > **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
