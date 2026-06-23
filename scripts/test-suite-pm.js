@@ -36,7 +36,8 @@
   // without HIDING the gap — distinct from PAGED_SKIP (overlay-only) and from a silent pass. summary.pagedKnownGaps
   // counts these; the audit (FR-005) confirms each is genuinely a deferred product gap, not a porting cop-out.
   const PAGED_KNOWN_GAP = new Map([
-    ['[7] open .html imports headings/bold/list onto the engine (path+format bound)', { reason: "WC.Files.open('*.html') dumps the raw HTML as literal text instead of parsing it (the super-converter html→doc path is not wired into the paged open flow; overlay parses it correctly)", tracker: 'feature 010 (paged import fidelity)' }],
+    // (010 FIXED the former [7] html-import gap: the paged open flow now parses html via createDocFromHTML — the [7]
+    //  test runs as a genuine pass. Removed from this map.)
     // [4d] (6) — RE-TRIAGED from PAGED_SKIP (review w4szfpzey): a REAL paged functional gap, NOT overlay-only.
     // These assert ONLY the PM model (doc().descendants → n.attrs.*) + export XML (no overlay DOM), yet fail at
     // the MODEL read in a genuine paged build (empirically: rowHeight=null, gridCol unchanged, justification=

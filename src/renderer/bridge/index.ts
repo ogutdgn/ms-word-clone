@@ -29,6 +29,10 @@ import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { toQueryState } from './state-sync'
 import { parseDocx } from './create-editor'
+// 010: the fork's html→PM parser (a public helper — the same the Editor constructor uses for its `html` option, and
+// replaceNodeWithHTML). Used to PARSE a .html/.txt/.csv import in the paged open flow instead of dumping raw text.
+// @ts-ignore - vendored fork JS helper (no ambient types)
+import { createDocFromHTML } from '@core/helpers/index.js'
 import { blankArrayBuffer } from '@/core/fixture'
 import { textToParagraphHtml, csvToTableHtml } from './file-content'
 import { createCoordinateAdapter } from '@/layout/coordinate-adapter'
@@ -246,7 +250,17 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
           // the markup carried text but NOTHING landed (a degraded import), do NOT let the caller bind a path to a blank
           // doc (a later save would overwrite the original with the blank).
           let landed = false
-          try { pres.editor.chain().selectAll().insertContent(extra.html).run(); landed = (pres.editor.state.doc.textContent || '').trim().length > 0 } catch { /* createNodeFromContent threw → degraded */ }
+          // 010: PARSE the html (createDocFromHTML — the fork helper the overlay constructor used) instead of
+          // insertContent(rawString), which in the paged PE inserts the markup as LITERAL TEXT (no parse → the [7]
+          // gap). Replace the whole (blank, from replaceFile) body with the parsed block fragment so headings/bold/
+          // lists become real PM nodes/marks. (txt → <p>-per-line html, csv → table html both ride this leg.)
+          try {
+            const peEd = pres.editor
+            const parsed = createDocFromHTML(extra.html, peEd) // a doc node parsed from the html
+            const frag = parsed && parsed.content && parsed.content.size ? parsed.content : null
+            if (frag) { const tr = peEd.state.tr; tr.replaceWith(0, peEd.state.doc.content.size, frag); peEd.view.dispatch(tr) }
+            landed = (peEd.state.doc.textContent || '').trim().length > 0
+          } catch { /* createDocFromHTML/replace threw → degraded (blank doc) */ }
           if (!landed && extra.html.replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').trim().length > 0) {
             lastImportBlanked = true // the old doc is gone + the import is blank — caller must unbind its file state
             w.WC.view = pres.editor.view; w.WC.PM.setClean(); pres.editor.view?.focus()
