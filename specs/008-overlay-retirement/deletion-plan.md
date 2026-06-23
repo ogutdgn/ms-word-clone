@@ -76,7 +76,12 @@ default and does NOT depend on any overlay code.
 - **P4 — docs reconcile**: CLAUDE.md/AGENTS.md/PAGINATION.md/ARCHITECTURE.md/LAYOUT_ENGINE.md + plan docs.
 - `/code-review` the full deletion diff before ff-merge into `general-done`.
 
-## THE DECISIONS (put to the user at the HARD STOP)
-1. **Go / approach** — approve the full retirement now (P1–P4), or stage it.
-2. **The 59 overlay-only `test:pm` tests** — delete / keep-skipped-forever / port to paged equivalents.
-3. **`test:bundle`** — delete (moot once there's one entry) / convert to a generic bundle-size ceiling.
+## THE DECISIONS — RESOLVED (user, 2026-06-22 HARD-STOP)
+1. **Go / approach → STAGED.** Land P1 (dead-engine delete) + re-run ALL gates first; then P2, P3, P4 — each
+   reviewable. Autonomous between stages. ff-merge into `general-done` at the end (`/code-review` the diff first).
+2. **The 59 overlay-only `test:pm` tests → DELETE.** Remove them from the suite (paged coverage lives in the
+   dedicated probes). RECORD the deleted-test → covering-probe mapping in `specs/008-overlay-retirement/`
+   (test-mapping.md). The 10 `PAGED_KNOWN_GAP` stay; the `[0a]` port stays.
+3. **`test:bundle` → CONVERT to a generic renderer entry-size ceiling.** Repurpose `check-overlay-bundle.js`
+   (or replace it) into a mode-agnostic bundle-size guard (the PE is heavy; catch accidental bloat). Keep the
+   `test:bundle` npm script pointing at the repurposed gate.
