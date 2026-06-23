@@ -2569,10 +2569,15 @@
     doc().descendants((n) => { (n.marks || []).forEach((m) => { if (m.type.name === 'textStyle' && m.attrs.fontFamily) fam = m.attrs.fontFamily; if (m.type.name === 'italic') ital = true; }); });
     return /Cambria Math/i.test(fam || '') && ital === true;
   });
-  await t('[6] insertPageBreak inserts a hardBreak page-break node', async () => {
+  await t('[6] insertPageBreak starts a new page (pageBreakBefore paragraph)', async () => {
+    // Page-break model (2026-06-23): a manual page break appends a REAL empty paragraph carrying pageBreakBefore on
+    // the new page (not an inline hardBreak{page}). The inline-break model left the new page with no paragraph → no
+    // painted line → no visible/clickable caret in the paged engine (docs/PAGE_BREAK_ROOT_CAUSE.md). A real
+    // pageBreakBefore paragraph is a clean block boundary the engine paints + the caret/click resolve natively, and
+    // Word reads <w:pageBreakBefore/> as a page break.
     setDoc('before break');
     PM().insertPageBreak(); await sleep(80);
-    let pb = false; doc().descendants((n) => { if (n.type.name === 'hardBreak' && (n.attrs.pageBreakType === 'page')) pb = true; });
+    let pb = false; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pb = true; });
     return pb === true;
   });
   await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
@@ -6026,14 +6031,19 @@
 
 
 
-  await t('[4a] manual page break exports as <w:br w:type="page">', async () => {
+  await t('[4a] manual page break exports as a Word page break (w:pageBreakBefore)', async () => {
+    // Model change (2026-06-23, paged engine): a manual page break is now a real empty paragraph carrying
+    // pageBreakBefore (a clean BLOCK-boundary page break) rather than an inline <w:br w:type="page"/>. Real Word
+    // reads <w:pageBreakBefore/> as a page break (COM-verified: 2 pages), and a real paragraph hosts a visible,
+    // clickable caret on the new page — which the inline break could not in the paged engine. (Imported docs that
+    // carry an inline <w:br w:type="page"/> are a separate known gap — see docs/PAGE_BREAK_ROOT_CAUSE.md.)
     setDocs(['Exp alpha line', 'Exp bravo line']);
     await sleep(200);
     caretToEndOf('alpha');
     PM().insertPageBreak();
     await sleep(200);
     const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
-    return /<w:br[^>]*w:type="page"/.test(xml) || 'no <w:br w:type="page"> in exported XML';
+    return /<w:pageBreakBefore/.test(xml) || 'no <w:pageBreakBefore/> in exported XML';
   });
 
   // ---- Phase 4a caret/click integrity (regression for the inline-block-spacer bug) ----

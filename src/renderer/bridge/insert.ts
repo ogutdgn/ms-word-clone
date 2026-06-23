@@ -216,17 +216,35 @@ export function installInsert(editor: AnyEditor) {
     return inserted !== false
   }
 
+  // Append a NEW empty paragraph that starts on a new page (paragraph `pageBreakBefore`), and return the position
+  // where it was inserted so the caret can be placed inside it. Unlike the inline hardBreak{page} model, this leaves
+  // a REAL paragraph on the new page — the paged engine paints a caret-bearing line for it natively (the empty-
+  // paragraph render path), so the new page is visible, clickable, and editable. The old inline-break model left the
+  // new page with no paragraph -> no line -> no caret/click (see docs/PAGE_BREAK_ROOT_CAUSE.md).
+  function appendPageBreakParagraph(): number | null {
+    try {
+      const $from = editor.state.selection.$from
+      const at = $from.after(1) // position just after the current top-level block (paragraph)
+      editor.chain().insertContentAt(at, { type: 'paragraph', attrs: { paragraphProperties: { pageBreakBefore: true } } }).run()
+      return at
+    } catch { return null }
+  }
+
   function insertPageBreak(): boolean {
-    const ok = editor.chain().insertPageBreak().run()
+    const at = appendPageBreakParagraph()
+    if (at != null) { try { editor.commands.setTextSelection(at + 1) } catch { /* best-effort caret move */ } }
     refocus()
-    return ok !== false
+    return at != null
   }
 
   function insertBlankPage(): boolean {
-    // Two consecutive page breaks = blank page (Word-faithful)
-    const ok = editor.chain().insertPageBreak().insertPageBreak().run()
+    // Word's Insert > Blank Page = one blank page with the caret on the page after it. Append a blank page-starting
+    // paragraph, then another (the page the caret continues on), and leave the caret in the second.
+    appendPageBreakParagraph()        // the blank page
+    const at = appendPageBreakParagraph() // the page after it (caret here)
+    if (at != null) { try { editor.commands.setTextSelection(at + 1) } catch { /* best-effort */ } }
     refocus()
-    return ok !== false
+    return at != null
   }
 
   // 003 P3: a column break = a hardBreak carrying lineBreakType 'column' (exports <w:br w:type="column"/>,
