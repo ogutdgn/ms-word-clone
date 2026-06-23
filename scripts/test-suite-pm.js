@@ -142,14 +142,16 @@
     ['[4d] table page-alignment: tblAlignCenter/Right/Left → justification attr + w:tblPr/w:jc export', { reason: 'paged ribbon table-op no-op: tblAlign* does not apply against the PE table selection (justification stays undefined)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
     ['[4d] table cell vertical-align: tblVAlignMid → CSS attr "middle" but exports OOXML w:vAlign "center"; top/bottom passthrough; round-trips', { reason: 'paged ribbon table-op no-op: tblVAlignMid does not apply against the PE cell selection (verticalAlign stays null)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
     ['[4d] cell margins: tblCellMargins ribbon flyout (4 distinct sides) → <w:tcMar> twips + re-open PREFILLS current', { reason: 'paged ribbon table-op no-op: the tblCellMargins flyout does not open against the PE table selection (no flyout)', tracker: 'paged ribbon-table command cell-resolution + a probe:table (backlog — per-feature paged reconciliation)' }],
-    // [8] + [11]×2 are DOWNSTREAM victims (not themselves gaps): an earlier round-trip test's programmatic
-    // re-open `PM().openDocx(bytes)` (e.g. [4b] Picture Format Crop) tears down the paged world via the
-    // overlay-only teardown path → failBridge clears `pm-active` + sets `PM.active=false` (instead of the
-    // paged-safe `replaceFile` used by WC.Files.open, cf. 627fec1). The editor instance still edits, so all
-    // content tests pass, but these world-flag / editability invariants then read the torn-down state.
-    ['[8] Restrict Editing enforcement drives engine editability (X3)', { reason: 'downstream of PM().openDocx() tearing down the paged world (failBridge) — enforcement can no longer drive the torn-down editor', tracker: 'paged programmatic open-path: PM().openDocx → replaceFile (cf. the 627fec1 WC.Files.open fix)' }],
-    ['[11] PM is the only world', { reason: 'PM.active is cleared by failBridge after a round-trip PM().openDocx() tears down the paged world (the overlay-only re-open path, not replaceFile)', tracker: 'paged programmatic open-path: PM().openDocx → replaceFile (cf. the 627fec1 WC.Files.open fix)' }],
-    ['[11] body is pm-active', { reason: 'the body pm-active class is removed by failBridge after a round-trip PM().openDocx() tears down the paged world (the overlay-only re-open path, not replaceFile)', tracker: 'paged programmatic open-path: PM().openDocx → replaceFile (cf. the 627fec1 WC.Files.open fix)' }],
+    // [8] + [11]×2 are DOWNSTREAM victims (not themselves gaps): an earlier round-trip test's programmatic re-open
+    // `PM().openDocx(bytes)` (e.g. [4b] Picture Format Crop) tears down the paged world → `failBridge` clears
+    // `pm-active` + sets `PM.active=false`; the editor instance still edits (content tests pass) but these world-flag
+    // / editability invariants then read the torn-down state. CORRECTED (008 P2): the cause is NOT the overlay
+    // `replaceEditor` teardown arm — that arm was already dead in paged (openDocx always took replaceFile) and
+    // deleting it in P2 did NOT fix these. The teardown is in the `openDocx → replaceFile` ROUND-TRIP flow itself
+    // (a re-exported docx re-open throws → failBridge). A real paged programmatic-open gap; its own backlog item.
+    ['[8] Restrict Editing enforcement drives engine editability (X3)', { reason: 'downstream of a round-trip PM().openDocx() re-open tearing down the paged world (failBridge) — enforcement then cannot drive the torn-down editor', tracker: 'paged programmatic open-path: openDocx→replaceFile round-trip teardown (backlog — distinct from the overlay arm, which 008 P2 deleted)' }],
+    ['[11] PM is the only world', { reason: 'PM.active is cleared by failBridge after a round-trip PM().openDocx() re-open tears down the paged world (the openDocx→replaceFile round-trip flow, NOT the overlay arm — 008 P2 confirmed)', tracker: 'paged programmatic open-path: openDocx→replaceFile round-trip teardown (backlog)' }],
+    ['[11] body is pm-active', { reason: 'the body pm-active class is removed by failBridge after a round-trip PM().openDocx() re-open tears down the paged world (the openDocx→replaceFile round-trip flow, NOT the overlay arm — 008 P2 confirmed)', tracker: 'paged programmatic open-path: openDocx→replaceFile round-trip teardown (backlog)' }],
   ]);
 
   const v = () => window.WC.view;

@@ -25,45 +25,11 @@ export async function parseDocx(source: ArrayBuffer): Promise<ParsedDocx> {
   return { docx, mediaFiles, fonts }
 }
 
-// slice 7: non-docx imports thread initial html through the docx constructor leg.
-// onContentError matters because Editor#generatePmData catches a constructor-internal
-// parse failure and emits 'contentError' (Editor.ts:2847-2851) — and the fork's
-// DEFAULT handler RETHROWS it (Editor.ts:750-752: `({ error }) => { throw error; }`).
-// Our override replaces that rethrow with a silent blank doc + flag, so
-// replaceEditor can detect the degradation and recover in-PM instead of unwinding.
-export type ExtraContent = { html?: string; onContentError?: () => void }
-
-// "Change User Name…" (Track Changes Options, T18) persists the identity here.
+// "Change User Name…" (Track Changes Options, T18) persists the identity here. A REAL display
+// identity — stamped as w:author/w:initials on tracked changes + creatorName on comment cards;
+// the dialog persists an override here so the identity survives relaunch + replaceFile remounts.
 function storedAuthorName(): string {
   try { return localStorage.getItem('wc-author-name') || 'Word User' } catch { return 'Word User' }
-}
-
-export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extra?: ExtraContent) {
-  return new (Editor as any)({
-    element: mountEl,
-    mode: 'docx',
-    content: parsed.docx,
-    mediaFiles: parsed.mediaFiles,
-    fonts: parsed.fonts,
-    // slice 7: when set, the doc initializes from HTML via createDocFromHTML while the
-    // converter keeps the (blank-template) docx context — the doc stays docx-exportable.
-    ...(extra?.html ? { html: extra.html } : {}),
-    ...(extra?.onContentError ? { onContentError: extra.onContentError } : {}),
-    extensions: [...getStarterExtensions(), ImageResize],
-    // slice 8 (A2): a REAL display identity — stamped as w:author/w:initials on tracked
-    // changes and as creatorName on comment cards (legacy parity: review-tools/comments
-    // used "Word User"). The oracle compares the author FLOW (stamp → card → docx →
-    // reimport) against real Word, where the name comes from the signed-in account.
-    // Task 6 (T18 "Change User Name…"): the dialog persists an override here so the
-    // identity survives relaunch + replaceEditor remounts.
-    user: { name: storedAuthorName(), email: '' },
-    isDebug: false,
-    telemetry: { enabled: false },
-  })
-}
-
-export async function createPmEditor(mountEl: HTMLElement, source: ArrayBuffer) {
-  return constructPmEditor(mountEl, await parseDocx(source))
 }
 
 // ─── Option-B paged path (WC_LAYOUT=paged) — the standup spike ──────────────────────

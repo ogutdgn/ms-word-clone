@@ -28,7 +28,7 @@ import { installStateSync } from './state-sync'
 import { installFocusGuards } from './focus'
 import { getActiveFormatting } from '@core/helpers/getActiveFormatting.js'
 import { toQueryState } from './state-sync'
-import { parseDocx, constructPmEditor } from './create-editor'
+import { parseDocx } from './create-editor'
 import { blankArrayBuffer } from '@/core/fixture'
 import { textToParagraphHtml, csvToTableHtml } from './file-content'
 import { createCoordinateAdapter } from '@/layout/coordinate-adapter'
@@ -203,21 +203,6 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
   // flag a consumer is about to read.
   lastImportBlanked = false
   const w = window as any
-  // Wire a freshly-constructed editor into the chrome — shared by the normal and
-  // the contentError-recovery paths so both get the identical seam.
-  const wire = (next: AnyEditor) => {
-    // Transaction-seam attach: references w.WC.pm only — safe before WC.view/WC.editor assignment.
-    next.on?.('transaction', () => { ;(w.WC.pm ??= {}).lastTxn = Date.now() }) // logger seam survives reopen
-    // installBridge sets current = editor first; assign WC.view/WC.editor AFTER
-    // so current and WC.editor never disagree.
-    installBridge(next)
-    w.WC.view = next.view
-    w.WC.editor = next
-    w.WC.PM.setClean()
-    // slice 10 PR4: re-attach the live-ink overlay to the freshly-mounted #pm-editor + render
-    // the loaded doc's ink (relink() rebuilds the layer against the new view, then renderInk()).
-    try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
-  }
   try {
     // Phase 1 — validate + PARSE before any teardown: a corrupt file must leave
     // the live editor untouched (spec §5.3 invariant).
@@ -243,8 +228,12 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
       // listeners + all 6 overlays (M4a–M4d). This runs INSIDE the Phase-2 try, so a replaceFile throw → the Phase-2
       // catch → failBridge (replaceFile is NOT validate-before-mutate — once it has run the live doc IS changed, so the
       // Phase-1 'untouched' contract no longer applies). parseDocx above already validated the bytes.
+      // 008: paged is the SOLE engine — load the new doc INTO the live PresentationEditor via replaceFile (the
+      // overlay destroy+reconstruct arm was retired). A missing replaceFile is a hard error → the Phase-2 catch →
+      // failBridge (rather than silently falling back to a now-deleted overlay path).
       const pres = w.WC?.presentation
-      if (w.__WC_LAYOUT_MODE === 'paged' && pres?.editor?.replaceFile) {
+      if (!pres?.editor?.replaceFile) throw new Error('[WC.PM] replaceEditor: PresentationEditor.replaceFile unavailable (paged is the sole engine)')
+      {
         // 002 P1 review #4: if a header/footer editing session is active when the user opens/creates a
         // doc, replaceFile (documentReplaced → refreshStructure) does NOT exit it, so no 'body' mode
         // change fires and the "Header & Footer Tools" tab + bridge state would orphan over the fresh
@@ -273,36 +262,6 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
         pres.editor.view?.focus()
         return true
       }
-      try { current?.destroy?.() } catch { /* old view teardown is best-effort */ }
-      mountEl.innerHTML = ''
-      let contentErr = false
-      const next = constructPmEditor(
-        mountEl,
-        parsed,
-        // CONSTRAINT: the plain-docx leg must NOT get an onContentError override —
-        // it relies on the fork's default RETHROW reaching the phase-2 catch →
-        // failBridge; overriding it would let a docx contentError degrade to a
-        // blank doc and return true (a §5.3 path-binding violation).
-        extra ? { html: extra.html, onContentError: () => { contentErr = true } } : undefined,
-      )
-      if (extra?.html && contentErr) {
-        // CONSTRAINT: a garbage html import degrades to BLANK only because our
-        // onContentError override swallows the error — Editor#generatePmData
-        // catches the createDocFromHTML failure and emits 'contentError', whose
-        // fork-DEFAULT handler rethrows (Editor.ts:750-752); the override turns
-        // that into a silent blank + flag. Without this detection the caller
-        // (files.js) would bind a path to a doc the file does not represent
-        // (§5.3 data loss). Recover by constructing a plain blank editor from the
-        // already-parsed template (keeps PM mode alive instead of failBridge) and
-        // return false so the caller never binds a path to the degraded blank.
-        try { next?.destroy?.() } catch { /* degraded editor teardown is best-effort */ }
-        mountEl.innerHTML = ''
-        lastImportBlanked = true // the old doc is gone — caller must unbind its file state
-        wire(constructPmEditor(mountEl, parsed))
-        return false
-      }
-      wire(next)
-      return true
     } catch (e) {
       // Phase-2 failure: mount may be empty, old editor already destroyed.
       // Recover via failBridge (un-flips to legacy world + toasts).
@@ -497,7 +456,7 @@ export function preinstallBridge() {
       const content = document.getElementById('pm-editor') || pages
       pages.style.marginBottom = (zoom < 1 ? 0 : ((content as HTMLElement).scrollHeight * (zoom - 1))) + 'px'
       if (ww.WC?.StatusBar?.updateZoom) ww.WC.StatusBar.updateZoom()
-      ww.WC.PM.__repaginate?.() // re-measure (Phase 4a): zoom re-layouts without a transaction
+      // (008: the overlay __repaginate re-measure was retired with pagination.ts — the PE re-layouts itself.)
     },
     zoomIn() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom + 0.1) * 10) / 10) },
     zoomOut() { const p = (window as any).WC.PM; p.setZoom(Math.round((p.zoom - 0.1) * 10) / 10) },
@@ -507,7 +466,6 @@ export function preinstallBridge() {
       const wa = document.getElementById('workarea'); if (!wa) return
       wa.classList.remove('view-print', 'view-web', 'view-read', 'view-outline', 'view-draft')
       wa.classList.add('view-' + v)
-      ;(window as any).WC.PM.__repaginate?.() // re-measure (Phase 4a): continuous views drop the page seams
     },
   }
   document.body.classList.add('pm-active')
