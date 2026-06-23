@@ -36,9 +36,10 @@ risk, for tests that are genuinely overlay-rendering-specific anyway.
 | `[insert]` | 1 | Picture **natural-size render** (the rendered `<img>` box) | `probe:imageresize` + insert export |
 | `[1]` | 1 | strike-on-superscript `<s>`-wrap **render** | mark application mode-agnostic |
 
-Total Category A = 22+8+7+7+6+5+3+3+1+1+1+1 = **62**.
+Total Category A (`PAGED_SKIP`) = 22+8+7+7+6+5+3+3+1+1+1+1 = **65** (the planning estimate of 62 was an
+arithmetic slip; the generator + collision-check produced 65 unique names — `summary.pagedSkips=65`).
 
-### Category B — functional / mode-agnostic → INVESTIGATE + paged-aware port (8 tests)
+### Category B — functional / mode-agnostic → INVESTIGATE (5 tests; OUTCOME below)
 
 These are NOT rendering-specific; they go through the (mode-agnostic) `WC.PM` bridge / converter, so they
 *should* pass in paged. They fail only because the **assertion mechanism** queries an overlay construct. Each is
@@ -51,6 +52,26 @@ investigated during implementation; ported to assert the paged equivalent, OR lo
 | `[8]` | 1 | Restrict Editing → PM view read-only | `editable` flag — assert on the **PE view** (`WC.view`) in paged |
 | `[0a]` | 1 | PK-prefixed junk import leaves the live editor intact | import resilience — assert the **live PE** survived |
 | `[11]` | 2 | "PM is the only world" / "body is pm-active" | environment/class guards — assert the paged body class / single-world invariant |
+
+### Category B — OUTCOME (after empirical investigation in a real paged build)
+
+- **`[0a]` → PORTED (genuine pass).** Paged's PE editable DOM is not a `.ProseMirror` directly under
+  `#pm-editor`; the editor genuinely survives the junk import (`v().dom` retains the text, `openDocx` returned
+  `false`). The assertion was retargeted to `v().dom` survival in paged (overlay keeps the `.ProseMirror` mount
+  check). 1 test.
+- **`[7]` → KNOWN-GAP (deferred to feature 010).** `WC.Files.open('*.html')` in paged **dumps the raw HTML as
+  literal text** into one text node instead of parsing it (the super-converter html→doc path isn't wired into the
+  paged open flow; overlay parses it). A REAL paged import-fidelity gap → `PAGED_KNOWN_GAP`, tracked to 010.
+- **`[8]` + `[11]`×2 → KNOWN-GAP (deferred to the open-path fix).** All three PASS in isolation but fail in the
+  full suite as **downstream victims**: an earlier round-trip test's `PM().openDocx(bytes)` re-open (e.g. `[4b]
+  Picture Format Crop`) tears the paged world down via the overlay-only path → `failBridge` clears `pm-active` +
+  sets `PM.active=false` (instead of the paged-safe `replaceFile` `WC.Files.open` uses, cf. `627fec1`). The editor
+  instance still edits (all content tests pass), but the world-flag / editability invariants read the torn state.
+  A REAL paged gap in the programmatic open-path → `PAGED_KNOWN_GAP`, tracked. 3 tests.
+
+So Category B resolved as **1 port + 4 known-gaps** (NOT 8; the planning estimate was wrong). The honesty
+invariant (FR-005) holds: nothing functional was silently skipped — the 4 gaps are visible (`⚠️`, with trackers)
+and surfaced via `summary.pagedKnownGaps`.
 
 ## Decision 3 — Harden the localStorage footgun (FR-006)
 
