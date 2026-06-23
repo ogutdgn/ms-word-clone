@@ -175,7 +175,7 @@ const AREA: Record<string, string> = {
 // paint the margin numbers, so the in-app render is an owned overlay (line-numbers-overlay.js, P2).
 // hyphenation (005): WC.PM.setHyphenation writes document-level settings.xml (w:autoHyphenation etc.) via an
 // owned converter write (no fork translator); in-app mid-word hyphenation render is out of scope (export-faithful).
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers', 'hyphenation'])
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers', 'hyphenation', 'position', 'align', 'rotate'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -367,7 +367,7 @@ export function preinstallBridge() {
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
     insertColumnBreak: () => false, insertLineBreak: () => false,
-    setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, setImageTransform: () => false, setImagePosition: () => false, setImageGrayscale: () => false, // Phase 4b/4c pre-mount stubs (replaced by installInsert on mount)
+    setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, setImageTransform: () => false, setImagePosition: () => false, setImageAlign: () => false, setImageGrayscale: () => false, // Phase 4b/4c + 012 pre-mount stubs (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
     insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,
     tableDeleteRow: () => false, tableDeleteColumn: () => false, tableDeleteTable: () => false,

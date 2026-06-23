@@ -961,7 +961,11 @@
       { label: 'Cancel' },
     ] });
   }
-  H.position = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('In Line with Text')); fly.appendChild(WC.flyItem('In Line with Text', { onClick: () => WC.PM.setImageWrap('inline') })); fly.appendChild(WC.flyHeader('With Text Wrapping')); [['Top Left', 'tl'], ['Top Center', 'tc'], ['Top Right', 'tr'], ['Middle Left', 'ml'], ['Middle Center', 'mc'], ['Middle Right', 'mr'], ['Bottom Left', 'bl'], ['Bottom Center', 'bc'], ['Bottom Right', 'br']].forEach(([l, p]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.Layout.position(p) }))); });
+  // 012 (frames group): wired onto WC.PM (was the retired WC.Layout). "In Line with Text" = setImageWrap('inline');
+  // the 9 "With Text Wrapping" presets apply square wrap + HORIZONTAL margin-relative align per column (l/c/r). v1
+  // limitation: the vertical row (Top/Middle/Bottom) aligns horizontally only — full 2D margin-relative placement is
+  // a follow-up (it needs a vertical page/margin anchor).
+  H.position = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyHeader('In Line with Text')); fly.appendChild(WC.flyItem('In Line with Text', { onClick: () => WC.PM.setImageWrap('inline') })); fly.appendChild(WC.flyHeader('With Text Wrapping')); [['Top Left', 'left'], ['Top Center', 'center'], ['Top Right', 'right'], ['Middle Left', 'left'], ['Middle Center', 'center'], ['Middle Right', 'right'], ['Bottom Left', 'left'], ['Bottom Center', 'center'], ['Bottom Right', 'right']].forEach(([l, h]) => fly.appendChild(WC.flyItem(l, { onClick: () => { WC.PM.setImageWrap('square'); WC.PM.setImageAlign({ h }); } }))); });
   H.wrapText = (c, node) => WC.flyout(node, (fly) => { [['In Line with Text', 'inline'], ['Square', 'square'], ['Tight', 'tight'], ['Through', 'through'], ['Top and Bottom', 'topbottom'], ['Behind Text', 'behind'], ['In Front of Text', 'front']].forEach(([l, m]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.PM.setImageWrap(m) }))); });
   H.bringForward = () => WC.PM.setImageZOrder('forward');
   // Picture Format → Size: toggle the selected picture's aspect-ratio lock. When UNLOCKED the
@@ -980,18 +984,19 @@
     );
   };
   H.sendBackward = () => WC.PM.setImageZOrder('backward');
-  H.selectionPane = () => WC.Layout.selectionPane();
+  H.selectionPane = () => WC.notImplemented('Selection Pane'); // deferred (UI pane, not an OOXML write); also isBlocked-gated
+  // 012 (frames group): wired onto WC.PM (was the retired WC.Layout). Align Left/Center/Right = horizontal,
+  // margin-relative (setImageAlign on the selected floating picture). Vertical align (Top/Middle/Bottom) + Distribute
+  // (multi-object) are v1 follow-ups (need a vertical page anchor / multi-selection).
   H.align = (c, node) => WC.flyout(node, (fly) => {
-    [['Align Left', 'left'], ['Align Center', 'center'], ['Align Right', 'right'], ['Align Top', 'top'], ['Align Middle', 'middle'], ['Align Bottom', 'bottom']].forEach(([l, p]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.Layout.align(p) })));
+    [['Align Left', 'left'], ['Align Center', 'center'], ['Align Right', 'right']].forEach(([l, h]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.PM.setImageAlign({ h }) })));
     fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem('Distribute Horizontally', { onClick: () => WC.Layout.distribute('h') }));
-    fly.appendChild(WC.flyItem('Distribute Vertically', { onClick: () => WC.Layout.distribute('v') }));
-    fly.appendChild(WC.flySep());
-    fly.appendChild(WC.flyItem((WC.Layout.alignTo === 'page' ? '✓ ' : '   ') + 'Align to Page', { onClick: () => { WC.Layout.alignTo = 'page'; } }));
-    fly.appendChild(WC.flyItem((WC.Layout.alignTo !== 'page' ? '✓ ' : '   ') + 'Align to Margin', { onClick: () => { WC.Layout.alignTo = 'margin'; } }));
+    [['Align Top'], ['Align Middle'], ['Align Bottom'], ['Distribute Horizontally'], ['Distribute Vertically']].forEach(([l]) => fly.appendChild(WC.flyItem(l, { onClick: () => WC.toast(l + ' is a follow-up', 'Horizontal align (Left/Center/Right, relative to the margin) is wired; vertical align + distribute are deferred.') })));
   });
   H.group = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Group', { onClick: () => WC.toast('Grouping is approximated — arrange objects individually.') })); fly.appendChild(WC.flyItem('Ungroup', { onClick: () => WC.toast('Ungroup') })); });
-  H.rotate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Rotate Right 90°', { onClick: () => WC.Layout.rotate(90) })); fly.appendChild(WC.flyItem('Rotate Left 90°', { onClick: () => WC.Layout.rotate(-90) })); fly.appendChild(WC.flyItem('Flip Vertical', { onClick: () => WC.Layout.flip('v') })); fly.appendChild(WC.flyItem('Flip Horizontal', { onClick: () => WC.Layout.flip('h') })); });
+  // 012 (frames group): wired onto WC.PM.setImageTransform (was the retired WC.Layout). Rotate is a relative delta
+  // (90/−90 → a:xfrm rot); flips TOGGLE (flipH/flipV). Operates on the selected picture (in-line or floating).
+  H.rotate = (c, node) => WC.flyout(node, (fly) => { fly.appendChild(WC.flyItem('Rotate Right 90°', { onClick: () => WC.PM.setImageTransform({ rotate: 90 }) })); fly.appendChild(WC.flyItem('Rotate Left 90°', { onClick: () => WC.PM.setImageTransform({ rotate: -90 }) })); fly.appendChild(WC.flySep()); fly.appendChild(WC.flyItem('Flip Vertical', { onClick: () => WC.PM.setImageTransform({ flipV: true }) })); fly.appendChild(WC.flyItem('Flip Horizontal', { onClick: () => WC.PM.setImageTransform({ flipH: true }) })); });
 
   // ---- References tab ----
   H.tableOfContents = (c, node) => WC.flyout(node, (fly) => {

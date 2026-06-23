@@ -193,19 +193,17 @@
   await t('[0a] invariants: telemetry off, WC intact', () =>
     (window.__NET_LOG || []).length === 0 && !!window.WC.Ribbon);
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
-    // Repointed (005): `hyphenation` shipped (ENGINE_READY) — the run-block probe moves to `position`
-    // (AREA layout-arrange, still Phase-7-gated, NOT in ENGINE_READY — stays blocked, so dispatching it
-    // toasts and opens no flyout/modal).
-    window.WC.Commands.run({ cmd: 'position', label: 'Position' });
+    // Repointed (012): `position`/`align`/`rotate` shipped (ENGINE_READY) — the run-block probe moves to `group`
+    // (AREA layout-arrange, still deferred, NOT in ENGINE_READY — multi-object grouping; stays blocked, so
+    // dispatching it toasts and opens no flyout/modal). `selectionPane` is the other still-deferred rep.
+    window.WC.Commands.run({ cmd: 'group', label: 'Group' });
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
   await t('[0a] D6 dispatch block: unflipped dropdown does not open', () => {
-    // Repointed (005): `hyphenation` shipped (ENGINE_READY) — the dropdown-block probe moves to
-    // `position` (AREA layout-arrange, still Phase-7-gated). The block is verified by open===0: the
-    // isBlocked gate returns BEFORE H.position runs. (Don't rely on H.position itself — like several
-    // still-deferred layout handlers it still calls the retired WC.Layout and would THROW if ever reached;
-    // that handler MUST be rewired off WC.Layout before `position` is ever added to ENGINE_READY.)
-    window.WC.Commands.dropdown({ cmd: 'position', type: 'dropdown' }, document.body);
+    // Repointed (012): `position` shipped (ENGINE_READY) — the dropdown-block probe moves to `group` (AREA
+    // layout-arrange, still deferred). The block is verified by open===0: the isBlocked gate returns BEFORE
+    // H.group runs (H.group is itself a harmless toast handler, but the gate must fire first).
+    window.WC.Commands.dropdown({ cmd: 'group', type: 'dropdown' }, document.body);
     const open = document.querySelectorAll('.flyout').length;
     window.WC.closeFlyouts();
     return open === 0;
@@ -2124,13 +2122,15 @@
   await t('[4b] Picture Format Arrange cmds are un-blocked (shipped engine) + reach the bridge', async () => {
     // Regression for the stale-DEFERRED bug: wrapText/bringForward/sendBackward ship engine
     // support (4c.1 wrap / 4c.3 z-order) but were gated by the coarse layout-arrange DEFERRED
-    // flag, so the ribbon path toasted "not available" instead of acting. ENGINE_READY un-blocks
-    // exactly those three; the still-undefined cmds (align/group/rotate/position) stay blocked.
+    // flag. ENGINE_READY un-blocks them. 012 (frames group) additionally un-blocks position/align/
+    // rotate (now wired to WC.PM.setImageAlign/setImageTransform); group/selectionPane stay deferred.
     if (PM().isBlocked('wrapText') !== false) return 'wrapText still blocked';
     if (PM().isBlocked('bringForward') !== false) return 'bringForward still blocked';
     if (PM().isBlocked('sendBackward') !== false) return 'sendBackward still blocked';
-    if (PM().isBlocked('align') !== true) return 'align should STAY blocked (WC.Layout.align is undefined)';
-    if (PM().isBlocked('rotate') !== true) return 'rotate should STAY blocked';
+    if (PM().isBlocked('position') !== false) return 'position should be un-blocked (012)';
+    if (PM().isBlocked('align') !== false) return 'align should be un-blocked (012)';
+    if (PM().isBlocked('rotate') !== false) return 'rotate should be un-blocked (012)';
+    if (PM().isBlocked('group') !== true) return 'group should STAY deferred (multi-object)';
     // End-to-end: dispatching the ribbon control reaches the bridge verb (was notifyBlocked before).
     setDoc('arr: ');
     await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 90), 'arr.png');
@@ -5959,7 +5959,7 @@
   // text + variants + page numbers are now UNBLOCKED as their engine support shipped (ENGINE_READY). `position`
   // is the still-blocked layout-ARRANGE representative (floating-object position — AREA layout-arrange, not in
   // ENGINE_READY); `docInfo` is the still-blocked header-footer representative (Document Info fields).
-  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('position') === true);
+  await t('[11] deferred Phase-7 areas still honestly blocked', () => window.WC.PM.isBlocked && window.WC.PM.isBlocked('docInfo') === true && window.WC.PM.isBlocked('group') === true);
   await t('[11] command hub intact (Commands.run does not throw)', () => { window.WC.Commands.run({ cmd: 'bold' }); return window.WC.view.state.doc.content.size > 0; });
 
   // ---------- Phase 4a: pagination core (src/renderer/pagination/pagination.ts) ----------

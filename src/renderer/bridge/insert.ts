@@ -569,6 +569,26 @@ export function installInsert(editor: AnyEditor) {
     return true
   }
 
+  // 012 (frames group) — HORIZONTAL align a FLOATING picture relative to the margin (Word's Arrange → Align →
+  // Align Left/Center/Right, "Align to Margin"). Computes the column-relative offset from the page text width
+  // (getPageStyles, inches→px) minus the picture width, then delegates to setImagePosition (which owns the floating
+  // /imported-anchor guards + the wp:positionH posOffset write). left=0, center=(colW−imgW)/2, right=colW−imgW.
+  // Word reads it back as Shape.Left at the computed offset (RelativeHorizontalPosition=column). Vertical align
+  // (top/middle/bottom) needs a page/margin VERTICAL anchor and is a documented v1 follow-up.
+  function setImageAlign(opts: { h?: 'left' | 'center' | 'right' }): boolean {
+    const sel = selectedImage()
+    if (!sel) { (window as any).WC?.toast?.('Select a picture first', 'Click a picture, then align it.'); return false }
+    if (!sel.node.attrs.isAnchor) { (window as any).WC?.toast?.('Align needs a floating picture', 'Use Wrap Text (e.g. Square) first — an in-line picture flows with the text.'); return false }
+    const ps = ((editor as any).getPageStyles && (editor as any).getPageStyles()) || {}
+    const wIn = ps?.pageSize?.width ?? 8.5, lIn = ps?.pageMargins?.left ?? 1, rIn = ps?.pageMargins?.right ?? 1
+    const colW = Math.max(40, Math.round((wIn - lIn - rIn) * 96))
+    const imgW = Number(sel.node.attrs.size?.width) || 0
+    let horizontal = 0
+    if (opts.h === 'center') horizontal = Math.max(0, Math.round((colW - imgW) / 2))
+    else if (opts.h === 'right') horizontal = Math.max(0, colW - imgW)
+    return setImagePosition({ horizontal })
+  }
+
   return {
     setImageWrap,
     setImageZOrder,
@@ -577,6 +597,7 @@ export function installInsert(editor: AnyEditor) {
     setImageAltText,
     setImageCrop,
     setImagePosition,
+    setImageAlign,
     setImageTransform,
     setImageGrayscale,
     insertLink,
