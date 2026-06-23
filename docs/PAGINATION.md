@@ -8,15 +8,13 @@
 > CSS still inform the current design.
 >
 > **Current state (2026-06-21 — paged-render migration COMPLETE):** the document is a **ProseMirror editor**
-> mounted at `#pm-editor`, rendered **by default** by the **paged SuperDoc PresentationEditor** into **real
-> per-page sheets** (`.superdoc-page` per page). The layout engine described in
-> **[LAYOUT_ENGINE.md](LAYOUT_ENGINE.md)** has SHIPPED and is the `WC_LAYOUT` default (flipped `'overlay'`→`'paged'`
-> in `src/renderer/main.ts`, FR-013); it provides real, model-driven multi-page layout (line-level splitting,
-> per-page rendering, page-number context) and was validated against the Word-for-Windows COM oracle across the
-> M1–M6 milestones. The **legacy continuous-flow page sheet** (`.page` in
-> `src/renderer/public/styles/editor.css`; geometry vars in `.../styles/base.css`; **no `repaginate()` engine**)
-> survives only behind `WC_LAYOUT=overlay npm run build` and is slated for retirement (see also
-> [docs/decisions/](decisions/) C1 and `docs/plan/deferrals.md` §A). **This document is the prior art** for the
+> mounted at `#pm-editor`, rendered by the **paged SuperDoc PresentationEditor** into **real per-page sheets**
+> (`.superdoc-page` per page). The layout engine described in **[LAYOUT_ENGINE.md](LAYOUT_ENGINE.md)** has SHIPPED
+> as the SOLE engine (FR-013; the `WC_LAYOUT` toggle + the legacy continuous-flow `overlay` paint were fully
+> removed in feature 008 — there is no `WC_LAYOUT=overlay` mode); it provides real, model-driven multi-page layout
+> (line-level splitting, per-page rendering, page-number context) and was validated against the Word-for-Windows
+> COM oracle across the M1–M6 milestones. (The former legacy continuous-flow page sheet has been retired.)
+> **This document is the prior art** for the
 > engine — its geometry, binary-search line split, and caret-as-char-offset trick informed the design (operating
 > on the PM model, not editable DOM).
 

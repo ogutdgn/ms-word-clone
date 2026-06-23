@@ -13,11 +13,11 @@
 |---|---|
 | ✅ **In scope** | should work; a Phase-3 fix target. |
 | ⛔ **Out of scope** | deliberately NOT built — permanent (e.g. Adobe Acrobat, Voice/Dictate, Add-ins, cloud-only services). |
-| 🕗 **Layout-reconciling (engine shipped)** | needed the pagination/layout engine; **flagged, not hacked** (→ [deferrals.md](plan/deferrals.md) §A.1). The engine — the paged SuperDoc PresentationEditor — has SHIPPED as the default (FR-013, 2026-06-21); these are now being reconciled **per-feature** against it. |
+| 🕗 **Layout-reconciling (engine shipped)** | needed the pagination/layout engine; **flagged, not hacked** (→ [deferrals.md](plan/deferrals.md) §A.1). The engine — the paged SuperDoc PresentationEditor — has SHIPPED as the sole render engine (default since FR-013, 2026-06-21; the legacy continuous-flow overlay engine was retired in 008); these are now being reconciled **per-feature** against it. |
 
 > **Flag-don't-hack rule:** a layout-coupled feature is recorded 🕗 with its *specific
 > requirement* in `deferrals.md` §A.1 (the layout-engine spec) — it is **never** faked with a
-> continuous-flow DOM hack; it is realized for real by the now-default paged layout engine. (The legacy spacer-hack pagination was deleted in slice 11; do
+> continuous-flow DOM hack; it is realized for real by the paged layout engine — the sole render engine (the legacy continuous-flow overlay engine was retired in 008). (The legacy spacer-hack pagination was deleted in slice 11; do
 > not grow a new one.) **Classifier:** multi-page · floating-object position · text-wrap ·
 > headers/footers-on-page · columns · vertical page geometry.
 
@@ -107,7 +107,7 @@ feature wiring stands; this pass fixes the ribbon arrangement + label visibility
 | Ribbon | Small stacked buttons keep their **labels** (Word arrangement) | ✅ In scope | THE reported bug (only icons on a narrow screen). `LARGE` set trimmed to the genuinely-large Insert buttons; the rest render as small labeled buttons stacked 3-per-column (`renderControl` `labeled` opt). Condense only ever hides LARGE-button labels, so the many small labels stay visible |
 | Pages / Tables / Illustrations / Links / Text / Symbols | feature behaviour | ✅ In scope (slice 10) | Cover Page, Blank Page, Page Break, Table, Pictures, Shapes, Icons, 3D Models, SmartArt, Chart, Screenshot, Link, Bookmark, Cross-reference, Text Box, WordArt, Drop Cap, Date & Time, Quick Parts, Object, Equation, Symbol — real inserts / honest toasts |
 | Header & Footer | Header / Footer / Page Number | ✅ Done (002 P1+P2+P3, Word-COM-validated) | on-page enter/edit/close + the "Header & Footer Tools" contextual tab (P1); Different First Page / Odd & Even variants (P2); real OOXML `PAGE`-field page numbers (P3). All round-trip to real Word (flags + variant text + `wdFieldPage` read back == authored). KNOWN: the paged engine doesn't resolve a *freshly-inserted* page-number field's number in-app (shows "0"); Word + a reopen render it correctly — deferrals.md §A.1 |
-| Illustrations / Text | Floating-object position + text-wrap | 🕗 Reconciling (engine shipped) | insertion + export are real (slice-10 anchors); off-flow positioning is now engine-backed (paged default), wiring being reconciled |
+| Illustrations / Text | Floating-object position + text-wrap | 🕗 Reconciling (engine shipped) | insertion + export are real (slice-10 anchors); off-flow positioning is now engine-backed (paged engine, sole since 008), wiring being reconciled |
 
 ## Draw
 _TBD._
@@ -129,13 +129,13 @@ _TBD._
 _TBD._
 
 ## Mailings
-_TBD — envelopes/labels page geometry is now supported by the default paged layout engine (deferrals.md §A)._
+_TBD — envelopes/labels page geometry is now supported by the paged layout engine (the sole render engine since 008) (deferrals.md §A)._
 
 ## Review
 _TBD._
 
 ## View
-_TBD — multi-page layout is live in the default paged engine; multi-page View modes / Side-to-Side wiring pending reconciliation._
+_TBD — multi-page layout is live in the paged engine (the sole render engine since 008); multi-page View modes / Side-to-Side wiring pending reconciliation._
 
 ## File (Backstage)
 _TBD._

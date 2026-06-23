@@ -17,10 +17,9 @@ first, then dive into the linked `docs/`.
 >
 > **SINGLE WORLD:** the renderer builds with **electron-vite + TypeScript**, and the document core
 > is an **owned, vendored ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`,
-> no `superdoc` npm dep, telemetry off) mounted at `#pm-editor`. As of 2026-06-21 (FR-013) the default
-> rendering mode is the **paged** SuperDoc PresentationEditor, which paints real per-page multi-page sheets;
-> the legacy continuous-flow `overlay` paint is reachable only via `WC_LAYOUT=overlay npm run build` and is
-> slated for retirement. Phase 2 wired every ribbon area onto
+> no `superdoc` npm dep, telemetry off) mounted at `#pm-editor`. The rendering engine is the **paged** SuperDoc
+> PresentationEditor (real per-page multi-page sheets) — the SOLE engine since 2026-06-21 (FR-013); the legacy
+> continuous-flow `overlay` paint + the `WC_LAYOUT` toggle were retired in feature 008. Phase 2 wired every ribbon area onto
 > that engine via the `WC.PM` bridge (`src/renderer/bridge/*.ts`): character/paragraph/lists/styles,
 > clipboard + editing-misc, find-replace, insert-basics + full Table Tools, file-io (docx/html/txt/csv
 > open + docx/html/txt save; `test:roundtrip` is THE docx gate), review (Track Changes + comments that
@@ -100,9 +99,9 @@ Read the doc that matches your task:
   the runtime contextual-tab mechanism. **How to add/change a control.**
 - [docs/ICONS.md](docs/ICONS.md) — `WC.icon()` resolution, the Fluent mapping, and
   the `gen-icons.js` build step. **How to add/remap an icon.**
-- [docs/PAGINATION.md](docs/PAGINATION.md) — the page sheet: real per-page multi-page sheets are LIVE
-  by default (the paged PresentationEditor, the `WC_LAYOUT` default since FR-013); the legacy continuous-flow
-  `overlay` sheet is reachable only via `WC_LAYOUT=overlay`.
+- [docs/PAGINATION.md](docs/PAGINATION.md) — the page sheet: real per-page multi-page sheets are LIVE via the
+  paged PresentationEditor, the SOLE engine (the legacy continuous-flow `overlay` sheet + the `WC_LAYOUT` toggle
+  were retired in feature 008).
 - [docs/FEATURES.md](docs/FEATURES.md) — tab-by-tab feature inventory; links to
   each `docs/*_TAB.md`, the UI-fidelity audit, and `NOT_IMPLEMENTED.md`.
 - [docs/BUILD_AND_RUN.md](docs/BUILD_AND_RUN.md) — how to run, the headless QA
@@ -124,10 +123,10 @@ Read the doc that matches your task:
 # run (builds via electron-vite, then launches)
 npm start
 
-# PM functional suite — returns JSON to --probe-out. Validates the OVERLAY engine (475); build OVERLAY
-# (a boot-mode guard fails loudly against a paged build). Paged rendering is covered by the probe:* probes.
-WC_LAYOUT=overlay npm run build && npm run test:pm
-node -e "const r=require('/tmp/wc-pm.json');console.log(r.summary)"
+# PM functional suite (paged-only, 416 — asserts mode=paged). 008 deleted the 59 overlay-only tests; their
+# paged coverage is in the probe:* probes (see specs/008-overlay-retirement/test-mapping.md).
+npm run build && npm run test:pm
+node -e "const r=require('/tmp/wc-pm-paged.json');console.log(r.summary)"
 
 # PM-core smoke (9)
 npm run build && npm run test:smoke

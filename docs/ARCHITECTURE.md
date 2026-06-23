@@ -5,8 +5,9 @@ renderer built by **electron-vite + TypeScript**. The document is a single
 **owned ProseMirror engine forked from SuperDoc** (`src/renderer/core/superdoc-fork/`)
 mounted at `#pm-editor` and driven through the `WC.PM` bridge
 (`src/renderer/bridge/*.ts`). As of 2026-06-21 (FR-013) the default rendering mode
-is the **paged** SuperDoc PresentationEditor, which paints real per-page sheets; the
-legacy continuous-flow `overlay` paint is reachable only via `WC_LAYOUT=overlay npm run build`.
+is the **paged** SuperDoc PresentationEditor, which paints real per-page sheets; this
+is now the **sole** rendering engine (the legacy continuous-flow `overlay` paint was
+retired in feature 008 — there is no `WC_LAYOUT=overlay` mode).
 The shared chrome around it (ribbon, dialogs,
 backstage, statusbar) is still **vanilla JavaScript** — classic `<script>` tags
 loaded in dependency order onto a global `WC` namespace (its WC→TS/ESM migration
@@ -230,10 +231,10 @@ transaction:
 - **Focus & overlays:** `focus.ts`, the ink overlay (`ink-overlay.ts`), and the
   comments/track chrome (`comments-ui.ts`, `track-chrome.ts`) layer UI over the view.
 
-The default engine is the **paged** SuperDoc PresentationEditor, which paints real
-per-page sheets (real, model-driven multi-page layout). The legacy continuous-flow
-`overlay` sheet is reachable only via `WC_LAYOUT=overlay npm run build` during the
-transition and is slated for retirement (see [PAGINATION.md](PAGINATION.md)).
+The sole rendering engine is the **paged** SuperDoc PresentationEditor, which paints
+real per-page sheets (real, model-driven multi-page layout). The legacy continuous-flow
+`overlay` sheet was retired in feature 008 — there is no `WC_LAYOUT=overlay` mode
+(see [PAGINATION.md](PAGINATION.md)).
 
 ---
 

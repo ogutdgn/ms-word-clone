@@ -1,8 +1,10 @@
-# Layout Engine — Phase 4 (DONE — the paged PresentationEditor is the default engine)
+# Layout Engine — Phase 4 (DONE — the paged PresentationEditor is the sole engine)
 
-> **Status: ENGINE SHIPPED as the default (2026-06-21, FR-013).** The paged-render migration
-> (M1–M6) adopted SuperDoc's per-page **PresentationEditor** as the layout engine and flipped it to
-> the `WC_LAYOUT` default (`'overlay'`→`'paged'` in `src/renderer/main.ts`). The FOUNDATION this doc
+> **Status: ENGINE SHIPPED as the SOLE engine.** The paged-render migration
+> (M1–M6) adopted SuperDoc's per-page **PresentationEditor** as the layout engine and made it
+> the default (`'overlay'`→`'paged'` in `src/renderer/main.ts`, 2026-06-21, FR-013); the legacy
+> continuous-flow `overlay` engine and the `WC_LAYOUT` toggle were then **fully removed in feature 008**,
+> leaving the paged PresentationEditor as the only rendering engine. The FOUNDATION this doc
 > called for is built and shipping; the per-feature acceptance items below are now reconcilable against
 > it (some — real multi-page pagination, image resize — are already live; others await per-feature
 > wiring). This remains the single source of truth for the layout-engine work. Origin: the 2026-06-15
@@ -18,9 +20,9 @@
 
 Phase 3 (ribbon tab-by-tab hardening) finished the *commands* and *chrome*, but it kept
 hitting a wall: a large class of features and bugs are not cosmetic gaps — they are
-**fundamentally blocked on the absence of a geometry/layout pass**. The document today is a
-**single continuous-flow page sheet** (`#pm-editor`, one `.page`) — now the **legacy `overlay` mode**
-(reachable only via `WC_LAYOUT=overlay`) — which had **no concept of**:
+**fundamentally blocked on the absence of a geometry/layout pass**. Before the engine, the document was a
+**single continuous-flow page sheet** (`#pm-editor`, one `.page`) — the legacy `overlay` paint, since
+**retired in feature 008** — which had **no concept of**:
 
 - page **boundaries** (real multi-page sheets, page breaks, page numbers),
 - **frames** with positions (a floating object anchored + positioned + wrapped),
@@ -33,7 +35,7 @@ row-splitting-across-pages** need a grid layout pass; borders *store + export*, 
 borders** need a margin-frame render. Every one of these traces back to the same missing
 foundation.
 
-**Decision (DONE):** the layout engine was built **first** (Phase 4) and has shipped as the default
+**Decision (DONE):** the layout engine was built **first** (Phase 4) and has shipped as the sole
 paged PresentationEditor, so the gated bugs are now fixable. We did **not** hack continuous-flow
 workarounds (that was the rule all along — `deferrals.md` §A.1 flagged them; this doc turned that flag
 list into the build plan the migration executed).
@@ -67,7 +69,7 @@ compared to real Word.
 Each row is a currently-gated feature/bug (mostly from `deferrals.md` §A.1 + the editor bugs
 found 2026-06-15). The engine is "done" when these are demonstrably fixable and fixed.
 
-> **Status (2026-06-21):** the engine has SHIPPED as the default paged PresentationEditor. The
+> **Status (2026-06-21):** the engine has SHIPPED as the sole paged PresentationEditor. The
 > "What was blocked" column below is the **pre-engine baseline** (the motivation), not the current
 > state — resolution is now tracked **per-feature**. Already LIVE in paged: real multi-page pagination
 > (#1) and image resize (#2 — the `ImageResize` plugin runs in the paged PE, M4b). The rest are now

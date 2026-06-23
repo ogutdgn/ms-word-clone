@@ -14,11 +14,11 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 > - **Start each session at [docs/plan/](docs/plan/):** `last-point.md` (where we are),
 >   `execution-map.md` (what to do now), `plan.md` (the roadmap + dev process). Keep these
 >   current with the **`plan-tracking`** skill (`.claude/skills/plan-tracking/`) at session end.
-> - **LAYOUT ENGINE (Phase 4) — COMPLETE & SHIPPING as the default (paged-render migration, FR-013, 2026-06-21).**
->   The paged SuperDoc **PresentationEditor** is the default rendering mode (`WC_LAYOUT` default flipped
->   `'overlay'`→`'paged'` in `src/renderer/main.ts`) and paints real per-page multi-page sheets. The legacy
->   continuous-flow `overlay` engine survives only behind `WC_LAYOUT=overlay npm run build` and is slated for
->   retirement. The engine that gated the bug class (image/table **resize+relocate**, floating objects, multi-page,
+> - **LAYOUT ENGINE (Phase 4) — COMPLETE & the SOLE engine (paged-render migration FR-013, 2026-06-21; overlay
+>   retired in 008, general-done).** The paged SuperDoc **PresentationEditor** is the ONLY rendering engine — it
+>   paints real per-page multi-page sheets. The legacy continuous-flow `overlay` engine + the `WC_LAYOUT` toggle
+>   were fully removed in feature 008 (there is no `WC_LAYOUT=overlay` mode). The engine that gated the bug class
+>   (image/table **resize+relocate**, floating objects, multi-page,
 >   headers/footers, page borders, columns) has shipped — those areas are now layout-engine-backed and being
 >   reconciled **per-feature** against it (no longer blocked on a future engine). Spec + acceptance + the migration
 >   milestones (M1–M6): **[docs/LAYOUT_ENGINE.md](docs/LAYOUT_ENGINE.md)**.
@@ -46,16 +46,16 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 
 - **Stack:** Electron 31 shell; renderer built by **electron-vite + TypeScript**. The **owned ProseMirror
   core** (`#pm-editor`, TS/ESM: `src/renderer/main.ts` → vendored fork in `src/renderer/core/superdoc-fork/`,
-  single `prosemirror-model` copy, telemetry off) is the **only** editor; its default rendering mode is the
-  **paged** SuperDoc PresentationEditor (real per-page sheets), with the legacy continuous-flow `overlay` paint
-  reachable only via `WC_LAYOUT=overlay npm run build`. The shared chrome (ribbon,
+  single `prosemirror-model` copy, telemetry off) is the **only** editor; its rendering engine is the **paged**
+  SuperDoc PresentationEditor (real per-page sheets) — the SOLE engine (the legacy continuous-flow `overlay` paint
+  + the `WC_LAYOUT` toggle were retired in feature 008). The shared chrome (ribbon,
   dialogs, backstage, statusbar) is still vanilla JS on the `window.WC` namespace — classic `<script>` tags
   under `src/renderer/public/js/` — kept as-is; its WC→TS/ESM migration is DEFERRED to a future slice. Main
   process (plain CJS) owns fs + `.docx` via the `window.wordAPI` `contextBridge` bridge.
 - **Document:** `#pm-editor` driven by the `WC.PM` bridge (`src/renderer/bridge/*.ts` — commands/io/
-  state-sync/focus). The default **paged** engine (the SuperDoc PresentationEditor) paints real per-page
-  multi-page sheets; the legacy continuous-flow `overlay` engine survives only behind `WC_LAYOUT=overlay` and is
-  slated for retirement — see [docs/PAGINATION.md](docs/PAGINATION.md).
+  state-sync/focus). The **paged** engine (the SuperDoc PresentationEditor) is the sole engine, painting real
+  per-page multi-page sheets (the legacy continuous-flow `overlay` engine was retired in 008) — see
+  [docs/PAGINATION.md](docs/PAGINATION.md).
 - **Ribbon:** data-driven from `WC.RIBBON` (10 tabs / 212 controls) →
   `WC.Ribbon` renders → `WC.Commands` dispatches `H[cmd]` (PM-only — each handler drives the `WC.PM` bridge).
   See [docs/RIBBON.md](docs/RIBBON.md).
@@ -101,13 +101,13 @@ from-scratch, faithful Microsoft Word desktop clone (Electron + electron-vite + 
 ```bash
 npm start                                   # build (electron-vite) + run the app
 
-# Gate suites — always build first:
-WC_LAYOUT=overlay npm run build && npm run test:pm  # PM functional suite — validates the OVERLAY engine (475);
-                                            #   a boot-mode guard FAILS LOUDLY against a paged build. Paged is
-                                            #   validated by the dedicated probes (probe:*). See memory
-                                            #   paged-testpm-overlay-suite.
-npm run build && npm run test:smoke         # PM-core smoke (9) — mode-agnostic (default paged build OK)
-npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate) — mode-agnostic
+# Gate suites — always build first (paged is the sole engine since 008):
+npm run build && npm run test:pm            # PM functional suite (paged-only, 416) — asserts mode=paged.
+                                            #   (008 deleted the 59 overlay-only tests; their paged coverage is
+                                            #   in the dedicated probes — see specs/008-overlay-retirement/test-mapping.md.)
+npm run build && npm run test:smoke         # PM-core smoke (9)
+npm run build && npm run test:roundtrip     # PM-converter docx round-trip (THE docx gate)
+npm run build && npm run test:bundle        # renderer entry-size gate (4) — the PE stays code-split out of the entry
 ```
 
 <!-- SPECKIT START -->
