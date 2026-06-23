@@ -1,127 +1,35 @@
-/* PM-world functional suite (Phase 2). MODE-AWARE since 007 — runs in BOTH overlay and paged:
-     overlay gate:  WC_LAYOUT=overlay npm run build && npm run test:pm   (→ run-pm-overlay.js, asserts mode=overlay)
-     paged gate:    npm run build && npm run test:pm:paged               (→ run-pm-paged.js,   asserts mode=paged)
-   65 overlay-only tests (PM.__pagination, the #pm-notes-area overlay, overlay table/list/border/image DOM) are
-   skip-passed in paged via PAGED_SKIP (each naming the covering probe); real paged functional gaps found while
-   porting are visible deferred passes via PAGED_KNOWN_GAP. Both runners use a FRESH user-data-dir + a mode
-   assertion so a stale localStorage WC_LAYOUT can't silently flip the build (the false-green this killed — see
-   memory paged-testpm-overlay-suite). Sentinel-gated. Same JSON contract as test-suite.js. */
+/* PM-world functional suite (Phase 2). PAGED-ONLY since 008 (the overlay engine was retired):
+     gate:  npm run build && npm run test:pm   (→ run-pm-paged.js, asserts mode=paged)
+   The 59 overlay-only rendering tests (PM.__pagination, the #pm-notes-area overlay, overlay table/list/border/
+   image DOM) were DELETED with the overlay engine — their paged coverage lives in the dedicated probes (see
+   specs/008-overlay-retirement/test-mapping.md). Real paged functional gaps found while porting (007) remain as
+   visible deferred passes via PAGED_KNOWN_GAP. The runner uses a FRESH user-data-dir + a mode=paged assertion.
+   Sentinel-gated. Same JSON contract as test-suite.js. */
 (async () => {
   const results = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const t = async (name, fn) => {
-    // 007 paged-aware skip: in paged, tests that assert OVERLAY-ONLY rendering constructs (the PAGED_SKIP map,
-    // defined below) are recorded as a skip-PASS carrying an explicit reason + the dedicated paged probe that
-    // DOES cover them — never a silent pass. The body is STILL RUN (so its content-authoring side effects survive
-    // for chained downstream tests — exactly as the original suite ran these bodies); only its overlay-DOM
-    // result/throw is converted to the skip-pass. The overlay path (!PAGED) is byte-unchanged. PAGED / PAGED_SKIP
-    // resolve at call time (after their decls).
-    const sk = PAGED ? (PAGED_SKIP.get(name) || null) : null;
+    // PAGED_KNOWN_GAP: a test that exercises a REAL paged FUNCTIONAL gap deferred to a planned feature is recorded
+    // as a VISIBLE known-gap PASS (⚠️ + reason + tracker) — never a silent pass. (008: the overlay-only PAGED_SKIP
+    // mechanism was retired with the overlay engine; those 59 tests were deleted, see the file header.)
     const kg = PAGED ? (PAGED_KNOWN_GAP.get(name) || null) : null; // a REAL paged gap deferred to a planned feature
-    const convert = () => results.push(sk
-      ? { name, pass: true, detail: '⊘ paged-skip (overlay-only): ' + sk.reason + ' — paged covered by ' + sk.probe }
-      : { name, pass: true, detail: '⚠️ paged known-gap (deferred): ' + kg.reason + ' — tracked: ' + kg.tracker });
+    const convert = () => results.push({ name, pass: true, detail: '⚠️ paged known-gap (deferred): ' + kg.reason + ' — tracked: ' + kg.tracker });
     // Convention: string return = FAILURE with detail (every `return '...'` in this
     // suite is a failure path). The old `r !== false` counted those strings green —
     // the slice-1 negation test exposed that hole.
-    try { const r = await fn(); if (sk || kg) return void convert(); results.push({ name, pass: r !== false && typeof r !== 'string', detail: typeof r === 'string' ? r : '' }); }
-    catch (e) { if (sk || kg) return void convert(); results.push({ name, pass: false, detail: 'ERR: ' + ((e && e.message) || e) }); }
+    try { const r = await fn(); if (kg) return void convert(); results.push({ name, pass: r !== false && typeof r !== 'string', detail: typeof r === 'string' ? r : '' }); }
+    catch (e) { if (kg) return void convert(); results.push({ name, pass: false, detail: 'ERR: ' + ((e && e.message) || e) }); }
   };
   for (let i = 0; i < 200 && !window.__WC_READY; i++) await sleep(50);
 
-  // GATE MODE (007 — paged-aware): this suite now runs in BOTH overlay and paged. Historically it validated only
-  // the OVERLAY rendering engine — ~70 tests read overlay-only constructs (PM.__pagination from the overlay
-  // Pagination engine, the #pm-notes-area overlay, overlay table/list/border DOM) absent in the paged
-  // PresentationEditor (memory paged-testpm-overlay-suite). 007 made those tests MODE-AWARE: in paged they assert
-  // the PAGED equivalent (.superdoc-page / painted footnotes / painted table-border DOM) or skip-with-reason when
-  // a construct is genuinely overlay-only. So a genuine paged build now passes WITHOUT a false-green. The mode is
-  // recorded (not silently flipped — the stale-localStorage footgun that produced the migration's false-green is
-  // surfaced here). `MODE` is read once below and threaded into the mode-aware assertions.
-  // Recorded ONCE and surfaced via summary.mode (NOT a counted result row), so BOTH modes report exactly 475:
-  // overlay = 475 run; paged = 406 run (incl. the [0a] paged-aware port) + 59 PAGED_SKIP (overlay-only) +
-  // 10 PAGED_KNOWN_GAP (real deferred gaps: [7] html-import, [8]+[11]×2 openDocx-teardown, 6×[4d] table-ribbon).
+  // GATE MODE: the suite is PAGED-ONLY (008 retired the overlay engine; the 59 overlay-only tests were deleted).
+  // MODE/PAGED are recorded for the summary + the PAGED_KNOWN_GAP gate (always 'paged' now); summary.mode is
+  // asserted == 'paged' by run-pm-paged.js (a fresh-profile boot, so a stale localStorage can't flip it).
+  // Total = 416 = 405 genuine pass + the [0a] paged-aware port + 10 PAGED_KNOWN_GAP (real deferred gaps:
+  // [7] html-import, [8]+[11]×2 openDocx-teardown, 6×[4d] table-ribbon — paged coverage / fixes tracked).
   const MODE = window.__WC_LAYOUT_MODE === 'paged' ? 'paged' : 'overlay';
   const PAGED = MODE === 'paged';
 
-  // 007 PAGED_SKIP: tests asserting OVERLAY-ONLY rendering constructs, skipped-with-reason in paged (see
-  // specs/007-paged-test-coverage/research.md Decision 2). Each names the construct + the dedicated paged
-  // probe that covers it. Generated from the genuine-paged fail list (65 entries); Category-B functional
-  // tests are NOT here — they are ported to paged-aware assertions. Auditable: summary.pagedSkips counts these.
-  const PAGED_SKIP = new Map([
-    // [1] (1) — strike-on-superscript <s>-wrap render (mark application is mode-agnostic)
-    ["[1] strike on superscript: line-through tracks the raised span (Word parity)", { reason: "strike-on-superscript <s>-wrap render (mark application is mode-agnostic)", probe: "report:glyphgeom" }],
-    // [2] (7) — overlay-rendered list-marker / shading DOM
-    ["[2] shading palette pick lands as paragraphProperties.shading + paints", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] borders face applies Word-default bottom border", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] numbering renders \"1.\" / \"2.\" markers across two paragraphs", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] multilevel Decimal: nested item shows 1.1.", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] multilevel Outline: 1) then nested a)", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] list marker separator has real width (fork CSS in the build)", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    ["[2] nested list indents: margin-left grows with level", { reason: "overlay-rendered list-marker / shading DOM", probe: "test:roundtrip + the passing structural asserts" }],
-    // [3] (1) — style-color decoration render (mark application is mode-agnostic)
-    ["[3] Heading1 text renders the style color via decorations", { reason: "style-color decoration render (mark application is mode-agnostic)", probe: "report:glyphgeom" }],
-    // [9] (6) — the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)
-    ["[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads \"0\" (A1)", { reason: "asserts the OVERLAY's degraded TOC page-number ('0' — overlay can't resolve the field); the tableOfContents node is created either way and paged's PE resolves the field differently", probe: "test:roundtrip (the TOC node export) + the passing tableOfContents-node assert" }],
-    ["[9] notes-area: refInsertFootnote renders #pm-notes-area with the note number + body (D9.1)", { reason: "the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)", probe: "probe:notes" }],
-    ["[9] notes-area: editing a note body in #pm-notes-area persists via the bridge (refListFootnotes + footnotes.list reflect it) (D9.1)", { reason: "the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)", probe: "probe:notes" }],
-    ["[9] notes-area: refShowNotes reveals the region (returns true with notes, focuses a body); false with none (D9.1)", { reason: "the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)", probe: "probe:notes" }],
-    ["[9] notes-area CLOBBER GUARD: a re-render mid-edit does NOT revert a focused dirty note body (FIX 1)", { reason: "the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)", probe: "probe:notes" }],
-    ["[9] notes-area: editing an ENDNOTE body in #pm-notes-area persists to the endnote (FIX 3)", { reason: "the #pm-notes-area overlay is disabled in paged (the PE paints footnotes at the page foot, M4d)", probe: "probe:notes" }],
-    // [home] (5) — overlay-rendered paragraph-border / text-effect / horizontal-rule DOM
-    ["[home] Bottom Border carries on Enter + merges — the rule moves to the run’s new last paragraph", { reason: "overlay-rendered paragraph-border / text-effect / horizontal-rule DOM", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    ["[home] All Borders on stacked paragraphs renders an outer box + merged inside-horizontal rules", { reason: "overlay-rendered paragraph-border / text-effect / horizontal-rule DOM", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    ["[home] Inside Horizontal on stacked paragraphs draws rules BETWEEN only (no outer edges)", { reason: "overlay-rendered paragraph-border / text-effect / horizontal-rule DOM", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    ["[home] Horizontal Line menu item inserts a horizontal-rule block", { reason: "overlay-rendered paragraph-border / text-effect / horizontal-rule DOM", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    ["[home] Text Effects: all quartet effects apply + render", { reason: "overlay-rendered paragraph-border / text-effect / horizontal-rule DOM", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    // [insert] (1) — Picture natural-size render (the rendered <img> box)
-    ["[insert] Picture inserts at NATURAL size, clamped to the column width (not tiny 100px)", { reason: "Picture natural-size render (the rendered <img> box)", probe: "probe:imageresize" }],
-    // [fix] (3) — overlay caret-hit / .ProseMirror-selectednode DOM
-    ["[fix] a node-selected image shows a visible selection frame (.ProseMirror-selectednode is styled)", { reason: "overlay caret-hit / .ProseMirror-selectednode DOM", probe: "probe:pointer (M2 click-to-caret)" }],
-    ["[fix] clicking the empty area below the text jumps the caret to the doc END", { reason: "overlay caret-hit / .ProseMirror-selectednode DOM", probe: "probe:pointer (M2 click-to-caret)" }],
-    ["[fix] clicking the left margin beside a paragraph places the caret in it", { reason: "overlay caret-hit / .ProseMirror-selectednode DOM", probe: "probe:pointer (M2 click-to-caret)" }],
-    // [4b] (3) — overlay image-resize handles + #pm-editor <img> render
-    ["[4b] the resize handles align with the image box (overlay is correctly anchored)", { reason: "overlay image-resize handles + #pm-editor <img> render", probe: "probe:imageresize" }],
-    ["[4b] a stretched (aspect-divergent) image renders + exports its explicit height", { reason: "overlay image-resize handles + #pm-editor <img> render", probe: "probe:imageresize" }],
-    ["[4b] Picture Format Grayscale: setImageGrayscale → grayscale attr + CSS filter + <a:grayscl> in a:blip; OFF clears (Word COM ColorType=2)", { reason: "overlay image-resize handles + #pm-editor <img> render", probe: "probe:imageresize" }],
-    // [4c] (1) — overlay image float/wrap render (the wrap export is mode-agnostic)
-    ["[4c] setImageWrap(\"square\") floats the image (wrap=Square + anchor + float render)", { reason: "overlay image float/wrap render (the wrap export is mode-agnostic)", probe: "probe:imageresize + test:roundtrip" }],
-    // [4d] (1) — column-resize handle is genuinely overlay-DOM. The other 6 [4d] ribbon-op tests were RE-TRIAGED
-    // out of PAGED_SKIP (review w4szfpzey): they assert only the PM model + export XML (no overlay DOM) and fail
-    // functionally in paged → moved to PAGED_KNOWN_GAP (a real paged ribbon-table command gap), not hidden here.
-    ["[4d] column resize is armed: hovering a column border sets the resize handle", { reason: "overlay column-resize handle (#pm-editor .ProseMirror columnResizing plugin + rendered cell border)", probe: "test:roundtrip + the PE .superdoc-page paint" }],
-    // [6b] (8) — overlay-rendered table DOM (#pm-editor table geometry)
-    ["[6b] AutoFit Fixed undoes the Window stretch", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] tableSetStyle visibly changes the table (bake)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] fresh table renders visible cell gridlines (Word parity)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] borderless table shows no gridlines", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] tableSetAlignment center visibly centers the table (geometry)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] tableSetAlignment right hugs the right (geometry)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] tableSetIndent still indents (no regression after the margin gating)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    ["[6b] a Table Layout tab control cmd dispatches (tblInsertBelow grows the row count)", { reason: "overlay-rendered table DOM (#pm-editor table geometry)", probe: "test:roundtrip (table export) + the PE .superdoc-page paint" }],
-    // [4a] (22) — the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator
-    ["[4a] pagination exposes page geometry from the document model", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] editor line-height calibrated to Word (Aptos-12 -> 1.225)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] no phantom browser-default paragraph top-margin leaks", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] short doc = single page, no page seams", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] overflowing content paginates into multiple pages with rendered seams", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] counts().pages + status bar reflect the live page count", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] page margins are realized (top-margin + tail spacers present)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] each seam positions the next page content at the page content-top", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] continuous (Web) view renders no page seams", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] manual page break forces the following content onto a new page", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] mid-paragraph break splits the paragraph (after-text on the next page)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] trailing manual page break adds a blank page", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] blank page (two breaks) adds a blank sheet (two seams)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] manual page break is a BLOCK-boundary seam (no block-in-inline; page-2 click maps right)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] blank page uses BLOCK-boundary seams (no block-in-inline spacer)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] section break (w:sectPr) forces the next content onto a new page", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] section break governed by the NEXT section: continuous-typed ender still page-breaks", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] a CONTINUOUS middle section stays on the page (next-section governs)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] section break before a TABLE pushes the table to a new page", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] status bar reports the caret page across a blank-page (two seams)", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-    ["[4a] a straddling table is moved wholesale, never line-split mid-cell", { reason: "the overlay Pagination engine (PM.__pagination) — paged uses the PresentationEditor as the sole paginator", probe: "probe:coords + probe:statusbar + report:glyphgeom" }],
-  ]);
 
   // 007 PAGED_KNOWN_GAP: tests that exercise a REAL paged FUNCTIONAL gap (not overlay-only rendering) that is
   // deferred to a planned feature. Recorded as a VISIBLE known-gap pass (⚠️ + tracker) so the paged gate is green
@@ -498,23 +406,6 @@
     const m = markNames('subsup').join(' ');
     return m.includes('"vertAlign":"superscript"') && !m.includes('"vertAlign":"subscript"');
   });
-  await t('[1] strike on superscript: line-through tracks the raised span (Word parity)', async () => {
-    // Repro: super/subscript serializes as an INNER span(vertical-align+65%); strike
-    // is the OUTER <s>. If <s> paints line-through at its own (full-size, baseline)
-    // metrics the line lands UNDER the raised glyph. Fix moves line-through to the
-    // inner shifted span. Assert the inner span paints it and the outer <s> does not.
-    setDoc('strikesuper probe'); selectText('strikesuper');
-    run('superscript'); run('strikethrough'); await sleep(60);
-    const inner = Array.from(document.querySelectorAll('#pm-editor .ProseMirror s > span'))
-      .find((sp) => /vertical-align:\s*super/.test(sp.getAttribute('style') || ''));
-    if (!inner) return 'no <s> wrapping a vertical-align:super span found';
-    const outer = inner.closest('s');
-    const innerLine = getComputedStyle(inner).textDecorationLine;
-    const outerLine = getComputedStyle(outer).textDecorationLine;
-    // Inner (shifted, 65%) span must carry line-through so it paints through the
-    // raised glyph's middle; outer <s> must NOT paint its own normal-baseline line.
-    return /line-through/.test(innerLine) && !/line-through/.test(outerLine);
-  });
 
   await t('[home] subscript/superscript toggles OFF on an empty doc (not one-way)', async () => {
     // Repro: on an empty paragraph, sub/super lives in the paragraph run
@@ -709,17 +600,13 @@
     window.WC.closeFlyouts();
     return applied && flipped;
   });
-  await t('[2] shading palette pick lands as paragraphProperties.shading + paints', async () => {
+  await t('[2] shading No Color clears it', async () => {
+    // self-contained setup (008: the prior shading-palette test that authored + shaded "shade" was retired)
     setDoc('shade probe text'); selectText('shade');
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body);
-    const sw = document.querySelector('.flyout .color-swatch[title="#FFFF00"]') || document.querySelector('.flyout .color-swatch');
-    const hex = sw.title.replace(/^#/, '').toUpperCase();
-    sw.click(); await sleep(50);
-    const a = paraAttrs('shade').paragraphProperties?.shading;
-    const el2 = paraEl('shade');
-    return !!a && a.fill === hex && !!el2 && el2.style.backgroundColor !== '';
-  });
-  await t('[2] shading No Color clears it', async () => {
+    const _sw = document.querySelector('.flyout .color-swatch[title="#FFFF00"]') || document.querySelector('.flyout .color-swatch');
+    if (_sw) { _sw.click(); await sleep(50); }
+    // now clear it via No Color:
     selectText('shade');
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body);
     const noColor = Array.from(document.querySelectorAll('.flyout .color-row'))
@@ -748,13 +635,6 @@
     if (!new RegExp('w:fill="' + hex + '"', 'i').test(shd)) return 'w:shd fill not ' + hex + ' (hex must round-trip verbatim): ' + shd;
     if (!/w:color="auto"/.test(shd)) return 'w:shd color not "auto" (full CT_Shd contract): ' + shd;
     return true;
-  });
-  await t('[2] borders face applies Word-default bottom border', async () => {
-    setDoc('border probe text'); selectText('border');
-    run('borders'); await sleep(50);
-    const b = paraAttrs('border').paragraphProperties?.borders;
-    const el2 = paraEl('border');
-    return !!b && b.bottom && b.bottom.val === 'single' && !!el2 && el2.style.borderBottom !== '';
   });
   await t('[2] EXPORT: bottom border → <w:pBdr><w:bottom w:val="single" w:sz="4"> (Word: LineStyle=1, LineWidth=0.5pt)', async () => {
     // The tests above cover the model attr + DOM paint; this guards the docx EXPORT and the
@@ -823,48 +703,6 @@
     window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Inside Vertical Border$/); await sleep(40);
     return before === JSON.stringify(paraAttrs('insv').paragraphProperties?.borders || null);
   });
-  await t('[home] Bottom Border carries on Enter + merges — the rule moves to the run’s new last paragraph', async () => {
-    setDocs(['mergeAA', 'mergeBB', 'mergeCC']);
-    let p = null, s = -1; doc().descendants((n, pos) => { if (n.type.name === 'paragraph') { s++; if (s === 1) p = pos + 1; } return p == null; });
-    window.WC.editor.commands.setTextSelection({ from: p, to: p });
-    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Bottom Border$/); await sleep(60);
-    const bbHas = getComputedStyle(paraEl('mergeBB')).borderBottomStyle === 'solid';
-    let pe = null; s = -1; doc().descendants((n, pos) => { if (n.type.name === 'paragraph') { s++; if (s === 1) pe = pos + 1 + n.content.size; } return true; });
-    window.WC.editor.commands.setTextSelection({ from: pe, to: pe });
-    window.WC.editor.commands.splitBlock(); await sleep(40);
-    window.WC.editor.commands.insertContent('mergeDD'); await sleep(140);
-    const ddCarried = !!(paraAttrs('mergeDD').paragraphProperties?.borders?.bottom);
-    const bbSuppressed = getComputedStyle(paraEl('mergeBB')).borderBottomStyle === 'none';
-    const ddDrawn = getComputedStyle(paraEl('mergeDD')).borderBottomStyle === 'solid';
-    return (bbHas && ddCarried && bbSuppressed && ddDrawn)
-      || ('bbHas=' + bbHas + ' ddCarried=' + ddCarried + ' bbSuppressed=' + bbSuppressed + ' ddDrawn=' + ddDrawn);
-  });
-  await t('[home] All Borders on stacked paragraphs renders an outer box + merged inside-horizontal rules', async () => {
-    setDocs(['boxAA', 'boxBB', 'boxCC']);
-    window.WC.editor.commands.selectAll();
-    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^All Borders$/); await sleep(140);
-    const cs = (needle) => getComputedStyle(paraEl(needle));
-    const topOnFirst = cs('boxAA').borderTopStyle === 'solid';
-    const noTopMid = cs('boxBB').borderTopStyle === 'none' && cs('boxCC').borderTopStyle === 'none';
-    const betweenRules = cs('boxAA').borderBottomStyle === 'solid' && cs('boxBB').borderBottomStyle === 'solid';
-    const bottomOnLast = cs('boxCC').borderBottomStyle === 'solid';
-    const sidesAll = ['boxAA', 'boxBB', 'boxCC'].every((n) => cs(n).borderLeftStyle === 'solid' && cs(n).borderRightStyle === 'solid');
-    return (topOnFirst && noTopMid && betweenRules && bottomOnLast && sidesAll)
-      || JSON.stringify({ topOnFirst, noTopMid, betweenRules, bottomOnLast, sidesAll });
-  });
-  await t('[home] Inside Horizontal on stacked paragraphs draws rules BETWEEN only (no outer edges)', async () => {
-    setDocs(['ihAA', 'ihBB', 'ihCC']);
-    window.WC.editor.commands.selectAll();
-    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Inside Horizontal Border$/); await sleep(140);
-    const cs = (needle) => getComputedStyle(paraEl(needle));
-    const noTopFirst = cs('ihAA').borderTopStyle === 'none';
-    const ruleAfterA = cs('ihAA').borderBottomStyle === 'solid';
-    const ruleAfterB = cs('ihBB').borderBottomStyle === 'solid';
-    const noBottomLast = cs('ihCC').borderBottomStyle === 'none';
-    const noSides = ['ihAA', 'ihBB', 'ihCC'].every((n) => cs(n).borderLeftStyle === 'none' && cs(n).borderRightStyle === 'none');
-    return (noTopFirst && ruleAfterA && ruleAfterB && noBottomLast && noSides)
-      || JSON.stringify({ noTopFirst, ruleAfterA, ruleAfterB, noBottomLast, noSides });
-  });
   await t('[home] flyItem checkable reserves a check column; ✓ only when checked', () => {
     const a = window.WC.flyItem('X', { checkable: true, checked: true });
     const b = window.WC.flyItem('Y', { checkable: true, checked: false });
@@ -896,14 +734,6 @@
     const ok = (paraAttrs('bsshade').paragraphProperties?.shading || {}).fill === hex;
     document.querySelectorAll('.modal-backdrop').forEach((n) => n.remove());
     return ok;
-  });
-  await t('[home] Horizontal Line menu item inserts a horizontal-rule block', async () => {
-    setDoc('hrline probe text');
-    const f = selectText('hrline');
-    // Word inserts the line at the cursor — collapse the range so the insert doesn't replace text.
-    v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), f.to, f.to)));
-    window.WC.Commands.dropdown({ cmd: 'borders', type: 'split' }, document.body); flyClick(/^Horizontal Line$/); await sleep(60);
-    return !!document.querySelector('#pm-editor [data-horizontal-rule]');
   });
   await t('[home] View Gridlines menu item toggles the page show-grid class', async () => {
     const pe = document.getElementById('pm-editor'); const g0 = pe.classList.contains('show-grid');
@@ -1059,15 +889,11 @@
     if (fmt !== 'decimal') return 'abstractNum level 0 numFmt not "decimal" (Word would render a bullet, not "1."): ' + fmt;
     return true;
   });
-  await t('[2] numbering renders "1." / "2." markers across two paragraphs', async () => {
+  await t('[2] ribbon increaseIndent inside a list raises the level (Word behavior)', async () => {
+    // self-contained setup (008: the prior numbering test that authored this list was retired with the overlay engine)
     setDocs(['Numbered one', 'Numbered two']);
     window.WC.editor.commands.selectAll();
-    run('numbering'); await sleep(150); // marker styling runs an rAF pass after the nodeview update
-    const m1 = paraEl('Numbered one')?.querySelector('.list-marker');
-    const m2 = paraEl('Numbered two')?.querySelector('.list-marker');
-    return !!m1 && m1.textContent.trim() === '1.' && !!m2 && m2.textContent.trim() === '2.';
-  });
-  await t('[2] ribbon increaseIndent inside a list raises the level (Word behavior)', async () => {
+    run('numbering'); await sleep(150);
     selectText('Numbered two');
     run('increaseIndent'); await sleep(50);
     const up = paraAttrs('Numbered two').paragraphProperties?.numberingProperties?.ilvl === 1;
@@ -1094,26 +920,6 @@
     Array.from(document.querySelectorAll('.flyout div')).find((c) => c.textContent.trim() === 'A.').click();
     await sleep(150);
     return paraAttrs('alpha').listRendering?.markerText === 'A.';
-  });
-  await t('[2] multilevel Decimal: nested item shows 1.1.', async () => {
-    setDocs(['ml first item', 'ml second item']);
-    window.WC.editor.commands.selectAll();
-    window.WC.Commands.dropdown({ cmd: 'multilevelList', type: 'dropdown' }, document.body);
-    flyClick(/^Decimal \(1\. 1\.1\. 1\.1\.1\.\)$/); await sleep(150);
-    const top = paraEl('ml first item')?.querySelector('.list-marker')?.textContent.trim() === '1.';
-    selectText('ml second item');
-    PM().cmd('increaseListIndent'); await sleep(150);
-    return top && paraEl('ml second item')?.querySelector('.list-marker')?.textContent.trim() === '1.1.';
-  });
-  await t('[2] multilevel Outline: 1) then nested a)', async () => {
-    setDocs(['ol first item', 'ol second item']);
-    window.WC.editor.commands.selectAll();
-    window.WC.Commands.dropdown({ cmd: 'multilevelList', type: 'dropdown' }, document.body);
-    flyClick(/^Outline \(1\) a\) i\)\)$/); await sleep(150);
-    const top = paraEl('ol first item')?.querySelector('.list-marker')?.textContent.trim() === '1)';
-    selectText('ol second item');
-    PM().cmd('increaseListIndent'); await sleep(150);
-    return top && paraEl('ol second item')?.querySelector('.list-marker')?.textContent.trim() === 'a)';
   });
   await t('[2] Change List Level → Level 3 sets ilvl 2 as ONE undo step', async () => {
     setDoc('level probe text'); selectText('level');
@@ -1154,21 +960,6 @@
     const ok = !!dlg && /Paragraph/.test(dlg.textContent);
     if (dlg) dlg.querySelector('.dlg-footer .btn:last-child').click();
     return ok;
-  });
-  await t('[2] list marker separator has real width (fork CSS in the build)', async () => {
-    setDoc('css probe text'); selectText('css');
-    run('numbering'); await sleep(150);
-    const tab = document.querySelector('#pm-editor .sd-editor-tab');
-    return !!tab && getComputedStyle(tab).display === 'inline-block' && tab.getBoundingClientRect().width > 0;
-  });
-  await t('[2] nested list indents: margin-left grows with level', async () => {
-    setDocs(['nest level zero', 'nest level one']);
-    window.WC.editor.commands.selectAll();
-    run('bullets'); await sleep(50);
-    selectText('nest level one');
-    PM().cmd('increaseListIndent'); await sleep(150);
-    const p0 = paraEl('nest level zero'); const p1 = paraEl('nest level one');
-    return !!p0 && !!p1 && parseFloat(p1.style.marginLeft || '0') > parseFloat(p0.style.marginLeft || '0');
   });
 
   // ---------- slice 3: styles (gallery + pane + shortcuts + preview) ----------
@@ -1241,18 +1032,6 @@
     window.WC.Commands.applyStyle('No Spacing'); await sleep(150);
     return paraAttrs('nospace').paragraphProperties?.styleId === 'NoSpacing'
       && PM().getState().spacingAfterPt === 0;
-  });
-  await t('[3] Heading1 text renders the style color via decorations', async () => {
-    setDoc('decor probe text'); selectText('decor probe text');
-    PM().cmd('setStyleById', 'Heading1'); await sleep(150);
-    const p = paraEl('decor');
-    // LEAF span only: the fork nests .sd-paragraph-content → [data-run] → decorated
-    // span, and ALL of them contain the needle text — document-order find() grabs the
-    // undecorated outer wrapper (execution finding, Task 1).
-    const span = p && Array.from(p.querySelectorAll('span')).find((s) => s.textContent.includes('decor') && !s.querySelector('span'));
-    if (!span) return 'no decorated span found';
-    const color = getComputedStyle(span).color;
-    return color === 'rgb(15, 71, 97)'; // fixture Heading1 w:color 0F4761
   });
   await t('[3] gallery highlight tracks the caret (Heading1 ↔ Normal)', async () => {
     setDocs(['plain paragraph here', 'heading paragraph here']);
@@ -1867,18 +1646,6 @@
     const attr = (() => { let a = null; doc().descendants((n) => { if (a || !n.isText || !n.text) return; if (n.text.indexOf('ligrt') >= 0) { const ts = n.marks.find((m) => m.type.name === 'textStyle'); a = ts?.attrs?.fontVariantLigatures; } }); return a; })();
     return /contextual/.test(attr || '') || ('round-trip lost ligatures: ' + attr);
   });
-  await t('[home] Text Effects: all quartet effects apply + render', async () => {
-    const hasStyle = (frag) => !!document.querySelector('#pm-editor .ProseMirror [style*="' + frag + '"]');
-    setDoc('q1 x'); selectText('q1'); PM().cmd('setMark', 'textStyle', { textOutline: { widthPt: 1.5, color: '#ff0000', fill: 'transparent' } }); await sleep(70);
-    if (!hasStyle('-webkit-text-stroke')) return 'outline did not render';
-    setDoc('q2 x'); selectText('q2'); PM().cmd('setMark', 'textStyle', { textGlow: { radiusPt: 8, color: '#156082' } }); await sleep(70);
-    if (!hasStyle('text-shadow')) return 'glow did not render';
-    setDoc('q3 x'); selectText('q3'); PM().cmd('setMark', 'textStyle', { textShadowW14: { dx: 1.5, dy: 1.5, blur: 1.5, color: 'rgba(0,0,0,0.45)' } }); await sleep(70);
-    if (!hasStyle('text-shadow')) return 'shadow did not render';
-    setDoc('q4 x'); selectText('q4'); PM().cmd('setMark', 'textStyle', { textReflection: 'half' }); await sleep(70);
-    if (!hasStyle('-webkit-box-reflect')) return 'reflection did not render';
-    return true;
-  });
   await t('[4] Select All selects the whole document via the menu', async () => {
     setDocs(['selall first para', 'selall second para']);
     const node = document.querySelector('[data-cmd="select"]') || document.body;
@@ -2188,20 +1955,6 @@
     const cs = getComputedStyle(pm);
     return pm.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
   };
-  await t('[insert] Picture inserts at NATURAL size, clamped to the column width (not tiny 100px)', async () => {
-    setDoc('picbig: ');
-    const res = await window.WC.Commands.insertPictureFromDataUrl(mkImg(1600, 800), 'big.png');
-    await sleep(140);
-    const img = document.querySelector('#pm-editor .ProseMirror img');
-    if (!img || !res) return 'no image / no result';
-    const colW = columnWidthPx();
-    const renderedW = img.getBoundingClientRect().width;
-    const clampedToColumn = res.width <= Math.round(colW) + 1 && Math.abs(renderedW - res.width) <= 3;
-    const notTiny = renderedW > 150; // would be 100 under the old hardcoded default
-    const aspectKept = Math.abs((res.width / res.height) - (1600 / 800)) < 0.05;
-    return (clampedToColumn && notTiny && aspectKept)
-      || JSON.stringify({ colW: Math.round(colW), renderedW: Math.round(renderedW), resW: res.width, resH: res.height });
-  });
   await t('[insert] small Picture keeps its natural size (no forced 100×100 box)', async () => {
     setDoc('picsmall: ');
     const res = await window.WC.Commands.insertPictureFromDataUrl(mkImg(80, 60), 'small.png');
@@ -2216,21 +1969,6 @@
     await sleep(120);
     return (res && res.width >= 150 && res.height >= 100 && res.natural == null)
       || ('res=' + JSON.stringify(res));
-  });
-  await t('[fix] a node-selected image shows a visible selection frame (.ProseMirror-selectednode is styled)', async () => {
-    setDoc('imgsel: ');
-    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 80), 'sel.png');
-    await sleep(120);
-    const ed = window.WC.editor;
-    let imgPos = null; ed.state.doc.descendants((n, p) => { if (n.type.name === 'image' && imgPos == null) imgPos = p; });
-    if (imgPos == null) return 'no image node';
-    v().dispatch(v().state.tr.setSelection(window.__PM_NodeSelection.create(doc(), imgPos)));
-    await sleep(60);
-    const sel = document.querySelector('#pm-editor .ProseMirror-selectednode');
-    if (!sel) return 'no .ProseMirror-selectednode element after selecting the image';
-    const cs = getComputedStyle(sel);
-    return (cs.outlineStyle === 'solid' && parseFloat(cs.outlineWidth) >= 1)
-      || ('outline=' + cs.outlineStyle + ' ' + cs.outlineWidth);
   });
   // Phase 4b — live image resize. Helpers: select an image as a NodeSelection, then
   // drag a named handle by (dx,dy) screen px via synthetic PointerEvents.
@@ -2289,23 +2027,6 @@
     return (okCx && okCy) || ('extent cx=' + cx + ' cy=' + cy + ' vs size ' + JSON.stringify(after));
   });
 
-  await t('[4b] the resize handles align with the image box (overlay is correctly anchored)', async () => {
-    // Guards the containing-block assumption: the overlay is position:absolute in #pages,
-    // so #pages MUST be position:relative or the handles drift off the image. The SE
-    // handle's screen center must sit at the image's bottom-right corner (± a few px).
-    setDoc('imgr3: ');
-    await window.WC.Commands.insertPictureFromDataUrl(mkImg(200, 100), 'r3.png');
-    await sleep(160);
-    if (selectImage() == null) return 'no image node';
-    await sleep(120);
-    const imgEl = document.querySelector('#pm-editor .ProseMirror img');
-    const se = document.querySelector('.wc-img-resize .wc-img-handle-se');
-    if (!imgEl || !se) return 'image or SE handle missing';
-    const ir = imgEl.getBoundingClientRect(), sr = se.getBoundingClientRect();
-    const hx = sr.left + sr.width / 2, hy = sr.top + sr.height / 2;
-    const dx = Math.abs(hx - ir.right), dy = Math.abs(hy - ir.bottom);
-    return (dx <= 6 && dy <= 6) || ('SE handle off the image corner by dx=' + Math.round(dx) + ' dy=' + Math.round(dy));
-  });
 
   await t('[4b] an edge handle (E) resizes the image (aspect-locked, single-axis drive)', async () => {
     setDoc('imgr4: ');
@@ -2322,29 +2043,6 @@
       || ('aspect drift on E-drag: ' + JSON.stringify(after));
   });
 
-  await t('[4b] a stretched (aspect-divergent) image renders + exports its explicit height', async () => {
-    // A picture whose stored box diverges from its intrinsic aspect (a stretched/free-resized
-    // image, or one imported from Word) must render + export the explicit width AND height —
-    // NOT height:auto (render) and NOT the intrinsic-aspect-scaled box (export).
-    setDoc('stretch: ');
-    PM().insertImage({ src: mkImg(100, 100), alt: 'sq', width: 100, height: 100 }); // 1:1 natural
-    await sleep(250);
-    let imgPos = null; doc().descendants((n, pos) => { if (n.type.name === 'image' && imgPos == null) imgPos = pos; });
-    if (imgPos == null) return 'no image node';
-    const node = doc().nodeAt(imgPos);
-    v().dispatch(v().state.tr.setNodeMarkup(imgPos, undefined, { ...node.attrs, size: { width: 240, height: 60 } })); // 4:1 box
-    await sleep(300);
-    const style = (document.querySelector('#pm-editor .ProseMirror img') || {}).getAttribute('style') || '';
-    if (/height:\s*auto/.test(style)) return 'render ignores the explicit height (height:auto): ' + style;
-    if (!/height:\s*60px/.test(style)) return 'render lacks the explicit 60px height: ' + style;
-    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
-    const m = xml.match(/<wp:extent[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
-    if (!m) return 'no wp:extent';
-    const cx = +m[1], cy = +m[2];
-    const okW = Math.abs(cx - Math.round(240 * 9525)) <= 9525;
-    const okH = Math.abs(cy - Math.round(60 * 9525)) <= 9525;
-    return (okW && okH) || ('extent ' + Math.round(cx / 9525) + 'x' + Math.round(cy / 9525) + 'px (want 240x60 — aspect-forced?)');
-  });
 
   await t('[4b] a dimensionless insertImage sizes to natural dims, not a squashing 100x100 placeholder', async () => {
     // Insert → Screenshot/Icon call insertImage without dims. The bridge must size to the image's
@@ -2582,62 +2280,6 @@
     return (/\brot="5400000"/.test(rt) && /\bflipH="1"/.test(rt)) || 'round-trip changed rot/flip (expected 90°=5400000 + flipH): ' + rt;
   });
 
-  await t('[4b] Picture Format Grayscale: setImageGrayscale → grayscale attr + CSS filter + <a:grayscl> in a:blip; OFF clears (Word COM ColorType=2)', async () => {
-    // Item 2 (a14 picture effects). NOTE: Word's OWN grayscale OOXML is plain <a:grayscl/> in a:blip (NOT
-    // the a14 imgEffect extension) — authored-in-Word COM ground truth. Word reads it as
-    // InlineShapes(1).PictureFormat.ColorType == 2 (grayscale, 1-based MsoPictureColorType). An earlier
-    // attempt mis-read 2 as BlackAndWhite (0-based) and wrongly reverted a:grayscl. validate-picteffect-win.ps1
-    // confirmed ColorType==2 on this exact export. The converter already round-trips grayscale; this gates
-    // the new bridge verb + render + the a:grayscl export (and a NEGATIVE guard against a14).
-    if (typeof PM().setImageGrayscale !== 'function') return 'PM.setImageGrayscale missing (red)';
-    if (PM().isBlocked('imgColor') !== false) return 'imgColor should not be blocked';
-    const grayOf = () => { let g = null; doc().descendants((n) => { if (n.type.name === 'image') g = n.attrs.grayscale; }); return g; };
-    const blipHasGrayscl = (xml) => /<a:blip[\s\S]*?<a:grayscl\b/.test(xml);
-    setDoc('gray: ');
-    await window.WC.Commands.insertPictureFromDataUrl(mkImg(120, 120), 'gray.png');
-    await sleep(160);
-    if (selectImage() == null) return 'no image node';
-    // ON: attr set + CSS filter rendered + <a:grayscl/> in a:blip; NO a14.
-    if (PM().setImageGrayscale(true) !== true) return 'setImageGrayscale(true) refused (red)';
-    await sleep(80); selectImage();
-    if (grayOf() !== true) return 'grayscale attr not set: ' + JSON.stringify(grayOf());
-    const img = document.querySelector('#pm-editor .ProseMirror img');
-    if (!img) return 'no rendered <img>';
-    const sp = img.closest('span');
-    const fImg = getComputedStyle(img).filter || '';
-    const fSpan = sp ? (getComputedStyle(sp).filter || '') : '';
-    if (!/grayscale/.test(fImg) && !/grayscale/.test(fSpan)) return 'rendered img has no grayscale filter: img=' + fImg + ' span=' + fSpan;
-    let xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
-    if (!blipHasGrayscl(xml)) return 'no <a:grayscl> inside a:blip on export';
-    if (/a14:imgEffect|a14:imgLayer|a14:imgProps/.test(xml)) return 'unexpected a14 imgEffect — grayscale must be plain a:grayscl (Word-faithful)';
-    // COEXISTENCE: grayscale + a transform must BOTH survive (the image attrs' renderDOM styles are
-    // CONCATENATED into one style string — Attribute.ts joins 'style' with '; ' — not last-wins). Apply
-    // a 90° rotation and confirm the rendered <img> keeps the grayscale filter AND a transform, and the
-    // export carries BOTH <a:grayscl> (in a:blip) and <a:xfrm rot> (in spPr) — independent OOXML elements.
-    if (typeof PM().setImageTransform === 'function') {
-      selectImage();
-      PM().setImageTransform({ rotate: 90 }); await sleep(60); selectImage();
-      const img2 = document.querySelector('#pm-editor .ProseMirror img');
-      if (img2) {
-        const cs = getComputedStyle(img2); const sp2 = img2.closest('span');
-        const filt = (cs.filter || '') + ' ' + (sp2 ? (getComputedStyle(sp2).filter || '') : '');
-        const xf = (cs.transform || '') + ' ' + (sp2 ? (getComputedStyle(sp2).transform || '') : '');
-        if (!/grayscale/.test(filt)) return 'grayscale filter lost after a rotate (style-merge clobber): ' + filt;
-        if (!xf || /^\s*none\s*none\s*$/.test(xf) || !/matrix|rotate/.test(xf)) return 'transform lost after grayscale (style-merge clobber): ' + xf;
-      }
-      xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
-      if (!blipHasGrayscl(xml)) return 'a:grayscl lost when combined with a transform';
-      if (!/<a:xfrm\b[^>]*\brot=/.test(xml)) return 'a:xfrm rot lost when combined with grayscale';
-      selectImage(); PM().setImageTransform({ reset: true }); await sleep(50); // restore for the OFF check
-    }
-    // OFF (anti-vacuous): attr cleared + a:grayscl gone.
-    selectImage();
-    if (PM().setImageGrayscale(false) !== true) return 'setImageGrayscale(false) refused (red)';
-    await sleep(80); selectImage();
-    if (grayOf() !== false) return 'grayscale attr not cleared: ' + JSON.stringify(grayOf());
-    xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
-    return !blipHasGrayscl(xml) || 'a:grayscl still present in a:blip after OFF';
-  });
 
   await t('[4c] Picture Position (4c.2): setImagePosition → marginOffset → exports wp:posOffset (EMU) + round-trips; inline-guarded', async () => {
     if (typeof PM().setImagePosition !== 'function') return 'PM.setImagePosition missing (red)';
@@ -2768,21 +2410,6 @@
 
   const imgWrapAttr = () => { let a = null; doc().descendants((n) => { if (n.type.name === 'image') a = { wrap: n.attrs.wrap, isAnchor: n.attrs.isAnchor, anchorData: n.attrs.anchorData }; }); return a; };
 
-  await t('[4c] setImageWrap("square") floats the image (wrap=Square + anchor + float render)', async () => {
-    if (typeof PM().setImageWrap !== 'function') return 'PM.setImageWrap missing (red)';
-    setDoc('wrap1: '); // clean text doc first → the next call exercises the no-image-selected path
-    if (PM().setImageWrap('square')) return 'setImageWrap should return false with no image selected';
-    PM().insertImage({ src: mkImg(120, 90), alt: 'w1', width: 120, height: 90 }); // stable insert (rId bypasses async registration)
-    await sleep(250);
-    if (selectImage() == null) return 'no image node';
-    if (!PM().setImageWrap('square')) return 'setImageWrap("square") returned false';
-    await sleep(200);
-    const a = imgWrapAttr();
-    if (!a || !a.wrap || a.wrap.type !== 'Square' || a.isAnchor !== true) return 'wrap not Square/anchor: ' + JSON.stringify(a);
-    if (!a.anchorData || !a.anchorData.hRelativeFrom) return 'no anchorData seeded (export would lack positionH/V): ' + JSON.stringify(a);
-    const style = (document.querySelector('#pm-editor .ProseMirror img') || {}).getAttribute ? document.querySelector('#pm-editor .ProseMirror img').getAttribute('style') : '';
-    return (/float\s*:/.test(style) && /shape-outside\s*:/.test(style)) || ('img style lacks float/shape-outside: ' + style);
-  });
 
   await t('[4c] a wrapped image exports a schema-valid wp:anchor (required CT_Anchor attrs)', async () => {
     setDoc('wrap2: ');
@@ -2960,22 +2587,6 @@
     doc().descendants((n) => { if (n.type.name === 'tableRow') rows++; });
     doc().descendants((n) => { if (n.type.name === 'tableRow' && cols === 0) cols = n.childCount; });
     return hasNode('table') && rows === 3 && cols === 4;
-  });
-  await t('[4d] column resize is armed: hovering a column border sets the resize handle', async () => {
-    setDoc('x'); PM().insertTable({ rows: 2, cols: 3 }); await sleep(200);
-    const cell = document.querySelector('#pm-editor .ProseMirror table tr td, #pm-editor .ProseMirror table tr th');
-    if (!cell) return 'no table cell rendered';
-    // The columnResizing plugin's state carries `activeHandle` (-1 = none, >=0 = armed).
-    const activeHandle = () => { const st = v().state; for (const pl of st.plugins) { try { const s = pl.getState && pl.getState(st); if (s && typeof s === 'object' && 'activeHandle' in s) return s.activeHandle; } catch (e) {} } return 'no-plugin'; };
-    if (activeHandle() === 'no-plugin') return 'columnResizing plugin not present';
-    const r = cell.getBoundingClientRect();
-    const mm = (x, y) => cell.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window }));
-    mm(r.right - 2, r.top + r.height / 2); await sleep(60); // hover the right border → arm
-    const armed = activeHandle();
-    mm(r.left + 10, r.top + r.height / 2); await sleep(60); // mid-cell → disarm
-    const disarmed = activeHandle();
-    if (!(typeof armed === 'number' && armed >= 0)) return 'border hover did not arm the resize handle (handleWidth disabled?): ' + armed;
-    return disarmed === -1 || 'mid-cell did not disarm: ' + disarmed;
   });
 
   await t('[4d] a column resize OVERRIDES a stale imported grid on export (round-trips)', async () => {
@@ -3475,24 +3086,6 @@
     const tp = tableAttr('tableProperties');
     return !!tp && tp.tableWidth && tp.tableWidth.value === 5000 && tp.tableWidth.type === 'pct';
   });
-  await t('[6b] AutoFit Fixed undoes the Window stretch', async () => {
-    // T3 defect B: 'window' writes tableWidth {5000,'pct'} (renders width: calc(100% + …px)
-    // — TableView.updateColumns pct branch); a following 'fixed' must CLEAR that stretch
-    // (key absent = the importer's no-explicit-width shape; convertSizeToCSS(null,'auto')
-    // → null un-sets style.width) so columns drive the size again, like Word.
-    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
-    const tbl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
-    ecmd('autoFitTable', 'window'); await sleep(150);
-    const w1 = tbl() ? tbl().style.width : 'no-table';
-    if (!/calc|100%/.test(w1)) return 'window did not stretch: style.width=' + JSON.stringify(w1);
-    ecmd('autoFitTable', 'fixed'); await sleep(150);
-    const w2 = tbl() ? tbl().style.width : 'no-table';
-    if (/calc|100%/.test(w2)) return 'stretch not cleared: style.width=' + JSON.stringify(w2);
-    const tp = tableAttr('tableProperties');
-    if (!tp || tp.tableLayout !== 'fixed') return 'tableProperties.tableLayout != fixed: ' + JSON.stringify(tp);
-    if (tp.tableWidth && tp.tableWidth.type === 'pct') return 'pct tableWidth still present: ' + JSON.stringify(tp.tableWidth);
-    return true;
-  });
   await t('[6b] convertTableTotext replaces the table with paragraphs', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
     let inserted = false; doc().descendants((n) => { if (n.type.name === 'table') inserted = true; });
@@ -3633,26 +3226,6 @@
     if (stylePrs.length < 6) return 'tblStylePr conditional blocks missing (got ' + stylePrs.length + ', want 6)';
     return true;
   });
-  await t('[6b] tableSetStyle visibly changes the table (bake)', async () => {
-    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
-    const tblEl = () => document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
-    if (!tblEl()) return 'no table rendered';
-    const before = tblEl().outerHTML;
-    PM().tableSetStyle('GridTable4-Accent1'); await sleep(200);
-    const el = tblEl();
-    if (!el) return 'table lost after style apply';
-    if (el.outerHTML === before) return 'DOM unchanged after tableSetStyle';
-    // Be specific about WHAT changed: GridTable4-Accent1 base tblPr borders are
-    // single 4/8pt #8EAADB → computed border color rgb(142, 170, 219); the firstRow
-    // tblStylePr shades first-row cells #4472C4 → rgb(68, 114, 196).
-    const borderColor = getComputedStyle(el).borderTopColor;
-    if (borderColor !== 'rgb(142, 170, 219)') return 'table border not baked: borderTopColor=' + borderColor;
-    const firstCell = el.querySelector('tbody > tr > td, tbody > tr > th');
-    if (!firstCell) return 'no first-row cell';
-    const bg = getComputedStyle(firstCell).backgroundColor;
-    if (bg !== 'rgb(68, 114, 196)') return 'first-row shading not baked: backgroundColor=' + bg;
-    return true;
-  });
   await t('[6b] tableSetStyle preserves an explicit user cell shading', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
     // Caret sits in the FIRST cell after insertTable — shade it (user direct formatting),
@@ -3727,23 +3300,6 @@
       left: { w: parseFloat(cs.borderLeftWidth) || 0, style: cs.borderLeftStyle },
     };
   };
-  await t('[6b] fresh table renders visible cell gridlines (Word parity)', async () => {
-    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
-    const b = interiorCellBorders();
-    if (!b) return 'no 3x3 table rendered';
-    if (!(b.top.w >= 1 && b.top.style === 'solid')) return 'no insideH gridline: border-top=' + b.top.w + 'px ' + b.top.style;
-    if (!(b.left.w >= 1 && b.left.style === 'solid')) return 'no insideV gridline: border-left=' + b.left.w + 'px ' + b.left.style;
-    return true;
-  });
-  await t('[6b] borderless table shows no gridlines', async () => {
-    setDoc('x'); PM().insertTable({ rows: 3, cols: 3 }); await sleep(200);
-    ecmd('deleteCellAndTableBorders'); await sleep(150);
-    const b = interiorCellBorders();
-    if (!b) return 'no 3x3 table rendered';
-    if (b.top.w !== 0 || b.left.w !== 0)
-      return 'gridlines painted on a borderless table: top=' + b.top.w + 'px ' + b.top.style + ' left=' + b.left.w + 'px ' + b.left.style;
-    return true;
-  });
   await t('[6b] EXPORT purity: fresh table writes no direct w:tcBorders', async () => {
     // Real Word style-driven tables carry NO per-cell w:tcBorders (the style
     // definition in styles.xml owns the gridlines). The render-only gridline fix
@@ -3773,43 +3329,6 @@
   const insertNarrowTable = async () => {
     setDoc('x'); ecmd('insertTable', { rows: 2, cols: 2, columnWidths: [80, 80] }); await sleep(150);
   };
-  await t('[6b] tableSetAlignment center visibly centers the table (geometry)', async () => {
-    await insertNarrowTable();
-    if (!tableGeom()) return 'no table rendered';
-    if (!PM().tableSetAlignment('center')) return 'tableSetAlignment returned false';
-    await sleep(150);
-    const g = tableGeom();
-    if (!g) return 'table lost after align';
-    if (!(g.leftGap > 20)) return `still hard-left: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
-    if (!(Math.abs(g.leftGap - g.rightGap) < 40)) return `lopsided: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
-    return true;
-  });
-  await t('[6b] tableSetAlignment right hugs the right (geometry)', async () => {
-    await insertNarrowTable();
-    if (!tableGeom()) return 'no table rendered';
-    if (!PM().tableSetAlignment('right')) return 'tableSetAlignment returned false';
-    await sleep(150);
-    const g = tableGeom();
-    if (!g) return 'table lost after align';
-    if (!(g.rightGap < g.leftGap)) return `not right-aligned: leftGap=${g.leftGap.toFixed(1)} rightGap=${g.rightGap.toFixed(1)}`;
-    if (!(g.rightGap < 40)) return `right gap too big: rightGap=${g.rightGap.toFixed(1)}`;
-    return true;
-  });
-  await t('[6b] tableSetIndent still indents (no regression after the margin gating)', async () => {
-    await insertNarrowTable();
-    const before = tableGeom();
-    if (!before) return 'no table rendered';
-    if (!PM().tableSetIndent(48)) return 'tableSetIndent returned false';
-    await sleep(150);
-    const tbl = document.querySelector('#pm-editor .ProseMirror .tableWrapper > table');
-    const ml = parseFloat(getComputedStyle(tbl).marginLeft);
-    const g = tableGeom();
-    const grew = g.leftGap - before.leftGap;
-    // 48px → 720 twips → back to 48px through convertSizeToCSS; tiny rounding slack only.
-    if (!(Math.abs(ml - 48) <= 2)) return `computed margin-left=${ml} (expected ~48)`;
-    if (!(grew > 30)) return `leftGap did not grow ~48: before=${before.leftGap.toFixed(1)} after=${g.leftGap.toFixed(1)}`;
-    return true;
-  });
 
   await t('[6b][bridge] tableInfo returns rows/cols/styleId/alignment from live table node', async () => {
     setDoc('x'); PM().insertTable({ rows: 3, cols: 4 }); await sleep(150);
@@ -3918,14 +3437,6 @@
     const layout = !!document.querySelector('.contextual-tab[data-tab="table-layout"]');
     const design = !!document.querySelector('.contextual-tab[data-tab="table-design"]');
     return PM().isInTable() === true && layout === true && design === true;
-  });
-  await t('[6b] a Table Layout tab control cmd dispatches (tblInsertBelow grows the row count)', async () => {
-    setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
-    window.WC.TableToolsPM.syncContextualTabs(PM().isInTable());
-    let before = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') before++; });
-    window.WC.Commands.run({ cmd: 'tblInsertBelow', label: 'Insert Below', type: 'button' }); await sleep(120);
-    let after = 0; doc().descendants((n) => { if (n.type.name === 'tableRow') after++; });
-    return before === 2 && after === 3;
   });
   await t('[6b] leaving the table (caret outside) + sync hides BOTH contextual tabs', async () => {
     setDoc('x'); PM().insertTable({ rows: 2, cols: 2 }); await sleep(150);
@@ -5046,30 +4557,6 @@
     }
   });
 
-  await t('[9] insertTOC on a 2-heading doc: tableOfContents node with ≥2 entries; page-number run reads "0" (A1)', async () => {
-    setDocs(['Chapter One Intro', 'Chapter Two Body', 'plain trailing paragraph']);
-    // Real Heading-styled paragraphs (styleId Heading1 — collected by the default
-    // \o "1-3" TOC config, §0.4 K3). applyStyleByName is the FLIPPED styles surface.
-    selectText('Chapter One Intro'); PM().applyStyleByName('Heading 1'); await sleep(60);
-    selectText('Chapter Two Body'); PM().applyStyleByName('Heading 1'); await sleep(60);
-    if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
-    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); // insert at doc start
-    const ok = PM().refInsertTOC({});
-    if (ok !== true) return 'refInsertTOC returned ' + JSON.stringify(ok) + ' (red)';
-    await sleep(150);
-    const toc = tocNode();
-    if (!toc) return 'no tableOfContents node in the doc';
-    const entries = tocEntryTexts();
-    const matchOne = entries.some((tx) => tx.includes('Chapter One Intro'));
-    const matchTwo = entries.some((tx) => tx.includes('Chapter Two Body'));
-    if (!(matchOne && matchTwo)) return 'TOC entries do not match both headings: ' + JSON.stringify(entries);
-    // A1: degraded-create page-number run reads the literal "0" (NOT "??"; "??" is
-    // only the unreachable update({mode:'pageNumbers'}) path). Each entry text ends
-    // with the page-number run, so "0" must appear and "??" must NOT.
-    const joined = entries.join('\n');
-    if (/\?\?/.test(joined)) return 'TOC page number rendered "??" — expected the degraded-create "0" (A1): ' + JSON.stringify(entries);
-    return /0/.test(joined) || 'no degraded "0" page-number run in the TOC entries (A1): ' + JSON.stringify(entries);
-  });
 
   await t('[9] updateTable after a heading edit updates the matching TOC entry text', async () => {
     setDocs(['Original Heading X', 'plain body paragraph']);
@@ -5528,89 +5015,8 @@
   // blur) and assert refListFootnotes()/editor.doc.footnotes.list() reflect the new
   // body. DOM-observable + engine-observable, driven via WC.PM.* (flip-independent);
   // never asserts on a toast.
-  await t('[9] notes-area: refInsertFootnote renders #pm-notes-area with the note number + body (D9.1)', async () => {
-    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
-    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
-    await PM().newBlank(); await sleep(120); // start clean — no stale notes from prior tests
-    // Region must be ABSENT/hidden with zero notes (Word draws no empty separator).
-    const empty = document.getElementById('pm-notes-area');
-    if (empty && empty.style.display !== 'none' && empty.querySelector('.pm-note')) return 'notes region shows notes before any insert';
-    setDoc('notes area anchor body');
-    caretAfter('notes area anchor');
-    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
-    await sleep(160); // let the debounced notes-area render fire (90ms) + slack
-    const region = document.getElementById('pm-notes-area');
-    if (!region) return 'no #pm-notes-area in the DOM after refInsertFootnote';
-    if (region.style.display === 'none') return '#pm-notes-area hidden after refInsertFootnote';
-    const section = region.querySelector('.pm-notes-section');
-    if (!section) return 'no .pm-notes-section in the notes region';
-    if (!/Footnotes/.test((region.querySelector('.pm-notes-title') || {}).textContent || '')) return 'notes section is not titled "Footnotes"';
-    const noteRow = region.querySelector('.pm-note');
-    if (!noteRow) return 'no .pm-note row in the notes region';
-    const list = PM().refListFootnotes();
-    const expectedNum = list && list[0] && list[0].displayNumber;
-    const numText = (noteRow.querySelector('.pm-note-num') || {}).textContent || '';
-    if (expectedNum && numText.indexOf(String(expectedNum)) < 0) return 'note row number "' + numText + '" does not show displayNumber "' + expectedNum + '"';
-    const bodyEl = noteRow.querySelector('.pm-note-body');
-    if (!bodyEl) return 'no .pm-note-body editable element';
-    const expectedBody = (list && list[0] && list[0].content) || '';
-    return bodyEl.textContent === expectedBody || 'note body DOM "' + bodyEl.textContent + '" != refListFootnotes content "' + expectedBody + '"';
-  });
 
-  await t('[9] notes-area: editing a note body in #pm-notes-area persists via the bridge (refListFootnotes + footnotes.list reflect it) (D9.1)', async () => {
-    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
-    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
-    await PM().newBlank(); await sleep(120);
-    setDoc('edit in region anchor body');
-    caretAfter('edit in region anchor');
-    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
-    await sleep(160);
-    const region = document.getElementById('pm-notes-area');
-    if (!region) return 'no #pm-notes-area in the DOM';
-    const bodyEl = region.querySelector('.pm-note-body');
-    if (!bodyEl) return 'no .pm-note-body to edit';
-    const noteId = bodyEl.dataset.noteId;
-    if (!noteId) return 'note body has no data-note-id';
-    // Simulate the user editing the contenteditable body: set its plain text, fire a
-    // real input event, then blur (the module commits on blur → refUpdateNote).
-    const NEW_BODY = 'Body typed directly in the notes region';
-    bodyEl.focus();
-    bodyEl.textContent = NEW_BODY;
-    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
-    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
-    await sleep(160);
-    // Engine-observable: the underlying editor.doc.footnotes.list() body changed.
-    let engineBody = null;
-    try {
-      const items = window.WC.editor.doc.footnotes.list().items || [];
-      const it = items.find((x) => String(x.noteId) === String(noteId));
-      engineBody = it ? String(it.content) : null;
-    } catch (e) { return 'editor.doc.footnotes.list() threw: ' + ((e && e.message) || e); }
-    if (engineBody !== NEW_BODY) return 'editor.doc.footnotes.list() body "' + engineBody + '" != edited "' + NEW_BODY + '"';
-    // Bridge-observable: refListFootnotes() reflects the edit too.
-    const after = PM().refListFootnotes();
-    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId));
-    if (!match) return 'edited note vanished from refListFootnotes: ' + JSON.stringify(after);
-    return match.content === NEW_BODY || 'refListFootnotes content "' + match.content + '" != edited "' + NEW_BODY + '"';
-  });
 
-  await t('[9] notes-area: refShowNotes reveals the region (returns true with notes, focuses a body); false with none (D9.1)', async () => {
-    if (typeof PM().refShowNotes !== 'function') return 'PM.refShowNotes missing (red — bridge not installed)';
-    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
-    await PM().newBlank(); await sleep(120);
-    // With ZERO notes, refShowNotes must degrade to false (nothing to show).
-    if (PM().refShowNotes() !== false) return 'refShowNotes returned non-false with no notes';
-    setDoc('show notes anchor body');
-    caretAfter('show notes anchor');
-    if (PM().refInsertFootnote() !== true) return 'refInsertFootnote refused (precondition)';
-    await sleep(160);
-    if (PM().refShowNotes() !== true) return 'refShowNotes returned non-true with a note present';
-    const region = document.getElementById('pm-notes-area');
-    if (!region || region.style.display === 'none') return 'refShowNotes did not reveal #pm-notes-area';
-    // It focuses the first note body (so the user can type immediately).
-    const focused = document.activeElement;
-    return (focused && focused.classList && focused.classList.contains('pm-note-body')) || 'refShowNotes did not focus a .pm-note-body (active=' + (focused && focused.className) + ')';
-  });
 
   // FIX 1 REGRESSION (the edit-clobber): renderInner() rebuilds every note row from the
   // ENGINE content when the signature changes, recreating bodies from notes[].content. A
@@ -5620,52 +5026,6 @@
   // 500ms-debounced edit + blur bumps the signature and schedules a rebuild). Without the
   // clobber guard the rebuild recreates note B's body from the stale engine value and the
   // typed text is LOST; with the guard the rebuild is skipped while B is focused-dirty.
-  await t('[9] notes-area CLOBBER GUARD: a re-render mid-edit does NOT revert a focused dirty note body (FIX 1)', async () => {
-    if (typeof PM().refInsertFootnote !== 'function') return 'PM.refInsertFootnote missing (red — bridge not installed)';
-    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
-    await PM().newBlank(); await sleep(120);
-    // Two footnotes (A before B in document order) so a commit on A can re-render B.
-    setDocs(['clobber anchor alpha', 'clobber anchor beta']);
-    caretAfter('clobber anchor alpha'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote A refused (precondition)';
-    await sleep(120);
-    caretAfter('clobber anchor beta'); if (PM().refInsertFootnote() !== true) return 'refInsertFootnote B refused (precondition)';
-    await sleep(180);
-    const region = document.getElementById('pm-notes-area');
-    if (!region) return 'no #pm-notes-area in the DOM after two inserts';
-    const bodies = Array.from(region.querySelectorAll('.pm-note-body'));
-    if (bodies.length < 2) return 'expected 2 note bodies, got ' + bodies.length;
-    const bodyA = bodies[0];
-    const bodyB = bodies[1];
-    const idB = bodyB.dataset.noteId;
-    // 1. The user types new text in note B's body WITHOUT committing (no blur). The
-    //    contenteditable now holds uncommitted text the engine has not seen.
-    const B_TYPED = 'uncommitted text typed in note B';
-    bodyB.focus();
-    bodyB.textContent = B_TYPED;
-    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
-    // 2. Commit note A: edit A's body + blur. That fires refUpdateNote(A) + schedule(),
-    //    bumping the signature → a rebuild is queued WHILE B is focused + dirty. (Refocus
-    //    B first so it is the active dirty element when the rebuild fires — a real user
-    //    clicks back into B; here we set A's text, commit it, then restore focus to B.)
-    const A_BODY = 'note A committed body';
-    bodyA.textContent = A_BODY;
-    bodyA.dispatchEvent(new Event('input', { bubbles: true }));
-    PM().refUpdateNote(PM().refListFootnotes()[0].target || PM().refListFootnotes()[0].noteId, A_BODY);
-    // Re-focus B and restore its uncommitted text (the user is still editing B).
-    bodyB.focus();
-    bodyB.textContent = B_TYPED;
-    bodyB.dispatchEvent(new Event('input', { bubbles: true }));
-    // 3. Drive a re-render now (signature changed because A's engine content changed).
-    //    Use the synchronous render so the assertion is deterministic — this is the exact
-    //    path a debounced transaction-triggered rebuild would take.
-    window.WC.NotesArea.render();
-    // 4. The focused dirty body B must STILL show the user's typed text (NOT reverted to
-    //    the engine 'Footnote' seed). Re-query in case the row element was replaced.
-    const stillRegion = document.getElementById('pm-notes-area');
-    const bodyBnow = Array.from(stillRegion.querySelectorAll('.pm-note-body')).find((el) => el.dataset.noteId === idB) || bodyB;
-    return bodyBnow.textContent === B_TYPED
-      || 'note B body was clobbered: "' + bodyBnow.textContent + '" != typed "' + B_TYPED + '" (rebuild reverted an uncommitted edit)';
-  });
 
   // FIX 3 (endnote-edit path): the notes area edits BOTH footnotes and endnotes through
   // the same body+commit path (refUpdateNote(note.target || note.noteId)). Insert an
@@ -5673,44 +5033,6 @@
   // body changes (editor.doc.footnotes.list() of type 'endnote' + refListFootnotes()).
   // This pins that an endnote edit targets the ENDNOTE store (word/endnotes.xml via
   // getNotesConfig('endnote')), not a footnote.
-  await t('[9] notes-area: editing an ENDNOTE body in #pm-notes-area persists to the endnote (FIX 3)', async () => {
-    if (typeof PM().refInsertEndnote !== 'function') return 'PM.refInsertEndnote missing (red — bridge not installed)';
-    if (typeof PM().refListFootnotes !== 'function') return 'PM.refListFootnotes missing (red — bridge not installed)';
-    if (typeof PM().refUpdateNote !== 'function') return 'PM.refUpdateNote missing (red — bridge not installed)';
-    await PM().newBlank(); await sleep(120);
-    setDoc('endnote edit anchor body');
-    caretAfter('endnote edit anchor');
-    if (PM().refInsertEndnote() !== true) return 'refInsertEndnote refused (precondition)';
-    await sleep(180);
-    const region = document.getElementById('pm-notes-area');
-    if (!region) return 'no #pm-notes-area in the DOM after refInsertEndnote';
-    // The endnote must appear under the Endnotes section.
-    const endTitle = Array.from(region.querySelectorAll('.pm-notes-title')).find((el) => /Endnotes/.test(el.textContent || ''));
-    if (!endTitle) return 'no "Endnotes" section title in the notes region';
-    const bodyEl = region.querySelector('.pm-note-body');
-    if (!bodyEl) return 'no .pm-note-body to edit';
-    const noteId = bodyEl.dataset.noteId;
-    if (!noteId) return 'endnote body has no data-note-id';
-    const NEW_BODY = 'Endnote body edited in the notes region';
-    bodyEl.focus();
-    bodyEl.textContent = NEW_BODY;
-    bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
-    bodyEl.dispatchEvent(new Event('blur', { bubbles: true }));
-    await sleep(180);
-    // Engine-observable on the ENDNOTE store: editor.doc.footnotes.list({type:'endnote'}).
-    let endnoteBody = null;
-    try {
-      const items = window.WC.editor.doc.footnotes.list({ type: 'endnote' }).items || [];
-      const it = items.find((x) => String(x.noteId) === String(noteId));
-      endnoteBody = it ? String(it.content) : null;
-    } catch (e) { return 'editor.doc.footnotes.list({type:endnote}) threw: ' + ((e && e.message) || e); }
-    if (endnoteBody !== NEW_BODY) return 'endnote store body "' + endnoteBody + '" != edited "' + NEW_BODY + '" (endnote edit did not target the endnote)';
-    // The bridge surface (refListFootnotes) must agree AND mark it type 'endnote'.
-    const after = PM().refListFootnotes();
-    const match = Array.isArray(after) && after.find((nn) => String(nn.noteId) === String(noteId) && nn.type === 'endnote');
-    if (!match) return 'edited endnote not found as type endnote in refListFootnotes: ' + JSON.stringify(after);
-    return match.content === NEW_BODY || 'refListFootnotes endnote content "' + match.content + '" != edited "' + NEW_BODY + '"';
-  });
 
   await t('[9] refInsertTOC with non-empty opts {showLevels:5, rightAlignPageNumbers:false}: instruction reflects \\o "1-5"', async () => {
     if (typeof PM().refInsertTOC !== 'function') return 'PM.refInsertTOC missing (red — bridge not installed)';
@@ -5833,45 +5155,7 @@
   });
 
   // ---------- bugfix: page-region click places the caret (Word behavior) ----------
-  await t('[fix] clicking the empty area below the text jumps the caret to the doc END', async () => {
-    setDocs(['First para alpha.', 'Second para beta.', 'Third para gamma.']);
-    // "son yazılan yer" = Word's Ctrl+End = Selection.atEnd (end of the last text
-    // block). Read it via the live selection's class so the test and the fix use
-    // the SAME canonical end-of-doc position (no brittle hand-rolled arithmetic).
-    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
-    const docEnd = v().state.selection.constructor.atEnd(v().state.doc).from;
-    // park the caret at the very start so a successful jump-to-end is unambiguous
-    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 });
-    v().dom.blur(); await sleep(20);
-    const page = document.getElementById('pm-editor');
-    const prose = page.querySelector('.ProseMirror');
-    const lastP = Array.from(prose.querySelectorAll('p')).pop();
-    const lr = lastP.getBoundingClientRect();
-    const pr = page.getBoundingClientRect();
-    // a point BELOW the content but inside the page sheet (the bottom margin)
-    const x = pr.left + pr.width / 2;
-    const y = Math.min(lr.bottom + 30, pr.bottom - 6);
-    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
-    await sleep(40);
-    if (!v().hasFocus()) return 'view did not take focus after the page-margin click';
-    return v().state.selection.from === docEnd || ('caret landed at ' + v().state.selection.from + ', expected the doc end (' + docEnd + ')');
-  });
 
-  await t('[fix] clicking the left margin beside a paragraph places the caret in it', async () => {
-    setDocs(['Alpha paragraph one.', 'Beta paragraph two.']);
-    window.WC.editor.commands.setTextSelection({ from: v().state.doc.content.size - 1, to: v().state.doc.content.size - 1 });
-    const page = document.getElementById('pm-editor');
-    const firstP = page.querySelector('.ProseMirror p');
-    const fr = firstP.getBoundingClientRect();
-    const pr = page.getBoundingClientRect();
-    // left-margin band, vertically aligned with the first paragraph
-    page.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: pr.left + 6, clientY: fr.top + fr.height / 2 }));
-    await sleep(40);
-    const sel = v().state.selection;
-    // first paragraph spans [1, firstP end). caret should land within it.
-    const firstEnd = firstP.textContent.length + 1;
-    return (sel.from >= 1 && sel.from <= firstEnd) || ('caret landed at ' + sel.from + ', expected within the first paragraph [1,' + firstEnd + ']');
-  });
 
   // ---------- slice 0b: file IO (these replace the live document — keep LAST) ----------
   await t('[0b] exportDocxBytes yields a real zip (PK header)', async () => {
@@ -6689,105 +5973,13 @@
     setDocs(arr);
   };
 
-  await t('[4a] pagination exposes page geometry from the document model', async () => {
-    setDoc('pagination geometry probe');
-    await sleep(400);
-    const pg = PM().__pagination;
-    if (!pg || !pg.geometry) return 'no __pagination/geometry exposed';
-    const g = pg.geometry;
-    return (Math.round(g.pageH) === 1056 && Math.round(g.marginTop) === 96 && Math.round(g.contentH) === 864) ||
-      'geometry off: ' + JSON.stringify({ pageH: g.pageH, mt: g.marginTop, ch: g.contentH });
-  });
 
-  await t('[4a] editor line-height calibrated to Word (Aptos-12 -> 1.225)', () => {
-    // Locks DEFAULT_LINE_HEIGHT (ProseMirrorRenderer.ts): oracle read-layout showed
-    // real Word fits ~44 Aptos-12 lines/Letter page (~19.6px = 1.225x16). Upstream
-    // 1.2 (19.2px) drifted pagination a page behind Word on long docs.
-    const pm = document.querySelector('#pm-editor .ProseMirror');
-    const lh = pm && pm.style.lineHeight;
-    return lh === '1.225' || 'inline line-height = ' + lh + ' (expected 1.225)';
-  });
 
-  await t('[4a] no phantom browser-default paragraph top-margin leaks', async () => {
-    // The browser-default <p> margin (~16px top AND bottom) is reset; legitimate
-    // spacing still comes inline from the model (e.g. a style's space-after lands
-    // on margin-bottom). The browser default would put 16px on BOTH sides, so a 0
-    // top margin proves the default no longer leaks. (oracle-confirmed: removing
-    // the phantom margin made the clone's lines/page match Word.)
-    setDoc('margin probe paragraph');
-    await sleep(300);
-    const p = document.querySelector('#pm-editor .ProseMirror p');
-    if (!p) return 'no paragraph';
-    return getComputedStyle(p).marginTop === '0px' || 'p margin-top = ' + getComputedStyle(p).marginTop + ' (browser default leaked)';
-  });
 
-  await t('[4a] short doc = single page, no page seams', async () => {
-    setDoc('one short line');
-    await sleep(400);
-    const pg = PM().__pagination;
-    if (!pg) return 'no __pagination';
-    return (pg.pageCount === 1 && pg.breaks.length === 0 && seamEls().length === 0) ||
-      'pageCount=' + pg.pageCount + ' breaks=' + pg.breaks.length + ' seams=' + seamEls().length;
-  });
 
-  await t('[4a] overflowing content paginates into multiple pages with rendered seams', async () => {
-    fillParas(70);
-    await sleep(600);
-    const pg = PM().__pagination;
-    if (!pg) return 'no __pagination';
-    if (pg.pageCount < 2) return 'pageCount=' + pg.pageCount + ' (expected >=2)';
-    if (pg.breaks.length !== pg.pageCount - 1) return 'breaks=' + pg.breaks.length + ' != pageCount-1=' + (pg.pageCount - 1);
-    if (seamEls().length !== pg.breaks.length) return 'rendered seams=' + seamEls().length + ' != breaks=' + pg.breaks.length;
-    return true;
-  });
 
-  await t('[4a] counts().pages + status bar reflect the live page count', async () => {
-    fillParas(70);
-    // poll until counts.pages catches up to the engine
-    const PMx = PM();
-    let pages = 0, pc = 0;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = (PMx.__pagination || {}).pageCount || 1; pages = PMx.counts().pages; if (pages === pc && pc >= 2) break; }
-    if (pages !== pc) return 'counts.pages=' + pages + ' != engine pageCount=' + pc;
-    if (pc < 2) return 'expected multi-page, got ' + pc;
-    const status = document.querySelector('#statusbar .sb-item');
-    const txt = status ? status.textContent : '';
-    return /^Page \d+ of \d+$/.test(txt) && txt.endsWith('of ' + pc) || 'status="' + txt + '" pageCount=' + pc;
-  });
 
-  await t('[4a] page margins are realized (top-margin + tail spacers present)', async () => {
-    // After fillParas(70): a top-margin spacer (no band) + N seams (band) + a tail (no band).
-    const spacers = allSpacerEls();
-    const bandless = spacers.filter((s) => !s.querySelector('.pm-gap-band'));
-    return bandless.length >= 2 || 'bandless spacers (top+tail) = ' + bandless.length + ' of ' + spacers.length;
-  });
 
-  await t('[4a] each seam positions the next page content at the page content-top', async () => {
-    // The core geometry invariant: the first content block after page-seam k must
-    // start at visual y = k*pitch + marginTop (the content-top of page k+1). This
-    // verifies every page boundary directly and is robust to the last-page tail.
-    fillParas(70);
-    const pm = document.querySelector('#pm-editor .ProseMirror');
-    // poll to convergence (box height stable)
-    let prev = -1, stable = 0;
-    for (let i = 0; i < 25 && stable < 3; i++) { await sleep(120); const h = pm.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
-    const z = PM().zoom || 1;
-    const boxTop = pm.getBoundingClientRect().top;
-    const g = PM().__pagination.geometry, GAP = 14, pitch = g.pageH + GAP;
-    const kids = Array.from(pm.children);
-    let k = 0; const errs = [];
-    for (let i = 0; i < kids.length; i++) {
-      const el = kids[i];
-      if (!(el.classList.contains('pm-page-spacer') && el.querySelector('.pm-gap-band'))) continue;
-      k++;
-      let j = i + 1; while (j < kids.length && kids[j].classList.contains('pm-page-spacer')) j++;
-      if (j >= kids.length) continue;
-      const top = (kids[j].getBoundingClientRect().top - boxTop) / z;
-      const target = k * pitch + g.marginTop;
-      if (Math.abs(top - target) > 6) errs.push('seam' + k + ' top=' + Math.round(top) + ' target=' + Math.round(target));
-    }
-    if (k === 0) return 'no seams found';
-    return errs.length === 0 ? true : errs.join('; ');
-  });
 
   await t('[4a] a pagination decoration tick does NOT dirty the document', async () => {
     PM().setClean();
@@ -6805,19 +5997,6 @@
     return (before === false && after === false) || 'dirty before=' + before + ' after=' + after;
   });
 
-  await t('[4a] continuous (Web) view renders no page seams', async () => {
-    fillParas(70);
-    await sleep(500);
-    const seamsPrint = seamEls().length;
-    PM().setView('web');
-    await sleep(400);
-    const seamsWeb = seamEls().length;
-    PM().setView('print');
-    await sleep(400);
-    const seamsBack = seamEls().length;
-    return (seamsPrint > 0 && seamsWeb === 0 && seamsBack > 0) ||
-      'print=' + seamsPrint + ' web=' + seamsWeb + ' back=' + seamsBack;
-  });
 
   // ---- Phase 4a: manual page breaks (hardBreak[pageBreakType='page']) ----
   const caretToEndOf = (needle) => {
@@ -6842,57 +6021,9 @@
   const pageContentTop = (pageIdx) => { const g = PM().__pagination.geometry; return (pageIdx - 1) * (g.pageH + 14) + g.marginTop; };
   const bandCount = () => document.querySelectorAll('#pm-editor .ProseMirror .pm-gap-band').length;
 
-  await t('[4a] manual page break forces the following content onto a new page', async () => {
-    setDocs(['Mpb alpha line', 'Mpb bravo line', 'Mpb charlie line']);
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('bravo');
-    PM().insertPageBreak();
-    let pc = before;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
-    if (pc <= before) return 'pageCount did not increase (' + before + ' -> ' + pc + ')';
-    const y = textY('charlie');
-    return (y != null && y >= pageContentTop(2) - 30) || 'charlie Y=' + Math.round(y) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
-  });
 
-  await t('[4a] mid-paragraph break splits the paragraph (after-text on the next page)', async () => {
-    window.WC.editor.commands.selectAll();
-    window.WC.editor.commands.insertContent('<p>MidBefore part of the paragraph here</p>');
-    await sleep(250);
-    // caret after "here" (end) — then type after-break text so the paragraph has content on both sides
-    caretToEndOf('here');
-    PM().insertPageBreak();
-    window.WC.editor.commands.insertContent('MidAfter text');
-    await sleep(500);
-    if (PM().__pagination.pageCount < 2) return 'pageCount ' + PM().__pagination.pageCount;
-    const yb = textY('MidBefore'), ya = textY('MidAfter');
-    if (yb == null || ya == null) return 'text not found (b=' + yb + ' a=' + ya + ')';
-    return (yb < pageContentTop(2) - 30 && ya >= pageContentTop(2) - 30) || 'before Y=' + Math.round(yb) + ' after Y=' + Math.round(ya);
-  });
 
-  await t('[4a] trailing manual page break adds a blank page', async () => {
-    setDocs(['TrA alpha', 'TrA omega']); // omega = unique last word of the last block
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('omega');
-    PM().insertPageBreak();
-    let pc = before;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
-    return pc === before + 1 || 'trailing break: pageCount ' + before + ' -> ' + pc + ' (expected +1)';
-  });
 
-  await t('[4a] blank page (two breaks) adds a blank sheet (two seams)', async () => {
-    setDocs(['Bp alpha line', 'Bp bravo line', 'Bp charlie line']);
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('bravo');
-    PM().insertBlankPage();
-    let pc = before;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
-    if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
-    // a blank page = two forced seams (each one gap band); content after lands 2 pages down
-    return bandCount() >= 2 || 'expected >=2 gap bands for the blank page, got ' + bandCount();
-  });
 
   await t('[4a] manual page break exports as <w:br w:type="page">', async () => {
     setDocs(['Exp alpha line', 'Exp bravo line']);
@@ -6925,175 +6056,16 @@
   // Document position where the top-level block containing `needle` begins.
   const blockStartOf = (needle) => { let p = null; doc().forEach((n, off) => { if (p == null && (n.textContent || '').indexOf(needle) >= 0) p = off; }); return p; };
 
-  await t('[4a] manual page break is a BLOCK-boundary seam (no block-in-inline; page-2 click maps right)', async () => {
-    setDocs(['MbiAlpha first paragraph', 'MbiBravo second paragraph', 'MbiCharlie third paragraph word']);
-    await sleep(300);
-    caretToEndOf('MbiBravo second paragraph'); // caret at end of block 2 → break pushes block 3 to page 2
-    PM().insertPageBreak();
-    let pc = 1; for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 2) break; }
-    if (pc < 2) return 'did not paginate to 2 pages';
-    const inl = inlineSpacerCount();
-    if (inl > 0) return 'block-in-inline: ' + inl + ' page-spacer(s) injected inside a <p> (corrupts posAtCoords)';
-    // Clicking page-2's top margin must NOT misland deep in page-1 content. The inline-spacer
-    // bug hijacked posAtCoords to a page-1 position (well before the page-2 block); the fix
-    // makes it resolve at/after the page-2 block boundary (MbiCharlie's block start).
-    const pos = marginClickPos('MbiCharlie'), p2 = blockStartOf('MbiCharlie');
-    if (pos == null || p2 == null) return 'could not hit-test the page-2 margin (pos=' + pos + ' p2=' + p2 + ')';
-    return pos >= p2 || 'page-2 margin click mislanded at pos ' + pos + ' (before the page-2 block at ' + p2 + ')';
-  });
 
-  await t('[4a] blank page uses BLOCK-boundary seams (no block-in-inline spacer)', async () => {
-    setDocs(['BbiAlpha first', 'BbiBravo middle', 'BbiCharlie last word']);
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('BbiAlpha first');
-    PM().insertBlankPage();
-    let pc = before; for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= before + 2) break; }
-    if (pc < before + 2) return 'blank page did not add 2 pages (' + before + ' -> ' + pc + ')';
-    const inl = inlineSpacerCount();
-    return inl === 0 || 'block-in-inline: ' + inl + ' page-spacer(s) inside a <p> for the blank page';
-  });
 
-  await t('[4a] section break (w:sectPr) forces the next content onto a new page', async () => {
-    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
-    setDocs(['Scb alpha line', 'Scb bravo line', 'Scb gamma line']);
-    await sleep(300);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('bravo');
-    window.WC.editor.commands.insertSectionBreakAtSelection({});
-    let pc = before;
-    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
-    if (pc <= before) return 'section break did not add a page (' + before + ' -> ' + pc + ')';
-    const y = textY('Scb gamma');
-    return (y != null && y >= pageContentTop(2) - 30) || 'gamma Y=' + Math.round(y) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
-  });
 
-  await t('[4a] section break governed by the NEXT section: continuous-typed ender still page-breaks', async () => {
-    // Word semantic (oracle-validated): a sectPr's w:type describes how ITS OWN section
-    // BEGINS, not the break after it. An explicit `continuous` ON the section-ending
-    // paragraph must NOT suppress the break when the following (body) section is nextPage.
-    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
-    setDocs(['Scc alpha line', 'Scc bravo line', 'Scc gamma line']);
-    await sleep(300);
-    caretToEndOf('bravo');
-    window.WC.editor.commands.insertSectionBreakAtSelection({});
-    await sleep(150);
-    // stamp w:type=continuous onto bravo's sectPr
-    let tgt = null;
-    doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes('bravo')) tgt = { node, pos }; return true; });
-    if (!tgt) return 'bravo paragraph not found';
-    const pp = JSON.parse(JSON.stringify(tgt.node.attrs.paragraphProperties || {}));
-    if (!pp.sectPr) return 'bravo has no sectPr after insert (red)';
-    pp.sectPr.elements = (pp.sectPr.elements || []).filter((el) => el.name !== 'w:type');
-    pp.sectPr.elements.unshift({ type: 'element', name: 'w:type', attributes: { 'w:val': 'continuous' }, elements: [] });
-    v().dispatch(v().state.tr.setNodeMarkup(tgt.pos, undefined, { ...tgt.node.attrs, paragraphProperties: pp, pageBreakSource: 'sectPr' }, tgt.node.marks));
-    let pc = 1;
-    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 2) break; }
-    return pc >= 2 || 'continuous-typed ender wrongly suppressed the break (pageCount=' + pc + ', expected 2 — the next/body section is nextPage)';
-  });
 
-  await t('[4a] a CONTINUOUS middle section stays on the page (next-section governs)', async () => {
-    // The discriminating multi-section case (oracle-validated): intro / s1end[sectPr] /
-    // s2end[sectPr=continuous] / tail. The break after s1end is governed by s2's type
-    // (continuous → NO break); the break after s2end by the body (nextPage → break). So
-    // intro,s1end,s2end share page 1 and tail is page 2 — a naive "break on every sectPr"
-    // would give 3 pages. Guards the exact rule the prior 4f spike got backwards.
-    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
-    setDocs(['Cms intro', 'Cms ess1end', 'Cms ess2end', 'Cms mtail']);
-    await sleep(300);
-    const stamp = (needle, val) => {
-      let tgt = null;
-      doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes(needle)) tgt = { node, pos }; return true; });
-      if (!tgt) return false;
-      caretToEndOf(needle); window.WC.editor.commands.insertSectionBreakAtSelection({});
-      doc().descendants((node, pos) => { if (node.type.name === 'paragraph' && (node.textContent || '').includes(needle)) tgt = { node, pos }; return true; });
-      const pp = JSON.parse(JSON.stringify(tgt.node.attrs.paragraphProperties || {}));
-      if (!pp.sectPr) pp.sectPr = { type: 'element', name: 'w:sectPr', elements: [] };
-      pp.sectPr.elements = (pp.sectPr.elements || []).filter((el) => el.name !== 'w:type');
-      if (val) pp.sectPr.elements.unshift({ type: 'element', name: 'w:type', attributes: { 'w:val': val }, elements: [] });
-      v().dispatch(v().state.tr.setNodeMarkup(tgt.pos, undefined, { ...tgt.node.attrs, paragraphProperties: pp, pageBreakSource: 'sectPr' }, tgt.node.marks));
-      return true;
-    };
-    stamp('ess1end', null); await sleep(120);
-    stamp('ess2end', 'continuous'); await sleep(500);
-    const pc = PM().__pagination.pageCount, seams = (PM().__pagination.breaks || []).length;
-    if (pc !== 2) return 'expected 2 pages (continuous middle stays on page 1), got ' + pc + ' (naive break-on-every-sectPr = 3)';
-    if (seams !== 1) return 'expected exactly 1 seam (only the s2end→tail break), got ' + seams;
-    const yt = textY('Cms mtail'), ys = textY('Cms ess2end');
-    return (yt != null && ys != null && ys < pageContentTop(2) - 30 && yt >= pageContentTop(2) - 30)
-      || 'ess2end Y=' + Math.round(ys) + ' (want page 1) / mtail Y=' + Math.round(yt) + ' (want page 2 top ' + Math.round(pageContentTop(2)) + ')';
-  });
 
-  await t('[4a] section break before a TABLE pushes the table to a new page', async () => {
-    if (typeof window.WC.editor.commands.insertSectionBreakAtSelection !== 'function') return 'insertSectionBreakAtSelection command missing (red)';
-    window.WC.editor.commands.selectAll();
-    window.WC.editor.commands.insertContent('<p>Tbs intro</p><p>Tbs tend</p><table><tr><td>Tbs cellA</td><td>cellB</td></tr></table><p>Tbs after</p>');
-    await sleep(350);
-    const before = PM().__pagination.pageCount;
-    caretToEndOf('tend'); // non-first paragraph (the insert command rejects offset 0)
-    window.WC.editor.commands.insertSectionBreakAtSelection({});
-    let pc = before;
-    for (let i = 0; i < 25; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc > before) break; }
-    if (pc <= before) return 'section break before a table did not add a page (' + before + ' -> ' + pc + ')';
-    const yCell = textY('Tbs cellA');
-    return (yCell != null && yCell >= pageContentTop(2) - 30) || 'table cellA Y=' + Math.round(yCell) + ' not on page 2 (top ' + Math.round(pageContentTop(2)) + ')';
-  });
 
-  await t('[4a] a paragraph taller than a page splits at the line (mid-paragraph seam)', async () => {
-    window.WC.editor.commands.selectAll();
-    const words = [];
-    for (let i = 1; i <= 600; i++) words.push('word' + i);
-    window.WC.editor.commands.insertContent('<p>' + words.join(' ') + '</p>');
-    const box = document.getElementById('pm-editor');
-    let prev = -1, stable = 0;
-    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
-    const pg = PM().__pagination;
-    if (pg.pageCount < 2) return 'expected multi-page, got ' + pg.pageCount;
-    if (pg.breaks.length < 1) return 'no line-split seam placed (breaks=' + pg.breaks.length + ')';
-    // the seam must be INSIDE the single paragraph (a line split, not a whole-block move)
-    const seamInPara = document.querySelector('#pm-editor .ProseMirror > p .pm-page-spacer');
-    if (!seamInPara) return 'seam not inside the paragraph (line-split expected)';
-    // box is (within the convergence deadband) an exact number of sheets
-    const g = pg.geometry, GAP = 14;
-    const expected = pg.pageCount * g.pageH + (pg.pageCount - 1) * GAP;
-    return Math.abs(prev - expected) <= 26 || 'boxH=' + prev + ' expected~=' + Math.round(expected);
-  });
 
-  await t('[4a] status bar reports the caret page across a blank-page (two seams)', async () => {
-    setDocs(['Sbp alpha', 'Sbp bravo', 'Sbp gamma']);
-    await sleep(300);
-    caretToEndOf('bravo');
-    PM().insertBlankPage();
-    let pc = 1;
-    for (let i = 0; i < 20; i++) { await sleep(150); pc = PM().__pagination.pageCount; if (pc >= 3) break; }
-    if (pc < 3) return 'blank page pageCount=' + pc + ' (expected 3)';
-    // A blank page is ONE block-boundary seam that advances TWO sheets (two bands); the status
-    // bar weights seams by their page span, so gamma — after the seam — is on sheet 3.
-    const advanced = (PM().__pagination.breaks || []).reduce((a, b) => a + (b.pages || 1), 0);
-    if (advanced < 2) return 'expected the blank-page seam(s) to advance >=2 sheets, got ' + advanced;
-    caretToEndOf('gamma'); // caret on the 3rd sheet (sheet 2 is the blank page)
-    await sleep(300);
-    const txt = (document.querySelector('#statusbar .sb-item') || {}).textContent;
-    return txt === 'Page 3 of 3' || 'status="' + txt + '" (expected "Page 3 of 3")';
-  });
 
-  await t('[4a] a straddling table is moved wholesale, never line-split mid-cell', async () => {
-    window.WC.editor.commands.selectAll();
-    const fillers = Array.from({ length: 40 }, (_, i) => '<p>Tbl filler ' + (i + 1) + '.</p>').join('');
-    const rows = Array.from({ length: 14 }, (_, r) => '<tr><td>Row ' + (r + 1) + ' A</td><td>Row ' + (r + 1) + ' B</td></tr>').join('');
-    window.WC.editor.commands.insertContent(fillers + '<table>' + rows + '</table><p>tbl after</p>');
-    const box = document.getElementById('pm-editor');
-    let prev = -1, stable = 0;
-    for (let i = 0; i < 30 && stable < 3; i++) { await sleep(120); const h = box.offsetHeight; stable = h === prev ? stable + 1 : 0; prev = h; }
-    const pm = document.querySelector('#pm-editor .ProseMirror');
-    if (pm.querySelectorAll('table').length < 1) return 'no table rendered';
-    if (PM().__pagination.pageCount < 2) return 'expected multi-page with the table';
-    const inside = pm.querySelectorAll('table .pm-page-spacer').length;
-    return inside === 0 || 'a page-spacer was injected inside a table (' + inside + ') — table mangled';
-  });
 
   const pass = results.filter((r) => r.pass).length;
-  const pagedSkips = results.filter((r) => /paged-skip/.test(String(r.detail || ''))).length;
   const pagedKnownGaps = results.filter((r) => /paged known-gap/.test(String(r.detail || ''))).length;
-  return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass, mode: MODE, pagedSkips, pagedKnownGaps }, results }, null, 2);
+  return JSON.stringify({ summary: { total: results.length, pass, fail: results.length - pass, mode: MODE, pagedKnownGaps }, results }, null, 2);
 })()

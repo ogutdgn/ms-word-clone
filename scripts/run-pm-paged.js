@@ -22,4 +22,4 @@ if (s.fail !== 0) {
   j.results.filter((r) => !r.pass).forEach((r) => console.error('  FAIL ' + r.name + ' | ' + r.detail));
   process.exit(1);
 }
-console.log('PAGED OK: ' + s.pass + '/' + s.total + ' pass (' + s.pagedSkips + ' overlay-only skips, ' + s.pagedKnownGaps + ' deferred known-gaps)');
+console.log('PAGED OK: ' + s.pass + '/' + s.total + ' pass (' + s.pagedKnownGaps + ' deferred known-gaps)');
