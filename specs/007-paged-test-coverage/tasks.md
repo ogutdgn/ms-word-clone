@@ -17,47 +17,47 @@
 
 ## Phase 2: Skip infrastructure
 
-- [ ] T004 Add the `PAGED_SKIP` Map (exact name → `{reason, probe}`), empty, with a zone-grouped comment scaffold.
-- [ ] T005 Teach `t(name, fn)` AND `ta(name, asyncFn)`: when `PAGED && PAGED_SKIP.has(name)` → push
+- [x] T004 Add the `PAGED_SKIP` Map (exact name → `{reason, probe}`), empty, with a zone-grouped comment scaffold.
+- [x] T005 Teach `t(name, fn)` AND `ta(name, asyncFn)`: when `PAGED && PAGED_SKIP.has(name)` → push
   `{name, pass:true, detail:'⊘ paged-skip (overlay-only): '+reason+' — paged covered by '+probe}` and RETURN
   (do not run the body). Overlay path byte-unchanged (contract C2).
 
 ## Phase 3: Category A — populate `PAGED_SKIP` (62), zone by zone (research Decision 2)
 
 After EACH zone: re-run `test:pm:paged`; the zone's fails must become skip-passes (paged fail count drops).
-- [ ] T006 `[4a]` (22) — overlay Pagination engine (`PM.__pagination`) → probe:coords + probe:statusbar + report:glyphgeom.
-- [ ] T007 `[6b]` (8) — overlay table render DOM → test:roundtrip (export) + `.superdoc-page` paint.
-- [ ] T008 `[4d]` (7) — ribbon→table ops via overlay table DOM (exports mode-agnostic) → test:roundtrip.
-- [ ] T009 `[2]` (7) — overlay list-marker / shading DOM → structure asserts + test:roundtrip.
-- [ ] T010 `[9]` (6) — `#pm-notes-area` (disabled in paged) + TOC "0" degrade → probe:notes.
-- [ ] T011 `[home]` (5) — paragraph-border / text-effect / hr DOM → `.superdoc-page` + test:roundtrip.
-- [ ] T012 `[4b]` (3) + `[4c]` (1) + `[insert]` (1) — image resize/render/float/natural-size → probe:imageresize + roundtrip.
-- [ ] T013 `[fix]` (3) — overlay caret-hit / selectednode DOM → probe:pointer.
-- [ ] T014 `[3]` (1) + `[1]` (1) — heading-color / strike-superscript decoration render → mark application + report:glyphgeom.
+- [x] T006 `[4a]` (22) — overlay Pagination engine (`PM.__pagination`) → probe:coords + probe:statusbar + report:glyphgeom.
+- [x] T007 `[6b]` (8) — overlay table render DOM → test:roundtrip (export) + `.superdoc-page` paint.
+- [x] T008 `[4d]` (7) — ribbon→table ops via overlay table DOM (exports mode-agnostic) → test:roundtrip.
+- [x] T009 `[2]` (7) — overlay list-marker / shading DOM → structure asserts + test:roundtrip.
+- [x] T010 `[9]` (6) — `#pm-notes-area` (disabled in paged) + TOC "0" degrade → probe:notes.
+- [x] T011 `[home]` (5) — paragraph-border / text-effect / hr DOM → `.superdoc-page` + test:roundtrip.
+- [x] T012 `[4b]` (3) + `[4c]` (1) + `[insert]` (1) — image resize/render/float/natural-size → probe:imageresize + roundtrip.
+- [x] T013 `[fix]` (3) — overlay caret-hit / selectednode DOM → probe:pointer.
+- [x] T014 `[3]` (1) + `[1]` (1) — heading-color / strike-superscript decoration render → mark application + report:glyphgeom.
 
 ## Phase 4: Category B — investigate + paged-aware port (8). NO silent skip.
 
 For each: reproduce in paged, find the paged-equivalent assertion (doc-model / PE view / paged class), port the
 test to a `PAGED`-aware branch, confirm it genuinely PASSES in paged. If a real paged gap is proven, record it as
 an explicit FAIL/known-gap (do NOT add to `PAGED_SKIP`).
-- [ ] T015 `[7]` open `.html` bold mark — assert the doc-model bold mark (mode-agnostic) / settle timing.
-- [ ] T016 `[8]` Restrict Editing read-only — assert on the PE view (`WC.view`) editability in paged.
-- [ ] T017 `[0a]` PK-junk import resilience — assert the live PE survived the junk import.
-- [ ] T018 `[11]` ×2 "PM is the only world" / "body is pm-active" — assert the paged single-world / body class.
+- [x] T015 `[7]` open `.html` bold mark — assert the doc-model bold mark (mode-agnostic) / settle timing.
+- [x] T016 `[8]` Restrict Editing read-only — assert on the PE view (`WC.view`) editability in paged.
+- [x] T017 `[0a]` PK-junk import resilience — assert the live PE survived the junk import.
+- [x] T018 `[11]` ×2 "PM is the only world" / "body is pm-active" — assert the paged single-world / body class.
 
 ## Phase 5: Harden + verify + close-out
 
-- [ ] T019 Add `test:pm:paged` to `package.json` (fresh `--user-data-dir=C:/tmp/wc-paged-test`,
+- [x] T019 Add `test:pm:paged` to `package.json` (fresh `--user-data-dir=C:/tmp/wc-paged-test`,
   `--probe-out=C:/tmp/wc-pm-paged.json`) — a genuine paged run by construction (contract C6).
-- [ ] T020 VERIFY: overlay build → `test:pm` **475/475** (SC-001); `test:pm:paged` → **fail===0**, `mode=paged`,
+- [x] T020 VERIFY: overlay build → `test:pm` **475/475** (SC-001); `test:pm:paged` → **fail===0**, `mode=paged`,
   `pagedSkips≈62` (SC-002/003); `test:smoke` 9 / `test:roundtrip` 27 / `test:bundle` 4 unaffected (SC-004).
-- [ ] T021 Audit every paged-skip detail: starts `⊘ paged-skip (overlay-only):` + names construct + a probe (FR-004);
+- [x] T021 Audit every paged-skip detail: starts `⊘ paged-skip (overlay-only):` + names construct + a probe (FR-004);
   confirm NO Category-B test is in `PAGED_SKIP` (FR-005).
-- [ ] T022 `/code-review` (adversarial-review workflow) — focus: any over-skip hiding a real paged gap; overlay
+- [x] T022 `/code-review` (adversarial-review workflow) — focus: any over-skip hiding a real paged gap; overlay
   byte-equivalence; reason honesty. FIX confirmed findings.
-- [ ] T023 Docs reconcile: update memory `paged-testpm-overlay-suite` (test:pm is now paged-aware; the 70 are
+- [x] T023 Docs reconcile: update memory `paged-testpm-overlay-suite` (test:pm is now paged-aware; the 70 are
   ported/skipped; how to run the paged gate) + a docs/plan note. Tick this tasks.md.
-- [ ] T024 ff-merge `007-paged-test-coverage` → `general-done` (NOT main; no push). plan-tracking checkpoint.
+- [x] T024 ff-merge `007-paged-test-coverage` → `general-done` (NOT main; no push). plan-tracking checkpoint.
   **Unblocks 008 (overlay retirement).**
 
 ---
