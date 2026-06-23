@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP — 🏁 010 Paged Import Fidelity COMPLETE; 6 of 8 done)
+
+> **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
+> 010 ff-merged in @ `2f312ca`. **Phase:** POST-MIGRATION `general-done` cleanup loop (autonomous `/loop`). Ultracode ON.
+>
+> **State:** 6 of 8 COMPLETE — 005 ✅, 006 ✅, 007 ✅, 008 ✅, 009 ✅, **010 paged import fidelity ✅**. Remaining:
+> **011 pagination calibration (NEXT — the STOP-and-ask point: likely needs a fork edit)** → 012 frames group.
+>
+> **010 = fixed the `[7]` PAGED_KNOWN_GAP (007 surfaced it): paged `WC.Files.open('*.html')` DUMPED THE RAW HTML AS
+> LITERAL TEXT** instead of parsing it. Root cause (spike-confirmed): `replaceEditor`'s html leg did
+> `pres.editor.chain().selectAll().insertContent(extra.html).run()`, and in the paged PresentationEditor
+> `insertContent(htmlString)` inserts the markup as ONE literal text node (no parse) — the doc held the entire
+> `<!DOCTYPE html>…` string with NO bold/heading/list structure. The overlay had parsed via the Editor constructor's
+> `html` option; the paged path never did.
+>
+> **The NO-FORK fix** (`src/renderer/bridge/index.ts`): import `createDocFromHTML` from `@core/helpers/index.js` — a
+> PUBLIC fork helper (the SAME parser the Editor constructor + `replaceNodeWithHTML` use; NOT a fork edit). In the html
+> leg, PARSE `extra.html` → a doc node, then full-body replace the blank (from `replaceFile`) doc:
+> `tr.replaceWith(0, doc.content.size, parsed.content)` → `view.dispatch`. Keeps the §5.3 data-loss guard
+> (`landed`/`lastImportBlanked`) + the doc node's attrs (sectPr/page setup). **`.txt` (`<p>`-per-line html) + `.csv`
+> (table html) ride the SAME leg → fixed for free.** Spike: pre-fix `markTypes:[textStyle]`/`rawHtmlDumpedAsText:true`
+> → post-fix `markTypes:['bold']`/`rawHtmlDumpedAsText:false`/parsed texts.
+>
+> **Verify:** moved `[7]` OUT of PAGED_KNOWN_GAP → it runs as a genuine PASS. **test:pm 416/416 (pagedKnownGaps
+> 10→9), smoke 9, roundtrip 27, test:bundle 4.** No new Word-COM oracle (a doc-MODEL fidelity fix; the mark→docx
+> export is already round-trip-covered — see research.md D4).
+>
+> **/code-review (1-agent adversarial, the 48-line diff): 0 confirmed defects — SOUND + SAFE.** All 6 concerns
+> confirmed: genuinely no-fork (createDocFromHTML is a stable public export, Editor imports it the same way); the
+> full-body `replaceWith` PRESERVES `doc.attrs` (sectPr lives in doc.attrs, not a child) + top-level children are
+> `block`-group → valid; data-loss guard intact; edge cases safe; txt/csv robust (schema-driven parse, strictly more
+> correct than the old raw insert); selection safe (the `replaceNodeWithHTML` precedent). Reviewer noted the
+> full-body splice is the CORRECT choice over the precedent for preserving sectPr.
+>
+> **Commits: `e3167e0` fix+artifacts, `2f312ca` close-out.**
+>
+> **Next: 011 (pagination calibration) — ⚠️ the STOP-and-ask point.** Target: the PE-2-vs-Word-3 multi-page
+> page-count divergence (009's known-gap) — the measuring-dom systematic-offset hook. The spike will determine
+> whether the calibration is reachable NO-FORK (an owned write / public API) or needs a fork edit. **If it needs a
+> fork edit → STOP and ask the user** (per the loop directive). If no-fork → proceed with the full spec-kit chain.
+>
+> **Blockers/notes:** none for 010. 011 is gated on the no-fork spike outcome.
+
 ## 2026-06-22 (general-done cleanup LOOP — 🏁 009 M6 Glyph-Tolerance GATE COMPLETE; 5 of 8 done)
 
 > **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
