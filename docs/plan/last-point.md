@@ -7,6 +7,56 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP — 🏁 008 Overlay Retirement COMPLETE; 4 of 8 done)
+
+> **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; **user merges →main at the END**).
+> 008 ff-merged in @ `475173f`. **Phase:** POST-MIGRATION `general-done` cleanup loop (autonomous `/loop`).
+> Ultracode ON.
+>
+> **State:** 4 of 8 COMPLETE — 005 hyphenation ✅, 006 section breaks ✅, 007 paged test-coverage ✅,
+> **008 overlay retirement ✅**. Remaining: **009 M6→gate (NEXT)** → 010 import fidelity → 011 pagination
+> calibration → 012 frames group.
+>
+> **008 = the legacy continuous-flow OVERLAY render engine is FULLY RETIRED** (user-approved at a HARD-STOP; the
+> only feature in the loop that required explicit approval before its destructive deletion). The paged SuperDoc
+> PresentationEditor is now the SOLE engine. **Staged in 4 reviewable phases, gates green at every checkpoint:**
+> - **P1** (`94723c5`): deleted `src/renderer/pagination/pagination.ts` (the overlay decoration-paginator) +
+>   `src/renderer/bridge/notes-area.ts` (the overlay `#pm-notes-area` region); `main.ts`/`electron.vite.config`
+>   PAGED-UNCONDITIONAL (dropped the `WC_LAYOUT` toggle + `__WC_LAYOUT_DEFAULT__` define → `__WC_LAYOUT_MODE='paged'`).
+>   **This structurally killed the stale-localStorage false-green footgun.**
+> - **P2a** (`113712e`) + **P2b** (`d90da1f`): `index.ts` `replaceEditor` → paged-only (always `replaceFile`, no
+>   overlay teardown arm; deleted `constructPmEditor`/`createPmEditor`/`wire`/dead `__repaginate`) + cleared ALL
+>   dead overlay-mode branches (coordinate-adapter/focus/references/header-footer/ink-overlay/line-numbers-overlay)
+>   — `src/renderer/bridge` + `public/js` now have **zero** `__WC_LAYOUT_MODE` refs.
+> - **P3** (`43d5458` + `d269c7e`): DELETED the 59 overlay-only `test:pm` tests (suite is now **PAGED-ONLY at
+>   416/416**; `specs/008-overlay-retirement/test-mapping.md` maps each → its covering probe) via a verified
+>   JS-aware balance-scanner; deleted `run-pm-overlay.js` + `paged-overlays-probe.js`; `test:pm`→`run-pm-paged.js`;
+>   stripped the paged-vs-overlay TIER-1 arm from `test-roundtrip-paged.js` (now 71/0); renamed
+>   `check-overlay-bundle.js`→`check-entry-bundle.js` (generic entry-size ceiling); deleted dead overlay CSS.
+> - **P4** (`7bc5704` + `475173f`): docs reconciled (CLAUDE.md gate command `WC_LAYOUT=overlay npm run build &&
+>   test:pm` → `npm run build && test:pm`, paged 416; AGENTS/PAGINATION/ARCHITECTURE/LAYOUT_ENGINE/SCOPE);
+>   `/code-review` (12-agent adversarial, full 3976-line diff) → **0 confirmed / 8 refuted, SOUND + SAFE**.
+>
+> **⚠️ KEY FINDINGS (carry forward):** (1) the **`[8]`+`[11]` synergy was DISPROVEN** — making `replaceEditor`
+> paged-only did NOT fix them; `openDocx` already used `replaceFile`. The teardown is the `openDocx→replaceFile`
+> ROUND-TRIP flow throwing → `failBridge`, a SEPARATE backlog gap. `[8]`+`[11]`×2 stay PAGED_KNOWN_GAP (corrected
+> reasons). (2) the **entry chunk is ~8.5 MB** carrying the shared fork graph (Editor+extensions+layout/painter/
+> measuring-dom); only the 2.39 MB PE impl is dynamic-split — NOT a regression (the bundle gate caught my wrong
+> 2 MB re-pin; restored to 9.5 MB). (3) the ribbon-table-formatting gap (`task_cb2781a7`, 6×`[4d]` known-gaps) is
+> still open. (4) RESIDUAL (review-cleared, safe to defer): a few inert guarded `__pagination`/`__repaginate`
+> fallbacks (io.ts:49, coordinate-adapter getCurrentPage, index.ts:441-442, commands.js:2144) — already
+> undefined-in-paged pre-008, no behavioral change; cleanup-only.
+>
+> **Gates (008): test:pm 416/416 (paged-only, mode asserted; 10 known-gaps) / smoke 9 / roundtrip 27 / test:bundle
+> 4 / test:roundtrip:paged 71 — all 0 fail.**
+>
+> **Next: 009 (M6 glyph-tolerance → pass/fail GATE).** Turn the existing M6 `report:glyphgeom` (dev-box-only,
+> report-only) into a pass/fail gate using `contracts/m6-glyph-tolerance.md` thresholds (wrap 100%, start-X 0.75pt,
+> line-Y p95 ≤4.91pt, single-page page-count exact). The multipage PE-2-vs-Word-3 divergence is 011 (calibration),
+> NOT 009. Fresh sub-branch off general-done, full spec-kit chain.
+>
+> **Blockers/notes:** none. Loop self-paced. Overlay recoverable in git history if ever needed.
+
 ## 2026-06-22 (general-done cleanup LOOP — 🏁 007 Paged Test-Coverage COMPLETE; 3 of 8 done)
 
 > **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; **user merges →main at the END**).
