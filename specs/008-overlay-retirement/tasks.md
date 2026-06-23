@@ -14,16 +14,16 @@ re-run gates after each stage. Overlay stays recoverable in git history.
 - [x] T002 5-agent read-only mapping sweep + verification → `deletion-plan.md`. User HARD-STOP approval (staged).
 
 ## Phase 1 (P1): Dead-engine deletion — then re-run ALL gates [REVIEWABLE STAGE]
-- [ ] T003 Delete `src/renderer/pagination/pagination.ts` + its import/usage in `create-editor.ts` (the
+- [x] T003 Delete `src/renderer/pagination/pagination.ts` + its import/usage in `create-editor.ts` (the
   `constructPmEditor` overlay path: the `Pagination` import + extension entry).
-- [ ] T004 Delete `src/renderer/bridge/notes-area.ts` + its `installNotesArea()` call site in `index.ts`
+- [x] T004 Delete `src/renderer/bridge/notes-area.ts` + its `installNotesArea()` call site in `index.ts`
   (the PE paints footnotes in paged; the overlay region was already disabled in paged). Keep `WC.NotesArea`
   references in `references.ts` resolved (the paged `refShowNotes` stays — see P2).
-- [ ] T005 `main.ts` → paged unconditional: drop the `localStorage WC_LAYOUT || __WC_LAYOUT_DEFAULT__ || 'paged'`
+- [x] T005 `main.ts` → paged unconditional: drop the `localStorage WC_LAYOUT || __WC_LAYOUT_DEFAULT__ || 'paged'`
   resolution → `__WC_LAYOUT_MODE = 'paged'`; delete the overlay `else` arms (the `createPmEditor` branch + the
   `installBridge` overlay arm). Remove `constructPmEditor` from `create-editor.ts` (keep `constructPresentationEditor`).
-- [ ] T006 `electron.vite.config.ts` → remove the `__WC_LAYOUT_DEFAULT__` define.
-- [ ] T007 BUILD (paged) + re-run ALL gates: `npm run build` + `test:pm:paged` 475 + `test:smoke` 9 +
+- [x] T006 `electron.vite.config.ts` → remove the `__WC_LAYOUT_DEFAULT__` define.
+- [x] T007 BUILD (paged) + re-run ALL gates: `npm run build` + `test:pm:paged` 475 + `test:smoke` 9 +
   `test:roundtrip` 27 + `test:bundle` (still old gate here) + the key paged probes (opennew/coords/statusbar/
   notes). FIX any breakage. **STAGE CHECKPOINT** — commit P1.
 

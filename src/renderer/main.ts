@@ -5,16 +5,12 @@
 import { TextSelection, NodeSelection } from '@/pm'
 import { fixtureArrayBuffer, negationArrayBuffer } from '@/core/fixture'
 import { preinstallBridge, installBridge, failBridge } from '@/bridge/index'
-import { createPmEditor, createPagedEditor } from '@/bridge/create-editor'
+import { createPagedEditor } from '@/bridge/create-editor'
 import { installProofing } from '@/proofing/proofing'
 // Fork element styles (markers/tabs): the bridge imports @core/Editor.js directly, so
 // superdoc-fork/index.js → style.css never enters the build. Without the .sd-editor-tab
 // inline-block rule, list-marker separators and typed tabs render zero-width.
 import './core/superdoc-fork/assets/styles/elements/prosemirror.css'
-
-// Build-time default for the WC_LAYOUT toggle, injected by electron.vite.config.ts `define`
-// (= process.env.WC_LAYOUT at build, else ''). Erased at runtime by esbuild's define replace.
-declare const __WC_LAYOUT_DEFAULT__: string
 
 const w = window as any
 w.__PM_TextSelection = TextSelection
@@ -24,16 +20,9 @@ w.__PM_NodeSelection = NodeSelection
 // the fixture (gen-fixture) keeps the test hermetic.
 w.__WC_FIXTURE_NEGATION = negationArrayBuffer
 
-// WC_LAYOUT toggle (strangler-fig): 'paged' = the Option-B PresentationEditor — now the DEFAULT (FR-013 flip; all 6
-// fidelity milestones M1–M6 + paged open/new are done + the full suite passes in paged). 'overlay' = the legacy
-// decoration engine, still reachable via `WC_LAYOUT=overlay npm run build` or a localStorage override during the
-// transition. Renderer can't read process.env (contextIsolation), so use a runtime localStorage override, else the
-// build-time default, else paged.
-const layoutMode =
-  (() => { try { return localStorage.getItem('WC_LAYOUT') } catch { return null } })() ||
-  (typeof __WC_LAYOUT_DEFAULT__ !== 'undefined' ? __WC_LAYOUT_DEFAULT__ : '') ||
-  'paged'
-w.__WC_LAYOUT_MODE = layoutMode
+// 008: the overlay engine is retired — paged (the Option-B PresentationEditor) is the SOLE renderer.
+// `__WC_LAYOUT_MODE` stays 'paged' for the bridge/probe code that still reads it (now always paged).
+w.__WC_LAYOUT_MODE = 'paged'
 
 // SYNCHRONOUS (before the async mount): mode flag + page flip + D6 stub.
 preinstallBridge()
@@ -47,16 +36,10 @@ host.appendChild(mountEl)
 
 ;(async () => {
   try {
-    // WC_LAYOUT branch. paged: PresentationEditor paints real pages; the WC bridge binds to its
-    // INNER editor (which has .view). overlay: the plain Editor + decoration pagination (verbatim).
-    let editor: any
-    if (layoutMode === 'paged') {
-      const m = await createPagedEditor(mountEl, fixtureArrayBuffer())
-      editor = m.editor
-      w.WC.presentation = m.presentation // the paint owner; bridge binds to .editor, NOT this
-    } else {
-      editor = await createPmEditor(mountEl, fixtureArrayBuffer())
-    }
+    // The PresentationEditor paints real pages; the WC bridge binds to its INNER editor (which has .view).
+    const m = await createPagedEditor(mountEl, fixtureArrayBuffer())
+    const editor = m.editor
+    w.WC.presentation = m.presentation // the paint owner; bridge binds to .editor, NOT this
 
     // legacy scripts already built window.WC — never reassign it or window.WC.Editor
     w.WC.view = editor.view // plain PM EditorView — smoke checks .dispatch + .dom.isContentEditable
@@ -67,14 +50,9 @@ host.appendChild(mountEl)
       ;(w.WC.pm ??= {}).lastTxn = Date.now()
     })
 
-    // Overlay path: install verbatim. Paged standup: a bridge sub-installer may query
-    // #pm-editor/.pages (wiped/absent under PresentationEditor) and throw — don't let one throw
-    // mask the engine-paint proof; record it for the probe (full-B retargets these) and continue.
-    if (layoutMode === 'paged') {
-      try { installBridge(editor) } catch (be: any) { w.__WC_BRIDGE_ERROR = (be && (be.stack || be.message)) || String(be) }
-    } else {
-      installBridge(editor)
-    }
+    // A bridge sub-installer may still query a DOM node the PresentationEditor wiped/repurposed and
+    // throw — don't let one throw mask the engine-paint proof; record it for the probe and continue.
+    try { installBridge(editor) } catch (be: any) { w.__WC_BRIDGE_ERROR = (be && (be.stack || be.message)) || String(be) }
     w.WC.PM.setClean?.() // load-time transactions must never count as user edits
 
     w.__WC_READY = true // LAST statement after mount — the probe suites gate on this

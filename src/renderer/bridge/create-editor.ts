@@ -1,12 +1,9 @@
 // One construction path for the vendored Editor (boot + Open + New).
 import { Editor } from '@core/Editor.js'
 import { getStarterExtensions } from '@extensions/index.js'
-// Phase 4a: the owned, model-driven pagination engine (multi-page sheets) rides
-// the normal plugin pipeline as an extension so it survives every internal state
-// rebuild + Open/New and stays out of the fork. See src/renderer/pagination/.
-import { Pagination } from '@/pagination/pagination'
-// Phase 4b: live image resize — an owned NodeSelection-driven handle overlay over the
-// fork (same out-of-fork philosophy as Pagination). See src/renderer/imageresize/.
+// Live image resize — an owned NodeSelection-driven handle overlay over the fork (out-of-fork
+// philosophy). See src/renderer/imageresize/. (The legacy overlay decoration-paginator was
+// retired in 008 — the paged PresentationEditor is the sole paginator.)
 import { ImageResize } from '@/imageresize/image-resize'
 // Option-B: SuperDoc's real per-page layout engine (PresentationEditor). Imported LAZILY
 // inside constructPresentationEditor (a dynamic import — Milestone 1) so the heavy engine
@@ -52,7 +49,7 @@ export function constructPmEditor(mountEl: HTMLElement, parsed: ParsedDocx, extr
     // converter keeps the (blank-template) docx context — the doc stays docx-exportable.
     ...(extra?.html ? { html: extra.html } : {}),
     ...(extra?.onContentError ? { onContentError: extra.onContentError } : {}),
-    extensions: [...getStarterExtensions(), Pagination, ImageResize],
+    extensions: [...getStarterExtensions(), ImageResize],
     // slice 8 (A2): a REAL display identity — stamped as w:author/w:initials on tracked
     // changes and as creatorName on comment cards (legacy parity: review-tools/comments
     // used "Word User"). The oracle compares the author FLOW (stamp → card → docx →

@@ -22,7 +22,6 @@ import { installHyphenation } from './hyphenation'
 import { installSectionBreaks } from './section-breaks'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
-import { installNotesArea } from './notes-area'
 import { installIo } from './io'
 import { installStylePreview } from './style-preview'
 import { installStateSync } from './state-sync'
@@ -712,10 +711,9 @@ export function installBridge(editor: AnyEditor) {
   // slice 8 task 5: tracked-changes chrome (changed-line bars, format balloons,
   // Revisions pane).
   installTrackChrome(editor)
-  // slice 9 task 4 (D9.1): footnote/endnote notes region (continuous flow below the
-  // page sheet).
-  installNotesArea(editor)
-  installLineNumbersOverlay(editor) // 004 P2: paged-only owned margin-number overlay (no-op in overlay mode)
+  // (008: the overlay #pm-notes-area region was retired — the paged PresentationEditor paints
+  // footnote/endnote bodies per-page at the page foot; refShowNotes scrolls to the painted note.)
+  installLineNumbersOverlay(editor) // 004 P2: owned paged margin-number overlay (the paged line-number renderer)
   installFocusGuards()
   // M3: in paged mode PresentationEditor re-paginates WITHOUT a doc transaction (zoom, reflow),
   // so the transaction/selection-driven status-bar refresh (state-sync.ts) misses it and "Page X

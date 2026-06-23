@@ -131,12 +131,9 @@ export default defineConfig({
       ],
     },
     // Fixes the one unguarded process.env read at ProseMirrorRenderer.ts:966.
-    // __WC_LAYOUT_DEFAULT__ bakes the WC_LAYOUT toggle's build-time override ('' unless `WC_LAYOUT=<mode> npm run
-    // build`); empty falls through to main.ts's default, which is now PAGED (FR-013). Build overlay with
-    // `WC_LAYOUT=overlay npm run build`; main.ts also honors a runtime localStorage override.
+    // (008: the WC_LAYOUT build-time toggle `__WC_LAYOUT_DEFAULT__` was removed — paged is the sole engine.)
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
-      __WC_LAYOUT_DEFAULT__: JSON.stringify(process.env.WC_LAYOUT || ''),
     },
     plugins: [stubVueComponentsPlugin(), devCspPlugin()],
     build: { rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } } },

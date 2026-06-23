@@ -24,7 +24,7 @@
   t('WC_READY sentinel', () => window.__WC_READY === true);
   t('no boot error (__WC_ERROR)', () => !window.__WC_ERROR || ('ERR: ' + String(window.__WC_ERROR).slice(0, 200) && false));
   t('layout mode (info)', () => 'mode=' + mode);
-  const ok = t('refInsert/refShowNotes/refListFootnotes/refUpdateNote present + WC.NotesArea', () => (['refInsertFootnote', 'refInsertEndnote', 'refShowNotes', 'refListFootnotes', 'refUpdateNote'].every((k) => typeof PM[k] === 'function') && !!W.NotesArea) || ('verbs missing' && false));
+  const ok = t('refInsert/refShowNotes/refListFootnotes/refUpdateNote present', () => (['refInsertFootnote', 'refInsertEndnote', 'refShowNotes', 'refListFootnotes', 'refUpdateNote'].every((k) => typeof PM[k] === 'function')) || ('verbs missing' && false));
   if (!ok) return done();
 
   // insert a footnote + give it a DISTINCT body
@@ -33,30 +33,17 @@
   t('set the footnote body to a distinct marker', () => setFirstNoteBody('PROBEFOOTBODY') || ('refUpdateNote failed' && false));
   await sleep(600);
 
-  if (mode === 'paged') {
-    // (a) PE PAINTED the footnote body per-page (disabled overlay ≠ no notes)
-    t('PE PAINTED the footnote body on a .superdoc-page (disabled ≠ no-notes)', () => paintedHas('PROBEFOOTBODY') ? 'painted under .superdoc-page' : ('PROBEFOOTBODY NOT painted on any page — disabling the overlay would hide it' && false));
-    // (b) the #pm-notes-area overlay is DISABLED (absent or hidden) — no double-render
-    t('#pm-notes-area is absent OR display:none (overlay disabled, no double-render)', () => hiddenOrAbsent() ? ('#pm-notes-area=' + (notesArea() ? 'hidden' : 'absent')) : ('#pm-notes-area is VISIBLE — double-render not removed' && false));
-    // (c) refShowNotes scrolls the painted footnote into view (BEFORE the mutations below change notes[0])
-    t('refShowNotes() scrolls to the painted footnote (returns true)', () => PM.refShowNotes() === true ? 'scrolled to the painted note' : ('refShowNotes returned false in paged (could not locate the painted footnote)' && false));
-    // (d) FORCE a render + a doc transaction → the renderInner paged gate must keep the region absent (this directly
-    // exercises the gate: were it removed, WC.NotesArea.render() would create + show #pm-notes-area → a double-render).
-    t('WC.NotesArea.render() + a transaction do NOT mount #pm-notes-area (renderInner gate holds)', () => { try { W.editor.commands.insertContent(' more body text'); W.NotesArea.render(); } catch (e) {} return hiddenOrAbsent() ? 'gate holds — no region after forced render+transaction' : ('#pm-notes-area appeared — the paged gate was bypassed' && false); });
-    // (e) endnotes ALSO disabled (one region gate covers both) — insert an endnote, force a render, still no region
-    t('endnotes also disabled: an endnote + forced render still mounts NO #pm-notes-area', () => { try { PM.refInsertEndnote(); W.NotesArea.render(); } catch (e) {} return hiddenOrAbsent() ? 'still absent/hidden (both note types disabled)' : ('#pm-notes-area appeared for an endnote' && false); });
-    // WC.NotesArea facade still defined (guarded no-ops) — must not throw
-    t('WC.NotesArea facade stays defined (no throw)', () => (typeof W.NotesArea.render === 'function' && typeof W.NotesArea.showNotes === 'function' && typeof W.NotesArea.refresh === 'function' && (W.NotesArea.refresh(), true)) || ('facade missing/threw' && false));
-    return done();
-  }
-
-  // ── OVERLAY PARITY — the below-sheet editable region still mounts + renders ──
-  t('overlay: #pm-notes-area MOUNTS + is visible (editable region present)', () => !hiddenOrAbsent() ? 'visible' : ('#pm-notes-area not visible in overlay — parity broken' && false));
-  t('overlay: the region renders an editable .pm-note-body with the footnote text', () => {
-    const el = notesArea(); if (!el) return 'no #pm-notes-area' && false;
-    const body = el.querySelector('.pm-note-body');
-    return body && (body.textContent || '').indexOf('PROBEFOOTBODY') !== -1 && body.getAttribute('contenteditable') === 'true' ? 'editable note body rendered' : ('no editable .pm-note-body with the footnote text' && false);
-  });
-  t('overlay: refShowNotes() reveals the region (returns true)', () => PM.refShowNotes() === true ? 'revealed' : ('refShowNotes false in overlay' && false));
+  // 008: the overlay #pm-notes-area region is RETIRED (notes-area.ts deleted). The paged PresentationEditor is the
+  // sole footnote/endnote renderer — it paints note bodies per-page at the page foot; #pm-notes-area never mounts.
+  // (a) PE PAINTED the footnote body per-page
+  t('PE PAINTED the footnote body on a .superdoc-page', () => paintedHas('PROBEFOOTBODY') ? 'painted under .superdoc-page' : ('PROBEFOOTBODY NOT painted on any page' && false));
+  // (b) #pm-notes-area never mounts (the overlay region is gone) — no double-render
+  t('#pm-notes-area never mounts (overlay region retired)', () => hiddenOrAbsent() ? ('#pm-notes-area=' + (notesArea() ? 'hidden' : 'absent')) : ('#pm-notes-area is VISIBLE — an overlay region leaked' && false));
+  // (c) refShowNotes scrolls the painted footnote into view
+  t('refShowNotes() scrolls to the painted footnote (returns true)', () => PM.refShowNotes() === true ? 'scrolled to the painted note' : ('refShowNotes returned false (could not locate the painted footnote)' && false));
+  // (d) a doc transaction does NOT mount #pm-notes-area (no overlay module to create it)
+  t('a transaction does NOT mount #pm-notes-area', () => { try { W.editor.commands.insertContent(' more body text'); } catch (e) {} return hiddenOrAbsent() ? 'no region after a transaction' : ('#pm-notes-area appeared after a transaction' && false); });
+  // (e) endnotes also paint via the PE — an endnote does not mount a #pm-notes-area region either
+  t('an endnote also paints via the PE (no #pm-notes-area region)', () => { try { PM.refInsertEndnote(); } catch (e) {} return hiddenOrAbsent() ? 'still absent (both note types render via the PE)' : ('#pm-notes-area appeared for an endnote' && false); });
   return done();
 })();
