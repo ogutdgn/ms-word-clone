@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-06-22 (general-done cleanup LOOP — 🏁 009 M6 Glyph-Tolerance GATE COMPLETE; 5 of 8 done)
+
+> **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; user merges →main at the END).
+> 009 ff-merged in @ `a33b760`. **Phase:** POST-MIGRATION `general-done` cleanup loop (autonomous `/loop`). Ultracode ON.
+>
+> **State:** 5 of 8 COMPLETE — 005 ✅, 006 ✅, 007 ✅, 008 ✅, **009 M6 glyph-tolerance gate ✅**. Remaining:
+> **010 import fidelity (NEXT)** → 011 pagination calibration → 012 frames group.
+>
+> **009 = turned the dev-box-only M6 `report:glyphgeom` (REPORT-only) into a pass/fail GATE.** Validation infra,
+> NO `src`/fork change (the producers — the PE painted-DOM probe + the COM ps1 — are unchanged). In
+> `scripts/paged-glyphgeom-validate.js`, after the perFixture diff vs real Word COM, it asserts the
+> `contracts/m6-glyph-tolerance.md` thresholds per single-page fixture — **wrap-point agreement === 100%, start-X
+> p95 ≤ 1.0pt, line-Y p95 ≤ 6.0pt, single-page page-count exact** (the contract's wrap 100% / start-X ≤1px / line-Y
+> ≤5pt + a documented noise-headroom so a real regression fails but Word-COM/renderer noise doesn't flake);
+> `report.ok &&= gatePass`; exits 1 on a breach. Added a `test:glyphgeom` npm alias. The **multi-page page-count
+> divergence (PE 2 vs Word 3 pages)** is a VISIBLE ⚠️ known-gap tracked to **011** (pagination calibration), NOT a
+> hard fail — exactly as the contract scopes it.
+>
+> **Dev-box Word-COM verify:** GATE PASS — **64/64** tolerance checks (16 single-page fixtures × 4; 15 fonts all
+> wrap 100% / start-X 0.75pt / line-Y ≤ 4.91pt) + the multipage known-gap. SC-002 proven (16 line-Y checks breach a
+> 0.1pt threshold → the gate is NOT a no-op).
+>
+> **/code-review (1-agent adversarial, the 90-line diff): 1 Medium confirmed → FIXED.** The multi-page known-gap
+> exemption keyed on the DATA-derived `kind` (`pePages>1`), so a single-para fixture that REGRESSED into a page
+> split would escape into known-gaps instead of failing → re-keyed on **fixture IDENTITY** (`id==='multipage'`); any
+> OTHER fixture that turns out multi-page now gets a page-count-exact assertion (an unexpected split = a real
+> pagination regression → fail). Re-verified PASS on the saved data (64 checks + 1 known-gap, identical on healthy
+> data; the hole only opened under a future regression).
+>
+> **Gates: report:glyphgeom/test:glyphgeom GATE 64/64 PASS (dev-box) + the 4 core gates unaffected (test:pm 416 /
+> smoke 9 / roundtrip 27 / test:bundle 4).** Commits: `8140a14` plan+impl, `a33b760` review-fix+close.
+>
+> **Next: 010 (paged import fidelity).** Fix the gap 007 surfaced: paged `WC.Files.open('*.html')` dumps the raw
+> HTML as literal text instead of parsing it (the super-converter html→doc path isn't wired into the paged open
+> flow; the `[7]` PAGED_KNOWN_GAP). Also covers paged txt/csv import fidelity. NO-FORK; the WC.PM bridge; validate
+> the imported doc model. Fresh sub-branch off general-done, full spec-kit chain.
+>
+> **Blockers/notes:** none. Loop self-paced.
+
 ## 2026-06-22 (general-done cleanup LOOP — 🏁 008 Overlay Retirement COMPLETE; 4 of 8 done)
 
 > **Branch:** `general-done` (cleanup integration branch off `main` @ `89ed1b1`; **user merges →main at the END**).
