@@ -111,10 +111,16 @@ npm run build && npm run test:bundle        # renderer entry-size gate (4) — t
 ```
 
 <!-- SPECKIT START -->
-Active spec-kit plan: [specs/002-headers-footers/plan.md](specs/002-headers-footers/plan.md)
-(Headers & Footers in the paged editor — per-feature reconciliation on the now-default paged engine. P1 on-page
-enter/edit/close + the "Header & Footer Tools" contextual tab; P2 Different First Page / Odd & Even variants;
-P3 page-number fields. Probe-first spike resolves the entry mechanism. Validated vs the Word-COM oracle.)
-The paged-render migration (specs/001-paged-render-migration/) is COMPLETE & shipped to main. Sequencing is owned
-by [docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md).
+Current state (2026-06-23): the **`general-done` cleanup loop is COMPLETE** — 8 post-migration features (005
+hyphenation, 006 section breaks, 007 paged test-coverage, 008 overlay retirement, 009 glyph-tolerance gate, 010
+import fidelity, 011 pagination calibration, 012 frames group) are merged into the **`general-done`** branch, which
+is **ready for the user's ff-merge → `main`** (`git checkout main && git merge --ff-only general-done`). The
+paged-render migration (specs/001-paged-render-migration/) is COMPLETE & shipped. Sequencing/history:
+[docs/plan/layout-engine-runbook.md](docs/plan/layout-engine-runbook.md) + [docs/plan/last-point.md](docs/plan/last-point.md) (top).
+
+Active WIP (a branch, NOT merged): the **paged page-break fix** on `fix-pagebreak-optionB` — `insertPageBreak` now
+appends a real `pageBreakBefore` paragraph on the new page so it's visible/clickable/editable (the inline
+`hardBreak{page}` model left no caret-hostable line; full analysis in
+[docs/PAGE_BREAK_ROOT_CAUSE.md](docs/PAGE_BREAK_ROOT_CAUSE.md)). Gates green; ⚠️ PENDING a live click/cursor smoke
+test before merge. Known gap: imported docs carrying an inline `<w:br w:type="page"/>` still need a converter-level fix.
 <!-- SPECKIT END -->
