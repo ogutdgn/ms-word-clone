@@ -10,7 +10,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "start": "electron-vite dev",
+    "start": "electron-vite preview",
     "test:pm": "node scripts/run-pm-paged.js",
     "test:pm:paged": "node scripts/run-pm-paged.js",
     "test:smoke": "electron --user-data-dir=C:/tmp/wc-probe-profile --disable-http-cache . --probe-out=/tmp/wc-smoke.json --shot-evalfile=scripts/smoke-pm.js",
