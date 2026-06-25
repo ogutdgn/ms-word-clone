@@ -19,6 +19,10 @@
 // breaks (or one already using pageBreakBefore) is left untouched (returns false).
 
 import { TextSelection } from '@/pm'
+// @ts-ignore - vendored fork JS module (no types). Computes the attrs that carry across a paragraph
+// split, dropping keepOnSplit:false identifiers (paraId/textId/sdBlockId/sdBlockRev/listRendering) so a
+// continuation paragraph gets FRESH ids — exactly what splitBlockPatch (split-run.js) does for Enter.
+import { Attribute } from '@core/Attribute.js'
 
 type AnyNode = any
 type AnyEditor = any
@@ -44,8 +48,12 @@ function paragraphHasInlinePageBreak(para: AnyNode, hardBreakType: AnyNode): boo
 
 // Split ONE paragraph's inline content at each inline page break, preserving run structure
 // (attrs + marks) and the run-wrapper. Returns an array of paragraph nodes (>= 2 when a break was
-// present): piece[0] keeps the original attrs; piece[1..] carry pageBreakBefore (set by the caller).
-function splitParagraphAtPageBreaks(para: AnyNode, schema: AnyNode): AnyNode[] {
+// present): piece[0] keeps the ORIGINAL attrs (it IS the original paragraph's start, so it retains its
+// paraId/identity); piece[1..] use the split-carry attrs (fresh ids, keepOnSplit:false dropped) PLUS
+// pageBreakBefore — i.e. each continuation behaves exactly like a manual Enter-split of this paragraph.
+// (v1 trade-off: a page break MID a styled/numbered paragraph therefore yields a continuation in the
+// SAME style/list, just as Enter would — Word models the inline break as one paragraph across pages.)
+function splitParagraphAtPageBreaks(para: AnyNode, schema: AnyNode, extensionAttrs: AnyNode): AnyNode[] {
   const paraType = schema.nodes.paragraph
   const runType = schema.nodes.run
   const hardBreakType = schema.nodes.hardBreak
@@ -80,7 +88,12 @@ function splitParagraphAtPageBreaks(para: AnyNode, schema: AnyNode): AnyNode[] {
     }
   })
 
-  return segments.map((seg) => paraType.create(para.attrs, seg))
+  // Continuation attrs: the split-carry set (drops paraId/textId/sdBlockId/… so continuations get fresh
+  // ids on export, never duplicating the original's) + pageBreakBefore. Keeps paragraphProperties (style).
+  let contAttrs: AnyNode
+  try { contAttrs = Attribute.getSplittedAttributes(extensionAttrs, 'paragraph', para.attrs) } catch { contAttrs = para.attrs }
+  const contWithBreak = { ...contAttrs, paragraphProperties: { ...(contAttrs?.paragraphProperties || {}), pageBreakBefore: true } }
+  return segments.map((seg, idx) => (idx === 0 ? paraType.create(para.attrs, seg) : paraType.create(contWithBreak, seg)))
 }
 
 // Set paragraphProperties.pageBreakBefore = true on a paragraph node (returns a NEW node).
@@ -132,14 +145,15 @@ export function normalizeImportedPageBreaks(editor: AnyEditor): boolean {
     const hardBreakType = schema.nodes.hardBreak
     const paraType = schema.nodes.paragraph
     if (!hardBreakType || !paraType) return false
+    const extensionAttrs = editor?.extensionService?.attributes ?? []
 
     let changed = false
     const newTop: AnyNode[] = []
     doc.forEach((block: AnyNode) => {
       if (block.type === paraType && paragraphHasInlinePageBreak(block, hardBreakType)) {
         changed = true
-        const pieces = splitParagraphAtPageBreaks(block, schema)
-        pieces.forEach((p, idx) => newTop.push(idx === 0 ? p : withPageBreakBefore(p, schema)))
+        // pieces[1..] already carry pageBreakBefore + fresh split-attrs (see splitParagraphAtPageBreaks).
+        splitParagraphAtPageBreaks(block, schema, extensionAttrs).forEach((p) => newTop.push(p))
       } else {
         newTop.push(block)
       }
