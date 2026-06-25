@@ -506,6 +506,13 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-25 (loose-ends session — main pushed; importer page-break + focus-jump scoped)
+- [x] **`general-done` → `main` + the page-break FIX shipped to `main`** (user-confirmed, prior sessions): HEAD `150a2b5` — `31a4033` (page break = a real `pageBreakBefore` paragraph, editable) + `150a2b5` (blank-page +2→+1, runaway-Enter via stripping pageBreakBefore from the split continuation [fork edit], edit-scroll-jump deferral). Gates: pm 420 / smoke 9 / roundtrip 27 / bundle 4. User live-confirmed "i can write now."
+- [x] **Pushed `main` → `origin/main`** (`487efbd..150a2b5`; in sync 0/0).
+- [x] **Scoped the 2 remaining page-break loose ends** (read-only investigation): importer inline-`<w:br page>` gap CONFIRMED (translates to `paragraph→run→hardBreak{page}` → fragment-less uneditable page; fixable NO-FORK by import-time normalization into the shipped `pageBreakBefore`-paragraph model, or fork Option-B) → feature `013` candidate; focus-jump LIKELY RESOLVED by `31a4033`+`150a2b5`, no code change identified, live-only confirmation.
+- [x] **Plan docs renewed** (plan-tracking): last-point.md state-correction entry + this log; CURRENT PHASE unchanged (post-migration, closing the page-break thread).
+- [ ] **NEXT:** implement `013` importer fix (no-fork) + regression test + gates + Word-COM → LIVE-verify the importer fix AND the focus-jump via computer-use → ff-merge → then stop & reassess the big-phase pick.
+
 ### 2026-06-21 (🚢 MIGRATION SHIPPED + 002 headers/footers P1 + the test:pm false-green fix)
 > (The migration days 06-18→06-21 were tracked in [layout-engine-runbook.md](layout-engine-runbook.md), not here — this is the consolidated checkpoint.)
 - [x] **Paged-render migration** M1…M6 + paged open/new + the paged-default **FLIP (FR-013)** + doc reconciliation — **shipped to `origin/main`** (`7af5590`); paged is the default engine, overlay is legacy behind `WC_LAYOUT=overlay`.

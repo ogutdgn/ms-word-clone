@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-06-25 (loose-ends session — main pushed; importer page-break + focus-jump SCOPED)
+
+> **Branch:** `main` @ `150a2b5` — **now PUSHED to `origin/main` (in sync, 0/0)**. Phase: POST-MIGRATION,
+> closing out the page-break thread (the user picked "just the loose ends for now, then reassess").
+>
+> **⚠️ STATE CORRECTION (supersedes the 2026-06-23 entries below):** `general-done` (the 8-feature 005–012
+> cleanup loop) WAS ff-merged → `main`, AND the **page-break FIX shipped to `main` and the user LIVE-confirmed it**
+> ("i can write now"). The 2026-06-23 entry's "general-done READY to merge / page-break pending on a branch" is now
+> HISTORY. `main` HEAD = `150a2b5`; the relevant page-break commits are `31a4033` (page break = a real
+> `pageBreakBefore` paragraph — visible/editable/clickable; COM 2 pages) + `150a2b5` (blank-page +2→+1, runaway-Enter
+> pages fixed by stripping `pageBreakBefore` from the split continuation [a fork edit in `core/commands/splitBlock.js`
+> + `extensions/run/commands/split-run.js`], and edit-scroll-jump deferral). Gates at HEAD: **test:pm 420 / smoke 9 /
+> roundtrip 27 / bundle 4.**
+>
+> **Done this session:**
+> 1. **Pushed `main` → `origin/main`** (`487efbd..150a2b5`) — the page-break fix + general-done are now on the remote.
+> 2. **Investigated the two remaining loose ends** from the page-break thread (read-only, 2 Explore agents):
+>    - **Importer inline-`<w:br w:type="page"/>` gap (CONFIRMED + scoped).** Imported Word page breaks translate to
+>      `paragraph → run → hardBreak{pageBreakType:'page'}` (fork `super-converter/v3/handlers/w/br/br-translator.js:18`),
+>      which the layout-adapter turns into a fragment-less `pageBreak` block (`converters/break.ts`, `paragraph.ts:875`
+>      empty-para fallback fires only when the WHOLE paragraph is empty) → an uneditable/pruned new page — the SAME
+>      class the shipped insert-fix solved, but the insert-fix only covers *newly-inserted* breaks. **Two fix paths:**
+>      (A) **NO-FORK import-time normalization** in `bridge/index.ts`/`create-editor.ts` — post-parse, split each
+>      paragraph at the inline `hardBreak{page}` and re-model the tail as a `pageBreakBefore` paragraph (the EXACT
+>      model `insertPageBreak` already ships, `bridge/insert.ts:224`), so it renders an editable page; **recommended**,
+>      sidesteps a fork edit, consistent round-trip (`<w:br>`→`<w:pageBreakBefore/>`, both valid Word page breaks — the
+>      same trade-off the insert-fix already accepted). (B) Fork-level Option-B post-pass in
+>      `core/layout-adapter/internal.ts` (the doc's recommendation) — a Constitution-P1 fork edit (stop-and-ask).
+>      Either way: a spec-kit feature (`013`) + a regression test + Word-COM + **LIVE verification** (the crux — two
+>      prior half-fixes shipped on headless evidence and were reverted; see `docs/PAGE_BREAK_ROOT_CAUSE.md` §Verification).
+>    - **Focus-jump recheck (LIKELY RESOLVED, live-only).** Code analysis: `31a4033` gives the new page a real
+>      caret-bearing paragraph so the caret resolves to the right page, and `150a2b5` defers the scroll for docChanged
+>      trs (past the stale pre-edit layout) + adds a 25%-viewport bottom comfort margin in
+>      `PresentationEditor.#scrollScreenRectIntoView`. `bridge/focus.ts` has no RAF race (the `insert.ts:24` `refocus()`
+>      is synchronous). **No additional code change identified** — but headless can't prove a click lands a visible
+>      caret; needs a LIVE test (Ctrl+Enter → click low on page 2 → arrow-up → type; confirm visible caret + no jump).
+>
+> **Next (this thread):** implement the importer fix as feature `013` (NO-FORK normalization, path A) → regression
+> test + gates + Word-COM → **LIVE-verify BOTH the importer fix and the focus-jump via computer-use** (memory: CUA can
+> drive the dev Electron app — `request_access(['electron.exe'])`, productName='Word', 'Word User' avatar) → ff-merge
+> → checkpoint. Then **stop and reassess** (the big-phase pick — COMPLETENESS PASS `docs/bug-hunt/` vs Phase 5 Logger
+> — is deferred per the user).
+>
+> **Blockers/notes:** the importer fix + focus-jump both need LIVE verification before any "done" claim. Merge mode
+> for `013` to confirm (PR-vs-ff) — default ff-merge to `main` per memory `merge-mode-ff`.
+
 ## 2026-06-23 (POST-LOOP — npm-start fix + page-break deep-dive; general-done READY to merge → main)
 
 > **Branch:** `general-done` @ `e621b18` (off `main` @ `89ed1b1`). **READY for the user's `general-done` → `main`
