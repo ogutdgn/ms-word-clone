@@ -2090,9 +2090,9 @@
     ]);
     WC.dialog({ title: 'Sort Text', width: '440px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        // 'Date' maps to numeric (parseFloat-based) — legacy parity, recorded deferral;
-        // real Word does true date parsing.
-        const opts = { ascending: dir.value === 'Ascending', numeric: type.value !== 'Text', header: hdr.checked };
+        // Type maps to the right comparator: Number → numeric (parseFloat), Date → chronological
+        // (Date.parse), Text → locale compare. (Was: Date reused the numeric path → BUG-042.)
+        const opts = { ascending: dir.value === 'Ascending', numeric: type.value === 'Number', date: type.value === 'Date', header: hdr.checked };
         // Word keeps Sort enabled and silently sorts whatever exists (a single
         // paragraph is a no-op) — no "select multiple paragraphs" toast.
         WC.PM.withSelection(() => { WC.PM.sortParagraphs(opts); });

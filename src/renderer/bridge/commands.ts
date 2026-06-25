@@ -79,7 +79,7 @@ export function installCommands(editor: AnyEditor) {
   // Paragraph sort as ONE PM transaction (no engine command — legacy sortDialog
   // reordered DOM siblings). Restricted to contiguous siblings of the first selected
   // paragraph's parent, mirroring legacy sortSelection's same-parent guard.
-  function sortParagraphs(opts: { ascending?: boolean; numeric?: boolean; header?: boolean } = {}): boolean {
+  function sortParagraphs(opts: { ascending?: boolean; numeric?: boolean; date?: boolean; header?: boolean } = {}): boolean {
     const { state } = editor
     const { from, to } = state.selection
     const paras: Array<{ node: any; pos: number }> = []
@@ -97,9 +97,14 @@ export function installCommands(editor: AnyEditor) {
     if (blocks.reduce((s, b) => s + b.node.nodeSize, 0) !== end - start) return false
     const head = opts.header ? blocks.slice(0, 1) : []
     const toSort = opts.header ? blocks.slice(1) : blocks
+    // Date sorts CHRONOLOGICALLY (Word's "Date" type), not by leading number (the old bug:
+    // Date reused the numeric parseFloat path). Unparseable dates sort as 0 (epoch) — last-ish,
+    // matching Word's lenient ordering of non-dates.
+    const asDate = (s: string) => { const t = Date.parse(String(s).trim()); return Number.isNaN(t) ? 0 : t }
     const cmp = (a: any, b: any) => {
       let r: number
-      if (opts.numeric) r = (parseFloat(a.node.textContent) || 0) - (parseFloat(b.node.textContent) || 0)
+      if (opts.date) r = asDate(a.node.textContent) - asDate(b.node.textContent)
+      else if (opts.numeric) r = (parseFloat(a.node.textContent) || 0) - (parseFloat(b.node.textContent) || 0)
       else r = a.node.textContent.localeCompare(b.node.textContent, undefined, { numeric: true, sensitivity: 'base' })
       return opts.ascending === false ? -r : r
     }

@@ -2663,6 +2663,17 @@
     const hasInlinePage = /<w:br[^>]*w:type="page"/.test(xml);
     return (hasPbb && !hasInlinePage) || ('hasPbb=' + hasPbb + ' hasInlinePage=' + hasInlinePage);
   });
+  await t('[6] (014 Home) Sort by Date orders chronologically, not by leading number', async () => {
+    // BUG-042 fix: Type=Date reused the numeric parseFloat path (sorted by the leading number). Now it parses
+    // dates. Leading numbers 5/10/1 would sort 1,5,10 → years 2021,2020,2019 (descending); chronological asc
+    // must be 2019, 2020, 2021.
+    setDocs(['5 March 2020', '10 January 2019', '1 February 2021']); await sleep(60);
+    window.WC.editor.commands.selectAll(); await sleep(20);
+    PM().sortParagraphs({ date: true, ascending: true }); await sleep(80);
+    const order = []; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.textContent.trim()) order.push(n.textContent.trim()); });
+    const ok = order.length >= 3 && order[0].includes('2019') && order[1].includes('2020') && order[2].includes('2021');
+    return ok || ('order=' + JSON.stringify(order));
+  });
   await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
     setDoc('above line');
     PM().insertHr(); await sleep(80);
