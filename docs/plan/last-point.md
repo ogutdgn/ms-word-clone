@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-06-25 (🏁 013 importer page-break fix COMPLETE + merged → main; loose ends CLOSED)
+
+> **Branch:** `main` @ `005cb9b` — **pushed to `origin/main` (in sync 0/0)**. Phase: POST-MIGRATION. All four
+> page-break-thread loose ends are now CLOSED. Per the user's steer, we **stop & reassess** the next big phase.
+>
+> **🏁 013 importer page-break fix — DONE, live-confirmed, ff-merged → `main`** (`694763d` impl + `005cb9b`
+> review-fix; ff-merge `3fb2e66..005cb9b`). NO-FORK Path A: a new `src/renderer/bridge/page-breaks-import.ts`
+> `normalizeImportedPageBreaks(editor)` re-models every TOP-LEVEL inline page break (`hardBreak` with
+> `lineBreakType`/`pageBreakType` 'page' — the form a Word `<w:br w:type="page"/>` imports as) into a real
+> `pageBreakBefore` paragraph (the shipped insertPageBreak model → a caret-hostable editable page). Runs
+> automatically in `replaceEditor` after `replaceFile` (no-op on the html/text/csv leg); exposed as
+> `PM.normalizeImportedPageBreaks` for tests. Continuation paragraphs use the fork's own
+> `Attribute.getSplittedAttributes` (drops keepOnSplit:false ids — paraId/textId/sdBlockId — so they get fresh
+> ids like a manual Enter-split; keeps paragraphProperties/style). Round-trip trade-off (accepted, same as the
+> insert-fix): imported `<w:br w:type="page"/>` re-saves as `<w:pageBreakBefore/>` (both valid Word breaks).
+>
+> **Verify:** 3 regression tests added ([6] 013 — inline→pageBreakBefore+text preserved / no-op idempotency /
+> exports pageBreakBefore-not-inline-w:br). Gates: **test:pm 423 / smoke 9 / roundtrip 27 / bundle 4** (all 0 fail).
+> `/code-review` high (4 finder angles + verify): conventions clean (Path A holds — bridge-only, no fork edit);
+> **1 confirmed finding FIXED** (continuation paragraphs were duplicating the original's keepOnSplit:false ids →
+> now use getSplittedAttributes); the rest assessed not-bugs (leading-break empty para + consecutive breaks are
+> correct Word behavior; setClean/current/double-dispatch match existing import patterns) or documented v1 edges
+> (mid-paragraph break in a styled/numbered para behaves like an Enter-split; an extra empty line before a
+> following table). **LIVE-VERIFIED by the user** ("it works"): authored a real Word fixture `C:/tmp/wc-013-input.docx`
+> (COM: 2 pages, inline `<w:br page>`=true, pageBreakBefore=false) → opened in the app → page 2 editable with a
+> visible/clickable caret + smooth arrow-key crossing (the focus-jump bonus check). **KNOWN GAP (the open
+> importer-inline-break gap) is now CLOSED.** v1 limitation: page breaks inside a table cell are left as-is.
+>
+> **Focus-jump recheck — RESOLVED (live-confirmed).** No code change was needed; the shipped `31a4033`+`150a2b5`
+> already tamed it (real caret-bearing page + deferred scroll). The user's arrow-key crossing in the 013 live test
+> confirmed no jump.
+>
+> **All four loose ends CLOSED:** (1) main pushed ✅ (2) last-point.md refreshed ✅ (3) focus-jump recheck ✅
+> (4) importer fix (013) ✅.
+>
+> **NEXT (user's pick — deferred, per "stop & reassess"):** the COMPLETENESS PASS (`docs/bug-hunt/` — re-triage the
+> 65-bug ledger + 76-feature/321-control audit vs the paged codebase, then spec-kit features) **OR** pivot to
+> **Phase 5 (Logger)** — the actual CUA-RL-environment goal. Open follow-ups still parked: `task_689a9083` (011
+> empty-para line height), `task_cb2781a7` (paged ribbon table cmds), `task_3436e431` (paged counts().pages).
+>
+> **Blockers/notes:** none. Stale branches that can be deleted: `fix-pagebreak-optionB`, `fix-pagebreak-v2` (both
+> superseded — the page-break work is all on main); `general-done` (already merged to main).
+
 ## 2026-06-25 (loose-ends session — main pushed; importer page-break + focus-jump SCOPED)
 
 > **Branch:** `main` @ `150a2b5` — **now PUSHED to `origin/main` (in sync, 0/0)**. Phase: POST-MIGRATION,

@@ -511,7 +511,9 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **Pushed `main` → `origin/main`** (`487efbd..150a2b5`; in sync 0/0).
 - [x] **Scoped the 2 remaining page-break loose ends** (read-only investigation): importer inline-`<w:br page>` gap CONFIRMED (translates to `paragraph→run→hardBreak{page}` → fragment-less uneditable page; fixable NO-FORK by import-time normalization into the shipped `pageBreakBefore`-paragraph model, or fork Option-B) → feature `013` candidate; focus-jump LIKELY RESOLVED by `31a4033`+`150a2b5`, no code change identified, live-only confirmation.
 - [x] **Plan docs renewed** (plan-tracking): last-point.md state-correction entry + this log; CURRENT PHASE unchanged (post-migration, closing the page-break thread).
-- [ ] **NEXT:** implement `013` importer fix (no-fork) + regression test + gates + Word-COM → LIVE-verify the importer fix AND the focus-jump via computer-use → ff-merge → then stop & reassess the big-phase pick.
+- [x] **🏁 013 importer page-break fix COMPLETE + ff-merged → main** (`694763d`+`005cb9b`, `3fb2e66..005cb9b`, pushed): NO-FORK `bridge/page-breaks-import.ts` normalizes imported inline `<w:br page>` → a real `pageBreakBefore` paragraph (editable page), auto-runs in `replaceEditor`. 3 regression tests; gates pm 423 / smoke 9 / roundtrip 27 / bundle 4; `/code-review` 1 fix (fresh split-attrs via `getSplittedAttributes`); **LIVE-verified by the user** ("it works") on a real Word fixture `C:/tmp/wc-013-input.docx`. The open importer-inline-break gap is CLOSED. v1 limit: table-cell breaks left as-is.
+- [x] **Focus-jump recheck — RESOLVED** (no code change; `31a4033`+`150a2b5` already fixed it; live-confirmed via the 013 arrow-key crossing).
+- [x] **🏁 All four page-break-thread loose ends CLOSED.** NEXT (user's pick, deferred per "stop & reassess"): the COMPLETENESS PASS (`docs/bug-hunt/`) OR pivot to Phase 5 (Logger).
 
 ### 2026-06-21 (🚢 MIGRATION SHIPPED + 002 headers/footers P1 + the test:pm false-green fix)
 > (The migration days 06-18→06-21 were tracked in [layout-engine-runbook.md](layout-engine-runbook.md), not here — this is the consolidated checkpoint.)
