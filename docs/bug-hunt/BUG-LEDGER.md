@@ -1,612 +1,287 @@
-# ms-word-clone — Bug-Hunt Ledger
+# ms-word-clone — Bug Ledger (re-baseline 2026-06-25)
 
-> **⚠️ Validation currency (read first).** The campaign was run against `main @ 621da99`. `main` has since advanced to
-> `98fe04e` (~130 commits — the other agent implemented Page Setup export, Header/Footer text, +750 lines of tests).
-> **Re-validated 2026-06-17 against `98fe04e`:** BUG-014/015/016/005 re-reproduced; BUG-001/002/003 + all bugs in unchanged
-> files remain valid (their files are untouched). **GAP-A corrected** (Margins/Orientation/Size/Header/Footer now unblocked;
-> 15→10 blocked). **Still needs a refresh pass:** the handful of bugs in files the other agent touched since 621da99
-> (`commands.js` line refs, `design.ts` → BUG-011/024, `insert.ts` → BUG-012) and a correctness pass on the 5 newly-wired features.
-
-## Current-main re-validation (re-ran on `5f71cfa`, 2026-06-17)
-**Confirmed STILL real on current main (probes re-executed):** BUG-014 (font-size clamp), BUG-015 (highlight→shd),
-BUG-016 (convert-table dead toast over a working bridge), BUG-005 (restrict read-only LEAK) — all re-reproduced.
-BUG-011 re-confirmed via Word `read-word-props`: theme'd heading still renders **Aptos Display 20pt, not Garamond**.
-BUG-012 re-confirmed: `#MyBookmark` still exports as a broken external rel. BUG-001/002/003 + all bugs in untouched
-files remain valid.
-
-**NEW — BUG-026 [S3] Page Setup (orientation/size) updates export + pagination but NOT the visual page (render gap).**
-The just-implemented Page Setup exports a **correct `sectPr`** (margins `720`; landscape `pgSz 15840×12240 orient=landscape`;
-A4 `11909×16834`) AND updates pagination `pageH` (1056→816), but the **on-screen sheet stays portrait** (`--page-w/--page-h`
-CSS vars not updated) → landscape renders as a portrait sheet and Page-Width zoom over-zooms to 170% on the stale portrait
-width. Export/round-trip faithful; render-only (keystone render-tier). Evidence: `pagesetup-test.json` (`ORIENTATION.before==after` vars)
-+ `pagesetup-landscape.png`. Source: `bridge/design.ts:262 dePageSize` writes sectPr/geometry; the `--page-w/--page-h` paint isn't driven from it.
-
-**Newly-wired features re-validated (the other agent's recent PRs):**
-- **Header/Footer text (PR #130) — CLEAN.** `setHeaderText/setFooterText/getHeaderText/getFooterText` work; exports
-  `w:headerReference`/`w:footerReference` + `header1.xml`/`footer1.xml`; **round-trips** (`getHeaderText` after `openDocx` =
-  the set text). (A double-export probe sequence once read empty — a probe artifact, not a user flow.) ✓
-- **Picture Grayscale (PR #128) — CLEAN.** `setImageGrayscale(true)` → CSS `grayscale(1)` render + `<a:grayscl/>` export +
-  survives round-trip + clears on No-Recolor. ✓
-- **Page Setup (PR #126) — export ✓ / render ✗ = BUG-026** (above).
-
-**Legacy bug RESOLVED in PM (re-checked):** "Page Color erases Watermark" → FIXED (watermark survives the page color;
-`design.ts deWatermark` uses the `backgroundColor` longhand, not the `background` shorthand). ✓
-
----
-
-Campaign: systematic, Word-parity bug discovery (discovery-only — **no source fixes** while a
-second agent develops in the shared repo). Findings are evidenced (clone repro + Word COM oracle +
-screenshot) and severity-rated for a later fix pass.
-
-## Rig & isolation
-- **Isolated worktree** pinned to clean `main` so we never touch the other agent's WIP and never test
-  their half-built code: `C:\Users\ogutd\bughunt-wt` (detached @ `621da99`; `node_modules` junctioned
-  from the main checkout). Rebuild from clean main as needed; the other agent's working tree is untouched.
-- **Evidence loop (proven):** probe drives the real editor headlessly →
-  `npx electron . --shot-evalfile=<probe.js> --probe-out=<json> [--shot=<png>]` (a single run yields
-  model/OOXML JSON *and* a screenshot) → save `.docx` via `window.wordAPI.saveBytes` → Word COM oracle
-  `scripts\oracle\word-oracle-win.ps1 <verb> <docx> --out <json>` (run unsandboxed; PID-safe).
-- Evidence artifacts live in `C:\tmp\bughunt\` (probes/, *.json, *.png).
+> Fresh re-baseline of the clone vs **Word for Windows 16.0**, run against the **paged engine + features 002–013 + the page-break work**.
+> Supersedes the stale 2026-06-17 corpus (moved to [archive-2026-06-17/](archive-2026-06-17/)). Method + how to re-run: [RE-DISCOVERY-CAMPAIGN.md](RE-DISCOVERY-CAMPAIGN.md).
+>
+> **54 confirmed bugs — 0 S1 · 18 S2 · 27 S3 · 9 S4.** Each is code-confirmed + adversarially verified (a second agent tried to refute it).
+> Findings tagged `needs-runtime-probe+COM` (44) or `needs-live-compare` (46) await Phase-2/Phase-3 hardening. The actionable grouping is [COMPLETENESS-BACKLOG.md](COMPLETENESS-BACKLOG.md). Machine record: `findings-2026-06-25.json`.
 
 ## Severity scale
-- **S1** crash / data-loss / doc-corruption (Word refuses to open, content lost).
-- **S2** major wrong behavior or export corruption (feature does the wrong thing; round-trip drops/garbles).
-- **S3** fidelity / visual deviation from Word (renders or measures wrong, but content survives).
-- **S4** minor / cosmetic.
-- **S5** confirmed-as-expected (known deferral verified; logged so we don't re-chase).
+- **S1** crash / data-loss / doc corruption · **S2** major wrong behavior or export corruption · **S3** fidelity / visual deviation (content survives) · **S4** minor / cosmetic · **S5** confirmed-as-expected.
 
-## Method note (why some "bugs" are not bugs)
-The headless harness has gotchas that can masquerade as bugs (e.g. a page break is an **inline
-`hardBreak[pageBreakType='page']`** invisible to a top-level/text-only scan; pagination needs
-`PM().__pagination.pageCount` *polled* for the rAF measure). Every candidate is re-checked against the
-proven test-suite helpers before logging.
+## S2 — 18
 
----
+### RB-001 [S2] Fonts — Design › Document Formatting
+- Shares BUG-011's heading-font export gap with Themes (same code path). Also 'Customize Fonts...' is WC.notImplemented (commands.js:794), and Word's Fonts gallery rewrites theme1.xml fontScheme (major/minor) rather than redefining named styles. Needs runtime+COM to re-confirm the heading vs body font asymmetry on a saved doc with a real Heading 1.
+- **Evidence:** commands.js:794 H.fonts -> WC.PM.deApplyFonts (design.ts:94) -> redefine(themeUpdates(pair.heading,pair.body,null)) + applyDocDefaultsRun(body). SAME root cause as Themes: themeUpdates only emits the 6 paragraph styleIds, and redefineNamedStyles (linked-styles.js:164-181) strips theme bindings only on those, not the linked Heading*Char styles. Heading font change is therefore unreliable in Word (heading Char style retains asciiTheme=majorHAnsi); body font (Normal + docDefaults) is correct.
+- **Confirm:** needs-runtime-probe+COM
 
-## Verified CLEAN (do not re-investigate)
-- **Bold round-trips faithfully** — clone export → Word reads `bold=true`, Aptos 12, left. ✓
-- **Paragraph borders export correctly** — `<w:pBdr>` with proper per-edge children (`single/auto/sz4/space1`);
-  also exports on an **empty** paragraph. ✓
-- **Manual page break export is Word-faithful** — inline `<w:r><w:br w:type="page"/></w:r>`; a trailing
-  Ctrl+Enter stays **inside the same paragraph** (Word's `read-layout` shows `"…line\f"`, 1 paragraph) and
-  Word + clone **agree the doc is 2 pages**. ✓
-- **Blank page (two breaks) → +2 pages**, two gap-bands. ✓
-- **Bullets / Numbering / Multilevel are Word-faithful** — oracle read-para-props: bullet `listString`
-  `•`/`◦`/`▪` per level, `leftIndent` 36/72/108 pt, hanging 18 pt (matches Word defaults exactly); numbering
-  increments `1./2./3.`; **numbering continues across page overflow** (55-item list → item 55 = `55.` on page 3).
-  (The boot doc's `-` bullets are that seed doc's own numbering def, not a render bug.) ✓
-- **Font character formatting all exports to correct OOXML** — bold/italic, `w:u single`, `w:strike`,
-  `w:vertAlign super/subscript`, `w:color FF0000`, `w:highlight yellow` (Word's *named* highlight, not a hex
-  hack), `w:sz 40`=20pt, `w:rFonts "Courier New"`, `w:spacing 40`=2pt character spacing. ✓
-- **Paragraph shading exports correct `w:shd`** (`val=clear color=auto fill=FFFF00`). ✓
-- **Clear All Formatting** strips run marks **and** paragraph borders/shading (paraProps → `{}`), matching
-  Word's "reset to Normal." ✓
+### RB-002 [S2] Style Set — Design › Document Formatting
+- Re-test of BUG-006: still fully present (the name->preset mapping was never populated). Word's style sets restyle headings AND spacing per set; here it's just one fallback spacing for all 9. Fix: a real per-name preset table covering fonts+spacing+heading styling. Runtime probe optional to confirm identical output across the 9 cells.
+- **Evidence:** commands.js:792/801 styleSetGallery iterates WC.Design.STYLE_SETS = ['Default','Basic (Simple)','Basic (Elegant)','Lines (Distinctive)','Shaded','Casual','Centered','Word 2010','Word 2013'] (design-tools.js:102). Each cell calls WC.PM.deApplyStyleSet(name) -> design.ts:103 deApplyStyleSet, whose SETS map (design.ts:106-110) has keys ONLY {'No Paragraph Space','Compact','Double'}. None of the 9 gallery names intersect that map, so EVERY cell hits the fallback `{before:0,after:160,line:259,lineRule:'auto'}` (design.ts:111). All 9 style sets produce identical Normal-spacing output and change no fonts/heading styling, unlike Word where each set restyles distinctly.
+- **Confirm:** needs-runtime-probe+COM
 
----
+### RB-003 [S2] Themes — Design › Document Formatting
+- Re-test of BUG-011 (was Word-confirmed). Code path UNCHANGED on the paged engine: themeUpdates() never enumerates the linked *Char styles, and redefineNamedStyles only strips theme bindings on the passed styleIds. Fix: also redefine/strip the linked Char styles' asciiTheme on theme apply. Needs runtime+COM oracle (read-word-props on a saved theme2.docx heading) to re-confirm the heading-font asymmetry.
+- **Evidence:** commands.js:787 H.themes -> WC.PM.deApplyTheme -> design.ts:76 deApplyTheme -> redefine(themeUpdates(...)) (design.ts:50-63 builds updates ONLY for ['Title','Subtitle','Heading1','Heading2','Heading3','Normal']) -> fork command linked-styles.js:121 redefineNamedStyles. The export pass (linked-styles.js:164-181) deletes asciiTheme/hAnsiTheme bindings ONLY for the styleIds in `updates`. The linked '*Char' character styles (e.g. Heading1Char) are NOT in `updates`, so they keep w:asciiTheme="majorHAnsi". Word resolves run fonts from the linked Char style in preference to the literal, so headings still render in the OLD theme's major font (Aptos Display) while body becomes the new font. Body half works, heading half doesn't.
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-001 — [S3] Box-bordered paragraph spanning a page boundary renders a page-tall empty border box
-- **Area:** Home → Paragraph → Borders, × pagination (manual break *or* auto page overflow).
-- **Repro (clone):**
-  1. Type a paragraph, apply **All Borders** (or any box border).
-  2. Put the caret in the middle of that paragraph and press **Ctrl+Enter** (manual page break), *or* make
-     the paragraph long enough to overflow onto the next page.
-  - Probe: `C:\tmp\bughunt\probes\borders-visual.js`; screenshot `C:\tmp\bughunt\borders-visual.png`.
-- **Expected (Word):** the border box **closes under the last line on page 1** and **reopens** around the
-  continuation at the top of page 2. (Adjacent identical-border paragraphs correctly merge into one box —
-  that part the clone does right.)
-- **Actual (clone):** the bordered `<p>` contains the page-break **inline spacer**, so the CSS border wraps
-  the spacer's full height → the box balloons into a **page-tall empty rectangle** down to the bottom of
-  page 1; no reopen on page 2.
-- **Evidence:** screenshot shows the giant empty box; model probe `home-borders2.json` S5 = `seams:0, bands:1`
-  (band rendered *inline* inside the bordered paragraph). Export OOXML is correct; this is a **render-only** bug.
-- **Suspected source / root cause:** the known **block-in-inline spacer** (`docs/plan/deferrals.md §A.1b`,
-  pagination.ts in-`<p>` spacer) — the same root cause behind the mid-paragraph caret-misland. This is a NEW,
-  screenshot-documented *manifestation* (borders, and by extension paragraph shading, balloon across the seam).
-  Converges on the unbuilt frames-overlay keystone.
-- **Status:** logged (discovery-only). Not a quick point-fix — gated on the frames-overlay rework.
+### RB-004 [S2] Drawing (draw.pens.drawing, toggle) — Draw › Pens
+- Ink mode toggles correctly under the hood, but the button never shows pressed-state and the menu label is stuck on 'Start Drawing' (WC.Draw.enabled never set). Wrong UI state = S3.
+- **Evidence:** commands.js:740 H.drawing = () => { WC.PM.dSetDrawing(!WC.PM.dIsDrawing()); }. The bridge toggle works (draw.ts:108 flips drawState.on + syncs the overlay capture binding). BUG: the ribbon button gets NO pressed/latched state — 'drawing' is absent from ribbon.js TOGGLE_MAP (ll.35-40) and registers no state rule (grep of registerRibbonRule shows none for Draw), and H.drawing ignores the node so it never toggles '.toggled'. So the Drawing button never visually latches even though ink mode is on. Also commands.js:771 pensMenu reads WC.Draw.enabled to label 'Start/Stop Drawing', but WC.Draw.enabled is never set (always false) so it always says 'Start Drawing'. This is the drawing-toggle half of prior BUG-019, still live (ribbon.js:271/278 era, now commands.js:740/771).
+- **Confirm:** needs-live-compare
 
-## BUG-002 — [S3] Paragraph shading balloons to fill the rest of the page across a page break
-- **Area:** Home → Paragraph → Shading, × pagination (manual break *or* auto page overflow).
-- **Repro (clone):** shade a paragraph (any fill), put the caret mid-paragraph, press **Ctrl+Enter**
-  (or let a shaded paragraph overflow the page). Probe `C:\tmp\bughunt\probes\home-misc.js`;
-  screenshot `C:\tmp\bughunt\home-misc-shade-break.png`.
-- **Expected (Word):** the shading fill covers only the text line(s) of the paragraph; on page 1 it ends
-  under the last shaded line, and resumes around the continuation on page 2.
-- **Actual (clone):** the fill **floods the entire remainder of page 1** — a full-width yellow rectangle
-  from the text down to the bottom margin — because the page-break inline spacer lives *inside* the shaded
-  `<p>` and inherits the background. Even more visually severe than BUG-001.
-- **Evidence:** screenshot (giant yellow block); `home-misc.json` `shadeAcrossBreak.pageCount=2`; shading
-  OOXML export itself is correct (`w:shd`), so this is **render-only**.
-- **Suspected source / root cause:** same **block-in-inline spacer** as BUG-001 (`deferrals §A.1b`). Confirms
-  the root cause is general: **any block-level paragraph decoration (border, shading, and presumably a future
-  paragraph background/box) balloons across a page seam.** One fix (frames-overlay) resolves the whole class.
-- **Status:** logged (discovery-only). Same keystone dependency as BUG-001.
+### RB-005 [S2] Export → Create PDF/XPS — page geometry — File/Backstage › Backstage › Export
+- Independent of BUG-030 (chrome capture). Even with a print stylesheet, the page box would be wrong for non-Letter/non-portrait docs.
+- **Evidence:** main.js:448-452 printToPDF hardcodes `pageSize:'Letter'` and `margins:{marginType:'none'}` unconditionally. It ignores the document's actual page setup (A4/Legal/custom size, Landscape orientation, real margins) — all of which the clone now supports via Layout tab + the paged engine. A Landscape or A4 doc exports to a portrait Letter PDF with the wrong clipping. Word's PDF export honors the document page setup.
+- **Confirm:** needs-live-compare
 
-## BUG-003 — [S3] Image taller than the page bleeds across the page boundary (no clip / no seam)
-- **Area:** Insert → Pictures, × pagination (over-tall inline image).
-- **Repro (clone):** insert an inline image taller than the content area (~1100px > 864px content height).
-  Probe `C:\tmp\bughunt\probes\img-pagination.js`; screenshot `C:\tmp\bughunt\img-tall.png`.
-- **Expected (Word):** Word does not split an image; the too-tall image is clipped at the page bottom and
-  does not continue across the inter-page gap.
-- **Actual (clone):** the image paints continuously from the top of page 1 **down across the page seam**
-  (img bottom y1215 vs seam y1070, 256px past the page-1 content bottom) and into the gray gap — no clip,
-  no clean page boundary. `pageCount` counts 2 but the object is unsplittable so it just overflows.
-- **Evidence:** screenshot; `img-pagination.json` `IMG_TALL` (top 115 → bottom 1215, seam 1070).
-- **Suspected source / root cause:** the **over-tall single block** gap (`deferrals §A.1b/§A.1e`) — same
-  frames-overlay keystone as BUG-001/002; pagination can't split or clip a block taller than a page.
-- **Status:** logged (discovery-only).
+### RB-006 [S2] File → Close — File/Backstage › Backstage › rail
+- Prior BUG-020 [S2] re-validated — still present at backstage.js:48 + files.js:53.
+- **Evidence:** backstage.js:48 `if (pane === 'close') { WC.Files.newDoc(); return; }` → files.js:53 newDoc() opens a fresh blank document. Word's File → Close closes the current document (in a single-doc shell, returns to a backstage/no-document state or prompts). Here it silently REPLACES the doc with a new blank (after confirmDiscard), so you can never be document-less and 'Close' is indistinguishable from 'New'. Re-confirmed against current code; matches prior BUG-020. Note: confirmDiscard() does run first, so it's not data-loss, but the semantics are wrong.
+- **Confirm:** code-confirmed
 
-### Keystone cluster note
-BUG-001 (border), BUG-002 (shading), BUG-003 (tall image), and the **already-recorded table-taller-than-a-page
-overflow** (`deferrals §A.1e`: middle rows paint into the gray gap) are all the **same root cause** — the
-unbuilt frames-overlay / paged-layout engine that cannot split, clip, or reopen a block across a page seam.
-One fix resolves the whole cluster. Logged together so the fix pass treats them as one keystone, not four bugs.
+### RB-007 [S2] Info pane — Pages count — File/Backstage › Backstage › Info
+- Same root cause feeds Properties dialog and Word Count dialog (see those findings). Fix: route counts().pages through WC.PM.coords.getPageCount().
+- **Evidence:** backstage.js:107 shows ['Pages', c.pages] from WC.PM.counts(). counts() in bridge/io.ts:49 computes `const pages = (w.WC?.PM?.__pagination?.pageCount) || 1`. `__pagination` was the OVERLAY decoration-paginator, which was fully retired in feature 008 (paged is the sole engine). Under the paged PresentationEditor it does not exist, so pages ALWAYS falls back to 1. The correct paged count is available at WC.PM.coords.getPageCount() (coordinate-adapter.ts:89-103 → editor.currentTotalPages; exposed at bridge/index.ts:460). Word's Info backstage shows the true page count. This is the open follow-up task_3436e431. One-line fix, currently wrong for any multi-page doc.
+- **Confirm:** needs-runtime-probe+COM
 
-## Verified CLEAN (pagination, cont.)
-- **Inline image at a page boundary does NOT straddle** — a 240px image near the bottom of a full page
-  correctly moves to the next page (no seam straddle). ✓ (`img-pagination.json` `IMG_BOUNDARY`)
+### RB-008 [S2] Print (and Export → Create PDF/XPS) — File/Backstage › Backstage › Print / Export
+- Prior BUG-030 [S3] re-validated and arguably worse than S3 (full chrome capture). needsLive to see exact captured raster. Compounded by the geometry hardcode below.
+- **Evidence:** Print: backstage.js:118 → files.js:154 print() → main.js:460 webContents.print({printBackground:true}). PDF: backstage.js:144/126 → files.js:148 exportPdf() → main.js:440 webContents.printToPDF({printBackground:true, pageSize:'Letter', margins:{marginType:'none'}}). There is NO print stylesheet anywhere — Grep for '@media print'/'@page' across src/renderer/public/styles returns zero hits (only .print-preview screen styles in backstage.css:94-95). So both paths capture the FULL app chrome: title bar, ribbon, status bar, the gray #pages background and inter-page gap bands. Word prints only the document pages. Re-confirmed against current paged engine; matches prior BUG-030.
+- **Confirm:** needs-live-compare
 
----
+### RB-009 [S2] Font Size (combo) — Home › Font
+- Reachable via typed combo entry. Probe: setFontSize('120pt') then read back textStyle.fontSize == 96pt; COM oracle Word stores 120.
+- **Evidence:** commands.js:1881 setFontSize -> WC.PM.cmd('setFontSize', pt+'pt'). Fork clamps to defaults min:8 max:96 (font-size.js:57-58, minMax at :113). Word allows 1-1638pt. A typed combo value (comboCommit:1788 parseFloat) of e.g. 120 or 4 is SILENTLY clamped to 96/8 with no feedback. Confirms prior BUG-014 still live.
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-004 — [S3] Paragraph shading is mis-imported as a spurious run highlight on round-trip
-- **Area:** File I/O round-trip (docx importer) × Home shading. **Root cause: importer, NOT the layout keystone.**
-- **Repro (clone):** shade a paragraph (`w:shd fill=FFFF00`), `exportDocxBytes()` → `openDocx(bytes)` (save+reopen).
-  Probes `C:\tmp\bughunt\probes\roundtrip-stability.js` + `highlight-locate.js`.
-- **Expected (Word):** a shaded paragraph round-trips as paragraph shading only (`w:shd`); its text gets **no**
-  run highlight.
-- **Actual (clone):** after reimport the paragraph's **text gains a run highlight (`w:highlight`) matching the
-  shading fill** — `FFFF00`-shaded para → yellow highlight; `92D050`-shaded para → green highlight — *in addition*
-  to keeping the `w:shd`. Confirmed across two fill colors. Highlight count 1→2 on a mixed doc; in isolation a
-  pure highlight round-trips perfectly (1→1→1), so the trigger is specifically **w:shd on import**.
-- **Evidence:** `highlight-locate.json` — `before.hlRuns=[formatted]`; `after.hlRuns` adds the two shaded
-  paragraphs' text with highlight = their fill; `hlContexts[1]` shows a `<w:pPr><w:shd .../></w:pPr>` paragraph
-  whose run now carries `<w:highlight w:val="yellow"/>`.
-- **Suspected source:** the docx importer's shd handling (super-converter v2/v3 importer) bleeds paragraph
-  `w:shd` fill onto a run highlight mark. Visible formatting change; persists/compounds on every save+reopen.
-- **Status:** logged (discovery-only). Importer fix — independent of the layout keystone (a genuinely
-  different bug class). Worth escalating to S2 if the highlight visibly alters shaded docs in normal use.
+### RB-010 [S2] Shading (split) — Home › Paragraph
+- Whole-paragraph selection is correct; sub-paragraph selection over-applies. Probe: select 2 words, apply shading, check pPr vs rPr shd.
+- **Evidence:** commands.js:93 + applyColor 'shade' (commands.js:1912-1916) ALWAYS writes paragraphProperties.shading (pPr/w:shd) regardless of selection. On a partial text (sub-paragraph) selection Word applies RUN shading (rPr/w:shd) to just the selected characters; the clone floods the entire paragraph. Confirms prior BUG-036.
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-005 — [S2] Restrict Editing "read only" does not block programmatic / ribbon writes (protection bypass)
-- **Area:** Review → Restrict Editing (read-only protection). Spec REV-01.
-- **Repro (clone):** `ed().setEditable(false,false)` (what the restrict pane's read-only Start does) → then
-  `WC.Commands.run({cmd:'bold'})`, a raw `tr.insertText`, and `PM().cmd('addComment',…)`.
-  Probe `C:\tmp\bughunt\probes\spec-batch1.js` → `REV01_restrictLeak`.
-- **Expected (Word):** read-only protection blocks ALL edits — ribbon formatting, typing, and comments.
-- **Actual (clone):** with `view.editable===false`, **Bold applied, text inserted (doc size 28→37), and a comment
-  was added** — `verdict: LEAK`. `setEditable(false)` only flips the ProseMirror `editable` prop (gates DOM
-  contentEditable / keyboard), but the `WC.PM` bridge command surface (`bridge/commands.ts`, `create-editor.ts`)
-  has **no editable check**, so every ribbon `H[cmd]` and `PM.cmd` mutates the doc via `view.dispatch` regardless.
-- **Evidence:** `spec-batch1.json` `REV01_restrictLeak` = `{editableProp:false, boldAppliedWhileProtected:true,
-  insertLeaked:true, commentAddedWhileProtected:true, verdict:"LEAK"}`. Code: `Editor.setEditable` (Editor.ts:2291)
-  gates only the prop; no editable guard in the bridge dispatch (per spec agent's grep).
-- **Suspected source:** missing editable/protection guard in the `WC.PM` write path (the only document-write path).
-  Different bug class (access-control), unrelated to layout.
-- **Status:** logged (discovery-only). High-value, self-contained fix candidate for the later pass.
+### RB-011 [S2] Finish & Merge (mailings.finish.finish-merge) — Mailings › Finish
+- S2: per-record page breaks are silently dropped in the paged engine -> merged output is one continuous blob, not one-page-per-record. Root cause: mmBuildMerge emits a manual-break DIV that createDocFromHTML cannot parse (needs a real pageBreakBefore paragraph per 013). Field substitution itself is correct. Also folds BUG-059 (mergeType ignored) and BUG-064 (NEXT rule no-op). Needs paged-render live check + COM oracle on the saved merge.
+- **Evidence:** commands.js:1217 flyout -> WC.Mail.finishMerge(mode) (mailings-tools.js:171-182). 'Edit Individual Documents': turns preview off, mmBuildMerge(recipients, _mergeResolve) (mail.ts:39-57) builds per-record HTML joined by '<div class="manual-break" style="break-after:page">', then mmFinishToNewDoc -> WC.PM.openHtml -> createDocFromHTML. The fork has NO parse for class=manual-break / break-after:page (paragraph.js:196-204 makes it an empty <p>; grep=0 hits), so in the paged engine ALL RECORDS RUN TOGETHER with no page break between them — Word puts each record on its own section/page. This is a wrong-output regression introduced by the paged migration (the prior overlay engine honored break-after CSS). 'Print' = toast + Files.print (line 173). 'Send Email' = honest stub (line 174). BUG-059 (Directory ignored) and BUG-064 (NEXT field never advances the cursor; __NextRecord__->'' at mail.ts:51) also live here.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## BUG-006 — [S3] Style Set gallery is inert: all 9 named sets apply the same fallback spacing
-- **Area:** Design → Style Sets gallery. Spec DSGN-03 (static-confirmed in source).
-- **Repro:** click any Style Set in the Design gallery (Default, Shaded, Lines (Distinctive), Word 2013, …).
-- **Expected (Word):** the 9 style sets are visibly different (different spacing/fonts per set).
-- **Actual (clone):** the gallery names and the preset map **don't intersect at all**, so every cell hits the
-  default fallback `{before:0, after:160, line:259, lineRule:'auto'}` — all 9 produce identical spacing, and the
-  3 real presets (`No Paragraph Space / Compact / Double`) are **unreachable** from this gallery.
-- **Evidence (source):** gallery list `STYLE_SETS = ['Default','Basic (Simple)','Basic (Elegant)','Lines (Distinctive)','Shaded','Casual','Centered','Word 2010','Word 2013']`
-  (`src/renderer/public/js/design-tools.js:102`) vs `SETS = {'No Paragraph Space','Compact','Double'}`
-  (`src/renderer/bridge/design.ts:106-111`, `preset = SETS[name] || <fallback>`). No key overlap → always fallback.
-- **Suspected source:** missing name→preset mapping (UI-data wiring gap). Different bug class from the others.
-- **Status:** logged (discovery-only). Self-contained fix (populate the preset map for the gallery names).
+### RB-012 [S2] Go to Record (mailings.preview-results.go-to-record) — Mailings › Preview Results
+- BUG-021 live: wrong icon, step=6 (functionally jumps 6 records), 'pt' unit, default 0. Plus no value sync-back from navigation. The generic spinner renderer needs a record-spinner variant. Live/visual to confirm rendering.
+- **Evidence:** ribbon.js:450-461 renderSpinner is fully generic and mis-configures the goToRecord spinner (BUG-021 re-confirmed): isIndent=false so icon = increaseIndent (a paragraph-indent glyph), step='6' (arrows jump 6 records at a time), default value='0' (records are 1-based), unit span shows 'pt'. Dispatch commands.js:1817 WC.Mail.go((value||1)-1). Word's Go to Record box is a plain integer (default 1, step 1, no unit, no indent icon). Additionally the spinner value is NOT synced back after First/Prev/Next/Last navigation (no controlIndex.goToRecord.input.value update in go()), so the displayed number is stale.
+- **Confirm:** needs-live-compare
 
-## BUG-007 — [S2] View modes (Outline / Draft / Web) are visually dead — CSS targets the retired `#editor` id
-- **Area:** View tab → Outline / Draft / Web Layout. Spec VIEW-01/02/03/04.
-- **Repro (clone):** make a doc with Heading 1/2 + body; switch View → Outline (also Draft, Web).
-  Probe `C:\tmp\bughunt\probes\spec-batch3.js` → `VIEW`.
-- **Expected (Word):** Outline indents headings by level with collapse markers and dims body; Draft/Web reflow to a
-  continuous narrower column with no page sheet.
-- **Actual (clone):** the `#pm-editor` box is **byte-identical across print/outline/draft/web** (width `816px`,
-  same `box-shadow`, `padding-left:96px`); headings get **no indent, no `::before` marker, no dimming** in Outline
-  (`outlineHeadIndentSameAsPrint:true`, `draftBoxSameAsPrint:true`). Only the page-seam hide works. **Plus** the
-  status bar shows **"Print Layout" active while `WC.PM.view==='outline'`** (`H.outline` calls `setActiveView('print')`).
-- **Evidence:** `spec-batch3.json` `VIEW` — identical `pmBox`/`head` snapshots in all four views; `activeViewBtnWhileOutline:["Print Layout"]`.
-- **Root cause:** slice-11 legacy retirement — `editor.css` Outline/Draft/Web rules target `#editor` (gone) while PM
-  content is `#pm-editor`, and headings render as `<p styleid="Heading1">` not `<h1>` so even the element selectors miss.
-  `H.outline` passes the wrong literal to `setActiveView`. (`VIEW_TAB.md` still advertises the missing behavior.)
-- **Status:** logged (discovery-only). Self-contained: re-point the view CSS to `#pm-editor` + `p[styleid^=Heading]`,
-  fix the `setActiveView` arg. Not layout-engine-gated.
+### RB-013 [S2] Greeting Line (mailings.write-insert-fields.greeting-line) — Mailings › Write & Insert Fields
+- BUG-008 still live for switches. Field type round-trips as w:fldSimple GREETINGLINE. Dialog options never reach the export. Preview also affected: see Preview Results / BUG-058.
+- **Evidence:** commands.js:1176 -> WC.Mail.greetingLine(): the dialog (mailings-tools.js:90-111) collects greeting word/name-format/punctuation/fallback, but OK calls the PARAMETERLESS WC.PM.mmGreetingLine() (mail.ts:21). Export (translate-field-annotation.js:40) emits SIMPLE field instr just 'GREETINGLINE' with cached '«GreetingLine»'. BUG-008 re-confirmed: \f \l \e switches dropped. Word writes 'GREETINGLINE \f "..." \l 0 \e "..."'. Also note translate uses buildSimpleFieldElement (w:fldSimple) for GREETINGLINE while Word uses a complex fldChar field for GREETINGLINE — likely tolerable but a fidelity nit.
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-008 — [S2] Mail-merge field codes export with invalid operators and all switches/parameters dropped
-- **Area:** Mailings → Rules (IF), Greeting Line, Address Block, Insert Merge Field. Spec MAIL-01/02/03/04.
-- **Repro (clone):** insert each field, export; inspect `w:instrText` / `w:fldSimple`. Probe `spec-batch3.js` → `MAILINGS`.
-- **Confirmed exported OOXML (all wrong):**
-  - **IF rule:** `IF «Balance» Equal to "0" "Paid" "Due"` — uses the human label **"Equal to"** (Word requires `=`,`<>`,`>`,`<`)
-    and a **literal `«Balance»`** instead of a nested `MERGEFIELD`. Word shows `!Syntax Error` / never evaluates. **[S2]**
-  - **GREETINGLINE:** exports bare ` GREETINGLINE ` — the dialog's greeting word / name format / punctuation / fallback
-    `\f \l \e` switches are **all silently dropped**. **[S3]**
-  - **ADDRESSBLOCK:** exports bare ` ADDRESSBLOCK` with **no switches**, and the cached result run is the literal
-    `«AddressBlock»` placeholder. **[S3]**
-  - **MERGEFIELD with a space:** ` MERGEFIELD First Name ` — **unquoted**; Word parses only `First` (truncates the column). **[S3]**
-- **Expected (Word):** `IF «…» = "0" …`; `GREETINGLINE \f "…" \l 0 \e "…"`; `ADDRESSBLOCK \f "…" \c 1 \e …`; `MERGEFIELD "First Name"`.
-- **Evidence:** `spec-batch3.json` `MAILINGS` (exact `instr` strings + `ADDRESSBLOCK_cachedLiteral:true`).
-- **Root cause:** the `mmAddressBlock/mmGreetingLine/mmInsertRule` bridge fns are **parameterless** (dialog state never
-  reaches the code) and `mergeFieldInstruction` (translate-field-annotation.js) builds **no switches**; the IF dialog
-  emits human operator labels + literal guillemets. Two files: the export router + the authoring dialogs.
-- **Status:** logged (discovery-only). Different bug class (field-code authoring/export). The IF operator is the
-  highest-severity (functionally broken merge). Note: MERGEFIELD name escaping (MAIL-05) is an unverified related risk.
+### RB-014 [S2] Rules (mailings.write-insert-fields.rules) — Mailings › Write & Insert Fields
+- BUG-008 IF operator/literal-field is the highest-severity Mailings bug — exports a functionally broken (non-evaluating) IF field. Plus condition-less NEXTIF/SKIPIF. Rule fields now DO export as real complex fldChar runs (improved), but the instruction strings are invalid Word field code.
+- **Evidence:** commands.js:1178-1207 builds the Rules flyout (If/Fill-in/Ask/Merge Record#/Merge Seq#/Next/Next If/Set/Skip If). BUG-008 highest-severity re-confirmed: ifThenElseDialog (commands.js:1204) builds code 'IF «Field» Equal to "0" "Then" "Else"' using the HUMAN operator label op.value ('Equal to') and a LITERAL «Field» (not a nested MERGEFIELD). mmInsertRule (mail.ts:22) -> RULE export (translate-field-annotation.js:41-42, buildComplexFieldRuns) writes that instr verbatim. Word requires '=','<>','>','<' and a nested field, so this exports an IF that shows '!Syntax Error' / never evaluates. NEXTIF/SKIPIF (commands.js:1187,1189) insert bare 'NEXTIF'/'SKIPIF' with no condition. NEXT is handled but see BUG-064.
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-009 — [S3] All Cover Page designs collapse to one generic block (6 styles → 1)
-- **Area:** Insert → Cover Page. Spec IEX-01.
-- **Repro (clone):** insert Cover Page "Banded", then "Facet", then "Ion" (fresh docs). Probe `spec-batch3.js` → `INSERT_cover`.
-- **Expected (Word):** each built-in cover (Banded/Facet/Ion/Filigree/…) has a distinct layout, color band, and shapes.
-- **Actual (clone):** all produce the **same generic 3-line structure** `[title][Subtitle][Author Name] — <year>` with
-  **no banding/color/shape** (`hasBanding:false` for all; `xmlLen` 3863–3866). The only difference is the title text =
-  the style name. The 6 rich `COVERS` `build()` templates are dead code (`insert-features.js`); `xeCoverPage` ignores them.
-- **Evidence:** `spec-batch3.json` `INSERT_cover` (near-identical xml length, no banding markup, generic text per style).
-- **Root cause:** `Insert.insertCover` passes only the style `name` to `xeCoverPage`, which hardcodes one title/subtitle/author
-  tree (`insert-exotica.ts`). Silent design loss (not a documented deferral).
-- **Status:** logged (discovery-only). Self-contained (wire the per-style `build()` HTML through to insertion).
+### RB-015 [S2] Insert Citation (dropdown: Add New Source…, Add New Placeholder…, existing sources) — References › Citations & Bibliography
+- Insert-citation core works (field exports). Two issues: (1) 'Add New Placeholder…' is a stub (gap); (2) BUG-047 S2 data-loss still live — Source Manager Edit drops authors 2+ (editPrefill authors[0] + buildSourceFields rebuild + Object.assign in the fork). The S2 belongs to the Edit/data-loss path.
+- **Evidence:** commands.js:1057-1071 H.insertCitation flyout. 'Add New Source…' → WC.Dialogs.addSource() (dialogs.js:1282-1306) → refAddSource (references.ts:511-521, maps flat shape to fork CitationSourceFields, mints sourceId) then refInsertCitation (references.ts:524-534 → d.citations.insert). Working in-text CITATION field. BUT 'Add New Placeholder…' (commands.js:1060) is a no-op toast ('Add a source via Add New Source…') — Word inserts a real named placeholder citation. AND the addSource dialog only captures a SINGLE author string (dialogs.js:1285), and Source Manager Edit (editPrefill, dialogs.js:1317-1322) reads only authors[0] → editing a multi-author source DESTROYS authors 2+ via Object.assign (confirms BUG-047, S2 data loss).
+- **Confirm:** needs-runtime-probe+COM
 
-## Verified CLEAN (Review / Design)
-- **Display-for-Review modes are export-safe** — `all / simple / none / original` all export `w:ins`=1, `w:del`=1,
-  doc size constant. "No Markup"/"Original" do NOT bake or strip revisions from the saved file. ✓ (the S1-if-broken case)
-- **Page Color (Design) is export-correct** — `<w:background w:color="FFF2CC"/>` is emitted as the **first child of
-  `<w:document>` before `<w:body>`** (valid OOXML order), **survives export→reimport**, and is removed by Page Color → No Color. ✓
-- **Round-trip stability (formatting)** — borders, shading (`w:shd`), lists (4 `numPr`), alignment (3 `jc`), spacing,
-  color, font all survive export→reimport with stable counts (the only round-trip defects are BUG-004 and a cosmetic
-  `fontFamily` CSS-fallback string). ✓
-- **Comments round-trip fully** — text, author, an unresolved thread's reply, AND a resolved comment's resolved=true
-  status all survive export→reopen identically (2 in / 2 out). ✓ (REV-02)
-- **Tracked delete across a list boundary** keeps both items' text (marked `trackDelete`), exports `w:del`, and
-  preserves both list items' `numPr` (no merge, no lost numbering). ✓ (REV-09)
-- **Tracked formatting exports as `w:rPrChange`** (a tracked bold → format revision in the saved file). ✓ (REV-15)
-- (DSGN-13 theme-dirties-heading-less doc: inconclusive — the test doc was already dirty from setup; `WC.Design.THEMES`
-  exists and `deApplyTheme` returns true. Re-test with a clean doc later.)
+### RB-016 [S2] Manage Sources (button — Source Manager) — References › Citations & Bibliography
+- BUG-047 S2 data loss confirmed in current code. Single-list (no Master vs Current split) is a fidelity gap. needsRuntime to confirm the round-trip author drop via a probe + COM read-back.
+- **Evidence:** commands.js:1072 H.manageSources → WC.Dialogs.manageSources (dialogs.js:1307-1346). Lists sources (refListSources), Edit→refUpdateSource, Delete→refRemoveSource — a real master/current-list manager. DATA-LOSS bug: editPrefill (dialogs.js:1319-1321) collapses authors to authors[0] only, and the Edit submit (line 1333) routes the rebuilt single-author patch through refUpdateSource→buildSourceFields→fork Object.assign(source.fields,patch), overwriting the multi-author array. Confirms BUG-047. Word's Source Manager preserves all authors. Also lacks the two-pane Master/Current list + Copy/New/Browse of real Word (gap).
+- **Confirm:** needs-runtime-probe+COM
 
-## BUG-010 — [S3] Footnote/endnote inserts seed the note body with the literal word "Footnote"/"Endnote"
-- **Area:** References → Insert Footnote / Insert Endnote. Spec REF-10.
-- **Repro (clone):** caret in a paragraph → References → Insert Footnote. Probe `C:\tmp\bughunt\probes\spec-batch5.js` → `REF10_footnote`.
-- **Expected (Word):** a new footnote has an **empty** note body; the cursor moves there for the user to type.
-- **Actual (clone):** the note body is pre-seeded with the literal text **"Footnote"** (`refListFootnotes()` → `[{text:"Footnote"}]`,
-  `seedTextLeak:true`); endnotes seed **"Endnote"**. This exports as real footnote content the user never authored, so every
-  clone footnote ships the word "Footnote" in the saved `.docx`.
-- **Evidence:** `spec-batch5.json` `REF10_footnote` (`afterFirst:[{text:"Footnote"}]`, `footnoteRefsInXml:1`). Source: `references.ts:212` seeds the literal.
-- **Suspected source:** `refInsertFootnote/refInsertEndnote` seed content (`references.ts`). Different bug class (authoring seed).
-- **Status:** logged (discovery-only). Self-contained (seed an empty note body instead of the label literal).
+### RB-017 [S2] Mark Entry (button, Alt+Shift+X) — References › Index
+- BUG-022 still live: no Mark Index Entry dialog; silent no-op without a selection, and no subentry/cross-ref/page-range/Mark-All options when there is one. Word's dialog is the core of indexing UX.
+- **Evidence:** commands.js:1050 H.markEntry → WC.PM.refMarkIndexEntry() called with NO args and NO dialog. references.ts:340-358 refMarkIndexEntry(info) with info undefined falls to the selection-text branch (line 346-352): if there is a non-empty selection it marks an XE field with the selected text, else returns false (silent no-op). Word ALWAYS opens the full 'Mark Index Entry' dialog (Main entry / Subentry / Cross-reference / Current page / Page range / bold-italic / Mark / Mark All). Confirms BUG-022. So with no selection the button silently does nothing; with a selection it marks a bare XE with no subentry/options.
+- **Confirm:** code-confirmed
 
-## BUG-013 — [S3] Cross-reference "Page number" exports `REF \p` (Word renders "above/below"), not `PAGEREF`
-- **Area:** References / Insert → Cross-reference, "Insert reference to: Page number". Probe `C:\tmp\bughunt\probes\refxref.js`.
-- **Expected (Word):** a page-number cross-reference to a bookmark/heading exports `{ PAGEREF bookmark \h }` and shows the
-  target's page number.
-- **Actual (clone):** `refCrossReference({display:'pageNumber'})` exports **`REF tgt \p \h`**. The `\p` switch on a `REF`
-  field is Word's **relative-position** switch ("above"/"below") — NOT a page number. So in Word a "Page number" cross-ref
-  renders "above"/"below" (or nothing useful), never the page.
-- **Evidence:** `refxref.json` `XREF` = `{pageref:false, refField:"REF tgt \\p \\h"}`.
-- **Suspected source:** the `display:'pageNumber'` → field-code mapping in the fork `crossRefs.insert` conflates page-number
-  with the above/below (`\p`) form; should emit `PAGEREF` for `pageNumber`.
-- **Status:** logged (discovery-only). The cross-reference dialog also exposes only Heading/Bookmark targets and 3 of Word's
-  ~7 "insert reference to" options (a separate fidelity gap).
+### RB-018 [S2] Restrict Editing (review.protect.restrict-editing) — Review › Protect
+- Re-test of prior BUG-005 against current paged code: still present by inspection. The pane UI + Tracked-Changes-mode (enableTrackChanges + lock) leg work; the 'No changes (Read only)' leg leaks. Probe: setEditable(false), then run bold/insertText/addComment and check doc size/marks.
+- **Evidence:** dialogs.js:885-947 D.restrictEditingPane: read-only Start calls `p.getEditor().setEditable(false,false)`. Editor.ts:2291 setEditable only flips ProseMirror's `editable` prop (gates USER DOM input), it does NOT reject programmatic `view.dispatch`. The ribbon write path (WC.PM.cmd / H[cmd]) has no read-only guard: bridge/index.ts:180 isBlocked is purely the D6 layout-area gate (DEFERRED = layout-page/layout-arrange/header-footer) with zero `editable` awareness. So with protection 'on', ribbon formatting, programmatic tr.insertText, and addComment still mutate the doc. This is exactly prior BUG-005 [S2] and the architecture is unchanged on the paged engine. Word blocks ALL edits under read-only protection.
+- **Confirm:** needs-runtime-probe+COM
 
-## Audit-surfaced bugs (exhaustive 321-control fidelity audit — full catalog in `FIDELITY-AUDIT.md` + `audit-digest.json`)
-The 14-area audit classified **321 controls**: ~27 bugs, ~140 deviations, ~30 gaps, ~30 stubs, ~40 faithful. New confirmed bugs beyond BUG-001…013 (the ~140 deviations + gaps live in the companion files):
+## S3 — 27
 
-- **BUG-014 [S2] Font Size silently clamps to 8–96 pt (verified).** 4pt→8, 200pt→96, 1638pt→96 (`audit-verify1.json`); Word allows 1–1638. No feedback; the clamped value exports + round-trips. `font-size.js:112 minMax(8,96)`.
-- **BUG-015 [S3] Non-keyword highlight color exports as character shading, not highlight (verified).** Picker offers the full palette (Word's highlighter is a fixed 15-keyword set); `#FFC000`→`<w:shd fill="FFC000">` not `<w:highlight>` → on reopen it's shading, not highlight. `highlight-translator.js` shd fallback.
-- **BUG-016 [S3] Convert Text to Table (Insert) is a dead toast over a working bridge (verified).** The Insert item toasts "slice 6b" and does nothing, but `PM().textToTable({separator:','})` works (created a table). Feature unreachable from its Word location. `insert-features.js:44`.
-- **BUG-017 [S2] Format Painter lock can never be turned off with Esc (code).** Double-click locks + toasts "Press Esc to stop", but no Esc handler cancels it — armed forever. `app.js:70-77` (no painter branch), `commands.js:1714`.
-- **BUG-018 [S2] Replace (Ctrl+H) hides Match-case / Whole-words / Wildcards (code).** `H.replace`→`findPane(true)` with `advanced=undefined` → options row `display:none`; Replace locked to case-insensitive/no-wildcard with no way to enable. `commands.js:102`, `dialogs.js:133`.
-- **BUG-019 [S2] Draw tab pen-select + drawing-toggle UI state is dead (code).** Active pen tile reads `WC.Draw.pen.id` (never updated) → only first "Pen" highlights; Drawing toggle has no latch + flyout always says "Start Drawing" (`WC.Draw.enabled` never set). `ribbon.js:271/278`, `commands.js:644/675`.
-- **BUG-020 [S2] File → Close creates a new blank doc instead of closing (code).** Backstage "Close" calls `Files.newDoc()`; you can never end up document-less. `backstage.js:48`, `files.js:53`.
-- **BUG-021 [S2] Mailings → Go to Record spinner mis-rendered (code).** Generic paragraph-spinner: indent icon, "pt" unit, step 6, default 0 — should be a plain integer box (default 1, step 1). Arrows jump 6 records. `ribbon.js:450-461`.
-- **BUG-022 [S2] References → Mark Entry (Alt+Shift+X) has no dialog, silent no-op without a selection (code).** `refMarkIndexEntry()` called with no args/dialog; Word opens the full Mark Index Entry dialog. `commands.js:903`, `references.ts:334`.
-- **BUG-023 [S3] References → Next/Prev Endnote navigates footnotes too (code).** No type filter — `refNextNote` iterates footnote+endnote refs together. `commands.js:1559`, `references.ts:260`.
-- **BUG-024 [S4] Design → Themes active checkmark stuck on Aptos (code).** `isActive` reads `--doc-font` (static literal, never updated on apply). `commands.js:691/704`.
-- **BUG-025 [S3] Change Case fidelity (code/partial).** Sentence-case regex needs whitespace after a terminator ("end.New" not recapitalized); toggle-case is locale-unaware (Turkish i / German ß); no Shift+F3 cycle. `commands.ts:53-77`.
-- _Extensions: Mailings NEXTIF/SKIPIF insert bare condition-less fields → extends BUG-008. Watermark is preview-only/not-exported + Custom dialog lacks Picture/font/size/transparency → extends GAP-B. Layout Breaks menu is blocked AND built on dead `E()` → extends GAP-A._
+### RB-019 [S3] Pens Gallery (draw.pens.pens-gallery) — Draw › Pens
+- Pen selection works functionally (dSetPen sets the bridge pen), but the active-pen highlight is dead (always 'Pen' tile) and the 2nd-click pen-options (thickness/color/effects) flyout is missing. Wrong pressed-state UI = S3 fidelity.
+- **Evidence:** Two render paths. (a) In-ribbon gallery (ribbon.js:260-289 renderPensGallery): a tile's active highlight reads draw.pen && draw.pen.id === pen.id (line 271). WC.Draw.pen is NEVER reassigned anywhere (grep for 'WC.Draw.pen =' / 'Draw.pen =' returns no matches); it stays PENS[0]. So only the first 'Pen' tile ever shows active, regardless of the pen actually selected via dSetPen (draw.ts:120 only mutates the bridge drawState.pen, not WC.Draw.pen). (b) Flyout (commands.js:761 pensMenu) lists pens and calls dSetPen but also never updates WC.Draw.pen. This is prior BUG-019's pen-select half, still live. Also: the tooltip promises 'click again to set Thickness/Color/Effects' — there is no per-pen options flyout (tile click just toggles drawing).
+- **Confirm:** needs-live-compare
 
-## Legacy 55-bug re-triage (vs current PM code) → 6 new bugs (full detail in `LEGACY-RETRIAGE.md` / `BUGS-DETAILED.md`)
-Re-checked the pre-PM-pivot `docs/BUG_BUST_FINDINGS.md` (55 bugs, the user's separate list) against current PM code:
-- **37 fixed-in-PM** — the rebuild structurally eliminated the legacy DOM `execCommand`/Range-surgery corruption classes
-  (Format Painter cross-paragraph, Change Case multi-paragraph empty-paragraphs, cover-page stacking, convert-text-to-table-in-list,
-  Update-Labels-clobbers-table, nested-table drop, undo-ignores-DOM, etc. — all gone with the PM model).
-- **6 already-logged** (BUG-008 address/greeting, BUG-009 cover, BUG-019 draw, BUG-025 change-case + comments/headers COM-validated done).
-- **6 not-applicable** (legacy-`.wc-*`-DOM-only, no PM equivalent — e.g. cover-pushes-header-mid-doc: headers are parts now).
-- **6 NEW bugs in PM** → BUG-026 (page-setup render, above) + BUG-027…031:
-  - **BUG-027 [S3] VERIFIED** — bookmark with an existing name creates a duplicate (Word moves it). `retriage-verify.json`.
-  - **BUG-028 [S3] VERIFIED** — Shift+Tab / Decrease Indent at list level 1 is a silent no-op (Word outdents out of the list).
-  - **BUG-029 [S3]** — positioned/floating objects anchor to the whole doc, not their own page (code-confirmed; keystone-adjacent).
-  - **BUG-030 [S3]** — PDF export / Print capture app chrome + inter-page gap bands (no print stylesheet; code-confirmed).
-  - **BUG-031 [S4]** — ToF / Bibliography inserted twice stacks a duplicate (Index/ToA replace-in-place; ToF/Bib don't).
+### RB-020 [S3] Properties dialog — Pages row — File/Backstage › Backstage-adjacent (Info → Properties / Review Word Count)
+- Fixing counts().pages once repairs Info pane, Properties dialog, and Word Count simultaneously.
+- **Evidence:** commands.js:1562 propertiesDialog rows include ['Pages', c.pages] and dialogs.js:266 Word Count rows include ['Pages', c.pages]; both call WC.PM.counts() which has the dead __pagination read (io.ts:49). Same root cause as the Info-pane Pages bug — always 1. Listed separately since these are distinct surfaces a user sees.
+- **Confirm:** needs-runtime-probe+COM
 
-## Feature-research-spotted bugs (BUG-032…033 + 11 more in `FEATURE-IMPROVEMENTS.md`)
-The Table/Picture contextual-tab feature research (`FEATURE-IMPROVEMENTS.md`) spotted 13 bugs. The two clearest
-wrong-behavior bugs (now **runtime-verified** — probe `C:\tmp\bughunt\probes\table-bugs-verify.js`, 2026-06-17):
-- **BUG-032 [S3] Table Text Direction is a one-shot — can't restore horizontal.** `commands.js:130` hardwires the cell
-  text direction to `'tbRl'`; pressing it cannot cycle back to horizontal or to `btLr`, so once pressed the user can't
-  restore horizontal text from the ribbon. Word's button cycles horizontal → 90° → 270°. Fix: read-current-then-advance
-  the cycle + add `btLr`. (S, low risk.) **Runtime evidence:** first press → `tbRl`, second press → `tbRl` (`cycles:false`)
-  — the cell is stuck on `tbRl`, ribbon cannot restore horizontal.
-- **BUG-033 [S3] Table Indent-from-left is not gated by alignment → silently-ignored dead attribute.** `H.tblIndent`
-  (`commands.js:241`) applies a left indent regardless of justification, but the renderer (`TableView.js:158-167`) only
-  honors indent when alignment is NOT center/right. A user who sets indent then centers gets the indent silently ignored
-  yet still stored (a dead `w:tblInd` Word also ignores under center/right). Fix: gate/clear `tblIndent` on center/right
-  alignment, matching Word (which disables the control). (S.) **Runtime evidence:** indent `720` dxa survives setting
-  alignment=center, and the export contains BOTH `<w:tblInd>` and `<w:jc w:val="center">` (`bothCoexistInExport:true`).
-- The other 11 (Header Row/Column mislocated on Layout vs Design tblLook; Table Design tab has a misplaced 'Alignment'
-  group; Row Height has no 'Exactly' rule; no 'Clear table style' on the Design tab; hardcoded 5-swatch shading palette;
-  **Picture Format omits Align/Group/Selection Pane**; **Picture Format omits the entire Picture Styles group** — gallery/
-  border/effects/layout) are catalogued in `FEATURE-IMPROVEMENTS.md`. Bugs ↔ improvements are connected (fix = complete the feature).
+### RB-021 [S3] Text Effects and Typography — Outline — Home › Font
+- Only the width-preset items are broken; the explicit Outline Color path works. Probe: apply '1 pt outline', export, inspect w14:textOutline > w14:srgbClr val.
+- **Evidence:** commands.js:607-608 outlineMenu width presets pass color:'currentColor'. Export textOutline-translator.js:38 does String(o.color).replace(/^#/,'').toUpperCase() => 'CURRENTCOLOR', an invalid OOXML srgbClr w14:val. Word drops the invalid outline on open (data loss). Confirms prior BUG-051. (Outline Color... picker passes a real hex and is fine.)
+- **Confirm:** needs-runtime-probe+COM
 
-## S2-audit-promoted new bugs (BUG-034…040) — runtime-confirmed 2026-06-17
-A parallel triage of every not-yet-confirmed S2 fidelity-audit item (deduped vs the 33 logged bugs) surfaced 7 genuine
-new bugs, each runtime-confirmed by headless probe (`C:\tmp\bughunt\probes\s2-formatting.js` / `s2-insert-ui.js`).
-Full detail (Where/When/Symptom/Why/Evidence/Solution) in `BUGS-DETAILED.md` § BUG-034…040.
-- **BUG-034 [S2] Custom Watermark is CSS-only and silently dropped on save.** `deWatermark` (design.ts:274) paints an
-  `#pm-editor` SVG background, skips `markDirty`, never inserts a model node → `exportDocx` emits no `w:pict`. Probe: `applied&cssApplied` true, `afterHasWatermark:false`.
-- **BUG-035 [S2] Font dialog (Ctrl+D) accepts Small/All caps, Scale, Spacing, Position with live preview but applies none on OK.**
-  `dialogs.js:460-461 notifyBlocked`; the `textStyle` mark has no smallCaps/caps attr or `setSmallCaps`/`setCaps` command. Probe: dialog ticked+OK'd, export has no `w:smallCaps`/`w:caps`/spacing.
-- **BUG-036 [S2] Home Shading on a sub-paragraph selection floods the whole paragraph (pPr/shd not rPr/shd).**
-  `commands.js:1838-1842` always writes `paragraphProperties.shading`; no run-level path; dialog `shadeApplyTo` ignored. Probe: sub-range selection → whole-paragraph shd in model, no run mark.
-- **BUG-037 [S2] Layout > Breaks dropdown fully dead (blocked + dead `E()` code).** `breaks` AREA-mapped to DEFERRED
-  `layout-page`, both dispatch heads `notifyBlocked` and return; `breaksMenu` calls `E()`=retired `WC.Editor`. Probe: `blocked_breaks:true`, `breaksRunMutated:false` (the page-break verb itself works — Insert tab).
-- **BUG-038 [S2] Insert Link: bare domain → `file://` path, bare email → no `mailto:` (no scheme inference).**
-  Address passed RAW to `setLink`; scheme-less token resolved relative to the Electron `file://` base. Probe: `example.com`→`file:///…/example.com`, `a@b.com`→`null`, `https://example.com` ok.
-- **BUG-039 [S3] Cross-reference dialog exposes only 2 of Word's 7 reference types and no hyperlink/above-below checkboxes.**
-  `commands.js:1023-1024` hardcodes the option lists; engine `d.crossRefs.insert` is generic. Probe: `typeOptions:[Heading,Bookmark]`, `checkboxCount:0`.
-- **BUG-040 [S3] Text Box "Draw Text Box" == "Simple Text Box" (no drag), inserts an INLINE box not floating; gallery/Save missing.**
-  Both menu items → `H.textBox` (commands.js:473-477); `insertTextBox` has no anchor/wrap. Probe: `shapeContainerFound:true`, `hasFloatingAnchorAttr:false`.
-- _Also from this sweep: 1 duplicate (Mailings Rules If/Then/Else → folds into **BUG-008** mail-merge field-code export); 6 not-bugs
-  (Colors gallery, Page Borders dialog, **Track Changes Accept** = Word-parity, Compare/Combine, Screenshot + Save-As-type = real but
-  not headless-confirmable); 8 honest-degrade stubs (Watermark galleries, Borders split, File Info/Open/Options/Protect, Shapes, Equation).
-  One theorized defect — Track Changes **Reject** skip-adjacent — could NOT be reproduced (probe couldn't build adjacency); logged
-  transparently in `BUGS-DETAILED.md`, not numbered._
+### RB-022 [S3] Text Highlight Color (split) — Home › Font
+- Picking any of the 15 Word keyword colors is fine; any other swatch silently becomes shading. The palette itself is wrong (should be the 15-keyword highlighter grid).
+- **Evidence:** commands.js:57 + 1637 colorMenu(node,'hilite') uses the FULL WC.colorPalette (theme + tints + standard + More Colors — util.js:109) instead of Word's fixed 15-keyword highlighter set. On export, highlight-translator.js:48 getDocxHighlightKeywordFromHex returns null for a non-keyword color -> falls back to w:shd (character shading) NOT w:highlight (lines 56-66). On reopen it is shading, not a highlight: different semantics + the highlighter button won't toggle it off. Confirms prior BUG-015.
+- **Confirm:** needs-runtime-probe+COM
 
-## S3-audit-triage new bugs (BUG-041…043) — runtime-confirmed 2026-06-17
-Curated batch-1 of the S3 fidelity-audit tier (16 high-signal items: BUG-tagged + wrong-output-risk, deduped vs the
-40-bug catalog) surfaced 3 genuine new "lying control" bugs (wrong output where the control claims to work), each
-runtime-confirmed by headless probe (`C:\tmp\bughunt\probes\s3-search.js` / `s3-misc.js`). Full detail in
-`BUGS-DETAILED.md` § BUG-041…043.
-- **BUG-041 [S3] Find/Replace "Use wildcards": `{n}` / `(..)` / `@` escaped to literal (wrong/zero matches); Replace
-  backrefs inserted verbatim.** `SearchIndex.js:507` + `search.js:810/875`. Probe: `te{2}st`→0 matches, `(a)(b)`→0 replacements.
-- **BUG-042 [S4] Sort Text Type=Date sorts by leading number, not chronologically** (Date reuses the numeric `parseFloat`
-  path; no date parsing). `commands.js:2021` + `commands.ts:102`. Probe: date strings `matchesChrono:false`.
-- **BUG-043 [S4] Date & Time "Update automatically" checkbox is never read — always inserts an auto-updating DATE field**
-  (no static-text path). `insert-features.js:193` + `insert-exotica.ts:118-123`. Probe: `hasDateField:true` unconditionally.
-- _Also from batch-1: 4 duplicates (Mailings NEXTIF/SKIPIF → **BUG-008**; Next/Prev Endnote nav → **BUG-023**; Convert Text
-  to Table → **BUG-016**); 8 not-bugs (Format Painter single-click, Insert-Table caret placement, table default widths,
-  Replace-All count, Paste options/Paste Special, Go To — all honest reductions / correct); 2 known-stubs (Find/Replace
-  `^`-codes, Drop Cap Options). Remaining S3 items (~129) are predominantly DEVIATION/GAP/STUB feature-completeness — future
-  curated batches will sweep the wrong-output-risk ones._
+### RB-023 [S3] Cover Page — Insert › Pages
+- All 6 gallery designs collapse to ONE generic 3-paragraph block (design name ignored). Re-test of prior BUG-009 — STILL PRESENT on the exotica bridge.
+- **Evidence:** commands.js:435 H.coverPage -> insert-features.js:24-37 coverPageMenu lists 6 designs (Banded/Facet/Filigree/Ion/Motion/Retrospect) each calling Insert.insertCover(t) -> WC.PM.xeCoverPage(t.name). bridge/insert-exotica.ts:69 xeCoverPage(name) uses `name` ONLY as the title-paragraph string (line 78 `title = name`); the documentPartObject content (lines 88-92) is a fixed 3-paragraph stub (title bold / [Subtitle] / [Author Name] - year) regardless of which design was chosen. Word inserts 6 visually distinct fully-formatted cover layouts. The ribbon-data gallery/'More Cover Pages'/'Save Selection' items are also not individually wired. Remove Current Cover Page works (xeRemoveCoverPage deletes the first documentPartObject).
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## S3-audit-triage new bugs (BUG-044…046) — batch-2, runtime-confirmed 2026-06-17
-Batch-2 of the S3 tier (16 wrong-output-risk items: References/Table-insert/formatting-fields, deduped vs the 43-bug
-catalog) surfaced 3 more "lying-control" bugs, each runtime-confirmed (`s3b2-references.js` / `s3b2-quicktables-fix.js`).
-Full detail in `BUGS-DETAILED.md` § BUG-044…046.
-- **BUG-044 [S3] TOC "Automatic Table 1" and "Automatic Table 2" collapse to a byte-identical block; the heading caption
-  (Contents / Table of Contents) is silently dropped.** `refInsertTOC` (references.ts:114) never reads `opts.title`; fork
-  has no caption concept. Probe: `snapshotsDeepEqual:true`, neither caption present.
-- **BUG-045 [S3] Citation Style chosen before any bibliography exists is silently lost; ribbon toasts success anyway.**
-  `refSetCitationStyle` (references.ts:577) returns false with no global persistence; `commands.js:999` toasts unconditionally.
-  Probe: `setReturnedFalse:true`.
-- **BUG-046 [S3] Quick Tables presets (Calendar/Tabular List/Matrix/Double Table) all insert an identical empty grid; the
-  preset name carries no template.** `insert-features.js:91` maps each to bare `buildTable(rows,cols)`. Probe: all presets
-  `nonEmptyCells:0`/`headerCells:0`/`tblStyle:TableGrid`; Matrix == plain insertTable(4×4).
-- _Also from batch-2: 2 duplicates (Symbol no-source-font → **DEV-1**; Bookmark dup-name → **BUG-027**); 6 not-bugs (Insert
-  Caption auto-numbering works, Update Table full-rebuild correct, Add Text outlineLvl correct, Insert Table dialog fewer-options,
-  Paragraph Spacing presets have 6 DISTINCT correct values — unlike the BUG-006 Style-Set gallery); 6 known-stubs (Insert
-  Citation source dialog, Bibliography title, Draw Table, Convert-to-Text TAB-hardcoded, Quick Parts, Object/Text-from-File)._
+### RB-024 [S3] Align — Layout › Arrange
+- ENGINE_READY has 'align' but only 3 of 13 items do anything. Align-to-Page/Margin (the relativeFrom toggle), gridlines, and multi-object distribute are missing. Pictures only. P2 + S3 mix; the missing-items are the dominant gap.
+- **Evidence:** commands.js:991-995 H.align. Only Align Left/Center/Right are wired (-> setImageAlign({h}) -> margin-relative horizontal via insert.ts:597-608). Align Top/Middle/Bottom + Distribute H/V emit an honest 'is a follow-up' toast (commands.js:994). The ribbon-data control (ribbon-data.js:1537-1551) lists 13 items including 'Align to Page', 'Align to Margin', 'Align Selected Objects', 'View Gridlines', 'Grid Settings...' -- NONE of these 5 are rendered in the handler menu at all. setImageAlign is image-only and requires a single floating picture (no multi-select distribute).
+- **Confirm:** needs-live-compare
 
-## S3-audit-triage new bugs (BUG-047…048) — batch-3, runtime-confirmed 2026-06-17 (both DATA LOSS)
-Batch-3 of the S3 tier (16 Mailings/lists/footnotes/formatting items, deduped vs the 46-bug catalog) surfaced 2 more
-bugs — both **S2 data-loss** (higher severity than the prior S3 lying-controls), runtime-confirmed (`s3b3-misc.js`).
-Full detail in `BUGS-DETAILED.md` § BUG-047…048.
-- **BUG-047 [S2 data loss] Source Manager ▸ Edit silently destroys authors 2+ on any multi-author source.** `editPrefill`
-  (dialogs.js:1319) reads only `authors[0]`; the Edit round-trip rebuilds `authors:[ONE]` and `Object.assign` overwrites the
-  original array. Probe: a 2-author source, title-only edit → `afterAuthorCount:1`, `DATA_LOSS:true`.
-- **BUG-048 [S2 data loss] Merge/Keep-Source paste silently drops bold/italic/underline on docx export.** Marks live in the
-  PM model but the exporter run-translator doesn't read emphasis off the fork paste-parser's nested run node → bare
-  `<w:r><w:t>`. Probe: model has `[bold,italic,underline]`, export has none (`EMPHASIS_DROPPED:true`); the CONTROL
-  (`insertContent`) exports them correctly; Keep-Source paste reproduces it (shared `view.pasteHTML` route).
-- _Also from batch-3: 6 duplicates (Address Block / Greeting Line / Rules-Ask / Rules-Fill-in field-code export → **BUG-008**;
-  Insert Footnote + Insert Endnote literal-word seed → **BUG-010**); 3 not-bugs (Match Fields, Mark Citation, Page Color —
-  honest functional dialogs / verified-clean); 5 known-stubs (Insert-Merge-Field shape, Edit-Recipient-List alias, Multilevel
-  List, Bullets/Numbering dropdown rows)._
+### RB-025 [S3] Breaks — Layout › Page Setup
+- All 7 menu items wired (matches ribbon-data 7), ENGINE_READY has 'breaks'. The mid-paragraph-split semantics deviation is the real S3. KNOWN open gap (CLAUDE.md): imported docs carrying an inline <w:br w:type=page> still need a converter-level fix. Paged PE does not repaginate at a section break in-app (export-faithful).
+- **Evidence:** commands.js:552-566 breaksMenu. Page -> insertPageBreak (bridge/insert.ts:224-238 appendPageBreakParagraph); Column -> insertColumnBreak (insert.ts:254-258, hardBreak lineBreakType:'column' -> <w:br w:type=column>); Text Wrapping -> insertLineBreak (insert.ts:259-263); Next Page/Continuous/Even/Odd -> insertSectionBreak (bridge/section-breaks.ts). BUG: Page break (and Blank Page) ALWAYS insert a new EMPTY pageBreakBefore paragraph at $from.after(1) (insert.ts:226-229) -- it does NOT split the current paragraph at the caret. In Word, Ctrl+Enter mid-paragraph splits the paragraph and pushes the text AFTER the caret to the next page; here that text stays on the current page and a blank paragraph opens the new page. Section-breaks v1 (section-breaks.ts:68-79) refuses a 2nd+ TYPED break (one typed break per doc; multiple Next Page allowed).
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## S3-audit-triage new bugs (BUG-049…051) — batch-4, runtime-confirmed 2026-06-17
-Batch-4 of the S3 tier (16 Proofing/View/Home-font/clipboard items, deduped vs the 48-bug catalog) surfaced 3 more bugs
-(`s3b4-chrome.js` / `s3b4-outline-save.js`). Full detail in `BUGS-DETAILED.md` § BUG-049…051.
-- **BUG-049 [S4] Word Count dialog ignores the selection** (no "N of M words" row) — `D.wordCount` (dialogs.js:264) never
-  reads the already-computed `selWords`. Probe: `selWords:2`/`totalWords:5`, dialog shows "Words 5" only.
-- **BUG-050 [S4] View ▸ Navigation Pane checkbox never reflects the pane state** (lying control) — `H.navigationPane`
-  (commands.js:507) never `markChecked`. Probe: `paneOpen:true` but `toggledAfterOpen:false`.
-- **BUG-051 [S3 data loss] Text Effects ▸ Outline width presets export invalid OOXML `CURRENTCOLOR`** → Word drops the
-  outline color on save+reopen. Width presets store `color:'currentColor'` (commands.js:585); the translator uppercases it
-  to invalid hex. **Confirmed via the full .docx package** (`exportXmlOnly` omits it!): width-preset save → `<w14:srgbClr
-  w14:val="CURRENTCOLOR"/>` vs the `#FF0000` control → valid `FF0000`. (Re-affirms: validate the real save, not exportXmlOnly.)
-- _Batch-4 also: 0 duplicates; 4 not-bugs (Display-for-Review 4-mode parity correct, Clear-All-Formatting resets to Normal,
-  Zoom dialog fewer-options, Paste-main-face honors Set-Default-Paste); 7 known-stubs (Spelling&Grammar pane, 8-word Thesaurus,
-  Show-Markup items, Accessibility 4-checks, Language doc-level-only, Read-Mode snapshot, Underline-color unreachable); 2
-  needs-runtime-not-headless (Read Aloud TTS, Side-to-Side CSS targets retired #editor)._
+### RB-026 [S3] Margins — Layout › Page Setup
+- Unblocked (ENGINE_READY has 'margins'); export faithful for Normal/Narrow/Moderate/Wide/Custom. Mirrored != Word mirror margins (S3). Custom Margins dialog only offers a single uniform inches value, not per-side (Word's dialog has Top/Bottom/Left/Right/Gutter).
+- **Evidence:** commands.js:2150-2166 marginsMenu + bridge/design.ts:249-258 dePageMargins. Presets pass full {top,right,bottom,left} to d.sections.setPageMargins -> body sectPr w:pgMar (correct OOXML, all 4 sides, Word-validated per ENGINE_READY note). TWO fidelity issues vs Word: (1) the 'Mirrored' preset is applied as a SYMMETRIC lr=1.25 (commands.js:2155) instead of true mirror margins (Word writes w:mirrorMargins + inside/outside) -> a mirrored doc round-trips as plain symmetric margins. (2) The CSS paint setPageVar('--page-margin', lr*96) only applies the L/R value uniformly and ignores top/bottom; in the paged PE the real geometry comes from the sectPr, so whether the on-screen sheet margin updates live is a render question.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## S3-audit-triage new bugs (BUG-052…055) — batch-5, runtime-confirmed 2026-06-17
-Batch-5 of the S3 tier (16 Text-Effects/Font-Size/Arrange/Styles items, deduped vs the 51-bug catalog) surfaced 4 more
-bugs (`s3b5-model.js` / `s3b5-export.js`). Full detail in `BUGS-DETAILED.md` § BUG-052…055.
-- **BUG-052 [S3] Font Color theme picks down-convert to static hex on save** (no `w:themeColor`), so they don't re-theme;
-  Gradient submenu advertised but absent. Probe: export `<w:color w:val="D9E2F3"/>`, `hasThemeColor:false`.
-- **BUG-053 [S3] "Select All Text With Similar Formatting" selects one contiguous range**, sweeping non-matching text in
-  (corruption path when a mark is applied). Probe: selection text = "AAAA plain middle BBBB".
-- **BUG-054 [S3 data loss] Text Effects Shadow + Reflection silently dropped on export** (no `w14:shadow`/`w14:reflection`
-  translators — only outline/glow). Distinct from BUG-051 (written-but-invalid); here written-NOWHERE. Full-package probe:
-  saved .docx has 0 `w14:shadow`/`w14:reflection` while the outline control has `2 w14:textOutline`.
-- **BUG-055 [S3 + S2 data-loss path] Paragraph/Line-Spacing dialog OK destroys an exact/at-least line rule** even on an
-  indent-only edit (unconditionally writes `lineRule:'auto'`, line 276). Probe: `{line:280,exact}` → `{line:276,auto}`.
-- _Batch-5 also: 1 duplicate (Text Effects **Glow** → **BUG-051**, same currentColor root); 11 not-bugs (Styles-Gallery apply,
-  Show/Hide ¶, Save-As html/txt, Send-Backward, Insert-ToA, Number-Styles/Ligatures, Increase/Decrease-Font-Size jump-list
-  correct, Insert-Index, Wrap-Text, Bring-Forward — all honest reductions / verified-correct)._
+### RB-027 [S3] Position — Layout › Arrange
+- ENGINE_READY has 'position'. Vertical placement ignored (9 presets -> 3 distinct results) is the S3 fidelity gap. 'More Layout Options...' missing. Pictures only (no shapes).
+- **Evidence:** commands.js:968 H.position. 'In Line with Text' -> setImageWrap('inline'); the 9 With-Text-Wrapping presets -> setImageWrap('square') + setImageAlign({h}) where h is only left/center/right. BUG: all three rows (Top/Middle/Bottom) collapse to the SAME horizontal-only placement -- Top-Left == Middle-Left == Bottom-Left (commented v1 limit, commands.js:964-967). Word's Position presets set BOTH a vertical (top/middle/bottom relative to margin) and horizontal anchor. Also ribbon-data lists 'More Layout Options...' (ribbon-data.js:1472) but the handler menu does NOT render it. setImageAlign (insert.ts:597-608) requires isAnchor and only acts on type 'image' (selectedImage insert.ts:273-277), so shapes/text boxes/WordArt are unsupported.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## S3-audit-triage new bugs (BUG-056…057) — batch-6, runtime-confirmed 2026-06-17
-Batch-6 (16 fresh Table-Styles/AutoFit/TOC/Layout/Styles-pane items, deduped vs the 55-bug catalog) surfaced 2 more bugs
-(`s3b6-toc.js`); the rest were honest stubs/reductions (yield is tailing off). Full detail in `BUGS-DETAILED.md` § BUG-056…057.
-- **BUG-056 [S3] Custom TOC dialog "Tab leader" select is a dead/lying control** — OK handler never reads `leader.value`
-  (`commands.js:954-958`), so every choice yields default dots. Probe: dialog path → `w:leader="dot"`; `tabLeader:'hyphen'` → `w:leader="hyphen"`.
-- **BUG-057 [S3] "Manual Table" TOC harvests the document headings instead of literal placeholder rows** — wired to the
-  auto-TOC verb (`commands.js:937`). Probe: TOC text `"Alpha0Beta0"`, no "Type chapter title" placeholder.
-- _Batch-6 also: 0 duplicates; 4 not-bugs (Multilevel Change-List-Level, Editor F7, Export Change-File-Type, Insert Blank-Page);
-  10 known-stubs (Table Styles gallery sparse-on-blank-doc, AutoFit DOM-measure deferral, Footnote&Endnote dialog launcher,
-  Layout Align/Rotate/Hyphenation/Line-Numbers, Find Advanced, Styles task pane, Style Inspector — all documented feature gaps)._
+### RB-028 [S3] Size — Layout › Page Setup
+- OOXML export faithful. Minor: paper-size pick resets orientation to portrait. Live sheet repaint in paged PE needs confirming.
+- **Evidence:** commands.js:2181-2204 pageSizeMenu + dePageSize. Six presets Letter/Legal/A4/A3/Tabloid/Executive with px dims matching Word @96dpi (Letter 816x1056, Legal 816x1344, A4 794x1123, A3 1123x1587, Tabloid 1056x1632, Executive 696x1008). Each preset and the More-Paper-Sizes dialog ALWAYS pass orientation:'portrait' (commands.js:2189) even though dePageSize also passes width/height; harmless because dims are portrait-oriented, but if the doc was already landscape, choosing a paper size silently forces it back to portrait (Word preserves orientation when only the paper changes). Same live-repaint question as Orientation (BUG-026).
+- **Confirm:** needs-live-compare
 
-## S3-audit-triage new bugs (BUG-058…063) — batch-7 (Mailings-weighted), runtime-confirmed 2026-06-17
-Batch-7 (14 Mailings/Insert/Draw items, deduped vs the 57-bug catalog) surfaced **6** new bugs — the Mailings vein was still
-rich. 5 runtime-confirmed (`s3b7-mail.js` / `s3b7-directory.js`); BUG-063 code-confirmed. Full detail in `BUGS-DETAILED.md` § BUG-058…063.
-- **BUG-058 [S3] Preview Results resolves only MERGEFIELD** — Address Block / Greeting Line keep their «placeholder» while
-  preview is "on" (`mmPreview` hard-filters to MERGEFIELD). Probe: MERGEFIELD→"John", ADDRESSBLOCK→"«AddressBlock»".
-- **BUG-059 [S3] Finish & Merge ignores the Directory merge type** — emits a page break between every record (Word's Directory
-  is continuous). `mmBuildMerge` always `.join(BREAK)`s, never reads `mergeType`. Probe: directory + 2 recs → a BREAK between them.
-- **BUG-060 [S3] Labels "Full page of the same label" checkbox is inert** — always emits the full grid. Probe: unchecked → 30 cells.
-- **BUG-061 [S3] CSV recipient lists with a UTF-8 BOM prepend `﻿` to the first field name** — `parseCSV` doesn't strip the BOM.
-  Probe: `rows[0][0]` charCode 0xFEFF. (Common for Excel "CSV UTF-8" exports.)
-- **BUG-062 [S3] Bibliography dropdown ignores the chosen title** (Bibliography/References/Works Cited) — all three identical,
-  no heading emitted (`refInsertBibliography` drops `_title`). Probe: 3 exports byte-identical, no "Works Cited" heading.
-- **BUG-063 [S3] Draw Lasso Select drops <60%-enclosed strokes; ink-only, delete-only** (Word selects partial enclosure across
-  object types). Code-confirmed (`ink-overlay.ts:274` `inside/total > 0.6`).
-- _Batch-7 also: 1 duplicate (Draw Add-Pen custom-pen opacity → **BUG-019d**); 4 not-bugs (Envelopes, Check-for-Errors, Select-
-  Recipients-Type-New-List, Insert Pictures-dropdown); 3 known-stubs (Update Labels no-op, Shapes no-op stub, Selection Pane deferred)._
+### RB-029 [S3] Address Block (mailings.write-insert-fields.address-block) — Mailings › Write & Insert Fields
+- BUG-008 partially remediated: now exports a real ADDRESSBLOCK complex field (was bare). Remaining gap: dialog options never reach the bridge (parameterless mmAddressBlock) so all \f/\c/\e switches are lost; cached result is the literal placeholder. Preview/composite() resolves it in-app via _val.
+- **Evidence:** commands.js:1175 -> WC.Mail.addressBlock(): the dialog (mailings-tools.js:66-89) has name-format/company/postal options and a live preview, but OK just calls WC.PM.mmAddressBlock() (mail.ts:20) which is PARAMETERLESS. Export (translate-field-annotation.js:39 mergeFieldInstruction COMPOSITE) emits a complex field with instr exactly 'ADDRESSBLOCK' and cached text '«AddressBlock»' (the literal placeholder, not resolved). BUG-008 re-confirmed: none of the \f \c \e switches the dialog collects are written. Word writes 'ADDRESSBLOCK \f "..." \c 1 \e ...'. Note: export DID improve since the prior — it is now a real 5-run w:fldChar complex field (buildComplexFieldRuns), so the field type round-trips; only the switches/params are dropped.
+- **Confirm:** needs-runtime-probe+COM
 
-## S3-audit-triage new bugs (BUG-064…065) — batch-8 (final), runtime/code-confirmed 2026-06-17
-Batch-8 (12 last untriaged items, deduped vs the 63-bug catalog) surfaced 2 new bugs — the fresh wrong-output-risk pool is now
-mined out. Full detail in `BUGS-DETAILED.md` § BUG-064…065.
-- **BUG-064 [S3] Mailings Rules ▸ Next Record (NEXT) never advances the record cursor** — it's stripped (`__NextRecord__→''`)
-  and records stay page-broken, so multi-record-per-page (labels/Directory/Update Labels) is impossible. `mmBuildMerge` has no
-  record cursor (`mail.ts:56`). Probe: `«Name»`+NEXT, 2 recs → Alice + page-break + Bob (`bugConfirmed:true`).
-- **BUG-065 [S3] Draw ▸ Select Objects can't select non-ink objects** (ink-only, no marquee, no move/resize) — `selectAt()`
-  hit-tests only `.pm-ink-stroke` (`ink-overlay.ts:255`). Code-confirmed (same class as BUG-063 Lasso).
-- _Batch-8 also: 2 duplicates (Start-Mail-Merge type → **BUG-059**; Paragraph dialog launcher → **BUG-055**); 7 not-bugs
-  (Font-name-combo, Line-Spacing presets, Add/Remove-Space, Online-Video, Drawing-Canvas, Bullets-Library-glyphs, New+Templates);
-  and References Insert-Citation "Add New Placeholder…" — an **honest no-op redirect toast** (missing-feature stub, not a wrong-output bug)._
+### RB-030 [S3] Envelopes (mailings.create.envelopes) — Mailings › Create
+- Functional dialog exists (delivery/return address). Two deviations: (1) the manual-break separator div is dropped by the paged importer so the envelope is not a separate page; (2) no real envelope page size/orientation. Needs a live paged-render check + COM oracle for envelope geometry.
+- **Evidence:** commands.js:1169 H.envelopes -> WC.Mail.envelopes() (mailings-tools.js:184-192). The dialog builds an envelope HTML block + a '<div class="manual-break" style="break-after:page;page-break-after:always">' separator, then WC.PM.openHtml(env + existingHtml). openHtml -> replaceEditor -> createDocFromHTML (bridge/index.ts:260). The fork has NO parse rule for class=manual-break or break-after:page CSS (grep of superdoc-fork = 0 hits; paragraph.js:196-204 parses a bare <div> into an empty paragraph with extraAttrs, dropping the CSS). A real page break in the paged engine is a pageBreakBefore paragraph (013), not a styled div. So the envelope merges onto the same first page as the document instead of being its own page; envelope geometry (real envelope page size) is also not applied. Word produces a distinct envelope-sized page.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## ★ Final sweep summary — S2 + S3 fidelity-audit triage (2026-06-17)
-The bug-hunt extended into a systematic, runtime-verified triage of the wrong-output-risk items in the 321-control fidelity
-audit, deduped against the catalog. **Totals across S2 (1 batch) + S3 (8 curated batches): ~145 audit candidates triaged →
-32 genuine new runtime/code-confirmed bugs (BUG-034…065).** Plus 7 pre-existing bugs were runtime-re-confirmed during the sweep
-(BUG-005 read-only leak, BUG-027 bookmark dup, BUG-028 Shift+Tab, BUG-029 float anchor, BUG-030 print chrome, BUG-032/033 table).
+### RB-031 [S3] Insert Merge Field (mailings.write-insert-fields.insert-merge-field) — Mailings › Write & Insert Fields
+- Core insertion works and exports as a real w:fldSimple MERGEFIELD. The unquoted-name-with-space bug truncates multi-word column names on docx export — a real wrong-output edge case. Split control's main vs arrow both reach the same menu (no 'last used field' fast-insert like Word, minor).
+- **Evidence:** commands.js:1177 -> WC.Mail.insertMergeFieldMenu(node): flyout of the current field names; insertField -> WC.PM.mmInsertField(field) (mail.ts:19) -> addFieldAnnotationAtSelection MERGEFIELD. Insertion + getHTML round-trip is sound (field-annotation.js parseDOM/renderDOM emit data-field-type/data-default-display-label; sdt-translator->translateFieldAnnotation:56 -> buildSimpleFieldElement). BUG-008 'MERGEFIELD with space' re-confirmed: mergeFieldInstruction (translate-field-annotation.js:38) builds ' MERGEFIELD First Name ' UNQUOTED. Word parses only 'First' (truncates a column whose name has a space). Word requires 'MERGEFIELD "First Name"'. The default field set uses no-space names (FirstName) so the common case works, but any space-containing column name (e.g. from a CSV header) breaks on export.
+- **Confirm:** needs-runtime-probe+COM
 
-| Batch | Area | Candidates | New bugs | Dups | Not-bug | Stub | Needs-runtime |
-|---|---|---|---|---|---|---|---|
-| S2 | mixed wrong-behavior | 23 | **7** (034–040) | 1 | 6 | 8 | — |
-| S3-1 | search/sort/paste/convert | 16 | **3** (041–043) | 4 | 8 | 2 | — |
-| S3-2 | References/Table-insert/fields | 16 | **3** (044–046) | 2 | 6 | 5 | — |
-| S3-3 | Mailings/lists/footnotes | 16 | **2** (047–048, data-loss) | 6 | 3 | 5 | — |
-| S3-4 | Proofing/View/font/clipboard | 16 | **3** (049–051) | 0 | 4 | 7 | 2 |
-| S3-5 | Text-Effects/Font-Size/Arrange | 16 | **4** (052–055) | 1 | 9 | 0 | 2 |
-| S3-6 | Table-Styles/AutoFit/TOC/Layout | 16 | **2** (056–057) | 0 | 4 | 10 | — |
-| S3-7 | Mailings/Insert/Draw | 14 | **6** (058–063) | 1 | 4 | 3 | — |
-| S3-8 | Mailings/Home/Draw/File (final) | 12 | **2** (064–065) | 2 | 7 | 1 | — |
-| **Σ** | | **~145** | **32** | ~17 | ~51 | ~41 | ~4 |
+### RB-032 [S3] Labels (mailings.create.labels) — Mailings › Create
+- BUG-060 still live (inert Full-page checkbox). Label cell sizing not oracle-calibrated. Grid does render as a real PM table via createDocFromHTML in paged. Print path is a documented stub.
+- **Evidence:** commands.js:1170 -> WC.Mail.labels() (mailings-tools.js:193-203). Builds an Avery grid <table class="wc-labels"> via openHtml. BUG-060 prior re-confirmed: the 'Full page of the same label' checkbox (fullPage, line 196) is NEVER read by buildHTML (line 197) -> always emits the full grid even when unchecked. Word emits a single label when unchecked. Also label cell geometry is dashed-border CSS, not real Avery 5160 dimensions (Word lays out exact label sizes). 'Print' button is a toast stub (line 200).
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-**Yield trend:** S2 30% → S3 batches 3/3/2/3/4/2/6/2 (batch-7 Mailings rebounded to 6/14 — that subsystem held a rich vein of
-half-wired/lying controls — then batch-8 fell to 2/12). **The wrong-output-risk vein is now mined out:** the remaining audit
-items skew toward feature-completeness DEVIATION/GAP/STUB (already in `FEATURE-IMPROVEMENTS.md`) and needs-runtime-not-headless
-(TTS, view panels, native OS dialogs, pixels). **This sweep is complete.**
+### RB-033 [S3] Preview Results (mailings.preview-results.preview-results) — Mailings › Preview Results
+- BUG-058 live: composite/rule fields are not resolved during preview. MERGEFIELD preview itself is correct. Live check needed to confirm the in-app paged repaint shows the swapped label.
+- **Evidence:** commands.js:1210 -> WC.Mail.previewResults() (mailings-tools.js:149-159) -> WC.PM.mmPreview(map). BUG-058 re-confirmed: mmPreview (mail.ts:28-38) hard-filters to n.attrs.fieldType==='MERGEFIELD' (line 31), so when preview is ON, Address Block, Greeting Line, and rule fields KEEP their «placeholder» instead of showing resolved data (Word resolves all of them in preview). Plain MERGEFIELD preview works (replaces «Name» with the record value via _previewMap/_val). Toggle pressed-state managed manually (not in TOGGLE_MAP, see Highlight note).
+- **Confirm:** needs-live-compare
 
-**Highest-severity finds:** BUG-005 (read-only protection bypassed), BUG-047/048 (Source-Manager + Merge-paste data loss),
-BUG-051 (Outline exports invalid OOXML `CURRENTCOLOR` — only visible in a FULL .docx save), BUG-054 (Shadow/Reflection dropped
-on export). **Recurring lesson:** validate export bugs via the real `.docx` package (`exportDocxBytes`→`saveBytes`→unzip), not
-`exportXmlOnly` (which omits w14 run effects).
+### RB-034 [S3] Bibliography (dropdown: Bibliography / References / Works Cited / Insert Bibliography) — References › Citations & Bibliography
+- BUG-062 (title dropped, all 3 identical, no heading) + BUG-031 (re-insert stacks a duplicate). Bibliography also 'renders empty headless' per references.ts ledger A — needsLive to confirm the paged PE paints the bibliography entries (resolved citations) vs an empty block.
+- **Evidence:** commands.js:1074-1080 H.bibliography → refInsertBibliography(title). references.ts:617-625 refInsertBibliography(_title) DROPS the title entirely (d.citations.bibliography.insert({at:documentEnd}) with no title slot — the comment at 605-616 explains the fork has no title model and threading it through `style` would corrupt StyleName). So Bibliography/References/Works Cited produce a byte-identical block with NO heading. Confirms BUG-062. Also inserting twice STACKS a duplicate bibliography (no replace-in-place; references.ts always uses documentEnd) — confirms BUG-031 (Bib/ToF stack).
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-**Not yet triaged (low expected yield):** the S3 feature-completeness tail (~64 items), the S4/S5 cosmetic deviations (code
-evidence already establishes them), and the large unimplemented features (Shapes / SmartArt / Chart / Equation / Drawing — all
-tracked as P1–P3 work in `FEATURE-IMPROVEMENTS.md`). **Recommendation:** the high-value *bug discovery* is essentially complete;
-the remaining work is *feature implementation* (per `FEATURE-IMPROVEMENTS.md`) and the **layout engine (Phase 4)**, not more
-audit triage.
+### RB-035 [S3] Cross-reference (button — Cross-reference dialog) — References › Captions
+- BUG-013 S3 export-fidelity (pageNumber → \p collides with aboveBelow; should be PAGEREF) — a FORK fix in crossref-wrappers.ts:229. BUG-039 dialog-coverage gap (2 of 7 types, no checkboxes). needsRuntime to COM-confirm the field code Word reads back.
+- **Evidence:** commands.js:445 H.crossReference → crossRefDialogPM (commands.js:1096-1134): Type select (Heading/Bookmark only), Insert-as select (Page number/Text/Above-below), target list → refCrossReference. references.ts:630-643 → d.crossRefs.insert. WRONG-OUTPUT (BUG-013): 'Page number' maps to display:'pageNumber' which the fork (crossref-wrappers.ts:229) emits as 'REF tgt \p' — but \p on a REF field is Word's ABOVE/BELOW switch (crossref-wrappers.ts:230 maps aboveBelow to \p too, and the importer crossReference-translator.js:105 reads \p back as 'aboveBelow'). A 'Page number' cross-ref should emit PAGEREF; here it renders above/below in Word, never the page. Also BUG-039: dialog exposes only 2 of Word's ~7 reference types (no Numbered item/Figure/Table/Equation/Footnote/Endnote) and no 'Insert as hyperlink' / 'Include above/below' checkboxes.
+- **Confirm:** needs-runtime-probe+COM
 
-## Minor deviations (S4) — works, but not like Word (catalog)
-- **DEV-1 — Symbol inserts raw Unicode with no source font.** `insertSymbol('★')` exports a run with no `w:rFonts`
-  (`insert-exotica2.json`); Word's Symbol dialog applies the source font (Symbol/Wingdings) to the run. Glyph renders via
-  Unicode, but font fidelity + per-font codepoint mapping are absent. (`insert.ts insertSymbol`.)
-- _(Drop Cap `framePr` exports correctly — `drop`/`margin` both write `w:framePr dropCap lines=3`; in-app paint of the
-  enlarged initial is the known deferral. Date&Time field needs a cleaner re-test — placeholder-text collision.)_
+### RB-036 [S3] Custom Table of Contents… dialog (Tab leader select) — References › Table of Contents
+- BUG-056 still live: Tab leader is a dead/lying control (dialog→engine wiring drops leader.value). Fix is one line: pass tabLeader from leader.value.
+- **Evidence:** commands.js:1016-1035 customTOCDialog builds a 'leader' select (dots/dashes/none) at line 1019 but the OK handler (line 1028-1032) only passes includePageNumbers/showLevels/rightAlignPageNumbers to refInsertTOC — leader.value is NEVER read. references.ts:125 refInsertTOC supports a tabLeader config key, but the dialog never sends it, so every choice yields the default dotted leader. Confirms BUG-056 against current code (the 'show levels' and the two checkboxes DO wire through correctly).
+- **Confirm:** code-confirmed
 
-## BUG-012 — [S3] Internal-document hyperlinks unsupported; a `#anchor` link mis-exports as a broken external rel
-- **Area:** Insert → Link. Probe `C:\tmp\bughunt\probes\hyperlinks.js` + `docx-inspect`.
-- **Expected (Word):** the Insert Hyperlink dialog has a **"Place in This Document"** target (link to a heading/bookmark),
-  exported as `<w:hyperlink w:anchor="MyBookmark">` (no relationship) so the link jumps within the doc.
-- **Actual (clone):** the dialog (`dialogs.js:45` `D.insertLink`) only accepts a raw URL — no internal-target option. A
-  `#MyBookmark` href is exported as `<w:hyperlink r:id="rId9">` with **external** rel target `"#MyBookmark"`, which Word
-  treats as a broken external link, not a jump-to-bookmark.
-- **Evidence:** `hyperlinks.json` (`<w:hyperlink … r:id>` for all three) + `docx-inspect` relTargets show `#MyBookmark`
-  as an External relationship target alongside the web/mailto ones.
-- **Suspected source:** `insert.ts insertLink` always builds an external link mark; no `w:anchor` path; dialog lacks the
-  internal-target picker. **Follow-up:** verify round-trip of a *Word-authored* internal link (`w:anchor`) — likely also
-  degrades to a broken external rel on re-export.
-- **Status:** logged (discovery-only). Web + email links are correct (see clean list).
+### RB-037 [S3] Insert Endnote (button, Alt+Ctrl+D) — References › Footnotes
+- BUG-010 endnote variant. needsLive to verify endnote renders at document end on the paged sheets vs Word, and caret placement.
+- **Evidence:** commands.js:1045 H.insertEndnote → refInsertEndnote → insertNote('endnote'), references.ts:212 seeds content='Endnote'. Same literal-seed leak as footnotes (BUG-010). Endnote is roman-numbered at doc end (correct per spec), but the body ships the word 'Endnote' the user never typed.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## GAP-A — [S4 catalog] Control groups still honestly blocked (UPDATED for current main `98fe04e`)
-- **⚠️ Re-validated 2026-06-17 against current `main` (98fe04e).** Originally found at `621da99`; the other agent has since
-  **implemented and UNBLOCKED Margins, Orientation, Size (Page Setup export → sectPr) and Header, Footer.** Blocked set
-  shrank **15 → 10**. Those 5 now-wired features need a fresh correctness pass (no longer "missing").
-- **Still blocked (10, `WC.PM.isBlocked` true → deferral toast):**
-  - **Layout → Page Setup:** **Breaks**, **Columns**, Line Numbers, Hyphenation.
-  - **Layout → Arrange:** Position, Align, Group, Rotate, Selection Pane.
-  - **Insert/Design → Page Number.**
-- **Word-deviation notes (current):**
-  - **Layout → Breaks is still blocked**, so **section breaks, column breaks, and text-wrapping breaks are unavailable** —
-    only Insert → Page Break works. **Columns** is still blocked (single column only).
-  - Behind the block, the remaining menu code still calls the **retired `E()=WC.Editor`** (slice 11) — dead code that would
-    throw if unblocked (latent).
-- **Status:** updated to current main. Unblocking the remaining 10 is Phase-4/7 layout-engine work.
+### RB-038 [S3] Insert Footnote (button, Alt+Ctrl+F) — References › Footnotes
+- BUG-010 still live (literal 'Footnote' seed leaks into export). Also: caret does NOT move into the note body for typing (seed substitutes for that UX). needsLive to confirm the paged PE paints the note at the page foot + caret placement vs Word.
+- **Evidence:** commands.js:1044 H.insertFootnote → refInsertFootnote. references.ts:206-218 insertNote('footnote') calls d.footnotes.insert({type,at,content:seed}) where seed='Footnote' (line 212). Word creates an EMPTY note body and moves the caret there. Here the body is pre-seeded with the literal word 'Footnote', which exports as authored content in the .docx. Confirms BUG-010 against current code. The superscript ref + auto-number + per-page paint are otherwise correct.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## GAP-B — [S3/S4 catalog] Wired-but-stub features: UI present, no real effect (Word features missing)
-- **What:** these controls are NOT in the hard-blocked set (so they run a handler, no deferral-block), but the handler is a
-  **toast/no-op** — the feature looks available but does nothing real. The user reaches a working-looking UI and gets nothing.
-- **Insert → Illustrations:**
-  - **Shapes — STUB (S3, most misleading).** The Shapes gallery renders the full picker (all categories + SVG previews), but
-    `Insert.insertShape` (`insert-features.js:118`) **only toasts** "isn't available on the new engine yet" and inserts nothing.
-    Word's entire Shapes feature is absent behind a complete-looking picker.
-  - **SmartArt — stub toast** (`xeSmartArt` no-op). **Chart — stub toast** (`xeChart` no-op). **3D Models — toast "not available".**
-  - **Icons — works** (inserts inline SVG; no PNG raster fallback = known S4 deviation). **Screenshot — Screen Clipping only.**
-- **Insert → Text/Object:** **Signature Line, Object (OLE embed/from-file) — stub toasts** (`xeSignatureLine/xeObject` no-ops).
-  Online Pictures / Online Video → plain link or toast (no embed).
-- **Review/misc stubs:** Dictate, Sensitivity, Translate, Smart Lookup/Researcher, Read-Aloud (cloud) → honest toasts.
-- **Word-deviation note:** in Word all of the above produce real objects; here they're galleries/dialogs with no document
-  effect. The honest-degrade ones (toast, no crash, no mutation) are acceptable design — but **Shapes is the worst** because
-  the picker fully renders before doing nothing.
-- **Status:** catalogued (mostly honest degrades). Shapes-stub-behind-full-UI is the one worth surfacing as near-bug (S3).
+### RB-039 [S3] Next Footnote (split button: Next/Prev Footnote, Next/Prev Endnote) — References › Footnotes
+- BUG-023 still live and worse than logged: the endnote nav menu items are duplicates of the footnote items (no type filter passed or honored). Word filters by note type.
+- **Evidence:** Main button: commands.js:1046 H.nextFootnote → refNextNote() (defaults 'next'). Flyout: commands.js:1706-1715 — 'Next Endnote' calls pm.refNextNote('next') and 'Previous Endnote' calls pm.refNextNote('prev'), i.e. the SAME function as Next/Prev Footnote with NO type argument. references.ts:260-277 refNextNote collects BOTH footnoteReference AND endnoteReference positions with no type filter (line 265). So 'Next Endnote' is byte-identical to 'Next Footnote' and navigation jumps over footnotes and endnotes interleaved. Confirms (and sharpens) BUG-023.
+- **Confirm:** code-confirmed
 
-## BUG-011 — [S2] Apply Theme changes body font but NOT heading font (linked char styles not updated) — Word-confirmed
-- **Area:** Design → Themes (and Fonts gallery, same path). Spec DSGN-01.
-- **Repro (clone):** doc with a Heading 1 (via the real `applyStyleByName('Heading 1')`) + a body paragraph →
-  Design → Themes → Celestial (Garamond). Save, open in Word. Probes `theme2-savedocx.js`; oracle `read-word-props`.
-- **Expected (Word):** the theme changes both heading and body fonts to the theme's fonts (Garamond).
-- **Actual (Word-confirmed):** the **body renders Garamond** (correct) but the **heading renders in "Aptos Display" 20pt**
-  — the *default/previous* theme's major font, NOT Garamond. The theme apply half-works.
-- **Evidence:** oracle `read-word-props` on `theme2.docx` para 1 = `Heading`/`One` → **Aptos Display 20pt**, while body
-  (para 2) = **Garamond 12**. `styles.xml`: `Heading1` paragraph style = clean `w:ascii="Garamond"` (theme binding deleted) ✓,
-  **but the linked `Heading1Char` character style still has `w:asciiTheme="majorHAnsi"`** — and character styles take
-  precedence for run fonts, so Word resolves the heading to the (unchanged) theme major font.
-- **Root cause:** `redefineNamedStyles` (theme apply) updates the paragraph styles + docDefaults but **not the linked
-  `*Char` character styles**, which keep their `asciiTheme` bindings. (Secondary: the same paragraph showed a run-level
-  font split — the trailing word read Garamond 12 — i.e. run-level inconsistency that may compound; the headline body-vs-heading
-  asymmetry is the solid, reproducible part.)
-- **Status:** logged (discovery-only). Themes is a headline Design feature and is visibly broken for headings in real Word.
-  Fix: also strip/redefine the linked character styles' theme font bindings on theme apply. Self-contained.
+### RB-040 [S3] Style (dropdown: APA/Chicago/IEEE/ISO 690/MLA/Turabian) — References › Citations & Bibliography
+- BUG-045 still live: style chosen pre-bibliography is dropped but toasts success. The style does NOT persist as a document/global default (only binds to an existing bibliography node). Word stores the style globally and applies to citations immediately. Style list also incomplete (no Harvard despite docs).
+- **Evidence:** commands.js:1073 H.style flyout updates WC.Ref.citationStyle (checkmark state works) then calls WC.PM.refSetCitationStyle(s) and ALWAYS toasts 'Citation style: '+s. references.ts:583-603 refSetCitationStyle finds the FIRST bibliography node and configures it; if NO bibliography exists yet it returns false (line 598) — but the toast fires regardless (commands.js:1073, unconditional). So picking a style before inserting a bibliography is silently lost while the UI claims success. Confirms BUG-045. Also the menu omits Harvard (FEATURES.md/REFERENCES_TAB.md claim Harvard) and the full Word style set ('and more' in ribbon-data).
+- **Confirm:** code-confirmed
 
-## Verified CLEAN (zoom) — spec hypotheses that did NOT reproduce
-- **Caret landing is accurate under fractional zoom** — `coordsAtPos`→`posAtCoords` round-trip drift = **0** for 5 words at
-  zoom 0.75 / 1.0 / 1.5. ✓ (VIEW-07 — not a bug)
-- **Image-resize overlay tracks the scaled image** — at 1.5×, overlay rect == image rect exactly (367,342,300,210). ✓ (VIEW-08 — not a bug)
+### RB-041 [S3] Table of Contents (dropdown: Automatic Table 1/2, Manual Table, Custom TOC…, Remove TOC) — References › Table of Contents
+- Re-confirms BUG-044 (Automatic Table 1/2 collapse, caption dropped) + BUG-057 (Manual Table harvests headings). Auto-TOC heading collection + page numbers need a paged render check (needsLive) — paged PE has toc-page-number.js so likely paints, but verify entries/leaders/page-nums on real sheets vs Word.
+- **Evidence:** commands.js:1002-1015 H.tableOfContents flyout. 'Automatic Table 1' → refInsertTOC({title:'Contents'}); 'Automatic Table 2' → refInsertTOC({title:'Table of Contents'}). references.ts:114-134 refInsertTOC NEVER reads opts.title (only showLevels/hyperlinks/rightAlign/includePageNumbers/tabLeader). So the two presets are byte-identical and the heading caption ('Contents'/'Table of Contents') is dropped — Word renders the chosen heading above the TOC. Confirms BUG-044 against current code. 'Manual Table' → refInsertTOC({showLevels:3}) which still harvests document headings instead of emitting literal 'Type chapter title' placeholder rows (confirms BUG-057). The real TOC engine (toc-entry-builder.ts, toc-page-number.js, toc-bookmark-sync.ts) IS substantial, so the auto-TOC core works; these are fidelity gaps on the gallery presets.
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
 
-## Verified CLEAN (References / Design / Insert export) — spec hypotheses that did NOT reproduce
-- **TOC field threads the level cap** — `refInsertTOC({showLevels:2})` exports `TOC \o "1-2" \u \h \z`; Word's F9 will
-  correctly limit to Heading 1–2. ✓ (REF-01/02 — not a bug)
-- **Caption exports correct SEQ structure** — `"Figure " + [SEQ Figure \* ARABIC] + ": A sample figure"`; the `: ` delimiter
-  and `\* ARABIC` are present, so Word repopulates "Figure 1: …". (Headless shows "Figure : …" = the known empty-number
-  placeholder, not a bug.) ✓ (REF-04)
-- **Citation field present** — `CITATION <sourceId>` exported (author-split b:Sources in customXml unverified, but the field is well-formed). ✓ (REF-06)
-- **Page Borders export is faithful** — `dePageBorders({style:'groove',width:3})` → `w:top val="threeDEngrave" sz="24" color="…"`
-  (3→24 eighths-pt, groove→threeDEngrave), and Remove clears it. (On-page render is the known deferral; export is correct.) ✓ (DSGN-07)
-- **WordArt docPr ids stay unique across reopen+insert** — `1001`/`1002`, no duplicate → no Word-repair risk. ✓ (IEX-14 — not a bug)
-- **Web + email hyperlinks export correctly** — `https://…` and `mailto:…` become External relationships with the right
-  targets. ✓ (only the internal `#anchor` case is wrong — BUG-012)
-- **Multi-table export is no longer Word-corrupt** — a 2-table doc (3×3 + 2×2) opens cleanly in Word (`read-table` exit 0,
-  both tables correct). The recon's "2+ tables → corrupt" base-export bug is resolved in the current tree (other agent's
-  `w:tblPr` child-order fix). ✓
-- **Word Count is accurate** — 5 words / 23 chars for the doc, `selWords:2` for a 2-word selection. ✓
-- **Bookmark insert pairs start+end** — `<w:bookmarkStart id=0 name=BM1>` + matching `<w:bookmarkEnd id=0>` wrap the
-  selection (the B1 fix); Go-To moves the caret to the bookmark vicinity. ✓
+### RB-042 [S3] Draft — View › Views
+- Same dead-#editor root cause as Web/Outline. Draft does not visibly differ from Print in the paged engine.
+- **Evidence:** commands.js:1488 H.draft -> WC.PM.setView('draft') + toast. Draft CSS editor.css:326-327 (#workarea.view-draft #editor {box-shadow:none; continuous; max-width:860px}) targets the dead #editor. In paged mode #pm-editor keeps painting page sheets, so Draft produces no visible continuous-flow change (only #ruler/.pagebreak-guide hide, but .pagebreak-guide doesn't exist in paged either). Word's Draft = continuous no-page-sheet simplified view. ribbon-data.js marks draft feasible:'yes' but it is effectively a no-op in the paged engine.
+- **Confirm:** needs-live-compare
+
+### RB-043 [S3] Outline — View › Views
+- Two defects: dead CSS (no outline rendering) + wrong setActiveView('print') literal. Plus no Outlining contextual tab (separate P2 gap). VIEW_TAB.md still advertises 'headings indented by level with markers, body dimmed' — stale claim.
+- **Evidence:** commands.js:1487 H.outline -> WC.PM.setView('outline') + setActiveView('print') + toast. (1) Visual: editor.css:330-337 outline rules (heading indent, ⊟/○ markers, body dimming) all target #editor (dead in paged) — #pm-editor/.superdoc-page get nothing, so headings are NOT indented, no markers, no dimming (BUG-007). (2) State bug: H.outline calls setActiveView('print') (commands.js:1487) so the status bar shows Print Layout active even though WC.PM.view==='outline'. Word's Outline view also adds an Outlining contextual tab with promote/demote/collapse — entirely absent.
+- **Confirm:** needs-live-compare
+
+### RB-044 [S3] Side to Side (page movement) — View › Page Movement
+- Same #editor-retirement root cause as the view modes. The flex rules touch #pages/#canvas (real) but the layout-producing rule is on dead #editor. Toggling does change scroll-snap on #canvas but produces no usable side-by-side.
+- **Evidence:** commands.js:1491 H.sideToSide adds 'movement-side' to #workarea. CSS editor.css:373-377: #workarea.movement-side #canvas/#pages get flex-direction:row, but the column/page-height that creates the book-flip lives on #workarea.movement-side #editor (editor.css:375 columns:var(--page-w)) — the DEAD #editor. In paged mode #pages contains exactly ONE child (#pm-editor, main.ts:35), so flex-direction:row on #pages/#canvas reorders nothing; the .superdoc-page sheets inside #pm-editor still stack vertically. Word flips pages horizontally with scroll-snap. Net: no horizontal page layout, no book-flip — visually dead in the paged engine.
+- **Confirm:** needs-live-compare
+
+### RB-045 [S3] Web Layout — View › Views
+- Re-confirmed against current paged code: view-mode CSS still points at the dead #editor id. Fix = re-point CSS to #pm-editor/.superdoc-page or have the engine switch layout mode. Grouped bug with Draft/Outline.
+- **Evidence:** commands.js:515 H.webLayout -> WC.PM.setView('web') (index.ts:486-491) only adds class 'view-web' to #workarea. ALL web-view CSS targets the RETIRED #editor node: editor.css:318-320 (#workarea.view-web #editor {...}). In the paged engine there is NO #editor element (main.ts:32-35 creates only #pm-editor; create-editor.ts:37 PresentationEditor wipes mountEl and paints .superdoc-page sheets). editor.css:408-413 sets body.pm-active #editor {visibility:hidden} anyway. No rule targets #pm-editor or .superdoc-page for view-web. Net: clicking Web Layout produces NO visible change — pages still render as print sheets. Word reflows to continuous full-width no-page-sheet. Matches stale prior BUG-007.
+- **Confirm:** needs-live-compare
+
+## S4 — 9
+
+### RB-046 [S4] Themes (gallery active checkmark) — Design › Document Formatting
+- Re-test of BUG-024 (cosmetic, code-confirmed without runtime). The applied font is correct via redefined styles; only the gallery's tick is wrong. Fix: drive isActive from the applied theme name (track last-applied), not the unused --doc-font var.
+- **Evidence:** commands.js:787 isActive=(t)=>firstFont(t.body)===currentDocFont(); commands.js:800 currentDocFont() reads getComputedStyle(documentElement)['--doc-font']. --doc-font is defined statically only in base.css:52 ('Aptos',Calibri,...) and is NEVER set by any apply path (grep for setProperty('--doc-font') across src/renderer returns zero writes; deApplyTheme/deApplyFonts in design.ts redefine named styles + docDefaults but do not touch --doc-font). So currentDocFont() always returns 'Aptos' -> the gallery checkmark is permanently stuck on the Office theme regardless of which theme is applied.
+- **Confirm:** code-confirmed
+
+### RB-047 [S4] Change Case (5 modes) — Home › Font
+- Length-preserving single PM transaction (good). Edge-case fidelity only.
+- **Evidence:** commands.js:1937 changeCaseMenu -> commands.ts:53 changeCase. Sentence-case regex commands.ts:58 needs whitespace after terminator ('end.New' not recapitalized); toggle-case commands.ts:59 is locale-naive (Turkish dotless i, German eszett); no Shift+F3 cycle binding. Confirms prior BUG-025. Core upper/lower/caps are correct.
+- **Confirm:** code-confirmed
+
+### RB-048 [S4] Increase Font Size (Ctrl+>) — Home › Font
+- Matches Word's jump-list 8..72 but does not continue above 72. Cosmetic for normal use.
+- **Evidence:** commands.js:50 stepFont(1) walks SIZES list (commands.js:13: 8..72) then sticks at 72; also bounded by the 96pt fork clamp. Word's grow-font continues past 72 (80,90,...) up to 1638. Minor jump-list ceiling deviation.
+- **Confirm:** code-confirmed
+
+### RB-049 [S4] Sort — Home › Paragraph
+- Date sorting is the only defect; otherwise faithful single-transaction reorder.
+- **Evidence:** commands.js:90/2081 sortDialog -> commands.ts:82 sortParagraphs. Type=Date maps to numeric parseFloat (commands.js:2095 numeric:type.value!=='Text'; commands.ts:102), so dates sort by leading number not chronologically. Confirms prior BUG-042. Text/Number sort correct; same-parent contiguity guard.
+- **Confirm:** code-confirmed
+
+### RB-050 [S4] Date & Time — Insert › Text
+- Dialog inserts a REAL DATE field, but the 'Update automatically' checkbox is IGNORED — it always inserts an updating field. Word inserts STATIC text when the box is unchecked (the dialog's default). Minor wrong-behavior.
+- **Evidence:** commands.js:482 H.dateTime / dispatch 1676 -> WC.Insert.dateTimeDialog (insert-features.js:186). The 'Update automatically' checkbox `upd` (line 190) is BUILT but never read; OK onClick (line 193) always calls WC.PM.xeDateTime(fmt) -> bridge/insert-exotica.ts:118 inserts a DATE field unconditionally. Word: unchecked = static text snapshot, checked = field. Also verify the format list (6 entries, line 188) aligns with the OK mapping array (6 entries, line 193).
+- **Confirm:** needs-runtime-probe+COM
+
+### RB-051 [S4] Rotate — Layout › Arrange
+- Core rotate/flip works and exports correctly (012). Only gap: arbitrary-angle 'More Rotation Options...' dialog missing (S4 minor). Pictures only. Live render of the rotated/flipped image worth a spot-check.
+- **Evidence:** commands.js:999 H.rotate -> Rotate Right/Left 90 (setImageTransform({rotate:+/-90})) + Flip Vertical/Horizontal (setImageTransform({flipV/flipH:true})). bridge/insert.ts:500-529 mutates transformData.rotation (a:xfrm rot, normalized mod 360) + horizontalFlip/verticalFlip (export emits truthy flips only). ENGINE_READY has 'rotate'. Spec-kit 012, oracle-validated (rotation=90/flip). MINOR: ribbon-data lists 'More Rotation Options...' (ribbon-data.js:1578) for an arbitrary-angle dialog -- NOT rendered in the handler menu. selectedImage is image-only (Word also rotates shapes/text boxes).
+- **Confirm:** needs-live-compare
+
+### RB-052 [S4] Insert Table of Figures (button) — References › Captions
+- BUG-031 (ToF double-insert stacks). Field code is correct; entries are layout-resolved. needsLive to confirm the paged PE paints ToF entries with page numbers vs Word. No dialog = gap.
+- **Evidence:** commands.js:1049 H.insertTableOfFigures → refInsertTOF('Figure'). references.ts:324-335 inserts a RAW TOC field 'TOC \c "Figure" \h \z' at the caret (inlineTarget). Correct field code. BUG-031: re-inserting STACKS a second ToF (no replace-in-place; index/ToA use a replace path but ToF does not). Also no Table-of-Figures dialog (label chooser, tab leader, show page numbers) — hardcoded to 'Figure'. Entries repopulate in Word on F9/open (ledger C).
+- **Confirm:** needs-runtime-probe+COM, needs-live-compare
+
+### RB-053 [S4] Word Count (review.proofing.word-count) — Review › Proofing
+- Cosmetic/minor fidelity. Whole-doc counts themselves are accurate (prior batch verified 5 words/23 chars). Selection-scoped count is the missing piece.
+- **Evidence:** dialogs.js:264-275 D.wordCount reads only WC.PM.counts() (whole-doc totals) and renders 6 fixed rows. There is no selection-aware 'Words: N of M' line. Word's dialog shows 'Words N' reflecting the current selection when text is selected (and the status bar shows 'N of M'). Matches prior BUG-049 [S4]; unchanged.
+- **Confirm:** code-confirmed
+
+### RB-054 [S4] Navigation Pane — View › Show
+- Pane works (headings nav). Two defects: (a) checkbox pressed-state never updates [S4 cosmetic 'lying control']; (b) missing Pages-thumbnails + search tabs [P2 gap]. Reads view.dom headings live so it reflects the doc.
+- **Evidence:** commands.js:528 H.navigationPane -> WC.Dialogs.navPane() (dialogs.js:297-313) toggles a #nav-pane taskpane listing h1/h2/h3 headings (click scrolls into view). The PANE works. BUG: the control is type:'checkbox' (ribbon-data.js:2558) but H.navigationPane never calls markChecked/markRadio and there is no registered state rule (no registerRibbonRule('navigationPane') anywhere; not in TOGGLE_MAP ribbon.js:35-40). So the checkbox visual NEVER reflects whether the pane is open — a 'lying control' (matches stale prior BUG-050). Also: headings-only — no Pages thumbnail tab and no Results/search tab that Word's Nav Pane has.
+- **Confirm:** code-confirmed
+
