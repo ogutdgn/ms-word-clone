@@ -3,6 +3,8 @@
 > The actionable output of the re-discovery campaign: the 127 confirmed findings grouped into **22 spec-kit-feature-sized buckets**, fix-order prioritized. Each bucket = one candidate Completeness-Pass feature (`/speckit-specify → … → ff-merge`). Detail per finding: [BUG-LEDGER.md](BUG-LEDGER.md) + [FEATURE-IMPROVEMENTS.md](FEATURE-IMPROVEMENTS.md).
 >
 > Severity (synthesis agent's tally): **S1:0 S2:19 S3:28 S4:14 S5:3 none:64**. Authoritative per-finding tally: **54 bugs** (0 S1 · 18 S2 · 27 S3 · 9 S4) **+ 73 gaps** (1 P1 · 21 P2 · 51 P3) = **127**.
+>
+> **Phase-2 hardening status (2026-06-25):** P1 bucket runtime confirmations done — ✅ **Read-only protection bypass** (probe: `editableProp=false` yet doc mutated + bold dispatched), ✅ **Page-count stuck** (`counts().pages=1` vs `coords.getPageCount()=2` after a break), ✅ **Mail-merge field codes** (probe: IF exports only its label — condition dropped; ADDRESSBLOCK/GREETINGLINE no switches; `MERGEFIELD First Name` unquoted — *worse* than the archived BUG-008). **Citation multi-author data-loss** = code-confirmed (dialog reads `authors[0]`); **Print/PDF** = Phase-3 (live). Probes: `C:/tmp/bughunt/probes/p2-*.js`. The remaining ~40 `needsRuntime` + 46 `needsLive` findings are unhardened (code-confirmed + adversarially verified).
 
 ## P1
 

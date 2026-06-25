@@ -7,6 +7,48 @@
 
 ---
 
+## 2026-06-25 (RE-DISCOVERY CAMPAIGN — bug-hunt corpus re-baselined; Completeness Pass P1 tier hardened)
+
+> **Branch:** `main` @ `f17537c` (+ uncommitted doc checkpoint), pushed through `f17537c`. **Phase: COMPLETENESS
+> PASS — now ACTIVE** (the post-migration roadmap's final phase). The stale 2026-06-17 bug-hunt corpus was
+> re-baselined against the current paged engine; fixing the P1 buckets is the next step.
+>
+> **Done this session (after 013):**
+> 1. **Re-discovery campaign roadmap** — `docs/bug-hunt/RE-DISCOVERY-CAMPAIGN.md` (`13b4394`): a re-runnable
+>    playbook (full re-baseline · hybrid headless-sweep + COM-oracle + live-spot-check · S1–S5/state/P1–P3
+>    taxonomy · 3-phase execution). Designed via the brainstorming skill (user: scope=full re-baseline,
+>    method=hybrid). Re-run it whenever the engine/features drift enough to distrust the ledger.
+> 2. **Phase 1 sweep** — a 102-agent Workflow (one finder per ribbon tab → adversarial verify on bug/wrong/stub
+>    claims → synthesis): **137 findings → 127 confirmed** (54 bugs [0 S1 · 18 S2 · 27 S3 · 9 S4] + 73 gaps
+>    [1 P1 · 21 P2 · 51 P3]) in **22 prioritized spec-kit-feature buckets**. KEY: the old layout-keystone cluster
+>    (border/shading/tall-image across a page seam) did NOT resurface — the paged engine retired it (validated
+>    re-running > re-triage).
+> 3. **Fresh corpus committed** (`f17537c`): archived the stale corpus → `docs/bug-hunt/archive-2026-06-17/`; wrote
+>    fresh `BUG-LEDGER.md` (54 bugs, RB-NNN + file:line evidence), `FEATURE-IMPROVEMENTS.md` (73 gaps),
+>    `FIDELITY-AUDIT.md` (per-tab tally + headline), `COMPLETENESS-BACKLOG.md` (the 22 buckets — the actionable
+>    input to the Completeness Pass), `findings-2026-06-25.json` (machine record). Pushed.
+> 4. **Phase 2 — P1 tier hardened** (runtime probes, `C:/tmp/bughunt/probes/p2-*.js`): ✅ **protection bypass**
+>    (read-only doesn't block the WC.PM/H[cmd] write path — `editableProp=false` yet doc mutated), ✅ **page-count
+>    stuck** (`counts().pages=1` vs `coords.getPageCount()=2`), ✅ **mail-merge field codes** (IF exports only its
+>    label — condition dropped; ADDRESSBLOCK/GREETINGLINE no switches; unquoted `MERGEFIELD First Name` — worse
+>    than archived BUG-008). Citation multi-author data-loss = code-confirmed (dialog reads `authors[0]`);
+>    print/PDF = Phase-3 (live).
+>
+> **The 5 P1 buckets (fix targets, fix-order):** (1) Read-only/editing-protection enforcement · (2) Mail-merge
+> field-code export · (3) Print & PDF output (chrome + non-Letter geometry) · (4) Citation source multi-author
+> data-loss · (5) Paged page-count accounting (`counts().pages`). Then P2 (9 buckets) / P3 (8 buckets).
+>
+> **NEXT:** the user chose **"finish P1 tier → start fixing."** P1 tier hardened ✅ → **start the Completeness Pass
+> fixes**, first feature = **P1 #1 protection bypass** (cleanest, self-contained: add an editable-aware guard at
+> the single `WC.PM` write seam so programmatic writes are rejected under read-only — likely NO-FORK in
+> `bridge/index.ts`). Each P1 bucket = one spec-kit feature (014, 015, …) via the loop: specify→plan→tasks→spike→
+> implement→verify (4 gates + Word-COM oracle + /code-review)→ff-merge→checkpoint. Remaining Phase-2 (~40
+> needsRuntime, several COM) + Phase-3 (46 needsLive, needs the dev machine) can interleave or follow.
+>
+> **Blockers/notes:** none. Findings are code-confirmed + adversarially verified; the unhardened ones carry
+> `needsRuntime`/`needsLive` flags. Background follow-ups still parked: `task_689a9083`, `task_cb2781a7`,
+> `task_3436e431` (the last is now folded into P1 bucket #5).
+
 ## 2026-06-25 (🏁 013 importer page-break fix COMPLETE + merged → main; loose ends CLOSED)
 
 > **Branch:** `main` @ `005cb9b` — **pushed to `origin/main` (in sync 0/0)**. Phase: POST-MIGRATION. All four

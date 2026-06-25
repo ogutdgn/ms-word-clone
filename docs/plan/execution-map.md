@@ -506,6 +506,13 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-25 (RE-DISCOVERY campaign — bug-hunt corpus re-baselined; COMPLETENESS PASS active)
+- [x] **Re-discovery campaign roadmap** (`13b4394`) — `docs/bug-hunt/RE-DISCOVERY-CAMPAIGN.md`, a re-runnable playbook (full re-baseline · hybrid method · 3 phases). Designed via brainstorming (user: full re-baseline + hybrid).
+- [x] **Phase 1 sweep** — 102-agent Workflow (per-tab finder → adversarial verify → synthesis): 137 findings → **127 confirmed** (54 bugs · 73 gaps · 0 S1) in **22 spec-kit-feature buckets**. The old layout-keystone cluster did NOT resurface (paged engine retired it).
+- [x] **Fresh corpus committed + pushed** (`f17537c`) — archived the stale 2026-06-17 corpus → `archive-2026-06-17/`; wrote fresh BUG-LEDGER (54 RB-NNN bugs) / FEATURE-IMPROVEMENTS (73 gaps) / FIDELITY-AUDIT / COMPLETENESS-BACKLOG (22 buckets) / findings-2026-06-25.json.
+- [x] **Phase 2 — P1 tier hardened** (runtime probes): protection bypass ✅, page-count stuck ✅, mail-merge field codes ✅ (all worse-or-equal to the archived findings); citation data-loss code-confirmed; print/PDF → Phase 3.
+- [ ] **NEXT:** **start the Completeness Pass fixes** — P1 #1 protection bypass (feature 014, no-fork editable guard at the WC.PM write seam) first, then P1 #2–5; remaining Phase-2 (~40 needsRuntime) + Phase-3 (46 needsLive) interleave/follow.
+
 ### 2026-06-25 (loose-ends session — main pushed; importer page-break + focus-jump scoped)
 - [x] **`general-done` → `main` + the page-break FIX shipped to `main`** (user-confirmed, prior sessions): HEAD `150a2b5` — `31a4033` (page break = a real `pageBreakBefore` paragraph, editable) + `150a2b5` (blank-page +2→+1, runaway-Enter via stripping pageBreakBefore from the split continuation [fork edit], edit-scroll-jump deferral). Gates: pm 420 / smoke 9 / roundtrip 27 / bundle 4. User live-confirmed "i can write now."
 - [x] **Pushed `main` → `origin/main`** (`487efbd..150a2b5`; in sync 0/0).
