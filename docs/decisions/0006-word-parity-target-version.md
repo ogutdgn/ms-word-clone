@@ -26,7 +26,7 @@ installed on the Windows dev PC:
 | **Product** | Microsoft 365 Apps (`O365ProPlusRetail`) — subscription, NOT perpetual 2019/2021/2024 |
 | **App** | Microsoft **Word for Windows** (NOT Word for Mac) |
 | **Version** | 16.0 |
-| **Build** | **16.0.20026.20168** (read 2026-06-17; COM `Application.Build` reports `16.0.20026`) |
+| **Build** | **16.0.20026.20182** (re-read 2026-06-25 from this PC; was `…20168` on 2026-06-17 — a routine Current Channel auto-update, identity unchanged; COM `Application.Build` reports `16.0.20026`) |
 | **Update channel** | **Current Channel** (`AudienceData = Production::CC`; CDN GUID `492350f6-3a01-4f97-b9c0-c7c6ddf67d60`) |
 | **Architecture** | **64-bit** (`Platform = x64`) |
 | **Language** | en-US (`ClientCulture = en-us`) |
