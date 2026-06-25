@@ -6,6 +6,7 @@ import { STYLE_NAME_TO_ID } from './style-names'
 import { installClipboard, pasteEvent } from './clipboard'
 import { installSearch } from './search'
 import { installInsert } from './insert'
+import { normalizeImportedPageBreaks } from './page-breaks-import'
 import { installTable } from './table'
 import { installReview } from './review'
 import { installReferences } from './references'
@@ -267,6 +268,12 @@ async function replaceEditor(source: ArrayBuffer, extra?: { html?: string }): Pr
             return false
           }
         }
+        // 013: a Word docx may carry an INLINE <w:br w:type="page"/> page break, which imports as an inline
+        // hardBreak{page} that never ends its paragraph → the new page owns no paragraph → no caret/click target
+        // (docs/PAGE_BREAK_ROOT_CAUSE.md). Normalize every such inline break into a real pageBreakBefore paragraph
+        // (the shipped insertPageBreak model) so imported pages are visible/editable. No-op when none are present
+        // (the html/text/csv leg produces none → harmless). Runs on the finalized doc, before the clean/sync below.
+        try { normalizeImportedPageBreaks(pres.editor) } catch { /* best-effort — never break Open */ }
         w.WC.view = pres.editor.view // identity-stable across replaceFile, but keep the WC seam in sync
         w.WC.PM.setClean()
         try { (w.WC.PM.__inkOverlay && w.WC.PM.__inkOverlay.relink && w.WC.PM.__inkOverlay.relink()) } catch { /* overlay re-link is best-effort */ }
@@ -366,6 +373,7 @@ export function preinstallBridge() {
     removeBookmark: () => false, renameBookmark: () => false,
     insertSymbol: () => false, insertEquation: () => false,
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
+    normalizeImportedPageBreaks: () => false, // 013: pre-mount stub (runs on docx Open via replaceEditor)
     insertColumnBreak: () => false, insertLineBreak: () => false,
     setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, setImageTransform: () => false, setImagePosition: () => false, setImageAlign: () => false, setImageGrayscale: () => false, // Phase 4b/4c + 012 pre-mount stubs (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
@@ -518,6 +526,8 @@ export function installBridge(editor: AnyEditor) {
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current
+  // 013: expose the inline-page-break normalizer for probes/tests (it runs automatically on docx Open).
+  PM.normalizeImportedPageBreaks = () => normalizeImportedPageBreaks(current)
   PM.openDocx = (bytes: Uint8Array | ArrayBuffer) => {
     const buf = bytes instanceof Uint8Array
       ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)

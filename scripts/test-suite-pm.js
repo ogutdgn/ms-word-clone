@@ -2620,6 +2620,49 @@
     let pbb = 0; doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pbb++; });
     return pbb === 1 || ('expected exactly 1 pageBreakBefore paragraph after Home+Enter, got ' + pbb);
   });
+  await t('[6] (013) importer: an inline page break normalizes to a pageBreakBefore paragraph', async () => {
+    // 013: a Word <w:br w:type="page"/> imports as an INLINE hardBreak{lineBreakType:'page'} inside a run — it
+    // never ends its paragraph, so the new page owns no paragraph fragment → no caret/click target → pruned
+    // (docs/PAGE_BREAK_ROOT_CAUSE.md). normalizeImportedPageBreaks() re-models it into the shipped, caret-hostable
+    // pageBreakBefore-paragraph model (the same model insertPageBreak uses), keeping run structure + text order.
+    // Reproduce the imported model in-session (an inline page break with text on both sides), then normalize.
+    setDoc('Hello'); await sleep(40);
+    { const _to = window.WC.editor.state.selection.to; window.WC.editor.commands.setTextSelection({ from: _to, to: _to }); } // collapse the selectAll → caret at end (object form; number form no-ops in this fork)
+    window.WC.editor.commands.insertContent({ type: 'hardBreak', attrs: { lineBreakType: 'page' } });
+    window.WC.editor.commands.insertContent('World'); await sleep(60);
+    let hadInline = false;
+    doc().descendants((n) => { if (n.type.name === 'hardBreak' && (n.attrs?.pageBreakType === 'page' || n.attrs?.lineBreakType === 'page')) hadInline = true; });
+    const changed = PM().normalizeImportedPageBreaks(); await sleep(60);
+    let inlineLeft = false, pbb = 0;
+    doc().descendants((n) => { if (n.type.name === 'hardBreak' && (n.attrs?.pageBreakType === 'page' || n.attrs?.lineBreakType === 'page')) inlineLeft = true; });
+    doc().forEach((n) => { if (n.type.name === 'paragraph' && n.attrs?.paragraphProperties?.pageBreakBefore) pbb++; });
+    const text = doc().textContent;
+    const ordered = text.indexOf('Hello') > -1 && text.indexOf('World') > text.indexOf('Hello');
+    return (hadInline && changed === true && !inlineLeft && pbb === 1 && ordered)
+      || ('hadInline=' + hadInline + ' changed=' + changed + ' inlineLeft=' + inlineLeft + ' pbb=' + pbb + ' text=' + JSON.stringify(text));
+  });
+  await t('[6] (013) importer: normalizeImportedPageBreaks is a no-op with no inline page breaks', async () => {
+    // Idempotent + safe to call on any import (the html/text/csv leg produces no inline page breaks): returns
+    // false and leaves the doc untouched.
+    setDoc('plain paragraph'); await sleep(40);
+    const changed = PM().normalizeImportedPageBreaks(); await sleep(40);
+    return (changed === false && doc().textContent.includes('plain paragraph'))
+      || ('changed=' + changed + ' text=' + JSON.stringify(doc().textContent));
+  });
+  await t('[6] (013) importer: a normalized break exports as <w:pageBreakBefore/>, not an inline <w:br page>', async () => {
+    // Model→export proof: after normalization the page break is a paragraph pageBreakBefore (Word reads it as a
+    // page break — COM-verified elsewhere), and the inline <w:br w:type="page"/> is gone. This is the round-trip
+    // trade-off Path A accepts (both are valid Word page breaks; matches the shipped insert-fix [4a]).
+    setDoc('Page one'); await sleep(40);
+    { const _to = window.WC.editor.state.selection.to; window.WC.editor.commands.setTextSelection({ from: _to, to: _to }); } // collapse the selectAll → caret at end (object form; number form no-ops in this fork)
+    window.WC.editor.commands.insertContent({ type: 'hardBreak', attrs: { lineBreakType: 'page' } });
+    window.WC.editor.commands.insertContent('Page two'); await sleep(60);
+    PM().normalizeImportedPageBreaks(); await sleep(60);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const hasPbb = /<w:pageBreakBefore/.test(xml);
+    const hasInlinePage = /<w:br[^>]*w:type="page"/.test(xml);
+    return (hasPbb && !hasInlinePage) || ('hasPbb=' + hasPbb + ' hasInlinePage=' + hasInlinePage);
+  });
   await t('[6] insertHr inserts a horizontalRule contentBlock node', async () => {
     setDoc('above line');
     PM().insertHr(); await sleep(80);
