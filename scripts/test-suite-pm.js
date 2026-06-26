@@ -6609,6 +6609,18 @@
     return /DATE\b/.test(xml) || 'no DATE field in document.xml: ' + xml.slice(0, 300);
   });
 
+  await t('[ins-dt] xeDateTime static (Update-automatically OFF) → literal text, NO DATE field', async () => {
+    // RB-050: when the dialog's "Update automatically" box is unchecked, real Word inserts the
+    // formatted date as STATIC TEXT, not a DATE field. The dialog passes {auto:false, text}.
+    setDoc('Today '); caretAfter('Today ');
+    if (typeof PM().xeDateTime !== 'function') return 'PM.xeDateTime missing (red)';
+    if (PM().xeDateTime('M/d/yyyy', { auto: false, text: 'June 26, 2026' }) !== true) return 'xeDateTime(static) refused (red)';
+    await sleep(80);
+    const xml = await exportDocumentXml();
+    if (/\bDATE\b/.test(xml)) return 'RB-050: static date wrongly inserted a DATE field: ' + xml.slice(0, 200);
+    return /June 26, 2026/.test(xml) || 'static date text not found in export: ' + xml.slice(0, 300);
+  });
+
   await t('[10ex] EXPORT: xeQuickPart(author) → AUTHOR field', async () => {
     setDoc('By '); caretAfter('By ');
     if (typeof PM().xeQuickPart !== 'function') return 'PM.xeQuickPart missing (red)';

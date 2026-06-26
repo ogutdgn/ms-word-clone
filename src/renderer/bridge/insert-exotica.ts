@@ -115,11 +115,25 @@ export function installInsertExotica(editor: AnyEditor) {
   }
 
   // ---- dateTime + quickParts (real fields) ----
-  function xeDateTime(fmt: string): boolean {
+  function xeDateTime(fmt: string, opts?: { auto?: boolean; text?: string }): boolean {
     const f = (fmt && String(fmt).trim()) || 'M/d/yyyy'
-    const ok = insertField('DATE \\@ "' + f + '"')
-    if (ok) toast('Date field inserted (updates on F9 / open).')
-    return ok
+    // RB-050: the Date & Time dialog's "Update automatically" checkbox. When checked — or when no opts
+    // are passed (legacy callers / field default) — insert a live DATE field. When unchecked, real Word
+    // inserts the formatted date as STATIC TEXT instead of a field.
+    const auto = !opts || opts.auto !== false
+    if (auto) {
+      const ok = insertField('DATE \\@ "' + f + '"')
+      if (ok) toast('Date field inserted (updates on F9 / open).')
+      return ok
+    }
+    // Prefer the dialog's already-formatted display string; fall back to today's locale date (never the
+    // raw format token f, which would insert a garbage literal like "M/d/yyyy").
+    const text = (opts && typeof opts.text === 'string' && opts.text.trim()) ? opts.text : new Date().toLocaleDateString()
+    try {
+      const ok = editor.chain().insertContent(text).run() === true
+      if (ok) { refocus(); toast('Date inserted as static text.') }
+      return ok
+    } catch { return false }
   }
   function xeQuickPart(kind: string): boolean {
     const MAP: Record<string, string> = {

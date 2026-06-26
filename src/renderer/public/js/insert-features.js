@@ -190,7 +190,7 @@
     const upd = el('input', { type: 'checkbox' });
     const body = el('div', {}, [el('div', { style: { fontSize: '12px', color: '#666' }, text: 'Available formats:' }), list, el('label', { style: { display: 'flex', gap: '6px', marginTop: '8px' } }, [upd, el('span', { text: 'Update automatically' })])]);
     WC.dialog({ title: 'Date and Time', width: '420px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { WC.PM.xeDateTime(['MMMM d, yyyy', 'M/d/yyyy', 'yyyy-MM-dd', 'dddd, MMMM d, yyyy', 'h:mm AM/PM', 'M/d/yyyy h:mm AM/PM'][+list.value] || 'M/d/yyyy'); } },
+      { label: 'OK', primary: true, onClick: () => { const i = +list.value; const fmt = ['MMMM d, yyyy', 'M/d/yyyy', 'yyyy-MM-dd', 'dddd, MMMM d, yyyy', 'h:mm AM/PM', 'M/d/yyyy h:mm AM/PM'][i] || 'M/d/yyyy'; WC.PM.xeDateTime(fmt, { auto: upd.checked, text: fmts[i] }); } },
       { label: 'Cancel' },
     ] });
   };
