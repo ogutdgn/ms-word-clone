@@ -75,6 +75,9 @@
         if (!document.getElementById('backstage').hidden) WC.Backstage.close();
         return;
       }
+      // Shift+F3 — Word's Change Case keyboard cycle (no Ctrl): lowercase → UPPERCASE →
+      // Capitalize Each Word, advancing from the selection's current case (stateless).
+      if (e.key === 'F3' && e.shiftKey && !mod && !e.altKey) { e.preventDefault(); WC.shiftF3Cycle && WC.shiftF3Cycle(); return; }
       if (!mod) return;
       const shift = e.shiftKey;
       const applyStyleChord = (name) => () => { if (WC.PM.ready && !WC.PM.applyStyleByName(name)) WC.toast('Style “' + name + '” is not available in this document.'); };
@@ -131,6 +134,21 @@
     const cmd = dir > 0 ? 'increaseFontSize' : 'decreaseFontSize';
     WC.Commands.run({ cmd, label: cmd });
   }
+  // Shift+F3 case cycle. Reads the selection's text and advances: all-lowercase → UPPERCASE;
+  // all-uppercase → Capitalize Each Word; anything else (mixed/capitalized) → lowercase. Requires
+  // a non-empty selection (v1; Word also cycles the caret's word). Exposed for the keybinding + tests.
+  WC.shiftF3Cycle = function () {
+    if (!(WC.PM && WC.PM.ready) || !WC.view) return false;
+    const st = WC.view.state; const { from, to, empty } = st.selection;
+    if (empty) return false;
+    const txt = st.doc.textBetween(from, to, ' ', ' ');
+    if (!txt) return false;
+    const isLower = txt === txt.toLowerCase() && txt !== txt.toUpperCase();
+    const isUpper = txt === txt.toUpperCase() && txt !== txt.toLowerCase();
+    const mode = isLower ? 'upper' : isUpper ? 'titlecase' : 'lower';
+    WC.PM.changeCase(mode);
+    return mode;
+  };
 
   function bindMisc() {
     // keep title in sync with dirty state

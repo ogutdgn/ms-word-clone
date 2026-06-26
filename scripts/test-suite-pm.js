@@ -342,6 +342,20 @@
     const want = labels.map((l) => l[1]);
     return (vals.join(',') === want.join(',')) || ('w:u vals mismatch (got [' + vals.join(',') + '] want [' + want.join(',') + '])');
   });
+  await t('[home] Underline Color → <w:u w:color>; menu adds More Underlines + extra styles', async () => {
+    setDoc('ulcolorX'); selectText('ulcolorX');
+    WC.PM.chain([['setUnderline'], ['setMark', 'underline', { underlineColor: '#FF0000' }]]); await sleep(40);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const u = (xml.match(/<w:u\b[^>]*\/?>/) || [])[0] || '';
+    if (!/w:color="FF0000"/i.test(u)) return 'underline color not in w:u: ' + (u || '(no w:u)');
+    window.WC.Commands.dropdown({ cmd: 'underline', type: 'split' }, document.body); await sleep(30);
+    const labels = Array.from(document.querySelectorAll('.flyout .fly-item .fi-label')).map((n) => n.textContent.trim());
+    window.WC.closeFlyouts();
+    if (!labels.includes('More Underlines…')) return 'menu missing "More Underlines…"';
+    if (!labels.includes('Underline Color')) return 'menu missing "Underline Color"';
+    if (!labels.includes('Thick')) return 'menu missing extra style "Thick"';
+    return true;
+  });
   await t('[1] EXPORT: font color → <w:color w:val="FF0000"> (Word: Font.Color = 255, no BGR swap)', async () => {
     // The font-color MARK is covered above; this guards the EXPORT — setColor must emit <w:color w:val>
     // with the bare hex (no '#'). Applied to the WHOLE paragraph (uniform run). Word COM-validated:
@@ -409,6 +423,17 @@
       const got = doc().textContent;
       if (got !== want) return 'sentence("' + input + '") = "' + got + '" want "' + want + '"';
     }
+    return true;
+  });
+  await t('[home] Shift+F3 cycles case: lower→UPPER→Title→lower (RB-047)', async () => {
+    if (typeof window.WC.shiftF3Cycle !== 'function') return 'WC.shiftF3Cycle missing';
+    setDoc('hello there'); window.WC.editor.commands.selectAll();
+    window.WC.shiftF3Cycle(); await sleep(20); const t1 = doc().textContent;
+    window.WC.editor.commands.selectAll(); window.WC.shiftF3Cycle(); await sleep(20); const t2 = doc().textContent;
+    window.WC.editor.commands.selectAll(); window.WC.shiftF3Cycle(); await sleep(20); const t3 = doc().textContent;
+    if (t1 !== 'HELLO THERE') return 'step1 lower→UPPER = "' + t1 + '"';
+    if (t2 !== 'Hello There') return 'step2 UPPER→Title = "' + t2 + '"';
+    if (t3 !== 'hello there') return 'step3 mixed→lower = "' + t3 + '"';
     return true;
   });
   await t('[home] Change Case "tOGGLE cASE" matches Word per-character flip (RB-047 parity guard)', async () => {
@@ -1025,6 +1050,19 @@
     const order = /apple[\s\S]*banana[\s\S]*cherry/.test(v().dom.textContent);
     PM().cmd('undo'); await sleep(50);
     return order && /banana[\s\S]*cherry[\s\S]*apple/.test(v().dom.textContent);
+  });
+  await t('[home] Sort multi-key: Field 2 (Number) then Field 1 (Text) — Word "Then by"', async () => {
+    // Field 2 (Number) is primary: the two 25s come before the 30; the 25s tie, so the secondary
+    // key (Field 1, Text) orders Jones<Smith. Multi-key → Jones,25 / Smith,25 / Adams,30. A
+    // single-key whole-text sort would instead give Adams<Jones<Smith — so this discriminates.
+    setDocs(['Smith,25', 'Adams,30', 'Jones,25']);
+    window.WC.editor.commands.selectAll(); await sleep(60);
+    PM().sortParagraphs({ sep: ',', keys: [{ field: 2, type: 'number', ascending: true }, { field: 1, type: 'text', ascending: true }] });
+    await sleep(80);
+    const txt = doc().textContent;
+    const ai = txt.indexOf('Adams'), ji = txt.indexOf('Jones'), si = txt.indexOf('Smith');
+    if (!(ai >= 0 && ji >= 0 && si >= 0)) return 'missing records: ' + JSON.stringify(txt);
+    return (ji < si && si < ai) ? true : 'multi-key order wrong (want Jones<Smith<Adams): ' + JSON.stringify(txt);
   });
   await t('[2] bullets via run() creates a list paragraph + presses the toggle', async () => {
     setDoc('bullet probe text'); selectText('bullet');

@@ -2105,22 +2105,33 @@
   }
   function sortDialog() {
     WC.PM.captureSelection(); // the dialog steals focus; restore before sorting
-    const type = el('select', {}, ['Text', 'Number', 'Date'].map((t) => el('option', { text: t })));
-    const dir = el('select', {}, ['Ascending', 'Descending'].map((t) => el('option', { text: t })));
     const hdr = el('input', { type: 'checkbox' });
-    const body = el('div', {}, [
-      el('div', { class: 'row' }, [el('label', { text: 'Sort by:', style: { width: '70px' } }), el('span', { text: 'Paragraphs' })]),
-      el('div', { class: 'row' }, [el('label', { text: 'Type:', style: { width: '70px' } }), type, el('label', { style: { marginLeft: '12px' } }, [dir])]),
+    const TYPE_MAP = { Text: 'text', Number: 'number', Date: 'date' };
+    // Word's Sort dialog: a "Sort by" key + up to two "Then by" keys. Each key chooses a
+    // field (Paragraphs = whole line, or a 1-based tab-separated Field 1–3), a Type, and a
+    // direction. "Then by" rows are optional (field = "(none)").
+    const mkRow = (label, withNone) => {
+      const fieldOpts = (withNone ? ['(none)'] : []).concat(['Paragraphs', 'Field 1', 'Field 2', 'Field 3']);
+      const field = el('select', {}, fieldOpts.map((f) => el('option', { text: f })));
+      const type = el('select', {}, ['Text', 'Number', 'Date'].map((t) => el('option', { text: t })));
+      const dir = el('select', {}, ['Ascending', 'Descending'].map((t) => el('option', { text: t })));
+      const row = el('div', { class: 'row' }, [el('label', { text: label, style: { width: '70px' } }), field, type, el('label', { style: { marginLeft: '8px' } }, [dir])]);
+      return { row, field, type, dir };
+    };
+    const k1 = mkRow('Sort by:', false), k2 = mkRow('Then by:', true), k3 = mkRow('Then by:', true);
+    const body = el('div', {}, [k1.row, k2.row, k3.row,
       el('div', { class: 'row' }, [el('label', {}, [hdr, el('span', { text: ' My list has a header row' })])]),
     ]);
-    WC.dialog({ title: 'Sort Text', width: '440px', body, footer: [
+    const keyOf = (k) => (k.field.value === '(none)' ? null : {
+      field: k.field.value === 'Paragraphs' ? 0 : parseInt(k.field.value.replace('Field ', ''), 10),
+      type: TYPE_MAP[k.type.value], ascending: k.dir.value === 'Ascending',
+    });
+    WC.dialog({ title: 'Sort Text', width: '480px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        // Type maps to the right comparator: Number → numeric (parseFloat), Date → chronological
-        // (Date.parse), Text → locale compare. (Was: Date reused the numeric path → BUG-042.)
-        const opts = { ascending: dir.value === 'Ascending', numeric: type.value === 'Number', date: type.value === 'Date', header: hdr.checked };
-        // Word keeps Sort enabled and silently sorts whatever exists (a single
-        // paragraph is a no-op) — no "select multiple paragraphs" toast.
-        WC.PM.withSelection(() => { WC.PM.sortParagraphs(opts); });
+        // Multi-key: collect the Sort-by + any Then-by keys (Number→numeric, Date→chronological
+        // [BUG-042], Text→locale). Word silently sorts whatever exists (1 paragraph = a no-op).
+        const keys = [keyOf(k1), keyOf(k2), keyOf(k3)].filter(Boolean);
+        WC.PM.withSelection(() => { WC.PM.sortParagraphs({ keys, header: hdr.checked }); });
       } },
       { label: 'Cancel' },
     ] });
@@ -2150,12 +2161,27 @@
   }
 
   function underlineMenu(node) {
-    const styles = [['Single', 'solid'], ['Double', 'double'], ['Dotted', 'dotted'], ['Dashed', 'dashed'], ['Wavy', 'wavy']];
-    const UL_TYPE = { solid: 'single', double: 'double', dotted: 'dotted', dashed: 'dash', wavy: 'wave' }; // OOXML w:u values
+    // The first 5 labels/w:u values are pinned (an export test asserts [single,double,dotted,dash,wave]);
+    // the rest round out Word's underline gallery. Values are OOXML w:u tokens.
+    const styles = [['Single', 'single'], ['Double', 'double'], ['Dotted', 'dotted'], ['Dashed', 'dash'], ['Wavy', 'wave'],
+      ['Thick', 'thick'], ['Dot Dash', 'dotDash'], ['Dot Dot Dash', 'dotDotDash'], ['Words only', 'words']];
     WC.flyout(node, (fly) => {
-      styles.forEach(([label, s]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
-        WC.PM.chain([['setUnderline'], ['setMark', 'underline', { underlineType: UL_TYPE[s] }]]);
+      fly.appendChild(WC.flyItem('No Underline', { onClick: () => WC.PM.cmd('unsetUnderline') }));
+      styles.forEach(([label, w]) => fly.appendChild(WC.flyItem(label, { onClick: () => {
+        WC.PM.chain([['setUnderline'], ['setMark', 'underline', { underlineType: w }]]);
       } })));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('More Underlines…', { onClick: () => WC.Dialogs.font() }));
+      // Underline Color — opens a color palette that sets w:u/@w:color (keeps the current style;
+      // turns on single if no underline yet). 'inherit'/Automatic clears the colour back to auto.
+      const colorItem = WC.flyItem('Underline Color', { onClick: () => {
+        WC.PM.captureSelection();
+        WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => {
+          WC.PM.withSelection(() => WC.PM.chain([['setUnderline'], ['setMark', 'underline', { underlineColor: color === 'inherit' ? null : color }]]));
+        }, { autoLabel: 'Automatic', automatic: true })));
+      } });
+      colorItem.appendChild(el('span', { class: 'caret', html: WC.icon('chevron_down', 8), style: { marginLeft: 'auto', transform: 'rotate(-90deg)' } }));
+      fly.appendChild(colorItem);
     });
   }
 

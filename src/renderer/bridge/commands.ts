@@ -55,6 +55,10 @@ export function installCommands(editor: AnyEditor) {
       if (mode === 'lower') return t.toLowerCase()
       if (mode === 'upper') return t.toUpperCase()
       if (mode === 'caps') return t.replace(/\b\w/g, (m) => m.toUpperCase())
+      // Proper Title Case (lowercase the rest) — the Shift+F3 cycle's "Capitalize Each Word" step,
+      // which must produce "Hello There" from "HELLO THERE" (distinct from the menu's caps which
+      // only capitalizes the first letter and leaves the rest).
+      if (mode === 'titlecase') return t.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())
       // Word's wdTitleSentence (COM-verified, RB-047): capitalize the first letter of each
       // sentence (string start, or after .!? + WHITESPACE) and leave the rest AS-IS — it does
       // NOT lowercase the rest, and a terminator with NO following space ("end.New") is NOT a
@@ -169,7 +173,7 @@ export function installCommands(editor: AnyEditor) {
   // Paragraph sort as ONE PM transaction (no engine command — legacy sortDialog
   // reordered DOM siblings). Restricted to contiguous siblings of the first selected
   // paragraph's parent, mirroring legacy sortSelection's same-parent guard.
-  function sortParagraphs(opts: { ascending?: boolean; numeric?: boolean; date?: boolean; header?: boolean } = {}): boolean {
+  function sortParagraphs(opts: { ascending?: boolean; numeric?: boolean; date?: boolean; header?: boolean; keys?: Array<{ field?: number; type?: 'text' | 'number' | 'date'; ascending?: boolean }>; sep?: string } = {}): boolean {
     const { state } = editor
     const { from, to } = state.selection
     const paras: Array<{ node: any; pos: number }> = []
@@ -191,12 +195,26 @@ export function installCommands(editor: AnyEditor) {
     // Date reused the numeric parseFloat path). Unparseable dates sort as 0 (epoch) — last-ish,
     // matching Word's lenient ordering of non-dates.
     const asDate = (s: string) => { const t = Date.parse(String(s).trim()); return Number.isNaN(t) ? 0 : t }
+    // Multi-key sort (Word's "Sort by" + up to two "Then by"). A key's `field` selects a
+    // tab-separated column (1-based; 0/undefined = the whole paragraph, Word's "Paragraphs"); a tie
+    // on one key falls through to the next. Back-compat: with no `keys`, the legacy single
+    // numeric/date/text/ascending opts are used as the sole key.
+    const sep = opts.sep || '\t'
+    const fieldOf = (text: string, field?: number) => (!field ? text.trim() : (text.split(sep)[field - 1] ?? '').trim())
+    const cmpVal = (av: string, bv: string, type?: string) => {
+      if (type === 'date') return asDate(av) - asDate(bv)
+      if (type === 'number') return (parseFloat(av) || 0) - (parseFloat(bv) || 0)
+      return av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' })
+    }
+    const keys = opts.keys && opts.keys.length
+      ? opts.keys
+      : [{ field: 0, type: (opts.date ? 'date' : opts.numeric ? 'number' : 'text') as 'text' | 'number' | 'date', ascending: opts.ascending !== false }]
     const cmp = (a: any, b: any) => {
-      let r: number
-      if (opts.date) r = asDate(a.node.textContent) - asDate(b.node.textContent)
-      else if (opts.numeric) r = (parseFloat(a.node.textContent) || 0) - (parseFloat(b.node.textContent) || 0)
-      else r = a.node.textContent.localeCompare(b.node.textContent, undefined, { numeric: true, sensitivity: 'base' })
-      return opts.ascending === false ? -r : r
+      for (const k of keys) {
+        const r = cmpVal(fieldOf(a.node.textContent, k.field), fieldOf(b.node.textContent, k.field), k.type)
+        if (r !== 0) return k.ascending === false ? -r : r
+      }
+      return 0
     }
     const sorted = head.concat(toSort.slice().sort(cmp))
     editor.view?.dispatch(state.tr.replaceWith(start, end, sorted.map((p: any) => p.node)))
