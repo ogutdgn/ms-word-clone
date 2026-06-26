@@ -506,6 +506,11 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-26 (COMPLETENESS PASS — Home tab: 018 Find/Replace advanced + ultracode "finish all")
+- [x] **🏁 018 Find/Replace advanced COMPLETE + ff-merged → main** (`feat(home)` @ `dd33a2a`, pushed): special chars ^p/^t/^l (NO-FORK regexSource seam), Go To Page (NO-FORK coords.pageIndexOfPos), find-by-formatting (NO-FORK navigation `findFormatting`), wildcard {n,m}/() (2 minimal additive fork edits). Built off a 5-reader spike Workflow. Gates pm 473 / smoke 9 / roundtrip 27 / bundle 4. /code-review high → 8 fixes.
+- [x] **User directive: "finish all" + ultracode ON** → autonomous workflow-orchestrated execution of the remaining Home direct-TDD features.
+- [ ] **IN PROGRESS:** the 7 direct-TDD Home features (Show/Hide marks · Font Color Gradient · Create-a-Style · Selection Pane · Text Effects Options · Borders Inside-Vertical/Apply-to-Text · Font-name catalog). A 7-reader mapping Workflow is planning all of them. Then final Home regression sweep → INSERT tab.
+
 ### 2026-06-26 (COMPLETENESS PASS — Home tab: 017 List authoring)
 - [x] **🏁 017 List authoring COMPLETE + ff-merged → main** (`feat(home)` @ `4a1c1a9`, pushed): Bullets/Numbering/Multilevel dropdowns gain Change List Level + Set Numbering Value… + Define New Bullet/Number Format/Multilevel dialogs. **NO-FORK** — new `bridge/lists.ts` (`setNumberingValue`/`continueListNumbering`) reuses the fork's restartNumbering/continueNumbering/changeListLevelBy/applyListDefinition; arbitrary Set-Value = restart + `ListHelpers.setLvlOverride({startOverride:N})` (synchronous invalidation, range-validated 0..32767).
 - [x] **Spike (code-read):** confirmed the fork pre-registers every numbering primitive → NO fork edit needed (the ONLY net-new logic was arbitrary Set-Numbering-Value). Recorded in `specs/017-list-authoring/spec.md`.

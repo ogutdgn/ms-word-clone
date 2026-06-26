@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-26 (COMPLETENESS PASS — HOME TAB: 018 Find/Replace advanced merged; ultracode "finish all")
+
+> **Branch:** `main` @ `dd33a2a`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab. User directive
+> "just go ahead and finish all" + **ultracode ON** → autonomous, exhaustive, workflow-orchestrated.
+>
+> **🏁 018 Find/Replace advanced — DONE, merged** (`feat(home)` @ `dd33a2a`, spec-kit `specs/018-find-replace-advanced/`).
+> Built off an exhaustive 5-reader spike Workflow. Four sub-parts:
+> - **Special characters** ^p/^t/^l/^^ in Find — NO-FORK bridge `specialToRegexSource` → a precise RegExp via the new
+>   `options.regexSource` seam.
+> - **Go To Page** — NO-FORK `coords.pageIndexOfPos` (paged PE.computeCaretLayoutRect, inverse of getCurrentPage);
+>   scans textblocks for the first on page N; fails honestly when layout isn't ready (no jump-to-doc-end).
+> - **Find by formatting** — NO-FORK navigation-based `findFormatting(text, filter)` (bold/italic/underline + font
+>   family/size); matches a mark only when truly ON (skips imported w:val="0"/none), font by PRIMARY family.
+> - **Wildcards {n,m} + ()** in Find — **2 minimal additive FORK EDITS** (user-pre-authorized, marked): extend
+>   `SearchIndex.wildcardToRegExp` ({n,m}/() pass-through, literal parens stay \() + `search.js setSearchSession`
+>   (regexSource path + try/catch so a malformed pattern degrades to 0 matches, not a throw). Existing operators
+>   unchanged; fork SearchIndex.test.js 19/0.
+> - **Find pane UI** (dialogs.js): Special menu (last-focused box) + Format menu (Bold/Italic/Underline/Font…);
+>   format mode is navigation-only + carries Match Case + blocks Replace (no format-aware replace v1).
+> - **No COM** (navigation/search — no .docx output). Gates: **pm 473** / smoke 9 / roundtrip 27 / bundle 4.
+>   **/code-review high → 8 fixes** (mark-on-vs-presence, font primary-family, Go-To-Page honest-fail, format-mode
+>   highlight/replace/case). v1 limits documented in spec: backref-replace, ^p-in-replace, Go To Line, ignoreDiacritics
+>   + special-char, cross-text-node phrase.
+>
+> **HOME PROGRESS:** ✅ 7 bugs · ✅ 015 · ✅ batch-1 · ✅ 016 · ✅ 017 · ✅ **018**. **REMAINING (the direct-TDD batch,
+> in progress under ultracode):** Show/Hide ¶ full marks · Font Color Gradient (substantial) · Create-a-Style ·
+> Selection Pane · Text Effects Options dialogs · Borders Inside-Vertical + Apply-to-Text · Font-name installed-font
+> catalog. A 7-reader mapping Workflow is running to plan all of them. Then final Home regression sweep → INSERT tab.
+>
+> **LESSON (018):** the fork's search engine already had the wildcard regex translator + a flexible match index —
+> the spike found the precise extension points (regexSource seam, wildcardToRegExp branches) so the "advanced" surface
+> was mostly NO-FORK + two tiny additive edits. Workflow-spike-first paid off on a 4-part feature.
+
 ## 2026-06-26 (COMPLETENESS PASS — HOME TAB: 017 List authoring merged)
 
 > **Branch:** `main` @ `4a1c1a9`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab, "build all
