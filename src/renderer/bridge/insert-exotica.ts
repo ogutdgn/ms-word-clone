@@ -189,7 +189,18 @@ export function installInsertExotica(editor: AnyEditor) {
   }
 
   // ---- honest-degrade no-op toasts (no fork construction path; recorded follow-ups) ----
-  function xeChart(): boolean { toast('Charts (live c:chartSpace + data) need a chart subsystem — available in a future update.'); return true }
+  // Interim chart: the dialog computes an SVG (Insert.chartSVG) and passes it here; insert it as a
+  // static image (the xeIcon data-URL pattern). A live c:chartSpace + embedded workbook is a separate
+  // subsystem (NEEDS-USER) — this stops the control from silently inserting nothing.
+  function xeChart(svg?: string): boolean {
+    if (typeof svg === 'string' && svg.trim()) {
+      try {
+        const src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
+        return pm()?.insertImage?.({ src, alt: 'Chart' }) === true
+      } catch { return false }
+    }
+    toast('Charts (live c:chartSpace + data) need a chart subsystem — available in a future update.'); return true
+  }
   function xeSmartArt(): boolean { toast('SmartArt (dgm: diagrams) needs a diagram subsystem — available in a future update.'); return true }
   function xeObject(): boolean { toast('Embedding OLE objects needs a host runtime — not available in this clone.'); return true }
   function xeSignatureLine(): boolean { toast('Signature lines need the signature-provider subsystem — available in a future update.'); return true }

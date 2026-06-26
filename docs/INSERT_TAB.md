@@ -19,7 +19,7 @@ _Every Insert-tab control is implemented and working. Verified by 27 dedicated c
 - ✅ searchable icon picker -> inline SVG — **Icons**
 - 🟡 documented (no 3D runtime) — **3D Models**
 - ✅ List/Process/Cycle/Hierarchy (editable) — **SmartArt**
-- ✅ Column/Bar/Line/Pie from entered data -> inline SVG — **Chart**
+- 🟡 Column/Bar/Line/Pie from entered data -> **static** chart image (interim; a live `c:chartSpace` + embedded workbook is a separate subsystem, not yet built) — **Chart**
 - ✅ Screen Clipping via desktopCapturer — **Screenshot**
 
 ## Add-ins

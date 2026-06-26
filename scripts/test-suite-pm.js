@@ -6637,6 +6637,18 @@
     return (rows === 2 && cells === 6) || ('expected 2 rows / 6 cells, got ' + rows + ' / ' + cells);
   });
 
+  await t('[ins-chart] Chart: computed SVG inserts a real image (w:drawing), not a toast', async () => {
+    // The Insert > Chart dialog built an SVG via Insert.chartSVG but xeChart() only toasted, so nothing
+    // inserted. xeChart(svg) now inserts the SVG as a static image (interim until a live chart engine).
+    setDoc('x'); caretAfter('x');
+    if (typeof PM().xeChart !== 'function') return 'PM.xeChart missing (red)';
+    const svg = '<svg viewBox="0 0 10 10"><rect width="10" height="10" fill="#4472C4"/></svg>';
+    if (PM().xeChart(svg) !== true) return 'xeChart(svg) refused (red)';
+    await sleep(120);
+    const xml = await exportDocumentXml();
+    return /<w:drawing\b|<a:blip\b|<pic:pic\b/.test(xml) || 'no drawing/image in export after chart insert: ' + xml.slice(0, 200);
+  });
+
   await t('[10ex] EXPORT: xeQuickPart(author) → AUTHOR field', async () => {
     setDoc('By '); caretAfter('By ');
     if (typeof PM().xeQuickPart !== 'function') return 'PM.xeQuickPart missing (red)';

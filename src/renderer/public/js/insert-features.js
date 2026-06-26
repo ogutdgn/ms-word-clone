@@ -191,7 +191,13 @@
       el('div', { style: { fontSize: '12px', color: '#666', margin: '6px 0' }, text: 'Data (label, value per line):' }), data,
     ]);
     WC.dialog({ title: 'Insert Chart', width: '460px', body, footer: [
-      { label: 'OK', primary: true, onClick: () => { WC.PM.xeChart(); } },
+      { label: 'OK', primary: true, onClick: () => {
+        const rows = data.value.split('\n').map((l) => l.split(',')).filter((p) => p.length >= 2 && p[0].trim()).map((p) => [p[0].trim(), parseFloat(p[1]) || 0]);
+        if (!rows.length) { WC.toast('Enter chart data as "label, value" per line.'); return; }
+        const svgHtml = Insert.chartSVG(type.value, rows);
+        const m = svgHtml.match(/<svg[\s\S]*<\/svg>/);
+        WC.PM.xeChart(m ? m[0] : svgHtml);
+      } },
       { label: 'Cancel' },
     ] });
   };
