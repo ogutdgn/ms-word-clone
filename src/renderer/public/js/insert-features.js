@@ -41,8 +41,38 @@
     rows = Math.max(1, Math.min(1000, rows | 0)); cols = Math.max(1, Math.min(1000, cols | 0));
     WC.PM.insertTable({ rows, cols });
   };
-  Insert.convertTextToTable = function () {
-    WC.toast('Convert Text to Table is available in Table Tools (slice 6b)');
+  // Convert the selected paragraphs into a table. Called two ways:
+  //  - with an explicit delimiter string (the dialog's "Separate text at" choice, or programmatically)
+  //    → converts immediately via the real WC.PM.textToTable bridge verb;
+  //  - with no argument → opens Word's "Convert Text to Table" dialog to pick the separator.
+  Insert.convertTextToTable = function (delimiter) {
+    if (typeof delimiter === 'string') {
+      const ok = WC.PM.textToTable(delimiter);
+      if (!ok) WC.toast('Select the paragraphs of text to convert first.');
+      return ok;
+    }
+    // Pre-select the separator the way Word does: Tabs if present, else Commas, else Paragraphs.
+    let hasTab = false, hasComma = false;
+    try { const ed = WC.PM.getEditor(); const s = ed.state, sel = s.selection; const txt = s.doc.textBetween(sel.from, sel.to, '\n', ' '); hasTab = txt.indexOf('\t') >= 0; hasComma = txt.indexOf(',') >= 0; } catch (_) { /* no selection */ }
+    const def = hasTab ? 'tab' : hasComma ? 'comma' : 'para';
+    const radio = (val) => { const i = el('input', { type: 'radio', name: 'wc-ctt-sep', value: val }); if (val === def) i.checked = 'checked'; return i; };
+    const row = (val, label) => el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center', margin: '3px 0' } }, [radio(val), el('span', { text: label })]);
+    const other = el('input', { type: 'text', maxlength: '1', style: { width: '36px' } });
+    const body = el('div', {}, [
+      el('div', { style: { fontSize: '12px', color: '#666', marginBottom: '6px' }, text: 'Separate text at:' }),
+      row('para', 'Paragraphs'), row('tab', 'Tabs'), row('comma', 'Commas'),
+      el('label', { style: { display: 'flex', gap: '6px', alignItems: 'center', margin: '3px 0' } }, [el('input', { type: 'radio', name: 'wc-ctt-sep', value: 'other' }), el('span', { text: 'Other:' }), other]),
+    ]);
+    WC.dialog({ title: 'Convert Text to Table', width: '320px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const sel = body.querySelector('input[name="wc-ctt-sep"]:checked');
+        const v = sel ? sel.value : 'tab';
+        // 'Paragraphs' / 'Other' with no char → a delimiter that never matches → one column per paragraph.
+        const delim = v === 'tab' ? '\t' : v === 'comma' ? ',' : v === 'other' ? (other.value || String.fromCharCode(0)) : String.fromCharCode(0);
+        Insert.convertTextToTable(delim);
+      } },
+      { label: 'Cancel' },
+    ] });
   };
   Insert.tableMenu = function (node) {
     WC.flyout(node, (fly) => {

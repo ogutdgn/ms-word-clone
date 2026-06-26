@@ -6621,6 +6621,22 @@
     return /June 26, 2026/.test(xml) || 'static date text not found in export: ' + xml.slice(0, 300);
   });
 
+  await t('[ins-ctt] Convert Text to Table: comma-delimited paragraphs → real 2×3 w:tbl', async () => {
+    // The Insert > Table > "Convert Text to Table" menu item used to be a no-op toast even though
+    // WC.PM.textToTable exists. The menu fn now accepts an explicit delimiter (the dialog's choice).
+    window.WC.editor.commands.selectAll();
+    window.WC.editor.commands.insertContent('<p>a,b,c</p><p>d,e,f</p>');
+    window.WC.editor.commands.selectAll();
+    if (!window.WC.Insert || typeof window.WC.Insert.convertTextToTable !== 'function') return 'WC.Insert.convertTextToTable missing (red)';
+    window.WC.Insert.convertTextToTable(',');
+    await sleep(120);
+    const xml = await exportDocumentXml();
+    if (!/<w:tbl\b/.test(xml)) return 'no <w:tbl> after convert (menu still a no-op?): ' + xml.slice(0, 160);
+    const rows = (xml.match(/<w:tr\b/g) || []).length;
+    const cells = (xml.match(/<w:tc\b/g) || []).length;
+    return (rows === 2 && cells === 6) || ('expected 2 rows / 6 cells, got ' + rows + ' / ' + cells);
+  });
+
   await t('[10ex] EXPORT: xeQuickPart(author) → AUTHOR field', async () => {
     setDoc('By '); caretAfter('By ');
     if (typeof PM().xeQuickPart !== 'function') return 'PM.xeQuickPart missing (red)';
