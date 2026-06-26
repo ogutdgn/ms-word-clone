@@ -195,7 +195,7 @@
   await t('[0a] D6 dispatch block: unflipped cmd toasts before opening UI', () => {
     // Repointed (012): `position`/`align`/`rotate` shipped (ENGINE_READY) — the run-block probe moves to `group`
     // (AREA layout-arrange, still deferred, NOT in ENGINE_READY — multi-object grouping; stays blocked, so
-    // dispatching it toasts and opens no flyout/modal). `selectionPane` is the other still-deferred rep.
+    // dispatching it toasts and opens no flyout/modal). (`selectionPane` was un-deferred in the Home-polish batch.)
     window.WC.Commands.run({ cmd: 'group', label: 'Group' });
     return document.querySelectorAll('.flyout').length === 0 && !document.querySelector('.modal-backdrop');
   });
@@ -1340,6 +1340,79 @@
     const lvl1 = abs && (abs.elements || []).find((l) => l.name === 'w:lvl' && (l.attributes || {})['w:ilvl'] === '1');
     const lvl1Text = lvl1 && ((lvl1.elements || []).find((c) => c.name === 'w:lvlText') || {}).attributes?.['w:val'];
     return lvl1Text === '%2.' || ('ilvl=1 lvlText was ' + lvl1Text + ' (expected %2.)');
+  });
+  // ---------- Home polish batch (font catalog · selection pane · show/hide marks · text-effects options) ----------
+  await t('[2] Home font catalog: OS fonts enumerated (>17) + WC.FONTS enriched', async () => {
+    if (!window.wordAPI || !window.wordAPI.fonts || !window.wordAPI.fonts.list) return 'wordAPI.fonts.list not exposed';
+    const r = await window.wordAPI.fonts.list();
+    if (!r || !r.ok || !Array.isArray(r.fonts) || !r.fonts.length) return 'fonts:list failed: ' + JSON.stringify(r).slice(0, 120);
+    if (r.fonts.length <= 17) return 'expected >17 OS fonts, got ' + r.fonts.length;
+    // the module-load prefetch enriches WC.FONTS — poll for it
+    for (let i = 0; i < 40 && (window.WC.FONTS || []).length <= 17; i++) await sleep(50);
+    return (window.WC.FONTS || []).length > 17 || ('WC.FONTS still ' + (window.WC.FONTS || []).length);
+  });
+  await t('[2] Selection Pane lists doc images and selects an object on click', async () => {
+    document.querySelectorAll('#selection-pane').forEach((p) => p.remove());
+    setDoc('selpane base'); await sleep(40);
+    const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    PM().insertImage({ src: px, alt: 'objA' }); await sleep(80);
+    PM().insertImage({ src: px, alt: 'objB' }); await sleep(80);
+    const objs = PM().listObjects();
+    if (!objs || objs.length < 2) return 'listObjects found ' + (objs ? objs.length : 'none');
+    WC.Dialogs.selectionPane();
+    const pane = document.getElementById('selection-pane');
+    if (!pane) return 'selection pane did not open';
+    const rows = pane.querySelectorAll('.tp-result');
+    if (rows[0]) rows[0].click(); await sleep(40);
+    const selNode = window.WC.editor.state.selection && window.WC.editor.state.selection.node;
+    const selOk = selNode && selNode.type.name === 'image';
+    pane.remove();
+    return (rows.length >= 2 && selOk) || ('rows=' + rows.length + ' selNode=' + (selNode && selNode.type.name));
+  });
+  await t('[2] Selection Pane is no longer isBlocked (ENGINE_READY)', () => {
+    return window.WC.PM.ENGINE_READY ? window.WC.PM.ENGINE_READY.has('selectionPane') === true : 'ENGINE_READY not exposed';
+  });
+  await t('[2] Show/Hide ¶ paints space marks via the formatting-marks plugin', async () => {
+    setDoc('alpha beta gamma'); await sleep(100); // two spaces
+    const host = document.getElementById('pm-editor');
+    if (host.classList.contains('show-marks')) { run('showHide'); await sleep(100); } // ensure OFF
+    const before = host.querySelectorAll('.wc-mark-space').length;
+    run('showHide'); await sleep(150); // ON
+    const on = host.querySelectorAll('.wc-mark-space').length;
+    run('showHide'); await sleep(150); // OFF
+    const off = host.querySelectorAll('.wc-mark-space').length;
+    return (before === 0 && on >= 2 && off === 0) || ('before=' + before + ' on=' + on + ' off=' + off);
+  });
+  await t('[2] Text Effects: Glow Options applies a custom textGlow (radius 13)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('glowopt probe'); selectText('glowopt'); PM().captureSelection();
+    window.WC.Commands.dropdown({ cmd: 'textEffectsAndTypography', type: 'dropdown' }, document.body); await sleep(20);
+    flyClick(/^Glow$/); await sleep(20);
+    flyClick(/Glow Options/); await sleep(30);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'Glow Options dialog did not open';
+    dlg.querySelector('input[type=number]').value = '13'; // first number input = Size
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(60);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    const marks = markNames('glowopt');
+    return marks.some((m) => /textGlow/.test(m) && /"radiusPt":13/.test(m)) || ('marks: ' + JSON.stringify(marks));
+  });
+  await t('[2] Text Effects: Shadow Options computes dx/dy from angle+distance', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('shadowopt probe'); selectText('shadowopt'); PM().captureSelection();
+    window.WC.Commands.dropdown({ cmd: 'textEffectsAndTypography', type: 'dropdown' }, document.body); await sleep(20);
+    flyClick(/^Shadow$/); await sleep(20);
+    flyClick(/Shadow Options/); await sleep(30);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'Shadow Options dialog did not open';
+    const nums = dlg.querySelectorAll('input[type=number]'); // [transparency, blur, distance, angle]
+    nums[2].value = '10'; nums[3].value = '0'; // distance 10 @ angle 0 → dx=10, dy=0
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(60);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    const marks = markNames('shadowopt');
+    return marks.some((m) => /textShadowW14/.test(m) && /"dx":10/.test(m) && /"dy":0/.test(m)) || ('marks: ' + JSON.stringify(marks));
   });
   await t('[2] Paragraph dialog seeds from the caret and applies as ONE undo step', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic
@@ -2649,7 +2722,7 @@
     // Regression for the stale-DEFERRED bug: wrapText/bringForward/sendBackward ship engine
     // support (4c.1 wrap / 4c.3 z-order) but were gated by the coarse layout-arrange DEFERRED
     // flag. ENGINE_READY un-blocks them. 012 (frames group) additionally un-blocks position/align/
-    // rotate (now wired to WC.PM.setImageAlign/setImageTransform); group/selectionPane stay deferred.
+    // rotate (now wired to WC.PM.setImageAlign/setImageTransform); group stays deferred (selectionPane shipped in the Home-polish batch).
     if (PM().isBlocked('wrapText') !== false) return 'wrapText still blocked';
     if (PM().isBlocked('bringForward') !== false) return 'bringForward still blocked';
     if (PM().isBlocked('sendBackward') !== false) return 'sendBackward still blocked';

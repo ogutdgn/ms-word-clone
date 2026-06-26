@@ -415,6 +415,33 @@
     document.getElementById('workarea').appendChild(pane);
   };
 
+  // ---- Selection pane (Home › Editing › Select › Selection Pane) ----
+  // Lists the document's objects (pictures, shapes/ink) from WC.PM.listObjects(); a row click selects the object
+  // (NodeSelection) and scrolls to it. Toggle-on-reopen like the Navigation pane.
+  D.selectionPane = function () {
+    let pane = document.getElementById('selection-pane'); if (pane) { pane.remove(); return; }
+    pane = el('div', { class: 'taskpane', id: 'selection-pane' });
+    const head = el('div', { class: 'tp-head' }, [el('div', { class: 'tp-title', text: 'Selection' }), el('span', { class: 'x', html: WC.icon('win_close', 12), style: { cursor: 'pointer' }, onclick: () => pane.remove() })]);
+    const body = el('div', { class: 'tp-body' });
+    const objects = (WC.PM.listObjects && WC.PM.listObjects()) || [];
+    if (!objects.length) body.appendChild(el('div', { style: { color: '#888', padding: '12px 4px', fontSize: '13px' }, text: 'No objects in this document. Insert a picture or shape to see it here.' }));
+    objects.forEach((o) => {
+      const row = el('div', { class: 'tp-result', style: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' } }, [
+        el('span', { html: WC.icon(o.type === 'shape' ? 'shapes' : 'pictures', 14) }),
+        el('span', { style: { flex: '1' }, text: o.label + (o.floating ? '' : '  (inline)') }),
+      ]);
+      row.addEventListener('click', () => {
+        // o.pos is captured at build time; if the doc changed since, selectObjectAt returns false → rebuild the
+        // pane with fresh positions (Word's pane stays live; this is the lightweight equivalent).
+        if (WC.PM.selectObjectAt && WC.PM.selectObjectAt(o.pos)) return;
+        pane.remove(); D.selectionPane();
+      });
+      body.appendChild(row);
+    });
+    pane.appendChild(head); pane.appendChild(body);
+    document.getElementById('workarea').appendChild(pane);
+  };
+
   // ---- Styles task pane ----
   const STYLE_PREVIEW = {
     'Heading 1': 'color:#2e74b5;font:13pt Calibri', 'Heading 2': 'color:#2e74b5;font:12pt Calibri', 'Heading 3': 'color:#1f4d78',

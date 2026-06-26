@@ -81,10 +81,12 @@
     else pm.cmd(px > 0 ? 'increaseTextIndent' : 'decreaseTextIndent');
   }
   H.showHide = () => {
-    // Flip the DOM class only; the ribbon state machine owns the button latch
-    // ({ latched: st.formattingMarks }, registered in home-features.js). Toggling a
-    // class fires no editor transaction, so nudge a ribbon re-eval to re-latch now.
+    // Flip the DOM class; the ribbon state machine owns the button latch
+    // ({ latched: st.formattingMarks }, registered in home-features.js). The pilcrow rides CSS, but the FULL marks
+    // (space dots / tab arrows / break ↵) are painted by the owned formatting-marks decoration plugin, which reads
+    // the class in its decorations(state) — so after toggling we dispatch a no-op transaction to recompute the set.
     document.getElementById('pm-editor')?.classList.toggle('show-marks');
+    WC.PM && WC.PM.touch && WC.PM.touch(); // step-less re-render so the formatting-marks plugin recomputes for the new class
     WC.PM && WC.PM._scheduleRibbonSync && WC.PM._scheduleRibbonSync();
   };
   H.sort = () => sortDialog();
@@ -612,6 +614,7 @@
         fly.appendChild(WC.flyItem(lbl + ' outline', { onClick: () => applyTE('textOutline', { widthPt: w, color: '#000000', fill: 'transparent' }) })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Outline Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => applyTE('textOutline', { widthPt: 1.5, color, fill: 'currentColor' })))) }));
+      fly.appendChild(WC.flyItem('Outline Options…', { onClick: () => outlineOptionsDialog() }));
     });
   }
   function shadowMenu(node) {
@@ -620,12 +623,16 @@
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('No Shadow', { onClick: () => applyTE('textShadowW14', null) }));
       presets.forEach(([l, dx, dy]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('textShadowW14', { dx: dx * 1.5, dy: dy * 1.5, blur: 1.5, color: 'rgba(0,0,0,0.45)', preset: l }) })));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Shadow Options…', { onClick: () => shadowOptionsDialog() }));
     });
   }
   function reflectionMenu(node) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('No Reflection', { onClick: () => applyTE('textReflection', null) }));
       [['Tight', 'tight'], ['Half', 'half'], ['Full', 'full']].forEach(([l, v]) => fly.appendChild(WC.flyItem(l, { onClick: () => applyTE('textReflection', v) })));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Reflection Options…', { onClick: () => reflectionOptionsDialog() }));
     });
   }
   function glowMenu(node) {
@@ -634,7 +641,64 @@
       [['5 pt', 5], ['8 pt', 8], ['11 pt', 11], ['18 pt', 18]].forEach(([l, r]) => fly.appendChild(WC.flyItem(l + ' glow', { onClick: () => applyTE('textGlow', { radiusPt: r, color: GLOW_BLUE }) })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Glow Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => applyTE('textGlow', { radiusPt: 8, color })))) }));
+      fly.appendChild(WC.flyItem('Glow Options…', { onClick: () => glowOptionsDialog() }));
     });
+  }
+  // Text Effects per-effect Options dialogs — write the SAME textStyle attrs the presets do, with custom params.
+  // hex + transparency% → an rgba color (transparency 0% = opaque, 100% = clear). Reuses applyTE (withSelection).
+  function hexAlpha(hex, transPct) {
+    const a = (1 - Math.max(0, Math.min(100, Number(transPct) || 0)) / 100);
+    const h = String(hex || '#000000').replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16) || 0, g = parseInt(h.slice(2, 4), 16) || 0, b = parseInt(h.slice(4, 6), 16) || 0;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a.toFixed(2) + ')';
+  }
+  const teRow = (label, ctrl) => el('div', { class: 'row' }, [el('label', { text: label, style: { width: '130px' } }), ctrl]);
+  function shadowOptionsDialog() {
+    WC.PM.captureSelection();
+    const color = el('input', { type: 'color', value: '#000000' });
+    const trans = el('input', { type: 'number', min: '0', max: '100', value: '60', style: { width: '70px' } });
+    const blur = el('input', { type: 'number', min: '0', max: '50', step: '0.5', value: '4', style: { width: '70px' } });
+    const dist = el('input', { type: 'number', min: '0', max: '50', step: '0.5', value: '3', style: { width: '70px' } });
+    const angle = el('input', { type: 'number', min: '0', max: '359', value: '45', style: { width: '70px' } });
+    WC.dialog({ title: 'Shadow Options', width: '340px', body: el('div', {}, [
+      teRow('Color:', color), teRow('Transparency (%):', trans), teRow('Blur (pt):', blur), teRow('Distance (pt):', dist), teRow('Angle (°):', angle),
+    ]), footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const d = Number(dist.value) || 0, rad = (Number(angle.value) || 0) * Math.PI / 180;
+        applyTE('textShadowW14', { dx: +(Math.cos(rad) * d).toFixed(2), dy: +(Math.sin(rad) * d).toFixed(2), blur: Number(blur.value) || 0, color: hexAlpha(color.value, trans.value), preset: 'Custom' });
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+  function glowOptionsDialog() {
+    // Glow EXPORTS to w14:glow → the color must be a plain hex (the translator writes it into w14:srgbClr@val).
+    // Transparency would need a separate w14:alpha element (deferred) — color + size only keeps the export valid.
+    WC.PM.captureSelection();
+    const color = el('input', { type: 'color', value: GLOW_BLUE });
+    const size = el('input', { type: 'number', min: '0', max: '50', value: '8', style: { width: '70px' } });
+    WC.dialog({ title: 'Glow Options', width: '320px', body: el('div', {}, [teRow('Color:', color), teRow('Size (pt):', size)]), footer: [
+      { label: 'OK', primary: true, onClick: () => applyTE('textGlow', { radiusPt: Number(size.value) || 8, color: color.value }) },
+      { label: 'Cancel' },
+    ] });
+  }
+  function outlineOptionsDialog() {
+    // Outline EXPORTS to w14:textOutline (hex stroke colour; the translator emits a hollow fill). Color + width
+    // round-trip; a 'Filled text' fill does not (the translator hardcodes transparent) so it's omitted in v1.
+    WC.PM.captureSelection();
+    const color = el('input', { type: 'color', value: '#000000' });
+    const width = el('input', { type: 'number', min: '0', max: '20', step: '0.25', value: '1.5', style: { width: '70px' } });
+    WC.dialog({ title: 'Outline Options', width: '340px', body: el('div', {}, [teRow('Color:', color), teRow('Width (pt):', width)]), footer: [
+      { label: 'OK', primary: true, onClick: () => applyTE('textOutline', { widthPt: Number(width.value) || 1.5, color: color.value, fill: 'transparent' }) },
+      { label: 'Cancel' },
+    ] });
+  }
+  function reflectionOptionsDialog() {
+    WC.PM.captureSelection();
+    const preset = el('select', {}, ['Tight', 'Half', 'Full'].map((l) => el('option', { text: l })));
+    WC.dialog({ title: 'Reflection Options', width: '300px', body: el('div', {}, [teRow('Reflection:', preset)]), footer: [
+      { label: 'OK', primary: true, onClick: () => applyTE('textReflection', preset.value.toLowerCase()) },
+      { label: 'Cancel' },
+    ] });
   }
   function numberStylesMenu(node) {
     const opts = [['Default', 'normal'], ['Proportional Lining', 'lining-nums proportional-nums'], ['Tabular Lining', 'lining-nums tabular-nums'], ['Proportional Oldstyle', 'oldstyle-nums proportional-nums'], ['Tabular Oldstyle', 'oldstyle-nums tabular-nums']];
@@ -1096,7 +1160,7 @@
     );
   };
   H.sendBackward = () => WC.PM.setImageZOrder('backward');
-  H.selectionPane = () => WC.notImplemented('Selection Pane'); // deferred (UI pane, not an OOXML write); also isBlocked-gated
+  H.selectionPane = () => WC.Dialogs.selectionPane(); // object-list task pane (un-deferred; ENGINE_READY in bridge/index.ts)
   // 012 (frames group): wired onto WC.PM (was the retired WC.Layout). Align Left/Center/Right = horizontal,
   // margin-relative (setImageAlign on the selected floating picture). Vertical align (Top/Middle/Bottom) + Distribute
   // (multi-object) are v1 follow-ups (need a vertical page anchor / multi-selection).
@@ -2208,7 +2272,7 @@
       fly.appendChild(WC.flyItem('Select Objects', { onClick: () => pm.dSetSelect() }));
       fly.appendChild(WC.flyItem('Select All Text With Similar Formatting', { onClick: () => { if (!pm.selectSimilarFormatting()) WC.toast('Place the cursor in text first.'); } }));
       fly.appendChild(WC.flySep());
-      fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.toast('Selection Pane lists drawing objects — arrives with the Draw engine re-host (slice 10).') }));
+      fly.appendChild(WC.flyItem('Selection Pane…', { onClick: () => WC.Dialogs.selectionPane() }));
     });
   }
   function findMenu(node) {
@@ -2532,9 +2596,27 @@
   WC.Commands = Commands;
   WC.FONTS = FONTS; WC.SIZES = SIZES;
 
+  // Home › Font name — lazily pull the OS-installed font catalog from the main process (replacing the built-in
+  // 17-font fallback), cache it, and keep WC.FONTS in sync (the Font dialog reads it). Falls back to FONTS if the
+  // IPC is unavailable or returns nothing (headless/offline). Fetched once; the dropdown reads the cache.
+  let FONTS_CACHE = null;
+  let fontsRequested = false;
+  function ensureFontCatalog() {
+    if (fontsRequested) return;
+    fontsRequested = true;
+    try {
+      window.wordAPI && window.wordAPI.fonts && window.wordAPI.fonts.list && window.wordAPI.fonts.list().then((r) => {
+        if (r && r.ok && Array.isArray(r.fonts) && r.fonts.length) { FONTS_CACHE = r.fonts; WC.FONTS = r.fonts; }
+        else { fontsRequested = false; } // a transient failure must not pin the fallback for the session — allow a retry
+      }).catch(() => { fontsRequested = false; });
+    } catch (e) { fontsRequested = false; /* offline/headless → keep the fallback, allow retry */ }
+  }
+  ensureFontCatalog(); // prefetch at load so the first open usually has the full list
   function openFontList(anchor) {
+    ensureFontCatalog();
+    const list = FONTS_CACHE || FONTS;
     WC.flyout(anchor, (fly) => {
-      FONTS.forEach((f) => {
+      list.forEach((f) => {
         const item = WC.flyItem(f, { onClick: () => setFontName(f) });
         item.style.fontFamily = f;
         fly.appendChild(item);

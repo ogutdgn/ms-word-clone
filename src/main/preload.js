@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('wordAPI', {
     clear: () => ipcRenderer.invoke('recent:clear'),
   },
 
+  // OS-installed font families (Home › Font name dropdown)
+  fonts: {
+    list: () => ipcRenderer.invoke('fonts:list'),
+  },
+
   // Inserts
   pickImage: () => ipcRenderer.invoke('fs:readImage'),
   screenshot: () => ipcRenderer.invoke('insert:screenshot'),

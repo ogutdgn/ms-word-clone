@@ -177,7 +177,7 @@ const AREA: Record<string, string> = {
 // paint the margin numbers, so the in-app render is an owned overlay (line-numbers-overlay.js, P2).
 // hyphenation (005): WC.PM.setHyphenation writes document-level settings.xml (w:autoHyphenation etc.) via an
 // owned converter write (no fork translator); in-app mid-word hyphenation render is out of scope (export-faithful).
-const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers', 'hyphenation', 'position', 'align', 'rotate'])
+const ENGINE_READY = new Set<string>(['wrapText', 'bringForward', 'sendBackward', 'margins', 'orientation', 'size', 'header', 'footer', 'goToHeader', 'goToFooter', 'closeHeaderFooter', 'differentFirstPage', 'differentOddEven', 'pageNumber', 'columns', 'breaks', 'lineNumbers', 'hyphenation', 'position', 'align', 'rotate', 'selectionPane'])
 function isBlocked(cmd: string) { if (ENGINE_READY.has(cmd)) return false; const a = AREA[cmd]; return !!a && DEFERRED.has(a) }
 
 // Replace the live editor with one loaded from `source` (Open / New).
@@ -322,6 +322,7 @@ export function preinstallBridge() {
     AREA, DEFERRED, ENGINE_READY, // exposed for tests/audit
     cmd: () => false,
     chain: () => false,
+    touch: () => false, // pre-mount stub (replaced by installCommands on mount)
     getState: () => null,
     isDirty: () => false,
     setClean: () => {},
@@ -377,6 +378,7 @@ export function preinstallBridge() {
     insertPageBreak: () => false, insertBlankPage: () => false, insertHr: () => false,
     normalizeImportedPageBreaks: () => false, // 013: pre-mount stub (runs on docx Open via replaceEditor)
     insertColumnBreak: () => false, insertLineBreak: () => false,
+    listObjects: () => [], selectObjectAt: () => false, // 018-batch Selection Pane pre-mount stubs (replaced by installInsert)
     setImageWrap: () => false, setImageZOrder: () => false, setImageSize: () => false, setImageAltText: () => false, setImageCrop: () => false, setImageTransform: () => false, setImagePosition: () => false, setImageAlign: () => false, setImageGrayscale: () => false, // Phase 4b/4c + 012 pre-mount stubs (replaced by installInsert on mount)
     // slice 6: table pre-mount stubs (replaced by installTable on mount)
     insertTable: () => false, tableAddRow: () => false, tableAddColumn: () => false,

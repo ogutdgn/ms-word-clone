@@ -276,6 +276,45 @@ export function installInsert(editor: AnyEditor) {
     return null
   }
 
+  // Selection Pane (Home › Editing › Select) — enumerate the document's objects (pictures, shapes/ink) for the
+  // object-list pane. NO-FORK: a plain doc.descendants scan over the recognized object node types. Labels follow
+  // Word's "Picture N" / "Shape N" convention; floating vs inline is surfaced via the image's isAnchor attr.
+  function listObjects(): Array<{ pos: number; label: string; type: string; floating: boolean }> {
+    const out: Array<{ pos: number; label: string; type: string; floating: boolean }> = []
+    let pic = 0
+    let shp = 0
+    try {
+      editor.state.doc.descendants((node: any, pos: number) => {
+        const n = node?.type?.name
+        if (n === 'image') {
+          pic++
+          // Always "Picture N" for a unique, stable row label (Word names objects this way); the alt/title can
+          // repeat across objects, so using it as the label would make two rows indistinguishable.
+          out.push({ pos, label: 'Picture ' + pic, type: 'image', floating: !!node.attrs?.isAnchor })
+          return false
+        }
+        if (n === 'vectorShape' || n === 'shape' || n === 'contentBlock') {
+          shp++
+          out.push({ pos, label: 'Shape ' + shp, type: 'shape', floating: !!node.attrs?.isAnchor })
+          return false
+        }
+        return true
+      })
+    } catch { /* none */ }
+    return out
+  }
+
+  // Select (NodeSelection) the object at `pos` and scroll it into view — the Selection-Pane row click target.
+  function selectObjectAt(pos: number): boolean {
+    try {
+      const node = editor.state.doc.nodeAt(pos)
+      if (!node) return false
+      editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)).scrollIntoView())
+      editor.view.focus()
+      return true
+    } catch { return false }
+  }
+
   // Phase 4c — text wrap / floating. Maps the ribbon "Wrap Text" modes to the image's
   // `wrap` + `isAnchor` attrs (the fork's renderDOM already turns these into float/
   // shape-outside/absolute, and the exporter into wp:anchor + the wrap element). Done as a
@@ -634,6 +673,8 @@ export function installInsert(editor: AnyEditor) {
     insertColumnBreak,
     insertLineBreak,
     insertHr,
+    listObjects,
+    selectObjectAt,
   }
 }
 

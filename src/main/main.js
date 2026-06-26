@@ -282,6 +282,43 @@ ipcMain.handle('recent:clear', async () => {
   return [];
 });
 
+// Home › Font name — enumerate the OS-installed font families so the dropdown reflects the real system
+// (replaces the hardcoded 17-font renderer list). Windows: System.Drawing.FontFamily via PowerShell (always
+// present, clean family names). mac/Linux: scan the standard font dirs (best-effort). Renderer caches the result
+// and falls back to its built-in list if this returns nothing.
+let _fontCache = null; // the font list is static for a session — enumerate once, cache the success
+ipcMain.handle('fonts:list', async () => {
+  if (_fontCache) return _fontCache;
+  try {
+    let names = [];
+    if (process.platform === 'win32') {
+      // ASYNC execFile (not execSync) so the main process is never blocked while PowerShell runs.
+      const { execFile } = require('child_process');
+      const out = await new Promise((resolve, reject) => {
+        execFile('powershell',
+          ['-NoProfile', '-NonInteractive', '-Command', 'Add-Type -AssemblyName System.Drawing; [System.Drawing.FontFamily]::Families | ForEach-Object { $_.Name }'],
+          { timeout: 6000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+          (err, stdout) => (err ? reject(err) : resolve(stdout)));
+      });
+      names = String(out).split(/\r?\n/);
+    } else {
+      const os = require('os');
+      const dirs = process.platform === 'darwin'
+        ? ['/System/Library/Fonts', '/Library/Fonts', path.join(os.homedir(), 'Library/Fonts')]
+        : ['/usr/share/fonts', '/usr/local/share/fonts', path.join(os.homedir(), '.fonts')];
+      for (const d of dirs) {
+        try { for (const f of fs.readdirSync(d)) { if (/\.(ttf|otf|ttc)$/i.test(f)) names.push(f.replace(/\.[^.]+$/, '')); } } catch {}
+      }
+    }
+    const fonts = Array.from(new Set(names.map((s) => String(s).trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const res = { ok: fonts.length > 0, fonts };
+    if (res.ok) _fontCache = res; // cache only a successful enumeration (a transient failure can be retried)
+    return res;
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e), fonts: [] };
+  }
+});
+
 // ---------------------------------------------------------------------------
 // IPC: open document
 // ---------------------------------------------------------------------------

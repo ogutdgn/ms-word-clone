@@ -488,6 +488,15 @@ body.pm-active #pm-editor .ProseMirror s > span[style*="vertical-align: super"] 
 
 /* PM-mode visibility twins for show-marks / show-grid */
 body.pm-active #pm-editor.show-marks p::after { content: '¶'; color: #2b8aef; margin-left: 2px; }
+/* Show/Hide ¶ FULL marks — the formatting-marks decoration plugin tags each space/tab/break; CSS paints the glyph
+   overlaid on the (zero-content) original character so layout/positions are untouched. */
+.wc-mark-space { position: relative; }
+.wc-mark-space::before { content: '\00B7'; position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #2b8aef; font-weight: 700; pointer-events: none; }
+.wc-mark-nbsp { position: relative; }
+.wc-mark-nbsp::before { content: '\00B0'; position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #2b8aef; pointer-events: none; }
+.wc-mark-tab { position: relative; }
+.wc-mark-tab::before { content: '\2192'; position: absolute; left: 0; top: 0; color: #2b8aef; pointer-events: none; }
+.wc-mark-break { color: #2b8aef; pointer-events: none; user-select: none; }
 body.pm-active #pm-editor.show-grid { background-image: linear-gradient(#e9eef5 1px, transparent 1px), linear-gradient(90deg, #e9eef5 1px, transparent 1px); background-size: 24px 24px; }
 
 /* (008: the overlay footnote/endnote NOTES REGION styling (#pm-notes-area / .pm-notes-section /

@@ -310,8 +310,13 @@ export function installCommands(editor: AnyEditor) {
     return !!(s && (s.storedStyle || s.storedParaProps))
   }
 
+  // Dispatch a step-less transaction to force a view re-render (e.g. so a view-plugin's decorations() re-runs after
+  // a CSS-class toggle). docChanged is false, so it does NOT dirty the doc or add a history entry. Keeps ribbon
+  // handlers off editor.view directly (the WC.PM bridge stays the single write/dispatch seam).
+  function touch(): boolean { try { editor.view?.dispatch(editor.state.tr); return true } catch { return false } }
+
   return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs,
     setShading, clearShading, setFontSizePt, setAdvancedFontEffects, advFxAttrs, getAdvancedFontEffects,
-    getResolvedParaProps, styleIdForName, applyStyleByName,
+    getResolvedParaProps, styleIdForName, applyStyleByName, touch,
     selectAll, selectSimilarFormatting, armFormatPainter, cancelFormatPainter, painterArmed }
 }
