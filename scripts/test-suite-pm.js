@@ -6649,6 +6649,19 @@
     return /<w:drawing\b|<a:blip\b|<pic:pic\b/.test(xml) || 'no drawing/image in export after chart insert: ' + xml.slice(0, 200);
   });
 
+  await t('[ins-dropcap] Drop Cap Options: custom lines + distance → framePr w:lines/w:hSpace', async () => {
+    // Drop Cap used to hard-code lines=3 with no Options dialog. xeDropCap now honors a custom line
+    // count AND a distance-from-text (framePr hSpace, twips) passed by the Drop Cap Options dialog.
+    setDoc('Hello world, this is a paragraph for the drop cap.'); caretAfter('Hello');
+    if (typeof PM().xeDropCap !== 'function') return 'PM.xeDropCap missing (red)';
+    if (PM().xeDropCap('drop', 4, { hSpace: 144 }) !== true) return 'xeDropCap(opts) refused (red)';
+    await sleep(100);
+    const xml = await exportDocumentXml();
+    if (!/w:dropCap="drop"/.test(xml)) return 'no dropCap in framePr: ' + xml.slice(0, 200);
+    if (!/w:lines="4"/.test(xml)) return 'custom lines (4) not honored: ' + xml.slice(0, 200);
+    return /w:hSpace="144"/.test(xml) || 'distance (w:hSpace=144) not in framePr: ' + xml.slice(0, 250);
+  });
+
   await t('[10ex] EXPORT: xeQuickPart(author) → AUTHOR field', async () => {
     setDoc('By '); caretAfter('By ');
     if (typeof PM().xeQuickPart !== 'function') return 'PM.xeQuickPart missing (red)';

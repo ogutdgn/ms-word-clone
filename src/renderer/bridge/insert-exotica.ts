@@ -47,7 +47,7 @@ export function installInsertExotica(editor: AnyEditor) {
   }
 
   // ---- dropCap (real w:framePr) ----
-  function xeDropCap(kind: string, lines: number): boolean {
+  function xeDropCap(kind: string, lines: number, opts?: { hSpace?: number }): boolean {
     const dc = kind === 'margin' ? 'margin' : (kind === 'none' || !kind) ? null : 'drop'
     try {
       const { from } = editor.state.selection
@@ -58,8 +58,11 @@ export function installInsertExotica(editor: AnyEditor) {
       if (!node || node.type.name !== 'paragraph') return false
       const pos = $pos.before(depth)
       const pp = { ...(node.attrs.paragraphProperties || {}) }
-      if (dc) pp.framePr = { dropCap: dc, lines: lines || 3, wrap: 'around', vAnchor: 'text', hAnchor: 'text' }
-      else delete pp.framePr
+      if (dc) {
+        // hSpace = "Distance from text" in twips (Drop Cap Options dialog), exported as w:framePr/@w:hSpace.
+        const hSpace = opts && typeof opts.hSpace === 'number' && opts.hSpace > 0 ? Math.round(opts.hSpace) : undefined
+        pp.framePr = { dropCap: dc, lines: lines || 3, wrap: 'around', vAnchor: 'text', hAnchor: 'text', ...(hSpace ? { hSpace } : {}) }
+      } else delete pp.framePr
       editor.view?.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, paragraphProperties: pp }))
       refocus(); return true
     } catch { return false }

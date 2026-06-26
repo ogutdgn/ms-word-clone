@@ -218,6 +218,32 @@
     return `<span class="wc-shape" contenteditable="false" data-chart="${type}" style="display:inline-block"><svg viewBox="0 0 ${W} ${Hh}" width="${W}" height="${Hh}" style="border:1px solid #eee;background:#fff">${body}</svg></span>`;
   };
 
+  // ===================== Drop Cap Options =====================
+  Insert.dropCapDialog = function () {
+    // Reflect the current paragraph's drop cap (Word pre-fills the dialog from the existing setting).
+    let curKind = 'Dropped', curLines = 3, curDist = 0;
+    try {
+      const ed = WC.PM.getEditor(); const $p = ed.state.doc.resolve(ed.state.selection.from);
+      let d = $p.depth; while (d > 0 && $p.node(d).type.name !== 'paragraph') d--;
+      const node = $p.node(d); const fp = node && node.attrs && node.attrs.paragraphProperties && node.attrs.paragraphProperties.framePr;
+      if (fp && fp.dropCap) { curKind = fp.dropCap === 'margin' ? 'In margin' : 'Dropped'; curLines = fp.lines || 3; curDist = fp.hSpace ? +(fp.hSpace / 1440).toFixed(2) : 0; }
+    } catch (_) { /* keep defaults */ }
+    const pos = el('select', {}, ['None', 'Dropped', 'In margin'].map((t) => el('option', { text: t, selected: t === curKind ? 'selected' : null })));
+    const lines = el('input', { type: 'number', min: '1', max: '10', value: String(curLines), style: { width: '60px' } });
+    const dist = el('input', { type: 'number', min: '0', step: '0.1', value: String(curDist), style: { width: '60px' } });
+    const rowEl = (label, ctrl) => el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '4px 0' } }, [el('label', { text: label, style: { width: '150px' } }), ctrl]);
+    const body = el('div', {}, [rowEl('Position:', pos), rowEl('Lines to drop:', lines), rowEl('Distance from text (in):', dist)]);
+    WC.dialog({ title: 'Drop Cap', width: '340px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const kind = pos.value === 'None' ? 'none' : pos.value === 'In margin' ? 'margin' : 'drop';
+        const n = Math.max(1, Math.min(10, parseInt(lines.value, 10) || 3));
+        const hSpace = Math.round((parseFloat(dist.value) || 0) * 1440);
+        WC.PM.xeDropCap(kind, n, { hSpace });
+      } },
+      { label: 'Cancel' },
+    ] });
+  };
+
   // ===================== Date & Time =====================
   Insert.dateTimeDialog = function () {
     const now = new Date();

@@ -504,6 +504,8 @@
       fly.appendChild(WC.flyItem('None', { onClick: () => { WC.PM.xeDropCap('none', 0); } }));
       fly.appendChild(WC.flyItem('Dropped', { onClick: () => { WC.PM.xeDropCap('drop', 3); } }));
       fly.appendChild(WC.flyItem('In Margin', { onClick: () => { WC.PM.xeDropCap('margin', 3); } }));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Drop Cap Options…', { onClick: () => WC.Insert.dropCapDialog() }));
     });
   }
   function equationMenu(node) {
