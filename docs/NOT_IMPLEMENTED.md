@@ -104,7 +104,7 @@ _Auto-generated from deep research (`docs/research/raw-research.json`). This cat
 |---|---|---|
 | Footnotes & endnotes | 🟡 | Store notes; render references as superscript links to a notes section at document end (or a hover panel); round-trip footnotes/endnotes XML. True page-bottom placement only at PDF/print stage if at all. |
 | Table of contents (TOC) | 🟡 | Build TOC from heading nodes with clickable anchors; export as a TOC field with cached entries; page numbers only meaningful in the PDF/print pass, otherwise omit or show '#'. |
-| Captions, cross-references, table of figures | 🟡 | Insert caption paragraphs with SEQ counters; cross-refs via bookmarks and REF fields; recompute numbers on edit. Page-number cross-refs limited by pagination. |
+| Captions, cross-references, table of figures | 🟡 | Insert caption paragraphs with SEQ counters; cross-refs via bookmarks and REF fields; recompute numbers on edit. Page-number cross-refs limited by pagination. **Wrong-output defect:** Page-number cross-refs emit `REF \p` (above/below) instead of `PAGEREF` (BUG-013) — page-number cross-refs do not yet work. |
 | Citations & bibliography (source manager, styles APA/MLA/Chicago) | ✅ | Use citeproc-js + CSL styles for formatting citations and bibliography from a sources store; insert as fields; export bibliography as a paragraph block. Round-trip Word's bibliography part is partial but citations themselves work well. |
 | Index (mark entries, generate index) | 🟡 | Mark index entries (XE fields), generate sorted index block. Page numbers limited; otherwise full feature works. |
 

@@ -1,6 +1,6 @@
 # Insert Tab — Feature Status
 
-_Every Insert-tab control is implemented and working. Verified by 27 dedicated cases in scripts/test-suite.js (86/86 total pass)._
+_Mixed completeness — most controls work, but several are stubs (Shapes, SmartArt, live Chart, Signature Line, 3D Models, Online Pictures). See [docs/bug-hunt/INSERT-COMPLETENESS.md](bug-hunt/INSERT-COMPLETENESS.md) for the authoritative per-control state._
 
 ## Pages
 
@@ -10,15 +10,15 @@ _Every Insert-tab control is implemented and working. Verified by 27 dedicated c
 
 ## Tables
 
-- ✅ live grid + Insert Table dialog + Convert Text to Table + right-click editing (insert/delete rows&cols, merge, split, delete table) — **Table**
+- ✅ live grid + Insert Table dialog + Convert Text to Table (real bridge verb + "Separate text at" dialog) + right-click editing (insert/delete rows&cols, merge, split, delete table) — **Table** (Excel Spreadsheet sub-item is a ❌ stub — no OLE runtime)
 
 ## Illustrations
 
-- ✅ This Device + Online Pictures (documented) — **Pictures**
-- ✅ shape gallery -> inline SVG (lines/rect/oval/triangle/arrows/stars/callouts) — **Shapes**
+- 🟡 This Device inserts; Online Pictures is a no-op toast (no backend); Stock Images absent — **Pictures**
+- ❌ gallery present, inserts nothing — auto-shape engine pending — **Shapes**
 - ✅ searchable icon picker -> inline SVG — **Icons**
 - 🟡 documented (no 3D runtime) — **3D Models**
-- ✅ List/Process/Cycle/Hierarchy (editable) — **SmartArt**
+- ❌ gallery present, inserts nothing — SmartArt diagram engine pending — **SmartArt**
 - 🟡 Column/Bar/Line/Pie from entered data -> **static** chart image (interim; a live `c:chartSpace` + embedded workbook is a separate subsystem, not yet built) — **Chart**
 - ✅ Screen Clipping via desktopCapturer — **Screenshot**
 
@@ -35,7 +35,7 @@ _Every Insert-tab control is implemented and working. Verified by 27 dedicated c
 
 - ✅ — **Link**
 - ✅ add/go-to/delete — **Bookmark**
-- ✅ to headings/bookmarks — **Cross-reference**
+- 🟡 to headings/bookmarks; only 2 of ~7 reference types exposed and Page-number emits the wrong field (REF \p above/below, not PAGEREF — BUG-013) — **Cross-reference**
 
 ## Comments
 
@@ -43,26 +43,26 @@ _Every Insert-tab control is implemented and working. Verified by 27 dedicated c
 
 ## Header & Footer
 
-- ✅ edit mode + built-ins + remove — **Header**
-- ✅ edit mode + page-number preset + remove — **Footer**
-- ✅ top/bottom/current + format + auto-update — **Page Number**
+- 🟡 plain-text Edit Header modal only — no built-in gallery, no Remove — **Header**
+- 🟡 plain-text Edit Footer modal only — no gallery/preset, no Remove — **Footer**
+- 🟡 Top/Bottom/Current + Remove only; no Format Page Numbers dialog, no Page Margins, Current can't target body caret — **Page Number**
 
 ## Text
 
-- ✅ — **Text Box**
-- ✅ fields: Page/NumPages/Date/Author/FileName/Title (auto-update) — **Quick Parts**
+- 🟡 insert only — no built-in gallery; "Draw Text Box" is a no-op alias of Simple — **Text Box**
+- 🟡 6 field shortcuts only — no Building Blocks Organizer, AutoText, or Ctrl+F9 — **Quick Parts**
 - ✅ style gallery — **WordArt**
-- ✅ None/Dropped/In Margin — **Drop Cap**
-- ✅ — **Signature Line**
-- ✅ format dialog — **Date & Time**
+- 🟡 None/Dropped/In Margin; "Drop Cap Options..." absent, lines hard-coded to 3 — **Drop Cap**
+- ❌ toast-only, inserts nothing — signature-line object pending — **Signature Line**
+- ✅ format dialog + working "Update automatically" (unchecked = static text, checked = DATE field) — **Date & Time**
 - 🟡 Text from File (OLE embedding documented) — **Object**
 
 ## Symbols
 
-- ✅ gallery + insert — **Equation**
-- ✅ quick grid + full character map (subsets, recently used) — **Symbol**
+- 🟡 gallery + dialog insert Cambria-Math-italic styled TEXT, not real OOXML `<m:oMath>`; Ink Equation, Save-to-Gallery, Alt+= unimplemented — **Equation**
+- 🟡 quick grid + 6 fixed subsets; no Font selector, no code-point entry, Special Characters tab absent — **Symbol**
 
 ## Known approximations
 
-- **Header/Footer** appear once on screen (not repeated per sheet); they print correctly via the page flow. True per-sheet repetition needs a full pagination engine.
+- **Header/Footer** are painted per-page by the paged engine (`header-footer.ts:295-296`); the prior "appear once on screen" note predated the paged migration.
 - **3D Models**, **OLE Object embedding**, **Online Pictures search**, **cloud Add-ins**, and **embedded video playback** are documented stubs (no runtime/backend).
