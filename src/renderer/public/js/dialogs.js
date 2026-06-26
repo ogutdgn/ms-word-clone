@@ -482,12 +482,35 @@
     body.appendChild(previewRow);
     body.appendChild(list);
     const footer = el('div', { style: { display: 'flex', gap: '6px', padding: '10px 0 0', borderTop: '1px solid #eee', marginTop: '8px' } }, [
-      el('button', { class: 'btn', text: 'New Style', onclick: () => { WC.toast("New Style isn't on the new engine yet", 'Custom styles land in a later slice.'); } }),
+      el('button', { class: 'btn', text: 'New Style', onclick: () => { D.createStyle(); } }),
       el('button', { class: 'btn', text: 'Clear All', onclick: () => { if (WC.PM.ready && !WC.PM.applyStyleByName('Normal')) WC.toast('Style “Normal” is not available in this document.'); } }),
     ]);
     body.appendChild(footer);
     pane.appendChild(head); pane.appendChild(body);
     document.getElementById('workarea').appendChild(pane);
+  };
+
+  // ---- Create a Style (custom style from the current selection's formatting) ----
+  D.createStyle = function () {
+    if (WC.PM.isBlocked && WC.PM.isBlocked('stylesGallery')) { WC.PM.notifyBlocked('Styles'); return; }
+    WC.PM.captureSelection(); // the dialog steals focus; restore before minting
+    const nameInput = el('input', { type: 'text', class: 'grow', placeholder: 'Name your style', value: 'Style 1' });
+    const body = el('div', {}, [
+      el('div', { style: { fontSize: '12px', color: '#444', marginBottom: '8px' }, text: 'Create a new style from the current selection’s formatting.' }),
+      el('div', { class: 'row' }, [el('label', { text: 'Name:', style: { width: '60px' } }), nameInput]),
+    ]);
+    WC.dialog({ title: 'Create New Style from Formatting', width: '420px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const name = (nameInput.value || '').trim();
+        if (!name) { WC.toast('Enter a style name.'); return true; } // truthy → keep the dialog open
+        let r;
+        WC.PM.withSelection(() => { r = WC.PM.createNamedStyle(name); });
+        if (r && r.ok) { WC.toast('Created style “' + (r.name || name) + '”'); try { if (WC.Ribbon && WC.Ribbon.render) WC.Ribbon.render(); } catch (e) { /* gallery refresh best-effort */ } }
+        else WC.toast('Could not create the style.');
+      } },
+      { label: 'Cancel' },
+    ] });
+    setTimeout(() => { try { nameInput.focus(); nameInput.select(); } catch (e) {} }, 30);
   };
 
   // Apply Styles combo (Ctrl+Shift+S)

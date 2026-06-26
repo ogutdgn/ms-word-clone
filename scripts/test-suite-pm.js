@@ -1474,6 +1474,60 @@
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
     return markNames('graddlg').some((m) => /textGradient/.test(m)) || 'no textGradient mark after dialog';
   });
+  await t('[2] 021 Create-a-Style mints a custom style + exports it to styles.xml + applies it', async () => {
+    setDoc('mystyle probe text'); selectText('mystyle probe text');
+    PM().cmd('toggleBold'); PM().cmd('setMark', 'textStyle', { fontSize: '20pt' }); PM().cmd('setColor', '#FF0000');
+    await sleep(60);
+    const r = PM().createNamedStyle('My Test Style');
+    if (!r || !r.ok) return 'createNamedStyle failed: ' + JSON.stringify(r);
+    await sleep(60);
+    if (PM().allStyleNames().indexOf('My Test Style') < 0) return 'style not registered in allStyleNames';
+    const sid = paraAttrs('mystyle').paragraphProperties && paraAttrs('mystyle').paragraphProperties.styleId;
+    if (sid !== r.styleId) return 'style not applied (styleId=' + sid + ' want ' + r.styleId + ')';
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const stylesXml = window.WC.editor.converter && window.WC.editor.converter.convertedXml && window.WC.editor.converter.convertedXml['word/styles.xml'];
+    const root = (stylesXml && stylesXml.elements && stylesXml.elements[0] && stylesXml.elements[0].elements) || [];
+    const sty = root.find((e) => e.name === 'w:style' && (e.attributes || {})['w:styleId'] === r.styleId);
+    if (!sty) return 'no <w:style> for ' + r.styleId + ' in styles.xml';
+    const hasName = (sty.elements || []).some((c) => c.name === 'w:name' && (c.attributes || {})['w:val'] === 'My Test Style');
+    const rpr = (sty.elements || []).find((c) => c.name === 'w:rPr');
+    const hasBold = !!rpr && (rpr.elements || []).some((c) => c.name === 'w:b');
+    const hasColor = !!rpr && (rpr.elements || []).some((c) => c.name === 'w:color' && (c.attributes || {})['w:val'] === 'FF0000');
+    return (hasName && hasBold && hasColor) || ('style def off: name=' + hasName + ' bold=' + hasBold + ' color=' + hasColor);
+  });
+  await t('[2] 021 a created style is registered in the live linkedStyles array (in-app registry)', async () => {
+    // v1 KNOWN LIMIT: re-applying a session-created style BY NAME to other paragraphs may not take effect in-app
+    // (the linked-styles plugin establishes its style registry at load; the paged PE renders styles itself). The
+    // style is still pushed to converter.linkedStyles (best-effort) + correctly exported + applied to its own
+    // selection. Assert the live registry carries the entry.
+    setDoc('lsreg formatted text'); selectText('lsreg formatted text'); PM().cmd('toggleBold'); await sleep(40);
+    const r = PM().createNamedStyle('Registered Style');
+    if (!r || !r.ok) return 'create failed';
+    const arr = (window.WC.editor.converter && window.WC.editor.converter.linkedStyles) || [];
+    return arr.some((e) => e && e.id === r.styleId) || 'style not pushed to converter.linkedStyles';
+  });
+  await t('[2] 021 Create-a-Style does not clobber a built-in name (Heading 1 stays mapped)', async () => {
+    setDoc('clob probe'); selectText('clob');
+    PM().cmd('toggleBold'); await sleep(40);
+    const r = PM().createNamedStyle('Heading 1'); // collides with the built-in display name
+    // the built-in mapping must be intact, and the custom style got a distinct (suffixed) display name
+    return (r.ok && PM().styleIdForName && PM().styleIdForName('Heading 1') === 'Heading1' && r.name !== 'Heading 1') || ('builtin=' + (PM().styleIdForName && PM().styleIdForName('Heading 1')) + ' custom=' + r.name);
+  });
+  await t('[2] 021 Create-a-Style auto-suffixes a duplicate name to a unique id', async () => {
+    setDoc('dupstyle probe'); selectText('dupstyle');
+    const r1 = PM().createNamedStyle('Dup Style');
+    const r2 = PM().createNamedStyle('Dup Style');
+    return (r1.ok && r2.ok && r1.styleId !== r2.styleId) || ('ids: ' + (r1 && r1.styleId) + ' / ' + (r2 && r2.styleId));
+  });
+  await t('[2] 021 Create a Style dialog opens from the styles menu', () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('cstdlg probe'); selectText('cstdlg');
+    WC.Dialogs.createStyle();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    const ok = !!dlg && /Create New Style/.test(dlg.textContent || '');
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return ok || 'create-style dialog did not open';
+  });
   await t('[2] 019 Borders dialog has an Apply-to: Text option (run-level path)', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
     setDoc('dlgrb probe'); selectText('dlgrb');
@@ -1728,7 +1782,8 @@
     if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane(); // toggle-close
     return ok;
   });
-  await t('[3] pane Clear All applies Normal; New Style toasts (deferred)', async () => {
+  await t('[3] pane Clear All applies Normal; New Style opens the Create-a-Style dialog', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic
     setDoc('paneclear probe text'); selectText('paneclear probe text');
     PM().cmd('setStyleById', 'Quote'); await sleep(50);
     window.WC.Commands.launcher('styles', null, null);
@@ -1741,10 +1796,11 @@
     const cleared = paraAttrs('paneclear').paragraphProperties?.styleId === 'Normal';
     const newBtn = Array.from(pane.querySelectorAll('button')).find((b) => b.textContent.trim() === 'New Style');
     if (!newBtn) { window.WC.Dialogs.stylesPane(); return 'New Style button not found'; }
-    newBtn.click();
-    const noDialog = !document.querySelector('.modal-backdrop');
+    newBtn.click(); await sleep(20);
+    const hasDialog = !!document.querySelector('.modal-backdrop .dialog'); // New Style now opens the Create-a-Style dialog
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic cleanup (prevents a leaked-dialog cascade)
     if (document.getElementById('styles-pane')) window.WC.Dialogs.stylesPane();
-    return cleared && noDialog;
+    return cleared && hasDialog;
   });
   await t('[3] bridge resolved read exposes numbering ilvl (level-menu seam)', async () => {
     setDoc('resolved probe text'); selectText('resolved');

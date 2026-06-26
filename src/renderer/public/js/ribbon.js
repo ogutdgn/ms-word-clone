@@ -372,7 +372,7 @@
           styles.forEach((s) => { const ec = cell(s); if (s === active) ec.classList.add('active'); fg.appendChild(ec); });
           fly.appendChild(fg);
           fly.appendChild(WC.flySep());
-          fly.appendChild(WC.flyItem('Create a Style…', { icon: 'stylesGallery', onClick: () => WC.notImplemented('Create a Style (custom style authoring)') }));
+          fly.appendChild(WC.flyItem('Create a Style…', { icon: 'stylesGallery', onClick: () => WC.Dialogs.createStyle() }));
           fly.appendChild(WC.flyItem('Clear Formatting', { icon: 'clearAllFormatting', onClick: () => WC.Commands.run({ cmd: 'clearAllFormatting' }) }));
           fly.appendChild(WC.flyItem('Apply Styles…', { icon: 'styles', onClick: () => WC.Dialogs.applyStyles() }));
         }, { align: 'right' });
