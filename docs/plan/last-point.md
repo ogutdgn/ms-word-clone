@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-06-25 (COMPLETENESS PASS — HOME TAB: 7 bugs + 015 Font advanced effects merged)
+
+> **Branch:** `main` @ `292cfb9`, **pushed (in sync)**. **Phase: COMPLETENESS PASS — Home tab**, working the
+> agreed per-tab loop (fix bugs → triage features → next tab).
+>
+> **Done this session:**
+> 1. **Home BUGS fixed + merged** (`fix(home)` @ `59be244`): shading scope (RB-010 — run-level rPr/w:shd for a
+>    sub-paragraph selection vs pPr flood, COM-verified), Text-Effects outline color (RB-021 — valid black, was
+>    invalid CURRENTCOLOR), Highlight 15-keyword palette (RB-022 — always exports w:highlight), Change Case
+>    sentence-case (RB-047 — no whole-string lowercasing, COM-verified vs Word's wdTitleSentence), Font-size
+>    1–1638 range NO-FORK (RB-009/048 — combo + Font dialog + grow/shrink, via setMark not the fork 8–96 clamp,
+>    COM-verified 120pt). Gates pm436/smoke9/roundtrip27/bundle4; 2-pass /code-review (fixed the Font-dialog
+>    clamp consistency). KEY: Change Case "Sentence case" — Word does NOT lowercase the rest, only capitalizes
+>    sentence starts (the ledger's "end.New" framing was wrong; Word agrees on whitespace-gating). New oracles:
+>    validate-charshd-win.ps1, validate-changecase-win.ps1.
+> 2. **Home FEATURE TRIAGE (user decision):** build ALL non-stub Home gaps. Definitive inventory via a 5-agent
+>    audit workflow (every Home control vs live code). Roadmap: spec-kit **015** Font advanced effects (DONE),
+>    **016** Paragraph dialog completeness, **017** List authoring, **018** Find/Replace advanced; + a direct-TDD
+>    batch (underline color, multi-key sort, show/hide marks, Shift+F3, font-color gradient, create-a-style,
+>    selection pane, text-effects options, borders, font-name catalog). DROP the 5 cloud/ML/Office.js stubs
+>    (Dictate, Sensitivity, Add-ins, Reuse Files, Editor cloud refinements).
+> 3. **🏁 015 Font advanced effects — DONE, COM-validated, merged** (`feat(home)` @ `292cfb9`). The Font dialog's
+>    5 Advanced-tab effects now apply + export + clear + round-trip: All Caps/Spacing/Position NO-FORK (existing
+>    textStyle attrs); Small Caps + Char Scale via an OWNED `src/renderer/extensions/advanced-font-effects.ts`
+>    (addGlobalAttributes, the FontSize pattern) + **3 USER-AUTHORIZED minimal additive fork edits** (the spec's
+>    flagged STOP-AND-ASK; user said "add 6 lines"): styles.js decodeRPrFromMarks (export) + encodeMarksFromRPr
+>    (import) + calculateInlineRunPropertiesPlugin RUN_PROPERTIES_DERIVED_FROM_MARKS (clear). The fork ships the
+>    v3 rPr translators for all 5; only the mark↔runProperties whitelists excluded smallCaps/w (no ESM-safe seam
+>    → authorized fork edit). **COM oracle (validate-fonteffects-win.ps1): SmallCaps/AllCaps/Spacing=2/Position=3/
+>    Scaling=150 all read back correct.** Gates pm443/smoke9/roundtrip27/bundle4. /code-review high (2 passes):
+>    fixed import round-trip (imported smallCaps/scale now re-import as marks → render + prefill) + a non-preset
+>    scale prefill data-loss + a scale 0/NaN guard; refuted the setMark-clobber (setMark MERGES — verified) +
+>    position-0 findings. spec-kit artifacts in specs/015-font-effects/. **LESSON: COM caught an All-Caps false-
+>    green the XML test missed (it checked `<w:caps` presence, not w:val/correct run) — the failure was a probe-
+>    word-collision (shared "caps"/"RUN" substrings); the feature was correct.**
+>
+> **NEXT:** continue the Home roadmap — **016** Paragraph dialog completeness (At least/Exactly line rules +
+> first-line/hanging indent; dialogs.js D.paragraph hardcodes lineRule:auto, fork lineHeight.js only writes auto
+> — likely another spike/STOP-AND-ASK), then 017 / 018 / the direct-TDD batch. After Home: move to Insert.
+>
+> **Blockers/notes:** none. The constitution's "test:pm 475 OVERLAY" line is stale (008 retired overlay; test:pm
+> is paged-only, now 443).
+
 ## 2026-06-25 (RE-DISCOVERY CAMPAIGN — bug-hunt corpus re-baselined; Completeness Pass P1 tier hardened)
 
 > **Branch:** `main` @ `f17537c` (+ uncommitted doc checkpoint), pushed through `f17537c`. **Phase: COMPLETENESS
