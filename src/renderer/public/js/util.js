@@ -142,6 +142,29 @@
     return el('div', { class: 'color-swatch', title: c, style: { background: c }, onclick: () => { WC.closeFlyouts(); onPick(c, c); } });
   }
 
+  // RB-022: Word's Text Highlight Color gallery is a FIXED 15-keyword set (NOT the full
+  // theme/standard palette). Any non-keyword colour would round-trip as w:shd (character
+  // shading) instead of w:highlight — different semantics + the highlighter won't toggle
+  // it off. These 15 hexes are exactly the w:highlight keyword colours (helpers.js
+  // DOCX_HIGHLIGHT_KEYWORD_MAP, minus white) so every pick exports as a real w:highlight.
+  WC.HIGHLIGHT_COLORS = [
+    ['#FFFF00', 'Yellow'], ['#00FF00', 'Bright Green'], ['#00FFFF', 'Turquoise'], ['#FF00FF', 'Pink'], ['#0000FF', 'Blue'],
+    ['#FF0000', 'Red'], ['#000080', 'Dark Blue'], ['#008080', 'Teal'], ['#008000', 'Green'], ['#800080', 'Violet'],
+    ['#800000', 'Dark Red'], ['#808000', 'Dark Yellow'], ['#808080', 'Gray 50%'], ['#C0C0C0', 'Gray 25%'], ['#000000', 'Black'],
+  ];
+  WC.highlightPalette = function (onPick) {
+    const wrap = el('div', { class: 'color-palette highlight-palette' });
+    const grid = el('div', { class: 'color-grid' });
+    WC.HIGHLIGHT_COLORS.forEach(([c, label]) => grid.appendChild(
+      el('div', { class: 'color-swatch', title: c, 'data-label': label, style: { background: c }, onclick: () => { WC.closeFlyouts(); onPick(c, label); } }),
+    ));
+    wrap.appendChild(grid);
+    wrap.appendChild(el('div', { class: 'color-row', onclick: () => { WC.closeFlyouts(); onPick(null, 'No Color'); } }, [
+      el('span', { class: 'sw', style: { background: '#fff' } }), el('span', { text: 'No Color' }),
+    ]));
+    return wrap;
+  };
+
   // --- toast ---
   let toastWrap = null;
   WC.toast = function (msg, info) {

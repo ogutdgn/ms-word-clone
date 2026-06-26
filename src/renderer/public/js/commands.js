@@ -604,8 +604,12 @@
   function outlineMenu(node) {
     WC.flyout(node, (fly) => {
       fly.appendChild(WC.flyItem('No Outline', { onClick: () => applyTE('textOutline', null) }));
+      // RB-021: width presets must carry a REAL colour — 'currentColor' exported as an
+      // invalid <w14:srgbClr w14:val="CURRENTCOLOR"/> that Word drops on open (data loss).
+      // Word's default text-outline colour is black; the explicit "Outline Color…" picker
+      // below overrides it. (fill:transparent keeps the hollow outlined-text look.)
       [['¾ pt', 0.75], ['1 pt', 1], ['1½ pt', 1.5], ['2¼ pt', 2.25], ['3 pt', 3]].forEach(([lbl, w]) =>
-        fly.appendChild(WC.flyItem(lbl + ' outline', { onClick: () => applyTE('textOutline', { widthPt: w, color: 'currentColor', fill: 'transparent' }) })));
+        fly.appendChild(WC.flyItem(lbl + ' outline', { onClick: () => applyTE('textOutline', { widthPt: w, color: '#000000', fill: 'transparent' }) })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Outline Color…', { onClick: () => WC.flyout(node, (f2) => f2.appendChild(WC.colorPalette((color) => applyTE('textOutline', { widthPt: 1.5, color, fill: 'currentColor' })))) }));
     });
@@ -1870,9 +1874,16 @@
   }
   function stepFont(dir) {
     const cur = currentSizePt() || 11;
+    const MAXPRESET = SIZES[SIZES.length - 1]; // 72 — top of Word's jump-list
     let next;
-    if (dir > 0) { const bigger = SIZES.find((s) => s > cur); next = bigger != null ? bigger : SIZES[SIZES.length - 1]; }
-    else { const smaller = SIZES.filter((s) => s < cur); next = smaller.length ? smaller[smaller.length - 1] : SIZES[0]; }
+    if (dir > 0) {
+      // RB-048: grow continues PAST 72 (Word steps to the next multiple of 10), capped at 1638.
+      if (cur < MAXPRESET) { const bigger = SIZES.find((s) => s > cur); next = bigger != null ? bigger : MAXPRESET; }
+      else next = Math.min(1638, Math.floor(cur / 10) * 10 + 10);
+    } else {
+      if (cur > MAXPRESET) next = Math.max(MAXPRESET, Math.ceil(cur / 10) * 10 - 10); // step down by 10 to 72
+      else { const smaller = SIZES.filter((s) => s < cur); next = smaller.length ? smaller[smaller.length - 1] : Math.max(1, Math.round(cur) - 1); }
+    }
     setFontSize(next);
   }
   function currentSizePt() {
@@ -1882,7 +1893,9 @@
     if (!pt) return;
     // withSelection: combo commits arrive with focus in the combo input — the
     // focusin capture (focus.ts) snapshotted the PM selection; restore it first.
-    WC.PM.withSelection(() => WC.PM.cmd('setFontSize', pt + 'pt'));
+    // RB-009: setFontSizePt applies via setMark (NO-FORK) honouring Word's 1–1638 range,
+    // not the fork setFontSize 8–96 clamp.
+    WC.PM.withSelection(() => WC.PM.setFontSizePt(pt));
     WC.Ribbon.setComboValue('fontSize', String(pt));
   }
   function setFontName(name) {
@@ -1911,8 +1924,11 @@
         WC.Ribbon.setColorBar('textHighlightColor', color);
       } else if (kind === 'shade') {
         if (color && color !== 'transparent') lastShade = color;
-        if (!color || color === 'transparent') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
-        else pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: color.replace(/^#/, '').toUpperCase() } });
+        // RB-010: the bridge scopes shading to the selection (run-level rPr/w:shd for a
+        // sub-paragraph selection; pPr/w:shd for an empty caret / whole / multi-paragraph
+        // selection) like Word's Borders & Shading "Apply to" — not a paragraph flood.
+        if (!color || color === 'transparent') pm.clearShading();
+        else pm.setShading(color);
         WC.Ribbon.setColorBar && WC.Ribbon.setColorBar('shading', color);
       } else if (kind === 'page') {
         pm.dePageColor(color); // design area — slice 10 PR2 (real w:background)
@@ -1927,8 +1943,17 @@
     // (in applyColor and the unset paths below) restores this exact range.
     WC.PM.captureSelection();
     WC.flyout(node, (fly) => {
+      // RB-022: the highlighter uses the fixed 15-keyword gallery (not the full palette),
+      // so every pick exports as a real w:highlight (never a w:shd fallback).
+      if (kind === 'hilite') {
+        fly.appendChild(WC.highlightPalette((color) => {
+          if (color === null) { const pm = WC.PM; pm.withSelection(() => pm.cmd('unsetHighlight')); return; }
+          applyColor('hilite', color);
+        }));
+        return;
+      }
       fly.appendChild(WC.colorPalette((color, label) => {
-        if (color === null) { const pm = WC.PM; pm.withSelection(() => { if (kind === 'hilite') pm.cmd('unsetHighlight'); else if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); else { pm.dePageColorClear(); } }); return; }
+        if (color === null) { const pm = WC.PM; pm.withSelection(() => { if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.clearShading(); else { pm.dePageColorClear(); } }); return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
     });

@@ -55,7 +55,11 @@ export function installCommands(editor: AnyEditor) {
       if (mode === 'lower') return t.toLowerCase()
       if (mode === 'upper') return t.toUpperCase()
       if (mode === 'caps') return t.replace(/\b\w/g, (m) => m.toUpperCase())
-      if (mode === 'sentence') return t.toLowerCase().replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase())
+      // Word's wdTitleSentence (COM-verified, RB-047): capitalize the first letter of each
+      // sentence (string start, or after .!? + WHITESPACE) and leave the rest AS-IS — it does
+      // NOT lowercase the rest, and a terminator with NO following space ("end.New") is NOT a
+      // boundary. (The prior t.toLowerCase() flattened mixed case — wrong vs Word.)
+      if (mode === 'sentence') return t.replace(/(^\s*\w|[.!?]\s+\w)/g, (m) => m.toUpperCase())
       if (mode === 'toggle') return t.replace(/./g, (ch) => (ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase()))
       return t
     }
@@ -74,6 +78,55 @@ export function installCommands(editor: AnyEditor) {
     if (tr.docChanged) editor.view?.dispatch(tr)
     editor.view?.focus()
     return true
+  }
+
+  // RB-010: Shading respects selection granularity like Word's Borders & Shading
+  // "Apply to" dropdown. A PARTIAL (sub-paragraph) selection → run-level CHARACTER
+  // shading (rPr/w:shd) on just the run — Word-COM-verified (validate-charshd-win.ps1:
+  // Range("beta").Shading=FFE599 while Paragraph.Shading=automatic). An empty caret, a
+  // whole-paragraph selection, or a multi-paragraph selection → paragraph shading
+  // (pPr/w:shd). Previously every shade flooded the paragraph (pPr/w:shd) regardless of
+  // selection. The fork models a run background as the `highlight` mark, whose exporter
+  // emits w:shd for non-keyword colours (and w:highlight for the ~16 Word highlight
+  // keyword colours — a visually identical run background; a documented v1 edge).
+  function shadingScope(): 'run' | 'paragraph' {
+    const { selection, doc } = editor.state
+    const { from, to, empty } = selection
+    if (empty) return 'paragraph'
+    const $from = doc.resolve(from)
+    const $to = doc.resolve(to)
+    if (!$from.sameParent($to)) return 'paragraph' // spans >1 block
+    // whole-block content selected (start..end of the paragraph's text) → paragraph
+    if (from <= $from.start() && to >= $from.end()) return 'paragraph'
+    return 'run'
+  }
+  function setShading(color: string): boolean {
+    if (!color || color === 'transparent') return clearShading()
+    const fill = String(color).replace(/^#/, '').toUpperCase()
+    if (shadingScope() === 'run') {
+      // run-level character shading via the highlight mark (exports rPr/w:shd for a
+      // non-keyword colour; a keyword colour serialises as w:highlight — same visual).
+      return cmd('setHighlight', '#' + fill)
+    }
+    return cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill } })
+  }
+  function clearShading(): boolean {
+    // "No Color" clears BOTH paragraph shading and any run-level character shading in
+    // the selection (the highlight mark is the run-background carrier).
+    cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading')
+    cmd('unsetHighlight')
+    return true
+  }
+
+  // RB-009/048: apply font size via the run-level textStyle.fontSize mark directly so the
+  // full Word range (1–1638pt) is honoured. The fork's setFontSize command hard-clamps to
+  // 8–96 (font-size.js minMax) — a silent data-loss for typed combo values >96 / <8 and a
+  // ceiling on grow-font. We clamp to Word's documented 1–1638 instead (validation, not loss).
+  function setFontSizePt(pt: number | string): boolean {
+    const n = parseFloat(String(pt))
+    if (!Number.isFinite(n)) return false
+    const v = Math.min(1638, Math.max(1, n))
+    return cmd('setMark', 'textStyle', { fontSize: v + 'pt' })
   }
 
   // Paragraph sort as ONE PM transaction (no engine command — legacy sortDialog
@@ -203,6 +256,7 @@ export function installCommands(editor: AnyEditor) {
   }
 
   return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs,
+    setShading, clearShading, setFontSizePt,
     getResolvedParaProps, styleIdForName, applyStyleByName,
     selectAll, selectSimilarFormatting, armFormatPainter, cancelFormatPainter, painterArmed }
 }

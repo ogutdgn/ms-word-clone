@@ -443,7 +443,10 @@
 
     WC.dialog({ title: 'Font', width: '540px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        const steps = [['setFontFamily', fam.value], ['setFontSize', (parseFloat(size.value) || 11) + 'pt']];
+        // RB-009: apply size via textStyle.fontSize (NO-FORK) honouring Word's 1–1638 range,
+        // not the fork setFontSize 8–96 clamp — consistent with the ribbon combo (setFontSizePt).
+        const szPt = Math.min(1638, Math.max(1, parseFloat(size.value) || 11));
+        const steps = [['setFontFamily', fam.value], ['setMark', 'textStyle', { fontSize: szPt + 'pt' }]];
         steps.push([/Bold/.test(styleSel.value) ? 'setBold' : 'unsetBold']);
         steps.push([/Italic/.test(styleSel.value) ? 'setItalic' : 'unsetItalic']);
         if (colorVal) steps.push(['setColor', colorVal]);

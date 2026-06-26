@@ -293,6 +293,33 @@
     selectText('charfmt'); run('clearAllFormatting'); await sleep(50);
     return markNames('charfmt').length === 0;
   });
+  await t("[home] Font size combo accepts Word's full range — 120pt is NOT clamped to 96 (RB-009)", async () => {
+    // RB-009 data-loss: the fork's setFontSize hard-clamps 8–96 (font-size.js minMax); Word
+    // allows 1–1638. The combo now applies via setMark textStyle.fontSize (NO-FORK) so a typed
+    // 120 is kept, not silently clamped to 96.
+    setDoc('bigsize body'); selectText('bigsize');
+    window.WC.Commands.comboCommit({ cmd: 'fontSize' }, '120'); await sleep(50);
+    if (!markNames('bigsize').some((m) => m.includes('120pt'))) return 'fontSize not 120pt (clamped?): ' + markNames('bigsize').join(',');
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!/<w:sz w:val="240"/.test(xml)) return 'export w:sz not 240 (=120pt half-pts): ' + ((xml.match(/<w:sz w:val="\d+"/) || [])[0] || 'none');
+    return true;
+  });
+  await t('[home] Font size combo accepts small sizes — 4pt is NOT clamped to 8 (RB-009)', async () => {
+    setDoc('smallsize body'); selectText('smallsize');
+    window.WC.Commands.comboCommit({ cmd: 'fontSize' }, '4'); await sleep(50);
+    return markNames('smallsize').some((m) => m.includes('4pt')) ? true : 'fontSize not 4pt (clamped?): ' + markNames('smallsize').join(',');
+  });
+  await t("[home] Font size combo clamps to Word's 1638pt max (out-of-range guard, RB-009)", async () => {
+    setDoc('hugesize body'); selectText('hugesize');
+    window.WC.Commands.comboCommit({ cmd: 'fontSize' }, '5000'); await sleep(50);
+    return markNames('hugesize').some((m) => m.includes('1638pt')) ? true : 'fontSize not clamped to 1638: ' + markNames('hugesize').join(',');
+  });
+  await t('[home] Grow Font continues past 72 → 80 (RB-048)', async () => {
+    setDoc('growpast body'); selectText('growpast');
+    window.WC.Commands.comboCommit({ cmd: 'fontSize' }, '72'); await sleep(40);
+    selectText('growpast'); run('increaseFontSize'); await sleep(40);
+    return markNames('growpast').some((m) => m.includes('80pt')) ? true : 'grow from 72 did not reach 80: ' + markNames('growpast').join(',');
+  });
   await t('[1] EXPORT: underline STYLES via the menu → <w:u w:val> (CSS→OOXML map; Word: Font.Underline 1/3/4/7/11)', async () => {
     // Drives the REAL underline menu (label → UL_TYPE map → setMark) so this guards the CSS→OOXML enum
     // map — esp. Dashed→"dash" / Wavy→"wave" (the renamed ones, the fidelity risk). Underlines each WHOLE
@@ -364,6 +391,34 @@
     const vals = (xml.match(/<w:vertAlign\b[^>]*w:val="([^"]*)"/g) || []).map((m) => m.match(/w:val="([^"]*)"/)[1]);
     return (vals.join(',') === 'subscript,superscript') || ('w:vertAlign vals: got [' + vals.join(',') + '] want [subscript,superscript]');
   });
+  await t('[home] Change Case "Sentence case" matches Word: capitalize sentence starts, do NOT lowercase the rest (RB-047)', async () => {
+    // Word-COM ground truth (validate-changecase-win.ps1, installed M365): wdTitleSentence
+    // capitalizes the first letter of each sentence (start, or after .!? + WHITESPACE) and
+    // leaves every other character AS-IS. "end.New"/"no.space" (no space) are NOT recapitalized
+    // (Word agrees). The previous code lowercased the whole string first → wrong for mixed case.
+    const cases = [
+      ['the QUICK brown FOX. the lazy DOG', 'The QUICK brown FOX. The lazy DOG'],
+      ['end.New sentence here. another test', 'End.New sentence here. Another test'],
+      ['no.space here.test done', 'No.space here.test done'],
+      ['hello! world? yes. ok', 'Hello! World? Yes. Ok'],
+    ];
+    for (const [input, want] of cases) {
+      setDoc(input);
+      window.WC.editor.commands.selectAll();
+      PM().changeCase('sentence'); await sleep(20);
+      const got = doc().textContent;
+      if (got !== want) return 'sentence("' + input + '") = "' + got + '" want "' + want + '"';
+    }
+    return true;
+  });
+  await t('[home] Change Case "tOGGLE cASE" matches Word per-character flip (RB-047 parity guard)', async () => {
+    // Word-COM ground truth: "tOGGLE cASE eXAMPLE Text" → "Toggle Case Example tEXT".
+    setDoc('tOGGLE cASE eXAMPLE Text');
+    window.WC.editor.commands.selectAll();
+    PM().changeCase('toggle'); await sleep(20);
+    const got = doc().textContent;
+    return got === 'Toggle Case Example tEXT' ? true : 'toggle = "' + got + '"';
+  });
   await t('[1] changeCase UPPERCASE via PM transaction', async () => {
     setDoc('case probe text'); selectText('case probe');
     PM().changeCase('upper'); await sleep(50);
@@ -391,6 +446,17 @@
     PM().cmd('undo'); await sleep(50);
     const m2 = markNames('dialog').join(' ');
     return applied && !/Georgia/.test(m2) && !/bold:/.test(m2); // one undo removed ALL of it
+  });
+  await t("[home] Font dialog OK honors Word's full size range — 120pt is NOT clamped (RB-009)", async () => {
+    // Same NO-FORK widening as the combo: the Font dialog (Ctrl+D) size must not clamp to 96.
+    setDoc('fdialog big words'); selectText('fdialog big');
+    window.WC.Dialogs.font();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'dialog did not open';
+    dlg.querySelector('input[type=number]').value = '120';
+    const ok = Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim()));
+    ok.click(); await sleep(80);
+    return markNames('fdialog').some((m) => m.includes('120pt')) ? true : 'font dialog size clamped: ' + markNames('fdialog').join(' ');
   });
   await t('[1] subscript applies via textStyle vertAlign and toggles off', async () => {
     setDoc('subsup probe'); selectText('subsup');
@@ -599,14 +665,19 @@
     window.WC.closeFlyouts();
     return applied && flipped;
   });
+  // Collapse the selection to a caret at the start of `needle` → an EMPTY selection so
+  // shading takes the PARAGRAPH scope (RB-010: a non-empty sub-paragraph selection now
+  // takes the run scope). selectText positions us; we then collapse.
+  const caretAt = (needle) => { const f = selectText(needle); v().dispatch(v().state.tr.setSelection(window.__PM_TextSelection.create(doc(), f.from, f.from))); return f; };
   await t('[2] shading No Color clears it', async () => {
     // self-contained setup (008: the prior shading-palette test that authored + shaded "shade" was retired)
-    setDoc('shade probe text'); selectText('shade');
+    setDoc('shade probe text'); caretAt('shade'); // empty caret → paragraph shading scope
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body);
     const _sw = document.querySelector('.flyout .color-swatch[title="#FFFF00"]') || document.querySelector('.flyout .color-swatch');
     if (_sw) { _sw.click(); await sleep(50); }
+    if (paraAttrs('shade').paragraphProperties?.shading == null) return 'paragraph shading not applied on an empty caret';
     // now clear it via No Color:
-    selectText('shade');
+    caretAt('shade');
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body);
     const noColor = Array.from(document.querySelectorAll('.flyout .color-row'))
       .find((r) => /No Color/.test(r.textContent));
@@ -614,12 +685,67 @@
     noColor.click(); await sleep(50);
     return paraAttrs('shade').paragraphProperties?.shading == null;
   });
+  await t('[home] Shading on a sub-paragraph selection → run-level rPr/w:shd, paragraph NOT flooded (RB-010)', async () => {
+    // Word's Borders & Shading "Apply to: Text": shading a PARTIAL selection applies
+    // CHARACTER shading (rPr/w:shd) to just the run — NOT paragraph shading. COM-verified
+    // (validate-charshd-win.ps1: Range("beta").Shading=FFE599 = 10085887, Paragraph.Shading=automatic).
+    setDoc('alpha beta gamma'); selectText('beta');
+    if (typeof PM().setShading !== 'function') return 'PM.setShading missing';
+    PM().setShading('#FFE599'); await sleep(50);
+    if (paraAttrs('beta').paragraphProperties?.shading != null) return 'paragraph was flooded (pPr shading on a sub-selection)';
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const betaRun = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /<w:t[^>]*>beta<\/w:t>/.test(r));
+    if (!betaRun) return 'no run for "beta"';
+    if (!/<w:shd\b[^>]*w:fill="FFE599"/i.test(betaRun)) return 'run "beta" lacks rPr/w:shd FFE599: ' + betaRun;
+    if ((xml.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/g) || []).some((p) => /<w:shd\b/.test(p))) return 'unexpected paragraph-level <w:shd>';
+    return true;
+  });
+  await t('[home] Shading via the flyout on a partial selection → run-level shd (non-keyword swatch, RB-010)', async () => {
+    setDoc('one two three'); selectText('two');
+    window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body); await sleep(40);
+    const sw = document.querySelector('.flyout .color-swatch[title="#FFC000"]');
+    if (!sw) return 'no #FFC000 swatch in shading flyout';
+    sw.click(); await sleep(60);
+    if (paraAttrs('two').paragraphProperties?.shading != null) return 'paragraph flooded via flyout';
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const twoRun = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /<w:t[^>]*>two<\/w:t>/.test(r));
+    if (!twoRun || !/<w:shd\b[^>]*w:fill="FFC000"/i.test(twoRun)) return 'run "two" lacks rPr/w:shd FFC000: ' + twoRun;
+    return true;
+  });
+  await t('[home] Shading with an EMPTY caret → paragraph shading (pPr/w:shd), not run shd (RB-010)', async () => {
+    setDoc('caretpara body text'); caretAt('caretpara');
+    if (typeof PM().setShading !== 'function') return 'PM.setShading missing';
+    PM().setShading('#FFE599'); await sleep(50);
+    const a = paraAttrs('caretpara').paragraphProperties?.shading;
+    if (!a || a.fill !== 'FFE599') return 'empty-caret did not apply paragraph shd: ' + JSON.stringify(a);
+    return true;
+  });
+  await t("[home] Highlight palette is Word's fixed 15-keyword set — every pick exports w:highlight, never w:shd (RB-022)", async () => {
+    // RB-022: the highlighter used the full theme/standard palette + More Colors, so any
+    // non-keyword swatch round-tripped as w:shd (character shading), not w:highlight.
+    setDoc('hilitetest body'); selectText('hilitetest');
+    window.WC.Commands.dropdown({ cmd: 'textHighlightColor', type: 'split' }, document.body); await sleep(40);
+    const swatches = Array.from(document.querySelectorAll('.flyout .highlight-palette .color-swatch'));
+    if (swatches.length !== 15) return 'expected 15 highlighter swatches, got ' + swatches.length;
+    const flyTxt = document.querySelector('.flyout').textContent;
+    if (/More Colors/.test(flyTxt)) return 'highlighter must NOT offer More Colors (would allow non-keyword → w:shd)';
+    if (document.querySelector('.flyout .color-section-title')) return 'highlighter must NOT show Theme/Standard sections';
+    const green = swatches.find((s) => s.title === '#00FF00'); // Bright Green → keyword "green"
+    if (!green) return 'no #00FF00 (Bright Green) swatch';
+    green.click(); await sleep(60);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /<w:t[^>]*>hilitetest<\/w:t>/.test(r));
+    if (!run) return 'no run for hilitetest';
+    if (/<w:shd\b/.test(run)) return 'highlight fell back to w:shd (data semantics): ' + run;
+    if (!/<w:highlight\b[^>]*w:val="green"/.test(run)) return 'expected w:highlight w:val="green": ' + run;
+    return true;
+  });
   await t('[2] EXPORT: paragraph shading → <w:pPr><w:shd w:val="clear" w:fill=...> (Word: ParagraphFormat.Shading)', async () => {
     // The tests above cover the model attr + DOM paint; this guards the docx EXPORT — especially
     // w:val="clear" (Word only PAINTS the fill when val=clear; dropping it silently breaks shading in
     // Word) + the hex round-tripping verbatim. Word COM-validated separately with FF0000:
     // Paragraphs(1).Shading.BackgroundPatternColor=255 — oracle-probe-2-parashading.js + validate-parashading-win.ps1.
-    setDoc('para shade export'); selectText('shade');
+    setDoc('para shade export'); caretAt('shade'); // empty caret → paragraph shading scope (RB-010)
     window.WC.Commands.dropdown({ cmd: 'shading', type: 'split' }, document.body); await sleep(40);
     const sw = document.querySelector('.flyout .color-swatch[title="#FFFF00"]') || document.querySelector('.flyout .color-swatch');
     if (!sw) return 'no shading swatch in flyout';
@@ -795,6 +921,28 @@
     const outlineColor = /<w14:textOutline[\s\S]*?<w14:srgbClr w14:val="FF0000"/.test(xml);
     const glowColor = /<w14:glow[\s\S]*?<w14:srgbClr w14:val="00FF00"/.test(xml);
     return outlineEmu === '25400' && glowEmu === '63500' && outlineColor && glowColor;
+  });
+  await t('[effects] Text Effects → Outline width preset exports a VALID srgbClr (not CURRENTCOLOR) (RB-021)', async () => {
+    // RB-021 data-loss: the width presets passed color:'currentColor' → export emitted
+    // <w14:srgbClr w14:val="CURRENTCOLOR"/>, an invalid OOXML colour Word drops on open.
+    // The preset must carry a real hex (Word's default outline colour is black).
+    setDoc('outlinepreset body'); selectText('outlinepreset');
+    window.WC.Commands.dropdown({ cmd: 'textEffectsAndTypography', type: 'dropdown' }, document.body); await sleep(30);
+    const outlineRow = Array.from(document.querySelectorAll('.flyout .fly-item')).find((n) => /^Outline$/.test((n.querySelector('.fi-label') || n).textContent.trim()));
+    if (!outlineRow) return 'no Outline row in Text Effects menu';
+    outlineRow.click(); await sleep(30);
+    const preset = Array.from(document.querySelectorAll('.flyout .fly-item')).find((n) => /^1 pt outline$/.test((n.querySelector('.fi-label') || n).textContent.trim()));
+    if (!preset) return 'no "1 pt outline" preset';
+    preset.click(); await sleep(50);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const outline = (xml.match(/<w14:textOutline[\s\S]*?<\/w14:textOutline>/) || [])[0];
+    if (!outline) return 'no w14:textOutline in export';
+    if (/CURRENT/i.test(outline)) return 'CURRENTCOLOR leaked (data loss): ' + outline;
+    const val = (outline.match(/<w14:srgbClr[^>]*w14:val="([0-9A-Fa-f]{6})"/) || [])[1];
+    if (!val) return 'srgbClr val is not a valid 6-hex: ' + outline;
+    // 1pt = 12700 EMU — the width must also survive
+    if (!/w14:w="12700"/.test(outline)) return 'outline width not 1pt(12700 EMU): ' + outline;
+    return true;
   });
   await t('[insert] small stacked Insert buttons keep text labels; Home Font buttons stay icon-only', () => {
     const ci = window.WC.Ribbon.controlIndex;
