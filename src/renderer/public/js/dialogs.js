@@ -400,6 +400,19 @@
     const positionBy = el('input', { type: 'number', value: '3', step: '1', style: { width: '60px' } });
     [scale, spacing, spacingBy, position, positionBy].forEach((n) => { n.addEventListener('change', update); n.addEventListener('input', update); });
 
+    // 015: prefill the five advanced effects from the current run state (FR-006).
+    const fx = pm.ready ? pm.getAdvancedFontEffects() : { allCaps: false, smallCaps: false, spacingPt: null, positionPt: null, scalePct: null };
+    if (fx.smallCaps) small.c.checked = true;
+    if (fx.allCaps) allc.c.checked = true;
+    // Preserve a non-preset scale (e.g. an imported 120%) — add it as an option so OK doesn't
+    // silently clear it (the dialog always re-applies the control state).
+    if (fx.scalePct != null && fx.scalePct !== 100) {
+      if (!Array.from(scale.options).some((o) => o.value === String(fx.scalePct))) scale.appendChild(el('option', { value: String(fx.scalePct), text: fx.scalePct + '%' }));
+      scale.value = String(fx.scalePct);
+    }
+    if (fx.spacingPt != null && fx.spacingPt !== 0) { spacing.value = fx.spacingPt > 0 ? 'Expanded' : 'Condensed'; spacingBy.value = String(Math.abs(fx.spacingPt)); }
+    if (fx.positionPt != null && fx.positionPt !== 0) { position.value = fx.positionPt > 0 ? 'Raised' : 'Lowered'; positionBy.value = String(Math.abs(fx.positionPt)); }
+
     const previewSpan = el('span', { text: 'AaBbCc — The quick brown fox' });
     const previewBox = el('div', { class: 'font-preview' }, [previewSpan]);
 
@@ -446,7 +459,12 @@
         // RB-009: apply size via textStyle.fontSize (NO-FORK) honouring Word's 1–1638 range,
         // not the fork setFontSize 8–96 clamp — consistent with the ribbon combo (setFontSizePt).
         const szPt = Math.min(1638, Math.max(1, parseFloat(size.value) || 11));
-        const steps = [['setFontFamily', fam.value], ['setMark', 'textStyle', { fontSize: szPt + 'pt' }]];
+        // 015: the five Advanced-tab effects apply in the SAME setMark (one undo step); each is
+        // set-or-cleared from its control. Normal/100% clears the property (no stale carryover).
+        const spPt = spacing.value === 'Normal' ? 0 : (spacing.value === 'Expanded' ? 1 : -1) * (parseFloat(spacingBy.value) || 1);
+        const poPt = position.value === 'Normal' ? 0 : (position.value === 'Raised' ? 1 : -1) * (parseFloat(positionBy.value) || 3);
+        const advFx = pm.advFxAttrs({ allCaps: allc.c.checked, smallCaps: small.c.checked, spacingPt: spPt, positionPt: poPt, scalePct: parseInt(scale.value, 10) });
+        const steps = [['setFontFamily', fam.value], ['setMark', 'textStyle', Object.assign({ fontSize: szPt + 'pt' }, advFx)]];
         steps.push([/Bold/.test(styleSel.value) ? 'setBold' : 'unsetBold']);
         steps.push([/Italic/.test(styleSel.value) ? 'setItalic' : 'unsetItalic']);
         if (colorVal) steps.push(['setColor', colorVal]);
@@ -460,9 +478,7 @@
         if (sup.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'superscript' }]);
         else if (sub.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'subscript' }]);
         pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (matches Word)
-        if (small.c.checked || allc.c.checked || scale.value !== '100' || spacing.value !== 'Normal' || position.value !== 'Normal') {
-          pm.notifyBlocked('Caps and Advanced font effects');
-        }
+        // 015: the five advanced effects are now applied above (no more notifyBlocked).
         WC.Ribbon.setComboValue('font', fam.value); WC.Ribbon.setComboValue('fontSize', String(parseFloat(size.value) || 11));
       } },
       { label: 'Cancel' },

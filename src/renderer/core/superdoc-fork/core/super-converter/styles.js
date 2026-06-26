@@ -162,6 +162,18 @@ export function encodeMarksFromRPr(runProperties, docx) {
         const spacing = twipsToPt(value);
         textStyleAttrs[key] = `${spacing}pt`;
         break;
+      // MS-WORD-CLONE FORK EDIT (015, user-authorized — Constitution P1): IMPORT side for Small Caps
+      // + Character Scale, so an imported docx's <w:smallCaps/>/<w:w> renders in-app + prefills the
+      // Font dialog like the 3 fork-native effects (the v3 translators decode the rPr → these
+      // runProperties; this maps them onto the owned textStyle attrs). PURELY ADDITIVE.
+      case 'smallCaps':
+        if (value) textStyleAttrs[key] = true;
+        break;
+      case 'w': {
+        const wPct = parseInt(value, 10);
+        if (!isNaN(wPct)) textStyleAttrs[key] = wPct;
+        break;
+      }
       case 'fontFamily':
         const fontFamily = resolveDocxFontFamily(value, docx, getToCssFontFamily());
         textStyleAttrs[key] = fontFamily;
@@ -743,6 +755,19 @@ export function decodeRPrFromMarks(marks) {
                   runProperties.position = numeric * 2;
                 }
               }
+              break;
+            }
+            // MS-WORD-CLONE FORK EDIT (015, user-authorized — Constitution P1): Small Caps + Character
+            // Scale. The OWNED advanced-font-effects extension declares these textStyle attrs and the
+            // v3 rPr translators (w/smallCaps + w/w) already emit them; this run-export whitelist just
+            // needs to forward the two attrs. PURELY ADDITIVE — both attrs no-op'd here before, so this
+            // cannot regress any existing run property.
+            case 'smallCaps':
+              if (value) runProperties.smallCaps = true;
+              break;
+            case 'w': {
+              const pct = parseInt(value, 10);
+              if (!isNaN(pct)) runProperties.w = pct;
               break;
             }
             case 'styleId':

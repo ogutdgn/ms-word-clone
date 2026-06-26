@@ -129,6 +129,43 @@ export function installCommands(editor: AnyEditor) {
     return cmd('setMark', 'textStyle', { fontSize: v + 'pt' })
   }
 
+  // 015 — Font dialog Advanced-tab effects → textStyle attrs (null = clear, drops the property).
+  // All Caps → textTransform 'uppercase' (w:caps); Small Caps → smallCaps (w:smallCaps, owned
+  // attr via advanced-font-effects.ts); Spacing → letterSpacing 'Npt' signed (w:spacing twips);
+  // Position → position 'Npt' signed (w:position half-pt; distinct from sub/superscript vertAlign);
+  // Scale → w percent (w:w). Only keys PRESENT in `o` are written, so the dialog can set a subset.
+  type AdvFx = { allCaps?: boolean; smallCaps?: boolean; spacingPt?: number | null; positionPt?: number | null; scalePct?: number | null }
+  function advFxAttrs(o: AdvFx = {}): Record<string, unknown> {
+    const a: Record<string, unknown> = {}
+    if ('allCaps' in o) a.textTransform = o.allCaps ? 'uppercase' : null
+    if ('smallCaps' in o) a.smallCaps = o.smallCaps ? true : null
+    if ('spacingPt' in o) a.letterSpacing = o.spacingPt != null && o.spacingPt !== 0 ? o.spacingPt + 'pt' : null
+    if ('positionPt' in o) a.position = o.positionPt != null && o.positionPt !== 0 ? o.positionPt + 'pt' : null
+    if ('scalePct' in o) { const n = Number(o.scalePct); a.w = Number.isFinite(n) && n >= 1 && n !== 100 ? n : null }
+    return a
+  }
+  function setAdvancedFontEffects(o: AdvFx = {}): boolean {
+    const a = advFxAttrs(o)
+    if (!Object.keys(a).length) return false
+    return cmd('setMark', 'textStyle', a)
+  }
+  // Read the run's current advanced effects (for Font-dialog prefill, FR-006). Reads the
+  // textStyle mark at the selection head (stored marks when the selection is empty).
+  function getAdvancedFontEffects(): { allCaps: boolean; smallCaps: boolean; spacingPt: number | null; positionPt: number | null; scalePct: number | null } {
+    const { state } = editor
+    const sel = state.selection
+    const marks = sel.empty ? (state.storedMarks || sel.$from.marks()) : sel.$from.marksAcross(sel.$to) || sel.$from.marks()
+    const ts = (marks || []).find((m: any) => m.type.name === 'textStyle')
+    const a = (ts && ts.attrs) || {}
+    return {
+      allCaps: a.textTransform === 'uppercase',
+      smallCaps: !!a.smallCaps,
+      spacingPt: a.letterSpacing != null ? parseFloat(String(a.letterSpacing)) : null,
+      positionPt: a.position != null ? parseFloat(String(a.position)) : null,
+      scalePct: a.w != null ? Number(a.w) : null,
+    }
+  }
+
   // Paragraph sort as ONE PM transaction (no engine command — legacy sortDialog
   // reordered DOM siblings). Restricted to contiguous siblings of the first selected
   // paragraph's parent, mirroring legacy sortSelection's same-parent guard.
@@ -256,7 +293,7 @@ export function installCommands(editor: AnyEditor) {
   }
 
   return { cmd, chain, captureSelection, withSelection, changeCase, sortParagraphs,
-    setShading, clearShading, setFontSizePt,
+    setShading, clearShading, setFontSizePt, setAdvancedFontEffects, advFxAttrs, getAdvancedFontEffects,
     getResolvedParaProps, styleIdForName, applyStyleByName,
     selectAll, selectSimilarFormatting, armFormatPainter, cancelFormatPainter, painterArmed }
 }

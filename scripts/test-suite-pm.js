@@ -458,6 +458,67 @@
     ok.click(); await sleep(80);
     return markNames('fdialog').some((m) => m.includes('120pt')) ? true : 'font dialog size clamped: ' + markNames('fdialog').join(' ');
   });
+  // 015 — Font dialog advanced character effects (Small/All Caps, Spacing, Position, Scale).
+  const runFor = (xml, word) => (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => new RegExp('<w:t[^>]*>' + word + '</w:t>').test(r)) || '';
+  const xmlNow = () => window.WC.editor.exportDocx({ exportXmlOnly: true });
+  await t('[home] 015 All Caps via bridge → <w:caps>; clear drops it', async () => {
+    setDoc('allcapsX body'); selectText('allcapsX');
+    if (typeof PM().setAdvancedFontEffects !== 'function') return 'PM.setAdvancedFontEffects missing';
+    PM().setAdvancedFontEffects({ allCaps: true }); await sleep(40);
+    if (!/<w:caps\b/.test(runFor(await xmlNow(), 'allcapsX'))) return 'no <w:caps> after apply';
+    selectText('allcapsX'); PM().setAdvancedFontEffects({ allCaps: false }); await sleep(40);
+    return /<w:caps\b/.test(runFor(await xmlNow(), 'allcapsX')) ? '<w:caps> not cleared' : true;
+  });
+  await t('[home] 015 Small Caps via bridge (owned attr) → <w:smallCaps>; clear drops it', async () => {
+    setDoc('scapsX body'); selectText('scapsX');
+    PM().setAdvancedFontEffects({ smallCaps: true }); await sleep(40);
+    if (!/<w:smallCaps\b/.test(runFor(await xmlNow(), 'scapsX'))) return 'no <w:smallCaps> after apply (owned extension not active?)';
+    selectText('scapsX'); PM().setAdvancedFontEffects({ smallCaps: false }); await sleep(40);
+    return /<w:smallCaps\b/.test(runFor(await xmlNow(), 'scapsX')) ? '<w:smallCaps> not cleared' : true;
+  });
+  await t('[home] 015 Char Spacing via bridge → <w:spacing w:val> twips (Expanded +, Condensed −); Normal clears', async () => {
+    setDoc('spaceX body'); selectText('spaceX');
+    PM().setAdvancedFontEffects({ spacingPt: 2 }); await sleep(40);
+    if (!/<w:spacing\b[^>]*w:val="40"/.test(runFor(await xmlNow(), 'spaceX'))) return 'Expanded 2pt not w:spacing 40: ' + runFor(await xmlNow(), 'spaceX');
+    selectText('spaceX'); PM().setAdvancedFontEffects({ spacingPt: -1.5 }); await sleep(40);
+    if (!/<w:spacing\b[^>]*w:val="-30"/.test(runFor(await xmlNow(), 'spaceX'))) return 'Condensed 1.5pt not w:spacing -30';
+    selectText('spaceX'); PM().setAdvancedFontEffects({ spacingPt: 0 }); await sleep(40);
+    return /<w:spacing\b/.test(runFor(await xmlNow(), 'spaceX')) ? 'spacing not cleared at Normal' : true;
+  });
+  await t('[home] 015 Position via bridge → <w:position w:val> half-pt (Raised +, Lowered −); Normal clears', async () => {
+    setDoc('posX body'); selectText('posX');
+    PM().setAdvancedFontEffects({ positionPt: 3 }); await sleep(40);
+    if (!/<w:position\b[^>]*w:val="6"/.test(runFor(await xmlNow(), 'posX'))) return 'Raised 3pt not w:position 6: ' + runFor(await xmlNow(), 'posX');
+    selectText('posX'); PM().setAdvancedFontEffects({ positionPt: -2 }); await sleep(40);
+    if (!/<w:position\b[^>]*w:val="-4"/.test(runFor(await xmlNow(), 'posX'))) return 'Lowered 2pt not w:position -4';
+    selectText('posX'); PM().setAdvancedFontEffects({ positionPt: 0 }); await sleep(40);
+    return /<w:position\b/.test(runFor(await xmlNow(), 'posX')) ? 'position not cleared at Normal' : true;
+  });
+  await t('[home] 015 Char Scale via bridge (owned attr) → <w:w w:val>; 100% clears', async () => {
+    setDoc('scaleX body'); selectText('scaleX');
+    PM().setAdvancedFontEffects({ scalePct: 150 }); await sleep(40);
+    if (!/<w:w\b[^>]*w:val="150"/.test(runFor(await xmlNow(), 'scaleX'))) return 'Scale 150 not <w:w 150>: ' + runFor(await xmlNow(), 'scaleX');
+    selectText('scaleX'); PM().setAdvancedFontEffects({ scalePct: 100 }); await sleep(40);
+    return /<w:w\b/.test(runFor(await xmlNow(), 'scaleX')) ? 'scale not cleared at 100%' : true;
+  });
+  await t('[home] 015 Font dialog OK applies Small caps (exports w:smallCaps) + reopens pre-checked; no blocked toast', async () => {
+    let blocked = false; const realToast = window.WC.toast; window.WC.toast = (m) => { if (/not implemented|not available|blocked|Caps and Advanced/i.test(String(m))) blocked = true; };
+    try {
+      setDoc('fxdlg body'); selectText('fxdlg');
+      window.WC.Dialogs.font(); let dlg = document.querySelector('.modal-backdrop .dialog');
+      if (!dlg) return 'dialog did not open';
+      const smallCb = Array.from(dlg.querySelectorAll('label')).find((l) => /Small caps/.test(l.textContent)).querySelector('input[type=checkbox]');
+      smallCb.checked = true;
+      Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())).click(); await sleep(80);
+      if (!/<w:smallCaps\b/.test(runFor(await xmlNow(), 'fxdlg'))) return 'dialog OK did not export w:smallCaps';
+      if (blocked) return 'a blocked/not-available toast fired';
+      selectText('fxdlg'); window.WC.Dialogs.font(); dlg = document.querySelector('.modal-backdrop .dialog');
+      const smallCb2 = Array.from(dlg.querySelectorAll('label')).find((l) => /Small caps/.test(l.textContent)).querySelector('input[type=checkbox]');
+      const prechecked = smallCb2.checked;
+      Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /Cancel/.test(b.textContent.trim())).click();
+      return prechecked ? true : 'reopened dialog did not pre-check Small caps';
+    } finally { window.WC.toast = realToast; }
+  });
   await t('[1] subscript applies via textStyle vertAlign and toggles off', async () => {
     setDoc('subsup probe'); selectText('subsup');
     run('subscript'); await sleep(50);
@@ -6312,6 +6373,22 @@
     const after = Math.round(scr.scrollTop);
     // the old bug jumped scrollTop by hundreds of px (a full page); the fix keeps it ~0.
     return Math.abs(after - before) < 80 || ('view jumped on Enter while editing page 1: scrollTop ' + before + ' -> ' + after);
+  });
+  await t('[home] 015 import round-trip: exported smallCaps + scale re-import as textStyle MARKS (render + prefill)', async () => {
+    // The IMPORT side of the user-authorized fork edit: after author→export→re-open, the run must
+    // carry the owned textStyle smallCaps/w MARKS so it renders in-app + prefills the Font dialog
+    // (the 3 fork-native effects already do). Placed LAST in the suite: openDocx round-trips can
+    // tear down the paged world (the [8]/[11] known-gaps), so it must not cascade to other tests.
+    setDoc('importrtX'); selectText('importrtX');
+    PM().setAdvancedFontEffects({ smallCaps: true, scalePct: 150 }); await sleep(50);
+    let bytes; try { bytes = await PM().exportDocxBytes(); } catch (e) { return 'export bytes failed: ' + e.message; }
+    try { await PM().openDocx(bytes); } catch (e) { return 'openDocx failed: ' + e.message; }
+    await sleep(250);
+    let a = null; doc().descendants((n) => { if (a || !n.isText || !n.text || !n.text.includes('importrtX')) return; const m = n.marks.find((x) => x.type.name === 'textStyle'); a = m ? m.attrs : null; });
+    if (!a) return 'no textStyle mark on the reimported run';
+    if (a.smallCaps !== true) return 'reimported smallCaps not true: ' + JSON.stringify(a.smallCaps);
+    if (Number(a.w) !== 150) return 'reimported scale w not 150: ' + JSON.stringify(a.w);
+    return true;
   });
 
   // ---- Phase 4a caret/click integrity (regression for the inline-block-spacer bug) ----

@@ -30,6 +30,11 @@ const RUN_PROPERTIES_DERIVED_FROM_MARKS = new Set([
   'fontFamily',
   'vertAlign',
   'position',
+  // MS-WORD-CLONE FORK EDIT (015, user-authorized): Small Caps + Character Scale are mark-derived
+  // (the owned advanced-font-effects extension), so list them here too — otherwise clearing the
+  // mark (setMark{smallCaps:null}/{w:null}) leaves the stale value preserved and it re-exports.
+  'smallCaps',
+  'w',
   // Text Effects & Typography (Phase 3): mark-derived so user edits re-export.
   'numForm',
   'numSpacing',
