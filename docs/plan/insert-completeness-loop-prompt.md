@@ -23,6 +23,10 @@ Two phases, run as **one continuous session — do NOT stop and wait for me betw
 You do not need my approval to proceed. Use `AskUserQuestion` **only** to record a NEEDS-USER
 item's options for later — never to halt the loop.
 
+**You (Claude) do everything; Codex is your engineering partner** (§6) — pair with it on design,
+second opinions, root-cause, and adversarial review, but you stay the owner who decides, tests,
+oracle-validates, and commits.
+
 ---
 
 ## 1. How to establish ground truth for EVERY feature
@@ -42,6 +46,10 @@ Before you judge or fix anything, understand the **real Word** behavior. Three s
 3. **Validate fidelity with the Word-COM oracle** (`scripts/oracle/*`, `validate-*-win.ps1`)
    for anything that writes OOXML — author a probe → `wordAPI.saveBytes` to `C:/tmp` → PID-safe
    validate script reads it back in real Word. This is the parity gate for every fidelity claim.
+
+For ambiguous behaviors, **get a second read from Codex** (your teammate — §6): have it independently
+describe the real-Word flow / OOXML and diff it against what you captured; resolve disagreements by
+re-checking real Word.
 
 > The reference build is **Word for Windows 16.0** (ADR-0006). "Par with Word" means the *flow,
 > the dialog/contextual-tab UI, and the saved `.docx`* all match what real Word does.
@@ -138,7 +146,7 @@ for each section (Pages → … → E-signature):
     4. write the regression test in scripts/test-suite-pm.js (FIRST, red → green)
     5. npm run build && the 4 gates (test:pm, test:smoke, test:roundtrip, test:bundle)
     6. Word-COM oracle for any OOXML/fidelity claim (author probe → saveBytes → validate-*-win.ps1)
-    7. /code-review the diff; fix confirmed findings
+    7. /code-review the diff (+ a Codex adversarial pass on tricky slices — §6); fix confirmed findings
     8. ff-merge to main, push, delete the branch; flip the ledger row to ✅; correct stale docs
     9. checkpoint (plan-tracking) and CONTINUE to the next gap — do not pause
   when a section's AUTO-FIX gaps are done, move to the next section
@@ -182,7 +190,39 @@ leaving a full-looking picker that no-ops.
 
 ---
 
-## 6. Project rules you MUST follow (non-negotiable — from CLAUDE.md / AGENTS.md)
+## 6. Work with Codex — your engineering partner
+
+**You (Claude) own this end-to-end** — you drive real Word, write the ledger, design, implement,
+test, oracle-validate, and land every change. **Codex is your teammate**, a second senior engineer
+you actively pair with — not a fallback you only reach for when stuck. Bring it in through the
+`codex:codex-rescue` agent (hand it the context + files; it runs in the shared runtime). Pull it in
+proactively at these moments:
+
+- **Design review before a substantial fix.** Share your fix plan / SPIKE findings and ask Codex to
+  poke holes: is NO-FORK really achievable? is there a simpler bridge verb? which OOXML edge cases
+  will the Word-COM oracle catch? Reconcile its take with yours *before* writing code.
+- **Second opinion on ambiguous Word behavior.** For fuzzy flows (how Cover Page building-block
+  fields recalc, how Shapes should round-trip as DrawingML `wps:sp`, what Header gallery entries
+  Word ships), have Codex independently describe the real-Word flow / OOXML and **diff it against
+  what you captured** — where you disagree, go re-check real Word with computer-use.
+- **Root-cause partner when something fights you.** A failing gate, a converter round-trip mismatch,
+  a paged-render quirk — hand Codex the symptom + relevant files and **compare diagnoses** instead
+  of grinding solo.
+- **Adversarial diff review** (on top of `/code-review`) for the trickier slices: ask Codex to
+  review the change like a skeptical reviewer and try to break it.
+- **Two-design bake-off.** When a feature has two plausible designs, let Codex sketch one while you
+  sketch the other, then you (the owner) pick or merge the best.
+
+**Rules of engagement:** you stay the owner and single source of truth — Codex advises, reviews, and
+can draft, but *you* decide, integrate, test, and commit. **Never land Codex output unread**: verify
+it against real Word + the 4 gates + the oracle exactly as you would your own. When a decision was
+shaped by a Codex consult, note it briefly (commit body / ledger: "design reviewed with Codex").
+Codex is a *partner, not a gate* — if it's unavailable or unhelpful on an item, proceed; never block
+the loop waiting on it.
+
+---
+
+## 7. Project rules you MUST follow (non-negotiable — from CLAUDE.md / AGENTS.md)
 
 - **The `WC.PM` bridge is the only document-write path.** No `window.prompt`. Don't hand-edit the
   generated `ribbon-data.js` / `icons-fluent.js` (change the generators).
@@ -202,7 +242,7 @@ leaving a full-looking picker that no-ops.
 
 ---
 
-## 7. Start
+## 8. Start
 
 1. `request_access` for Word + the dev Electron app; confirm the COM oracle path works.
 2. Phase A: walk the 10 sections in real Word, capture flows/screenshots, write
