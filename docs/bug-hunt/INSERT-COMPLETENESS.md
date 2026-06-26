@@ -41,7 +41,7 @@
 | 15 | med | small | Header & Footer | Header Remove + Footer Remove menu items | NO-FORK additive | setSlotText(kind,'') (bridge already clears bands) |
 | 16 | med | small | Header & Footer | Current Position should insert a PAGE field at the body caret | NO-FORK | insertPageNumber({position:'current'}) extended to the live body selection |
 | 17 | med | small | Header & Footer | Fix false 'works' docs claims | NO-FORK (docs) | n/a |
-| 18 | med | small | Text | Drop Cap Options dialog (Font / Lines to drop / Distance from text) missing; lines hard-coded to 3 | NO-FORK | thread params into WC.PM.xeDropCap(kind,{lines,font,distance}) in bridge/insert-exotica.ts:50-66; add the dialog in dialogs.js + dropCapMenu Options item in commands.js:502-508 |
+| 18 | med | small | Text | ✅ DONE (6010ffa, Font selector deferred) — Drop Cap Options dialog (Font / Lines to drop / Distance from text) missing; lines hard-coded to 3 | NO-FORK | thread params into WC.PM.xeDropCap(kind,{lines,font,distance}) in bridge/insert-exotica.ts:50-66; add the dialog in dialogs.js + dropCapMenu Options item in commands.js:502-508 |
 | 19 | med | small | Symbols | Symbol dialog: add a Font selector so Wingdings/Webdings glyphs round-trip | NO-FORK | extend WC.PM.insertSymbol(ch, {font}) (src/renderer/bridge/insert.ts:166) to emit a w:rFonts / legacy w:sym symbol-font run |
 | 20 | med | small | Symbols | Symbol dialog: add Character-code box with from: Unicode(hex)/ASCII(dec/hex) | NO-FORK | reuse WC.PM.insertSymbol(ch) (src/renderer/bridge/insert.ts:166) |
 | 21 | med | small | Symbols | Fix false 'works'/'fully implemented' docs claims for Equation and Symbol | NO-FORK | none (docs only) |
