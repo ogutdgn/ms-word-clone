@@ -1064,6 +1064,30 @@
     if (!(ai >= 0 && ji >= 0 && si >= 0)) return 'missing records: ' + JSON.stringify(txt);
     return (ji < si && si < ai) ? true : 'multi-key order wrong (want Jones<Smith<Adams): ' + JSON.stringify(txt);
   });
+  await t('[home] 016 Paragraph dialog: Exactly 18pt + First-line 0.5in + contextual → OOXML', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic: no leaked dialog
+    setDoc('paradlgX body'); selectText('paradlgX');
+    window.WC.Dialogs.paragraph();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'paragraph dialog did not open';
+    const selects = Array.from(dlg.querySelectorAll('select'));
+    const lineRule = selects.find((s) => Array.from(s.options).some((o) => o.text === 'Exactly'));
+    const special = selects.find((s) => Array.from(s.options).some((o) => o.text === 'First line'));
+    if (!lineRule || !special) return 'new dialog controls (Exactly/First line) not found';
+    lineRule.value = 'Exactly'; lineRule.parentElement.querySelector('input[type=number]').value = '18';
+    special.value = 'First line'; special.parentElement.querySelector('input[type=number]').value = '0.5';
+    dlg.querySelector('input[type=checkbox]').checked = true;
+    Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(80);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic: ensure no leak downstream
+    const ppr = (await window.WC.editor.exportDocx({ exportXmlOnly: true })).match(/<w:pPr\b[\s\S]*?<\/w:pPr>/);
+    const p = ppr ? ppr[0] : '';
+    const spc = (p.match(/<w:spacing\b[^>]*\/?>/) || [])[0] || '';
+    if (!/w:line="360"/.test(spc) || !/w:lineRule="exact"/.test(spc)) return 'line spacing not Exactly 18pt (line=360 exact): ' + spc;
+    if (!/<w:ind\b[^>]*w:firstLine="720"/.test(p)) return 'first-line indent not 720 (0.5in): ' + p;
+    if (!/<w:contextualSpacing\b/.test(p)) return 'no <w:contextualSpacing>: ' + p;
+    return true;
+  });
   await t('[2] bullets via run() creates a list paragraph + presses the toggle', async () => {
     setDoc('bullet probe text'); selectText('bullet');
     run('bullets'); await sleep(150);
@@ -1178,6 +1202,7 @@
     return at2 && paraAttrs('level').paragraphProperties?.numberingProperties?.ilvl === 0;
   });
   await t('[2] Paragraph dialog seeds from the caret and applies as ONE undo step', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic
     setDoc('dlg para probe'); selectText('dlg');
     run('center');
     window.WC.Commands.spinner('indentLeft', 0.5);
@@ -1190,7 +1215,8 @@
     const seeded = selects[0].value === 'Centered' && parseFloat(inputs[0].value) === 0.5;
     if (!seeded) { dlg.querySelector('.dlg-footer .btn:last-child').click(); return 'seeds wrong: ' + selects[0].value + '/' + inputs[0].value; }
     selects[0].value = 'Right';
-    inputs[2].value = '18'; // spacing before (pt)
+    // 016 inserted the Special "By" input at index 2 → spacing-before is now inputs[3].
+    inputs[3].value = '18'; // spacing before (pt)
     Array.from(dlg.querySelectorAll('.dlg-footer .btn')).find((b) => /^OK$/.test(b.textContent.trim())).click();
     await sleep(80);
     const a1 = paraAttrs('dlg').paragraphProperties;

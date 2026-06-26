@@ -229,29 +229,61 @@
     const indR = el('input', { type: 'number', value: String(st.indentRightIn != null ? st.indentRightIn : 0), step: '0.1', style: { width: '70px' } });
     const before = el('input', { type: 'number', value: String(st.spacingBeforePt != null ? st.spacingBeforePt : 0), style: { width: '70px' } });
     const after = el('input', { type: 'number', value: String(st.spacingAfterPt != null ? st.spacingAfterPt : 8), style: { width: '70px' } });
-    const lineOpts = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
-    const line = el('select', {}, lineOpts.map((o) => el('option', { text: o })));
-    // lineSpacing is null for exact/atLeast rules (no multiplier form) — leave the
-    // select at its default rather than lie with a converted value.
-    if (st && st.lineSpacing != null && lineOpts.indexOf(fmtLine(st.lineSpacing)) !== -1) line.value = fmtLine(st.lineSpacing);
+    // 016: full line-spacing rule + "At", Special indent (first-line/hanging), contextual spacing.
+    const pp = (pm.ready && pm.getResolvedParaProps && pm.getResolvedParaProps()) || {};
+    const sp = pp.spacing || {}; const ind = pp.indent || {};
+    const lineRule = el('select', {}, ['Single', '1.5 lines', 'Double', 'At least', 'Exactly', 'Multiple'].map((o) => el('option', { text: o })));
+    const lineAt = el('input', { type: 'number', value: '12', step: '0.5', style: { width: '70px' } });
+    // prefill the rule + At from the current paragraph (exact/atLeast = pt; auto = preset or ×-multiple)
+    if (sp.lineRule === 'exact') { lineRule.value = 'Exactly'; lineAt.value = String((sp.line || 240) / 20); }
+    else if (sp.lineRule === 'atLeast') { lineRule.value = 'At least'; lineAt.value = String((sp.line || 240) / 20); }
+    else if (sp.line === 360) lineRule.value = '1.5 lines';
+    else if (sp.line === 480) lineRule.value = 'Double';
+    else if (sp.line && sp.line !== 240) { lineRule.value = 'Multiple'; lineAt.value = String(Math.round((sp.line / 240) * 100) / 100); }
+    else lineRule.value = 'Single';
+    const special = el('select', {}, ['(none)', 'First line', 'Hanging'].map((o) => el('option', { text: o })));
+    const specialBy = el('input', { type: 'number', value: '0.5', step: '0.1', style: { width: '70px' } });
+    if (ind.firstLine) { special.value = 'First line'; specialBy.value = String(Math.round((ind.firstLine / 1440) * 100) / 100); }
+    else if (ind.hanging) { special.value = 'Hanging'; specialBy.value = String(Math.round((ind.hanging / 1440) * 100) / 100); }
+    const ctx = el('input', { type: 'checkbox' }); if (pp.contextualSpacing) ctx.checked = true;
+    const inline = (a, label, b) => el('span', {}, [a, el('label', { style: { marginLeft: '8px' } }, [el('span', { text: label }), b])]);
     const body = el('div', {}, [
       row('Alignment:', align),
       row('Indent left (in):', indL), row('Indent right (in):', indR),
+      row('Special:', inline(special, ' By (in): ', specialBy)),
       row('Spacing before (pt):', before), row('Spacing after (pt):', after),
-      row('Line spacing:', line),
+      row('Line spacing:', inline(lineRule, ' At: ', lineAt)),
+      el('div', { class: 'row' }, [el('label', {}, [ctx, el('span', { text: " Don't add space between paragraphs of the same style" })])]),
     ]);
     function row(label, ctrl) { return el('div', { class: 'row' }, [el('label', { text: label, style: { width: '160px' } }), ctrl]); }
-    WC.dialog({ title: 'Paragraph', width: '460px', body, footer: [
+    // line-rule → {line twips/240ths, rule}; Single/1.5/Double = auto presets; At least/Exactly = pt×20; Multiple = ×240.
+    const lineSpacing = () => {
+      const at = parseFloat(lineAt.value);
+      switch (lineRule.value) {
+        case '1.5 lines': return { line: 360, rule: 'auto' };
+        case 'Double': return { line: 480, rule: 'auto' };
+        case 'At least': return { line: Math.round((at || 12) * 20), rule: 'atLeast' };
+        case 'Exactly': return { line: Math.round((at || 12) * 20), rule: 'exact' };
+        case 'Multiple': return { line: Math.round((at || 1.15) * 240), rule: 'auto' };
+        default: return { line: 240, rule: 'auto' }; // Single
+      }
+    };
+    WC.dialog({ title: 'Paragraph', width: '480px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
+        const ls = lineSpacing();
+        const by = Math.round((parseFloat(specialBy.value) || 0) * 1440);
         const steps = [
           ['setTextAlign', { Left: 'left', Centered: 'center', Right: 'right', Justified: 'justify' }[align.value]],
           ['updateAttributes', 'paragraph', {
             'paragraphProperties.spacing.before': Math.round((parseFloat(before.value) || 0) * 20),
             'paragraphProperties.spacing.after': Math.round((parseFloat(after.value) || 0) * 20),
-            'paragraphProperties.spacing.line': Math.round((parseFloat(line.value) || 1.15) * 240),
-            'paragraphProperties.spacing.lineRule': 'auto',
+            'paragraphProperties.spacing.line': ls.line,
+            'paragraphProperties.spacing.lineRule': ls.rule,
             'paragraphProperties.indent.left': Math.round((parseFloat(indL.value) || 0) * 1440),
             'paragraphProperties.indent.right': Math.round((parseFloat(indR.value) || 0) * 1440),
+            'paragraphProperties.indent.firstLine': special.value === 'First line' ? by : null,
+            'paragraphProperties.indent.hanging': special.value === 'Hanging' ? by : null,
+            'paragraphProperties.contextualSpacing': ctx.checked ? true : null,
           }],
         ];
         pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (Word)
