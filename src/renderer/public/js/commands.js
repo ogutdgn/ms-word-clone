@@ -577,12 +577,11 @@
   // ---- Home: Text Effects, Multilevel List, Dictate, extras ----
   H.textEffectsAndTypography = (c, node) => { WC.PM.captureSelection(); textEffectsMenu(node); };
   H.multilevelList = (c, node) => multilevelMenu(node);
-  H.dictate = () => WC.toast("Dictate isn't available in this clone");
-  H.sensitivity = () => WC.toast("Sensitivity labels aren't available in this clone");
+  // Dictate / Sensitivity / Reuse Files / (Home) Add-ins were REMOVED from the ribbon (user decision 2026-06-26 —
+  // cloud/ML/Office.js features with no local equivalent; see gen.js EXCLUDED_CONTROL_IDS). Their handlers are gone.
   H.editor = () => WC.Dialogs.editorPane();
-  H.addIns = (c, node) => addInsMenu(node);
+  H.addIns = (c, node) => addInsMenu(node); // still used by File › Options › Add-ins + Insert › Add-ins
   H.getAddIns = (c, node) => addInsMenu(node);
-  H.reuseFiles = () => WC.toast('Reuse Files surfaces content from your cloud/OneDrive documents — not available in this local clone.', 'See docs/NOT_IMPLEMENTED.md');
 
   const PT = 1.3333;
   function textEffectsMenu(node) {

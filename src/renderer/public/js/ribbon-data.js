@@ -507,44 +507,6 @@ window.WC.RIBBON = [
         ]
       },
       {
-        "name": "Voice",
-        "id": "voice",
-        "controls": [
-          {
-            "id": "home.voice.dictate",
-            "cmd": "dictate",
-            "label": "Dictate",
-            "type": "split",
-            "tooltip": "Use your voice to type anywhere on your computer. Dropdown selects spoken language and dictation settings.",
-            "feasible": "no",
-            "items": [
-              "Spoken Language",
-              "Settings"
-            ]
-          }
-        ]
-      },
-      {
-        "name": "Sensitivity",
-        "id": "sensitivity",
-        "controls": [
-          {
-            "id": "home.sensitivity.sensitivity",
-            "cmd": "sensitivity",
-            "label": "Sensitivity",
-            "type": "dropdown",
-            "tooltip": "Apply a sensitivity label to classify and protect this document (requires Microsoft Purview / organizational policy).",
-            "feasible": "no",
-            "items": [
-              "Public",
-              "General",
-              "Confidential",
-              "Highly Confidential"
-            ]
-          }
-        ]
-      },
-      {
         "name": "Editor",
         "id": "editor",
         "controls": [
@@ -555,38 +517,6 @@ window.WC.RIBBON = [
             "type": "button",
             "tooltip": "Check spelling, grammar, and refinements (clarity, conciseness) with the Editor pane.",
             "shortcut": "F7",
-            "feasible": "no"
-          }
-        ]
-      },
-      {
-        "name": "Add-ins",
-        "id": "add-ins",
-        "controls": [
-          {
-            "id": "home.add-ins.add-ins",
-            "cmd": "addIns",
-            "label": "Add-ins",
-            "type": "dropdown",
-            "tooltip": "Quick access to installed Office Add-ins; opens the Get Add-ins store and My Add-ins list.",
-            "feasible": "no",
-            "items": [
-              "Get Add-ins",
-              "My Add-ins"
-            ]
-          }
-        ]
-      },
-      {
-        "name": "Reuse Files",
-        "id": "reuse-files",
-        "controls": [
-          {
-            "id": "home.reuse-files.reuse-files",
-            "cmd": "reuseFiles",
-            "label": "Reuse Files",
-            "type": "button",
-            "tooltip": "Find and reuse content from your existing files (Microsoft 365 cloud feature). May not appear on all builds.",
             "feasible": "no"
           }
         ]

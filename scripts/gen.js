@@ -31,6 +31,16 @@ for (const bundleKey of Object.keys(research.ribbon)) {
 const byName = {};
 for (const t of allTabs) byName[t.name] = t;
 
+// Controls intentionally OMITTED from the clone's ribbon — cloud/ML/Office.js features with no local equivalent
+// (user decision 2026-06-26). raw-research.json stays accurate (Word DOES have these); gen.js drops them from OUR
+// ribbon. A group left with no controls is dropped too. Keyed by the generated `${tab}.${group}.${label-slug}` id.
+const EXCLUDED_CONTROL_IDS = new Set([
+  'home.voice.dictate',           // Dictate — speech-to-text (cloud)
+  'home.sensitivity.sensitivity', // Sensitivity — Microsoft Purview labels (enterprise cloud)
+  'home.add-ins.add-ins',         // Add-ins — Office.js runtime
+  'home.reuse-files.reuse-files', // Reuse Files — M365 cloud content
+]);
+
 const seenIds = new Set();
 function uniqueId(base) {
   let id = base, n = 2;
@@ -49,10 +59,12 @@ function buildTab(tab) {
       const controls = [];
       let launcher = null;
       for (const c of g.controls || []) {
+        const baseId = `${tabSlug}.${gSlug}.${slug(c.label)}`;
+        if (EXCLUDED_CONTROL_IDS.has(baseId)) continue; // intentionally omitted (user decision) — see EXCLUDED_CONTROL_IDS
         const tip = decode(c.tooltip || '');
         const isLauncher = /dialog box launcher/i.test(tip);
         const ctrl = {
-          id: uniqueId(`${tabSlug}.${gSlug}.${slug(c.label)}`),
+          id: uniqueId(baseId),
           // A4 (slice 8): optional per-control "cmd" override — labels stay
           // Word-faithful while cmd ids stay unique (e.g. Comments "Previous" →
           // previousComment vs Tracking "Previous" → previousChange).
@@ -70,7 +82,7 @@ function buildTab(tab) {
       const out = { name: decode(g.name), id: gSlug, controls };
       if (launcher) out.launcher = launcher;
       return out;
-    }),
+    }).filter((g) => g.controls.length > 0 || g.launcher), // drop groups emptied by EXCLUDED_CONTROL_IDS
   };
 }
 

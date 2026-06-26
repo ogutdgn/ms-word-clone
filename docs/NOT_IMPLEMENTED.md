@@ -184,11 +184,7 @@ Every ribbon tab, group, and control from Microsoft Word is rendered in this clo
 
 ### ❌ Not implemented (placeholder UI only)
 
-- Home ▸ Voice ▸ Dictate
-- Home ▸ Sensitivity ▸ Sensitivity
 - Home ▸ Editor ▸ Editor
-- Home ▸ Add-ins ▸ Add-ins
-- Home ▸ Reuse Files ▸ Reuse Files
 - Insert ▸ Illustrations ▸ 3D Models
 - Insert ▸ Illustrations ▸ Screenshot
 - Insert ▸ Add-ins ▸ Get Add-ins
