@@ -514,7 +514,8 @@ hold the single-PM-copy + telemetry-off invariants.
 - [x] **🏁 020 Font Color Gradient COMPLETE + merged** (`02c0509`): owned gradient-text-fill.ts + a net-new w14:textFill translator + the import/export/whitelist edits. COM: `Font.Fill.Type == msoFillGradient`.
 - [x] **🏁 021 Create-a-Style COMPLETE + merged** (`36ac9ef`): NO-FORK bridge/styles.ts mints a custom paragraph style → styles.xml. COM: Word reads `Styles('WcStyleRed')` (paragraph, bold, 20pt, red TextColor).
 - [x] **🏁🏁 ALL HOME FEATURES DONE.** test:pm 491 / smoke 9 / roundtrip 27 / bundle 4. 4 new COM oracles this session.
-- [ ] **NEXT:** discuss the 5 intentional cloud/ML/Office.js stubs (user's request) → then a final Home regression sweep → INSERT tab.
+- [x] **Stubs resolved (user decision):** Dictate, Sensitivity, Add-ins, Reuse Files REMOVED from the Home ribbon (`chore(ribbon)` @ `11ccfaa` — gen.js EXCLUDED_CONTROL_IDS + regenerated ribbon-data.js; dead handlers dropped). The **Editor** stays — its local spell/grammar pane works (only the cloud refinements were ever a stub; test [editor] confirms it renders counts + a suggestion fixes the doc).
+- [ ] **NEXT:** final Home regression sweep → then the INSERT-tab completeness pass (same per-tab loop).
 
 ### 2026-06-26 (COMPLETENESS PASS — Home tab: 017 List authoring)
 - [x] **🏁 017 List authoring COMPLETE + ff-merged → main** (`feat(home)` @ `4a1c1a9`, pushed): Bullets/Numbering/Multilevel dropdowns gain Change List Level + Set Numbering Value… + Define New Bullet/Number Format/Multilevel dialogs. **NO-FORK** — new `bridge/lists.ts` (`setNumberingValue`/`continueListNumbering`) reuses the fork's restartNumbering/continueNumbering/changeListLevelBy/applyListDefinition; arbitrary Set-Value = restart + `ListHelpers.setLvlOverride({startOverride:N})` (synchronous invalidation, range-validated 0..32767).
