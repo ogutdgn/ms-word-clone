@@ -41,6 +41,10 @@ const RUN_PROPERTIES_DERIVED_FROM_MARKS = new Set([
   'ligatures',
   'contextualAlternates',
   'stylisticSets',
+  // MS-WORD-CLONE FORK EDIT (019, user-authorized): run-level border ("Apply to: Text") is mark-derived (the owned
+  // run-border extension declares textStyle.borders; the v3 rPr bdr translator already emits <w:bdr>). PURELY
+  // ADDITIVE — 'borders' was no-op'd here before, so this cannot regress any existing run property.
+  'borders',
 ]);
 
 export const TRANSIENT_HYPERLINK_STYLE_IDS = new Set(['Hyperlink', 'FollowedHyperlink']);

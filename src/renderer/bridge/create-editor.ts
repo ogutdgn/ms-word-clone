@@ -10,6 +10,8 @@ import { ImageResize } from '@/imageresize/image-resize'
 import { AdvancedFontEffects } from '@/extensions/advanced-font-effects'
 // Home Show/Hide ¶ — owned decoration plugin painting space/tab/break marks when #pm-editor.show-marks is on.
 import { FormattingMarks } from '@/extensions/formatting-marks'
+// 019 — owned extension declaring the run-level border (textStyle.borders → rPr/w:bdr) for "Apply to: Text".
+import { RunBorder } from '@/extensions/run-border'
 // Option-B: SuperDoc's real per-page layout engine (PresentationEditor). Imported LAZILY
 // inside constructPresentationEditor (a dynamic import — Milestone 1) so the heavy engine
 // subgraph (presentation-editor + layout-engine + painter-dom + measuring-dom) stays code-split
@@ -61,7 +63,7 @@ export async function constructPresentationEditor(mountEl: HTMLElement, parsed: 
     // M4b: + ImageResize (a NodeSelection-driven handle overlay; positions via WC.PM.coords.nodeBoxFor, so
     // it tracks the PAINTED image). NOT Pagination — PE is the sole paginator (our Pagination would measure
     // the hidden host and inject spurious seams; ImageResize neither measures nor paginates).
-    extensions: [...getStarterExtensions(), ImageResize, AdvancedFontEffects, FormattingMarks],
+    extensions: [...getStarterExtensions(), ImageResize, AdvancedFontEffects, FormattingMarks, RunBorder],
     documentId: 'wc-paged-boot',
     documentMode: 'editing',
     user: { name: storedAuthorName(), email: '' },

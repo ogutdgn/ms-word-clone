@@ -1414,6 +1414,36 @@
     const marks = markNames('shadowopt');
     return marks.some((m) => /textShadowW14/.test(m) && /"dx":10/.test(m) && /"dy":0/.test(m)) || ('marks: ' + JSON.stringify(marks));
   });
+  await t('[2] 019 run-level border: textStyle.borders exports rPr/w:bdr', async () => {
+    setDoc('runborder probe'); selectText('runborder');
+    PM().cmd('setMark', 'textStyle', { borders: { val: 'single', size: 8, color: 'FF0000', space: 1 } });
+    await sleep(80);
+    const marks = markNames('runborder');
+    if (!marks.some((m) => /textStyle/.test(m) && /"borders"/.test(m))) return 'no borders attr on the mark: ' + JSON.stringify(marks);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /runborder/.test(r));
+    if (!run) return 'run not found in export';
+    const bdr = (run.match(/<w:bdr\b[^>]*\/?>/) || [])[0];
+    if (!bdr) return 'no <w:bdr> in the run rPr';
+    return (/w:val="single"/.test(bdr) && /w:color="FF0000"/.test(bdr)) || ('w:bdr attrs off: ' + bdr);
+  });
+  await t('[2] 019 run-level border clears with null (no stale w:bdr)', async () => {
+    setDoc('rbclear probe'); selectText('rbclear');
+    PM().cmd('setMark', 'textStyle', { borders: { val: 'single', size: 8, color: '000000', space: 1 } }); await sleep(40);
+    PM().cmd('setMark', 'textStyle', { borders: null }); await sleep(40);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /rbclear/.test(r));
+    return !/<w:bdr/.test(run || '') || 'w:bdr still present after clear';
+  });
+  await t('[2] 019 Borders dialog has an Apply-to: Text option (run-level path)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('dlgrb probe'); selectText('dlgrb');
+    WC.Dialogs.bordersAndShading('borders');
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    const ok = !!dlg && Array.from(dlg.querySelectorAll('select')).some((s) => Array.from(s.options).some((o) => o.value === 'text'));
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return ok || 'no Apply-to Text option in the Borders dialog';
+  });
   await t('[2] Paragraph dialog seeds from the caret and applies as ONE undo step', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic
     setDoc('dlg para probe'); selectText('dlg');

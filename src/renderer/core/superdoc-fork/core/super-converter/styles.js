@@ -174,6 +174,12 @@ export function encodeMarksFromRPr(runProperties, docx) {
         if (!isNaN(wPct)) textStyleAttrs[key] = wPct;
         break;
       }
+      // MS-WORD-CLONE FORK EDIT (019, user-authorized): IMPORT side for the run-level border — map an imported
+      // run's <w:bdr> (decoded to runProperty 'borders') onto the owned textStyle.borders attr so it renders +
+      // round-trips. PURELY ADDITIVE (mirrors the 015 import cases above).
+      case 'borders':
+        if (value && typeof value === 'object') textStyleAttrs[key] = value;
+        break;
       case 'fontFamily':
         const fontFamily = resolveDocxFontFamily(value, docx, getToCssFontFamily());
         textStyleAttrs[key] = fontFamily;
@@ -770,6 +776,12 @@ export function decodeRPrFromMarks(marks) {
               if (!isNaN(pct)) runProperties.w = pct;
               break;
             }
+            // MS-WORD-CLONE FORK EDIT (019, user-authorized): run-level border ("Apply to: Text"). The owned
+            // run-border extension stores a single OOXML border object on textStyle.borders; forward it to the run
+            // property the v3 rPr bdr translator reads (createBorderPropertyHandler('w:bdr','borders')). ADDITIVE.
+            case 'borders':
+              if (value && typeof value === 'object') runProperties.borders = value;
+              break;
             case 'styleId':
               if (value != null) {
                 runProperties.styleId = value;

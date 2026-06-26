@@ -1401,12 +1401,21 @@
         // restore the captured selection (the dialog blurred the editor) before writing
         pm.withSelection(() => {
           if (bordersTouched) {
-            const b = buildBorders();
-            if (Object.keys(b).length) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': b });
-            else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
-            if (applyTo === 'text') flags.push('Apply to: Text (run-level borders) is deferred — applied to the paragraph.');
+            if (applyTo === 'text') {
+              // 019: "Apply to: Text" = a run-level (character) border — a SINGLE <w:bdr> around the selection
+              // (not the 4-sided paragraph w:pBdr). null clears it. Uses the chosen style/width/color/distance.
+              const chosen = ['top', 'bottom', 'left', 'right'].filter((k) => edges[k]);
+              const def = chosen.length ? { val: style, size: width, color: color === 'auto' ? 'auto' : color.replace(/^#/, '').toUpperCase(), space: space } : null;
+              pm.cmd('setMark', 'textStyle', { borders: def });
+              // w:bdr has no per-edge option — a character border is always a full box. Tell the user if they chose a subset.
+              if (chosen.length && chosen.length < 4) flags.push('Apply to: Text draws a full box around the characters (a character border has no per-edge option).');
+            } else {
+              const b = buildBorders();
+              if (Object.keys(b).length) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.borders': b });
+              else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders');
+              if (edges.between) flags.push('Inside Horizontal border renders between paragraphs with the layout engine (Phase 4).');
+            }
             if (setting === 'shadow' || setting === '3d') flags.push('Shadow / 3-D border depth renders with the layout engine (Phase 4).');
-            if (edges.between) flags.push('Inside Horizontal border renders between paragraphs with the layout engine (Phase 4).');
           }
           if (shadingTouched) {
             if (shadeFill) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });

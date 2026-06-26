@@ -2206,7 +2206,7 @@
     if (['top', 'bottom', 'left', 'right'].indexOf(edge) >= 0) lastBorderEdge = edge;
     const pm = WC.PM;
     if (edge === 'none') { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.borders'); return; }
-    if (edge === 'insideV') { WC.toast('Inside Vertical borders apply to tables/columns — deferred to the layout engine (Phase 4).'); return; }
+    if (edge === 'insideV') { WC.toast('Inside Vertical borders apply between table columns. Use Table Tools to border a table; for text, use Borders & Shading → Apply to: Text.'); return; }
     // getAttributes reads ONE paragraph (selection head); multi-paragraph selections seed
     // single-edge toggles from that paragraph only (recorded simplification, deferrals A.1).
     const attrs = pm.getEditor().getAttributes('paragraph') || {};
