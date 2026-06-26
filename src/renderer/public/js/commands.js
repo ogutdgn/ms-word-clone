@@ -673,7 +673,7 @@
       } })));
       fly.appendChild(WC.flySep());
       fly.appendChild(WC.flyItem('Change List Level', { onClick: () => changeListLevelMenu(node) }));
-      fly.appendChild(WC.flyItem('Define New Multilevel List…', { onClick: () => WC.notImplemented('Define New Multilevel List dialog') }));
+      fly.appendChild(WC.flyItem('Define New Multilevel List…', { onClick: () => defineNewMultilevelDialog() }));
     });
   }
   function changeListLevelMenu(node) {
@@ -695,6 +695,114 @@
         if (delta !== 0) pm.cmd('changeListLevelBy', delta);
       } }));
     });
+  }
+
+  // 017 List authoring — the number/bullet-style catalogs the Define-New dialogs author. fmt = OOXML w:numFmt,
+  // text = w:lvlText (%1–%9 = the number for that level). These feed WC.PM.cmd('applyListDefinition', …).
+  const NUM_STYLES = [['1, 2, 3, …', 'decimal'], ['a, b, c, …', 'lowerLetter'], ['A, B, C, …', 'upperLetter'],
+    ['i, ii, iii, …', 'lowerRoman'], ['I, II, III, …', 'upperRoman']];
+
+  // Set Numbering Value — Word's dialog: "Start new list" + "Set value to N" (→ WC.PM.setNumberingValue, NO-FORK:
+  // restart + startOverride) or "Continue from previous list" (→ continueListNumbering, drops the override).
+  function setNumberingValueDialog() {
+    WC.PM.captureSelection(); // the dialog steals focus; restore before applying
+    const start = el('input', { type: 'radio', name: 'wc-snv-mode' }); start.checked = true;
+    const cont = el('input', { type: 'radio', name: 'wc-snv-mode' });
+    const value = el('input', { type: 'number', min: '0', max: '32767', value: '1', style: { width: '80px' } });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', {}, [start, el('span', { text: ' Start new list' })])]),
+      el('div', { class: 'row' }, [el('label', {}, [cont, el('span', { text: ' Continue from previous list' })])]),
+      el('div', { class: 'row' }, [el('label', { text: 'Set value to:', style: { width: '90px' } }), value]),
+    ]);
+    WC.dialog({ title: 'Set Numbering Value', width: '360px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const n = parseInt(value.value, 10);
+        const startAt = Number.isFinite(n) ? Math.min(32767, Math.max(0, n)) : 1; // clamp to the bridge's valid range
+        WC.PM.withSelection(() => {
+          const ok = cont.checked ? WC.PM.continueListNumbering() : WC.PM.setNumberingValue(startAt);
+          if (!ok) WC.toast('Place the cursor in a numbered list first.');
+        });
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+
+  // Define New Bullet — choose a glyph (typed or from a small palette) → a single-level bullet definition.
+  function defineNewBulletDialog() {
+    WC.PM.captureSelection();
+    const common = ['•', '◦', '▪', '■', '◆', '➤', '✓', '–', '»', '★'];
+    const glyph = el('input', { type: 'text', maxlength: '4', value: '•', style: { width: '60px', textAlign: 'center', fontSize: '16px' } });
+    const palette = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '4px', margin: '8px 0' } });
+    common.forEach((g) => {
+      const cell = el('div', { text: g, style: { border: '1px solid #ddd', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '16px' } });
+      cell.addEventListener('click', () => { glyph.value = g; });
+      palette.appendChild(cell);
+    });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Bullet character:', style: { width: '110px' } }), glyph]),
+      el('div', { style: { fontSize: '11px', color: '#666' }, text: 'Or pick a symbol:' }), palette,
+    ]);
+    WC.dialog({ title: 'Define New Bullet', width: '320px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const g = (glyph.value || '').trim() || '•';
+        WC.PM.withSelection(() => { WC.PM.cmd('applyListDefinition', { listType: 'bulletList', levels: [{ fmt: 'bullet', text: g }] }); });
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+
+  // Define New Number Format — a number style + a format string (e.g. "%1)") → a single-level ordered definition.
+  function defineNewNumberFormatDialog() {
+    WC.PM.captureSelection();
+    const style = el('select', {}, NUM_STYLES.map(([l]) => el('option', { text: l })));
+    const fmt = el('input', { type: 'text', value: '%1.', style: { width: '120px' } });
+    const body = el('div', {}, [
+      el('div', { class: 'row' }, [el('label', { text: 'Number style:', style: { width: '110px' } }), style]),
+      el('div', { class: 'row' }, [el('label', { text: 'Number format:', style: { width: '110px' } }), fmt]),
+      el('div', { style: { fontSize: '11px', color: '#666' }, text: 'Use %1 where the number appears (e.g. %1. or %1)).' }),
+    ]);
+    WC.dialog({ title: 'Define New Number Format', width: '380px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const f = NUM_STYLES[Math.max(0, style.selectedIndex)][1];
+        let t = (fmt.value || '').trim() || '%1.';
+        if (t.indexOf('%1') < 0) t = '%1' + t; // ensure the number placeholder is present
+        WC.PM.withSelection(() => { WC.PM.cmd('applyListDefinition', { listType: 'orderedList', levels: [{ fmt: f, text: t }] }); });
+      } },
+      { label: 'Cancel' },
+    ] });
+  }
+
+  // Define New Multilevel List — a 9-level editor (per-level number style + format text) → applyListDefinition.
+  function defineNewMultilevelDialog() {
+    WC.PM.captureSelection();
+    const STYLES = NUM_STYLES.concat([['Bullet •', 'bullet']]);
+    const rows = [];
+    const grid = el('div', { style: { maxHeight: '300px', overflow: 'auto' } });
+    for (let i = 0; i < 9; i++) {
+      const sty = el('select', {}, STYLES.map(([l]) => el('option', { text: l })));
+      const defText = Array.from({ length: i + 1 }, (_, k) => '%' + (k + 1)).join('.') + '.';
+      const txt = el('input', { type: 'text', value: defText, style: { width: '150px' } });
+      rows.push({ sty, txt });
+      grid.appendChild(el('div', { class: 'row' }, [el('label', { text: 'Level ' + (i + 1), style: { width: '56px' } }), sty, txt]));
+    }
+    const body = el('div', {}, [
+      el('div', { style: { fontSize: '11px', color: '#666', marginBottom: '6px' }, text: 'Set the format for each level. %1–%9 insert the number for that level.' }),
+      grid,
+    ]);
+    WC.dialog({ title: 'Define New Multilevel List', width: '460px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const levels = rows.map((r, i) => {
+          const fmt = STYLES[Math.max(0, r.sty.selectedIndex)][1];
+          let text = (r.txt.value || '').trim();
+          if (fmt === 'bullet') text = text || '•';
+          else if (text.indexOf('%') < 0) text = '%' + (i + 1) + '.'; // a cleared number level keeps ITS OWN counter, not %1
+          return { fmt, text };
+        });
+        const listType = levels[0].fmt === 'bullet' ? 'bulletList' : 'orderedList';
+        WC.PM.withSelection(() => { WC.PM.cmd('applyListDefinition', { listType, levels }); });
+      } },
+      { label: 'Cancel' },
+    ] });
   }
 
   function sensitivityMenu(node) {
@@ -2083,6 +2191,13 @@
         grid.appendChild(cell);
       });
       fly.appendChild(grid);
+      // 017: Word's bullet/number dropdowns also carry Change List Level + the Define-New authoring entry
+      // (and Set Numbering Value for ordered lists). NO-FORK — these dispatch the fork list verbs via WC.PM.
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Change List Level', { onClick: () => changeListLevelMenu(node) }));
+      if (ordered) fly.appendChild(WC.flyItem('Set Numbering Value…', { onClick: () => setNumberingValueDialog() }));
+      fly.appendChild(WC.flyItem(ordered ? 'Define New Number Format…' : 'Define New Bullet…',
+        { onClick: () => { if (ordered) defineNewNumberFormatDialog(); else defineNewBulletDialog(); } }));
     });
   }
 

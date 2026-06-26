@@ -21,6 +21,7 @@ import { installLineNumbers } from './line-numbers'
 import { installLineNumbersOverlay } from './line-numbers-overlay'
 import { installHyphenation } from './hyphenation'
 import { installSectionBreaks } from './section-breaks'
+import { installLists } from './lists'
 import { installCommentsUI } from './comments-ui'
 import { installTrackChrome } from './track-chrome'
 import { installIo } from './io'
@@ -426,6 +427,8 @@ export function preinstallBridge() {
     applyManualHyphenation: () => false,
     // 006 section-breaks pre-mount stub (replaced by installSectionBreaks on mount)
     insertSectionBreak: () => false,
+    // 017 list-authoring pre-mount stubs (replaced by installLists on mount)
+    setNumberingValue: () => false, continueListNumbering: () => false,
     // slice 10: mail-merge pre-mount stubs (replaced by installMailMerge on mount)
     mmInsertField: () => false, mmAddressBlock: () => false, mmGreetingLine: () => false,
     mmInsertRule: () => false, mmHighlight: () => false, mmPreview: () => false,
@@ -522,7 +525,7 @@ export function installBridge(editor: AnyEditor) {
   // (addComment/resolveComment/setActiveComment — A2 Document API path must win) and
   // falls through to installCommands' cmd for everything else.
   const commands = installCommands(editor)
-  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor), installLineNumbers(editor), installHyphenation(editor), installSectionBreaks(editor))
+  Object.assign(PM, commands, installIo(editor), installStylePreview(editor), installClipboard(editor), installSearch(editor), installInsert(editor), installTable(editor), installReview(editor, commands.cmd), installReferences(editor), installHeaderFooter(editor), installMailMerge(editor), installDesign(editor), installInsertExotica(editor), installDraw(editor), installInkOverlay(editor), installColumns(editor), installLineNumbers(editor), installHyphenation(editor), installSectionBreaks(editor), installLists(editor))
   PM.getState = () => toQueryState(editor)
   PM.debugFormatting = () => getActiveFormatting(editor) // raw entries (probe/verifier aid)
   PM.getEditor = () => current

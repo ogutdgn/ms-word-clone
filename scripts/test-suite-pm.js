@@ -1201,6 +1201,146 @@
     PM().cmd('undo'); await sleep(50);
     return at2 && paraAttrs('level').paragraphProperties?.numberingProperties?.ilvl === 0;
   });
+  // ---------- 017: list authoring (Set Numbering Value / Change List Level in number+bullet menus / Define New) ----------
+  // Does the exported numbering.xml carry a <w:startOverride w:val="V"> on any w:num? (NO-FORK Set Numbering Value)
+  const hasStartOverride = (val) => {
+    const numXml = window.WC.editor.converter?.convertedXml?.['word/numbering.xml'];
+    const els = (numXml && numXml.elements && numXml.elements[0] && numXml.elements[0].elements) || [];
+    return els.some((e) => e.name === 'w:num' && (e.elements || []).some((o) =>
+      o.name === 'w:lvlOverride' && (o.elements || []).some((s) =>
+        s.name === 'w:startOverride' && (s.attributes || {})['w:val'] === String(val))));
+  };
+  await t('[2] 017 Set Numbering Value 5 on the first item exports w:startOverride=5', async () => {
+    setDocs(['SNV one', 'SNV two', 'SNV three']);
+    window.WC.editor.commands.selectAll(); run('numbering'); await sleep(150);
+    selectText('SNV one');
+    if (PM().setNumberingValue(5) !== true) return 'setNumberingValue returned non-true';
+    await sleep(150);
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return hasStartOverride(5) || 'no <w:startOverride w:val="5"> in numbering.xml';
+  });
+  await t('[2] 017 Set Numbering Value mid-list mints a NEW numId (preceding items keep theirs)', async () => {
+    setDocs(['SNVm alpha', 'SNVm beta', 'SNVm gamma']);
+    window.WC.editor.commands.selectAll(); run('numbering'); await sleep(150);
+    const id0 = paraAttrs('SNVm alpha').paragraphProperties?.numberingProperties?.numId;
+    selectText('SNVm beta');
+    PM().setNumberingValue(10); await sleep(150);
+    const idBeta = paraAttrs('SNVm beta').paragraphProperties?.numberingProperties?.numId;
+    const idAlpha = paraAttrs('SNVm alpha').paragraphProperties?.numberingProperties?.numId;
+    return id0 != null && idBeta != null && idBeta !== id0 && idAlpha === id0;
+  });
+  await t('[2] 017 Continue Numbering removes the startOverride', async () => {
+    setDocs(['SNVc first', 'SNVc second']);
+    window.WC.editor.commands.selectAll(); run('numbering'); await sleep(150);
+    selectText('SNVc first');
+    PM().setNumberingValue(7); await sleep(120);
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    if (!hasStartOverride(7)) return 'precondition failed: startOverride=7 not set';
+    selectText('SNVc first');
+    if (PM().continueListNumbering() !== true) return 'continueListNumbering returned non-true';
+    await sleep(120);
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return !hasStartOverride(7) || 'startOverride=7 still present after continue';
+  });
+  await t('[2] 017 setNumberingValue is a silent no-op off a list', () => {
+    setDoc('SNVn plain text'); selectText('plain');
+    return PM().setNumberingValue(3) === false;
+  });
+  await t('[2] 017 Change List Level reachable from the Numbering dropdown → ilvl 2', async () => {
+    setDoc('numlvl probe'); selectText('numlvl');
+    run('numbering'); await sleep(150);
+    window.WC.Commands.dropdown({ cmd: 'numbering', type: 'split' }, document.body);
+    flyClick(/^Change List Level$/); flyClick(/^Level 3$/); await sleep(50);
+    return paraAttrs('numlvl').paragraphProperties?.numberingProperties?.ilvl === 2;
+  });
+  await t('[2] 017 Change List Level reachable from the Bullets dropdown → ilvl 1', async () => {
+    setDoc('bullvl probe'); selectText('bullvl');
+    run('bullets'); await sleep(150);
+    window.WC.Commands.dropdown({ cmd: 'bullets', type: 'split' }, document.body);
+    flyClick(/^Change List Level$/); flyClick(/^Level 2$/); await sleep(50);
+    return paraAttrs('bullvl').paragraphProperties?.numberingProperties?.ilvl === 1;
+  });
+  await t('[2] 017 Define New Number Format applies a custom lowerLetter "%1)" definition', async () => {
+    setDoc('dnf probe'); selectText('dnf');
+    PM().cmd('applyListDefinition', { listType: 'orderedList', levels: [{ fmt: 'lowerLetter', text: '%1)' }] });
+    await sleep(150);
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const numXml = window.WC.editor.converter?.convertedXml?.['word/numbering.xml'];
+    const els = (numXml && numXml.elements && numXml.elements[0] && numXml.elements[0].elements) || [];
+    const ok = els.some((abs) => abs.name === 'w:abstractNum' && (abs.elements || []).some((lvl) =>
+      lvl.name === 'w:lvl' && (lvl.attributes || {})['w:ilvl'] === '0'
+      && (lvl.elements || []).some((c) => c.name === 'w:numFmt' && (c.attributes || {})['w:val'] === 'lowerLetter')
+      && (lvl.elements || []).some((c) => c.name === 'w:lvlText' && (c.attributes || {})['w:val'] === '%1)')));
+    return ok || 'no abstractNum lvl0 with numFmt=lowerLetter + lvlText="%1)"';
+  });
+  await t('[2] 017 Define New Bullet opens a dialog (not a notImplemented toast)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('dnb probe'); selectText('dnb');
+    window.WC.Commands.dropdown({ cmd: 'bullets', type: 'split' }, document.body);
+    flyClick(/Define New Bullet/); await sleep(50);
+    const opened = !!document.querySelector('.modal-backdrop .dialog');
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return opened;
+  });
+  await t('[2] 017 Define New Multilevel List opens a dialog (not a notImplemented toast)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('mldef probe'); selectText('mldef');
+    window.WC.Commands.dropdown({ cmd: 'multilevelList', type: 'dropdown' }, document.body);
+    flyClick(/Define New Multilevel List/); await sleep(50);
+    const opened = !!document.querySelector('.modal-backdrop .dialog');
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return opened;
+  });
+  await t('[2] 017 Set Numbering Value dialog (Numbering dropdown) sets start value 4', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDocs(['DLG sn one', 'DLG sn two']);
+    window.WC.editor.commands.selectAll(); run('numbering'); await sleep(150);
+    selectText('DLG sn one');
+    window.WC.Commands.dropdown({ cmd: 'numbering', type: 'split' }, document.body);
+    flyClick(/^Set Numbering Value/);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'Set Numbering Value dialog did not open';
+    const num = dlg.querySelector('input[type=number]');
+    if (!num) return 'no value spinner in dialog';
+    num.value = '4'; num.dispatchEvent(new Event('input', { bubbles: true }));
+    const okBtn = Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim()));
+    if (!okBtn) return 'no OK button';
+    okBtn.click(); await sleep(150);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    return hasStartOverride(4) || 'dialog did not set startOverride=4';
+  });
+  await t('[2] 017 setNumberingValue rejects out-of-range / NaN (no half-applied restart)', async () => {
+    setDocs(['RNG one', 'RNG two']);
+    window.WC.editor.commands.selectAll(); run('numbering'); await sleep(150);
+    selectText('RNG one');
+    return PM().setNumberingValue(-1) === false && PM().setNumberingValue(99999) === false && PM().setNumberingValue(NaN) === false;
+  });
+  await t('[2] 017 Define New Multilevel: a cleared number level keeps its OWN %N placeholder (not %1)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('mlfix probe'); selectText('mlfix');
+    window.WC.Commands.dropdown({ cmd: 'multilevelList', type: 'dropdown' }, document.body);
+    flyClick(/Define New Multilevel List/);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'multilevel dialog did not open';
+    const inputs = dlg.querySelectorAll('input[type=text]');
+    if (inputs.length < 9) return 'expected 9 level inputs, got ' + inputs.length;
+    inputs[1].value = ''; // clear Level 2 → fallback must be %2. (its own counter), not %1.
+    selectText('mlfix'); // re-anchor (the dialog stole focus; OK restores the captured selection)
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(150);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const numId = paraAttrs('mlfix').paragraphProperties?.numberingProperties?.numId;
+    const numXml = window.WC.editor.converter?.convertedXml?.['word/numbering.xml'];
+    const els = (numXml && numXml.elements && numXml.elements[0] && numXml.elements[0].elements) || [];
+    const numDef = els.find((e) => e.name === 'w:num' && (e.attributes || {})['w:numId'] === String(numId));
+    const absId = numDef && ((numDef.elements || []).find((e) => e.name === 'w:abstractNumId') || {}).attributes?.['w:val'];
+    const abs = els.find((e) => e.name === 'w:abstractNum' && (e.attributes || {})['w:abstractNumId'] === absId);
+    const lvl1 = abs && (abs.elements || []).find((l) => l.name === 'w:lvl' && (l.attributes || {})['w:ilvl'] === '1');
+    const lvl1Text = lvl1 && ((lvl1.elements || []).find((c) => c.name === 'w:lvlText') || {}).attributes?.['w:val'];
+    return lvl1Text === '%2.' || ('ilvl=1 lvlText was ' + lvl1Text + ' (expected %2.)');
+  });
   await t('[2] Paragraph dialog seeds from the caret and applies as ONE undo step', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove()); // hermetic
     setDoc('dlg para probe'); selectText('dlg');
