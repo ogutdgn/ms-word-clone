@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-06-25 (COMPLETENESS PASS — HOME TAB: + batch-1 quick wins + 016 Paragraph dialog merged)
+
+> **Branch:** `main` @ `9a76a18`, **pushed**. Phase: COMPLETENESS PASS — Home tab, "build all non-stub
+> features" (user mandate "finish all in home"). Continues the entry below (7 bugs + 015).
+>
+> **Shipped since 015 (all merged + COM-validated where applicable):**
+> - **Direct-TDD batch-1** (`feat(home)` @ `ea5d20a`): **Shift+F3** case cycle (app.js WC.shiftF3Cycle +
+>   keybinding; new bridge 'titlecase' changeCase mode), **multi-key Sort** (bridge sortParagraphs `keys`
+>   array + `sep`; dialog Sort-by + 2 Then-by rows with Field/Type/dir), **Underline Color + More Underlines**
+>   (underlineMenu: extra styles, No Underline, More Underlines→Font dialog, Underline Color picker → w:u/@w:color).
+>   /code-review all-refuted (setUnderline+setMark MERGES — probe-verified). pm446.
+> - **🏁 016 Paragraph dialog completeness** (`feat(home)` @ `9a76a18`, spec-kit): line-spacing rule dropdown
+>   (Single/1.5/Double/At least/Exactly/Multiple + At), Special indent (first-line/hanging + By), contextual
+>   spacing — all one updateAttributes chain, prefilled from getResolvedParaProps. **NO-FORK** (the dialog
+>   already writes paragraphProperties directly; spike confirmed exact/atLeast + ind firstLine/hanging export).
+>   **COM (validate-paragraph-win.ps1): p1 LineSpacingRule=4(Exactly)/18pt/FirstLineIndent=36; p2 Rule=3(AtLeast)/14pt.**
+>   pm447/smoke9/roundtrip27/bundle4.
+>
+> **HOME PROGRESS:** ✅ all 7 bugs · ✅ 015 Font advanced effects · ✅ batch-1 (Shift+F3, multi-key Sort,
+> Underline Color) · ✅ 016 Paragraph dialog. **REMAINING Home features (NEXT):** spec-kit **017** List authoring
+> (Set Numbering Value/start-at, Change List Level, Define New Bullet/Number — needs a fork numbering spike;
+> there is NO list extension dir, numbering is handled via toggleOrderedList/applyListDefinition cmds) · **018**
+> Find/Replace advanced (formatting + ^p/^t search, Go To page/line, wildcard ranges/groups). **Remaining direct
+> medium features:** Show/Hide ¶ full marks (needs a whitespace decoration plugin), Font Color Gradient (w14
+> gradient fill — substantial), Create a Style (dialog), Selection Pane (object pane), Text Effects per-effect
+> Options dialogs, Borders Inside-Vertical + Apply-to-Text, Font-name installed-font catalog (OS fonts via main).
+> The 5 cloud/ML/Office.js stubs stay stubs.
+>
+> **LESSON (016):** dialog restructure shifts `querySelectorAll('select')`/`input` INDICES — an existing
+> index-based test (the seeds test) broke + leaked a dialog cascade; fix = hermetic `.modal-backdrop` cleanup in
+> the affected tests + re-index. Prefer label-based control lookup in new dialog tests.
+
 ## 2026-06-25 (COMPLETENESS PASS — HOME TAB: 7 bugs + 015 Font advanced effects merged)
 
 > **Branch:** `main` @ `292cfb9`, **pushed (in sync)**. **Phase: COMPLETENESS PASS — Home tab**, working the
