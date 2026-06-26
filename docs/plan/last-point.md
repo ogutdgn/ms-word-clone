@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-26 (COMPLETENESS PASS — HOME TAB: 🏁 ALL Home features DONE — 019/020/021 merged)
+
+> **Branch:** `main` @ `36ac9ef`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab. The 3 remaining
+> COM-fidelity features are merged → **every non-stub Home feature is now built.** NEXT: discuss the 5 intentional
+> cloud/ML/Office.js stubs with the user (their request), then a final Home regression sweep → INSERT tab.
+>
+> **🏁 019 Borders** (`feat(home)` @ `7fc664b`) — run-level (Apply-to-Text) character border via the 015 owned-
+> extension pattern: NEW `src/renderer/extensions/run-border.ts` (textStyle.borders attr) + 3 additive fork edits
+> (whitelist + import/export cases in styles.js); the fork's v3 rPr bdr translator emits `<w:bdr>`. The Borders &
+> Shading "Apply to: Text" applies it; Inside-Vertical message made honest (table-scoped, not wired). **COM
+> (validate-runborder): Word opens the run-border docx WITHOUT repair** (character borders have no clean COM read).
+> **🏁 020 Font Color Gradient** (`feat(home)` @ `02c0509`) — `w14:textFill/gradFill`: owned `gradient-text-fill.ts`
+> (textStyle.textGradient) + a NET-NEW v3 `w14-textFill` translator (additive fork edit) + register + the
+> import/export cases + whitelist. Font Color dropdown → "Gradient…" dialog (2 colors + angle + presets; clears the
+> solid w:color). v1 = linear srgbClr (theme/radial deferred; theme-stop import skipped not corrupted; angle modulo;
+> ≥2-stop guard). **COM (validate-gradient): Word reads `Font.Fill.Type == msoFillGradient(3)`.**
+> **🏁 021 Create-a-Style** (`feat(home)` @ `36ac9ef`) — NO-FORK `bridge/styles.ts createNamedStyle`: captures rPr
+> via `decodeRPrFromMarks`, builds a translated style def, registers in `translatedLinkedStyles.styles` +
+> `converter.linkedStyles` + `STYLE_NAME_TO_ID`/`STYLE_ID_TO_NAME`, splices `<w:style>` via
+> `syncStylesDiffToConvertedXml`, applies the styleId. Wired the ribbon "Create a Style…" + styles-pane "New Style".
+> **COM (validate-createstyle): Word reads `Styles('WcStyleRed')` = a paragraph style with Bold + Size 20 +
+> `Font.TextColor.RGB == 255` (red).** v1 limit: re-apply BY NAME to other paragraphs may not take in-app (the
+> linked-styles plugin's registry is load-time + the paged PE renders styles itself).
+>
+> **HOME PROGRESS: ✅✅ COMPLETE** — 7 bugs · 015 · batch-1 · 016 · 017 · 018 · Home-polish batch · 019 · 020 · 021.
+> Every non-stub Home control is built. Gates across the session: **test:pm 447 → 491**, smoke 9 / roundtrip 27 /
+> bundle 4 throughout. 4 new Word-COM oracles (runborder/gradient/createstyle + the earlier listauthoring).
+>
+> **LESSONS (the COM trio):** (a) run-level OOXML run-properties (borders/gradient) = the 015 pattern — owned
+> textStyle attr + the whitelist/import/export fork-edit trio; a NEW w14 property also needs a net-new translator.
+> (b) Whitelisting in `RUN_PROPERTIES_DERIVED_FROM_MARKS` is REQUIRED for setMark{attr:null} to CLEAR (else the
+> plugin preserves the stale run property). (c) Word's `Style.Font.Color.RGB` is unreliable for a direct style
+> rPr color (reports 0); use `Font.TextColor.RGB`. (d) The linked-styles plugin builds its registry at LOAD and
+> the paged PE renders styles itself — a session-added style applies/exports but doesn't re-render by name.
+
 ## 2026-06-26 (COMPLETENESS PASS — HOME TAB: Home-polish batch merged; 3 COM features remain)
 
 > **Branch:** `main` @ `34e8ebd`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab, ultracode finish-all.
