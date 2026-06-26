@@ -261,6 +261,7 @@ export function encodeMarksFromRPr(runProperties, docx) {
   // visual-effect objects; pass them through to the textStyle mark so they round-trip.
   if (runProperties.textOutline) textStyleAttrs.textOutline = runProperties.textOutline;
   if (runProperties.textGlow) textStyleAttrs.textGlow = runProperties.textGlow;
+  if (runProperties.textGradient) textStyleAttrs.textGradient = runProperties.textGradient; // MS-WORD-CLONE FORK EDIT (020): import the gradient text fill
 
   if (Object.keys(textStyleAttrs).length) {
     marks.push({ type: 'textStyle', attrs: textStyleAttrs });
@@ -816,6 +817,12 @@ export function decodeRPrFromMarks(marks) {
             }
             case 'textGlow': {
               if (value && typeof value === 'object') runProperties.textGlow = value;
+              break;
+            }
+            // MS-WORD-CLONE FORK EDIT (020, user-authorized): Font Color Gradient — forward the textGradient mark
+            // attr to the run property the net-new w14:textFill translator reads. PURELY ADDITIVE.
+            case 'textGradient': {
+              if (value && typeof value === 'object') runProperties.textGradient = value;
               break;
             }
           }

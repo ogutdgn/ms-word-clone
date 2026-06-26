@@ -45,6 +45,11 @@ const RUN_PROPERTIES_DERIVED_FROM_MARKS = new Set([
   // run-border extension declares textStyle.borders; the v3 rPr bdr translator already emits <w:bdr>). PURELY
   // ADDITIVE — 'borders' was no-op'd here before, so this cannot regress any existing run property.
   'borders',
+  // MS-WORD-CLONE FORK EDIT (020, user-authorized): Font Color Gradient is mark-derived (the owned gradient-text-fill
+  // extension declares textStyle.textGradient; the net-new v3 w14:textFill translator emits it). Whitelisting makes
+  // the plugin RE-DERIVE it from the mark each transaction, so clearing the mark (setMark{textGradient:null}) drops
+  // the run property instead of preserving the stale w14:textFill. The import case mints the mark → round-trip safe.
+  'textGradient',
 ]);
 
 export const TRANSIENT_HYPERLINK_STYLE_IDS = new Set(['Hyperlink', 'FollowedHyperlink']);

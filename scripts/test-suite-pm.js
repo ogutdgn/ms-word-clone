@@ -1435,6 +1435,45 @@
     const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /rbclear/.test(r));
     return !/<w:bdr/.test(run || '') || 'w:bdr still present after clear';
   });
+  await t('[2] 020 Font Color gradient: textGradient exports rPr/w14:textFill/gradFill', async () => {
+    setDoc('gradtext probe'); selectText('gradtext');
+    PM().cmd('setMark', 'textStyle', { textGradient: { type: 'linear', angle: 90, stops: [{ pos: 0, color: '#FF0000' }, { pos: 1, color: '#0000FF' }] } });
+    await sleep(80);
+    if (!markNames('gradtext').some((m) => /textGradient/.test(m))) return 'no textGradient on the mark';
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /gradtext/.test(r));
+    if (!run) return 'run not found';
+    if (!/<w14:textFill>/.test(run) || !/<w14:gradFill>/.test(run)) return 'no w14:textFill/gradFill in run';
+    return (/w14:val="FF0000"/.test(run) && /w14:val="0000FF"/.test(run) && /<w14:gs\b/.test(run)) || ('gradFill off: ' + ((run.match(/<w14:gradFill>[\s\S]*?<\/w14:gradFill>/) || [])[0] || '').slice(0, 200));
+  });
+  await t('[2] 020 gradient angle 90° → w14:lin ang 5400000', async () => {
+    setDoc('gradang probe'); selectText('gradang');
+    PM().cmd('setMark', 'textStyle', { textGradient: { type: 'linear', angle: 90, stops: [{ pos: 0, color: '#000000' }, { pos: 1, color: '#FFFFFF' }] } });
+    await sleep(60);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /gradang/.test(r));
+    return /<w14:lin\b[^>]*w14:ang="5400000"/.test(run || '') || ('lin: ' + ((run || '').match(/<w14:lin[^>]*>/) || [])[0]);
+  });
+  await t('[2] 020 gradient clears with null (no stale w14:textFill)', async () => {
+    setDoc('gradclr probe'); selectText('gradclr');
+    PM().cmd('setMark', 'textStyle', { textGradient: { type: 'linear', angle: 90, stops: [{ pos: 0, color: '#000000' }, { pos: 1, color: '#FFFFFF' }] } }); await sleep(40);
+    PM().cmd('setMark', 'textStyle', { textGradient: null }); await sleep(40);
+    const xml = await window.WC.editor.exportDocx({ exportXmlOnly: true });
+    const run = (xml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || []).find((r) => /gradclr/.test(r));
+    return !/<w14:textFill>/.test(run || '') || 'w14:textFill still present after clear';
+  });
+  await t('[2] 020 Font Color menu Gradient dialog applies a gradient mark', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('graddlg probe'); selectText('graddlg'); PM().captureSelection();
+    window.WC.Commands.dropdown({ cmd: 'fontColor', type: 'split' }, document.body); await sleep(20);
+    flyClick(/Gradient/); await sleep(30);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'gradient dialog did not open';
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(60);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return markNames('graddlg').some((m) => /textGradient/.test(m)) || 'no textGradient mark after dialog';
+  });
   await t('[2] 019 Borders dialog has an Apply-to: Text option (run-level path)', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
     setDoc('dlgrb probe'); selectText('dlgrb');

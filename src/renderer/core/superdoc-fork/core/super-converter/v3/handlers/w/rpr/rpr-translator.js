@@ -46,6 +46,8 @@ import { translator as stylisticSetsTranslator } from '../w14-stylisticSets/styl
 import { translator as cntxtAltsTranslator } from '../w14-cntxtAlts/cntxtAlts-translator.js';
 import { translator as textOutlineTranslator } from '../w14-textOutline/textOutline-translator.js';
 import { translator as glowTranslator } from '../w14-glow/glow-translator.js';
+// MS-WORD-CLONE FORK EDIT (020, user-authorized): net-new w14:textFill translator (Font Color Gradient).
+import { translator as textFillTranslator } from '../w14-textFill/textFill-translator.js';
 import {
   trackInsertRunPropertyTranslator,
   trackDeleteRunPropertyTranslator,
@@ -99,6 +101,7 @@ export const propertyTranslators = [
   cntxtAltsTranslator,
   textOutlineTranslator,
   glowTranslator,
+  textFillTranslator, // MS-WORD-CLONE FORK EDIT (020): Font Color Gradient (w14:textFill)
   trackInsertRunPropertyTranslator,
   trackDeleteRunPropertyTranslator,
   webHiddenTranslator,

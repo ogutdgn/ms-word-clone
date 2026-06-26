@@ -2128,7 +2128,41 @@
         if (color === null) { const pm = WC.PM; pm.withSelection(() => { if (kind === 'fore') pm.cmd('unsetColor'); else if (kind === 'shade') pm.clearShading(); else { pm.dePageColorClear(); } }); return; }
         applyColor(kind, color === 'inherit' ? '#000000' : color);
       }, { noColor: kind !== 'fore', autoLabel: kind === 'fore' ? 'Automatic' : 'No Color', automatic: kind === 'fore' }));
+      // 020: Font Color gradient fill (w14:textFill) — only on the font-color (fore) palette.
+      if (kind === 'fore') {
+        fly.appendChild(WC.flySep());
+        fly.appendChild(WC.flyItem('Gradient…', { onClick: () => gradientDialog() }));
+      }
     });
+  }
+  // 020: Font Color › Gradient — apply a linear gradient TEXT fill (textStyle.textGradient → w14:textFill).
+  function gradientDialog() {
+    WC.PM.captureSelection();
+    const c1 = el('input', { type: 'color', value: '#2B579A' });
+    const c2 = el('input', { type: 'color', value: '#ED7D31' });
+    const angle = el('input', { type: 'number', min: '0', max: '359', value: '90', style: { width: '70px' } });
+    const presets = [['Blue → Orange', '#2B579A', '#ED7D31'], ['Sunset', '#FF512F', '#DD2476'], ['Ocean', '#2193B0', '#6DD5ED'], ['Grayscale', '#000000', '#BBBBBB']];
+    const presetRow = el('div', { style: { display: 'flex', gap: '6px', margin: '6px 0' } });
+    presets.forEach(([l, a, b]) => {
+      const sw = el('div', { title: l, style: { width: '44px', height: '22px', borderRadius: '3px', cursor: 'pointer', background: `linear-gradient(90deg, ${a}, ${b})`, border: '1px solid #ccc' } });
+      sw.addEventListener('click', () => { c1.value = a; c2.value = b; });
+      presetRow.appendChild(sw);
+    });
+    const body = el('div', {}, [
+      el('div', { style: { fontSize: '11px', color: '#666' }, text: 'Presets:' }), presetRow,
+      el('div', { class: 'row' }, [el('label', { text: 'Color 1:', style: { width: '90px' } }), c1]),
+      el('div', { class: 'row' }, [el('label', { text: 'Color 2:', style: { width: '90px' } }), c2]),
+      el('div', { class: 'row' }, [el('label', { text: 'Angle (°):', style: { width: '90px' } }), angle]),
+    ]);
+    WC.dialog({ title: 'Gradient Text Fill', width: '340px', body, footer: [
+      { label: 'OK', primary: true, onClick: () => {
+        const grad = { type: 'linear', angle: parseInt(angle.value, 10) || 90, stops: [{ pos: 0, color: c1.value }, { pos: 1, color: c2.value }] };
+        // Word's gradient text fill REPLACES the solid font color — clear w:color so the run doesn't carry a stale
+        // solid color alongside the w14:textFill (which would mismatch what Word writes).
+        WC.PM.withSelection(() => { WC.PM.cmd('unsetColor'); WC.PM.cmd('setMark', 'textStyle', { textGradient: grad }); });
+      } },
+      { label: 'Cancel' },
+    ] });
   }
 
   function changeCaseMenu(node) {
