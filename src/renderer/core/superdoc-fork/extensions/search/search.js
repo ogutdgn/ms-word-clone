@@ -687,11 +687,25 @@ export const Search = Extension.create({
           // FORK EDIT (slice 5, fidelity): Word's "Use wildcards" mode is ALWAYS
           // case-sensitive — the Match Case option is greyed/ignored in Word 16.77.1
           // when wildcards are on. Force 'g' (no 'i') regardless of caseSensitive.
-          const pattern = useWildcards
-            ? new RegExp(SearchIndex.wildcardToRegExp(query), 'g') // Word: wildcards are always case-sensitive
-            : query;
+          // MS-WORD-CLONE FORK EDIT (018, user-authorized): a caller may pass a precompiled RegExp source via
+          // options.regexSource (the bridge uses this for Word special characters ^p/^t/^l → a precise \n/\t regex,
+          // a path the whitespace-flexible string builder can't express). Wildcards keep their own path.
+          // Construction is wrapped in try/catch so a malformed wildcard/regex degrades to 0 matches (never throws).
+          let pattern;
+          try {
+            pattern = options.regexSource
+              ? new RegExp(options.regexSource, caseSensitive ? 'g' : 'gi')
+              : useWildcards
+                ? new RegExp(SearchIndex.wildcardToRegExp(query), 'g') // Word: wildcards are always case-sensitive
+                : query;
+          } catch {
+            this.storage.searchResults = [];
+            this.storage.activeMatchIndex = -1;
+            this.storage.highlightEnabled = highlight;
+            return { matches: [], activeMatchIndex: -1 };
+          }
           let indexMatches =
-            ignoreDiacritics && !useWildcards
+            ignoreDiacritics && !useWildcards && !options.regexSource
               ? searchIndex.searchIgnoringDiacritics(query, { caseSensitive, searchModel })
               : searchIndex.search(pattern, { caseSensitive, searchModel });
           // FORK EDIT (slice 5): whole-word post-filter on index offsets.

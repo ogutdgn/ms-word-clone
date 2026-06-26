@@ -60,6 +60,8 @@ export interface CoordinateAdapter {
   getPages(): PageInfo[]
   /** 1-based current page of the caret. paged: PE.computeCaretLayoutRect(caret).pageIndex+1; overlay: __pagination break-scan. */
   getCurrentPage(): number
+  /** 0-based page index of a model pos (paged: PE.computeCaretLayoutRect(pos).pageIndex). -1 if unknown/overlay. (018 — Go To Page) */
+  pageIndexOfPos(pos: number): number
   /** Model pos → {top,bottom,left} in #pages-local space (page-relative, zoom-divided). null off-page/hidden run. (M4a — track-chrome) */
   posToOverlayLocalRect(pos: number): { top: number; bottom: number; left: number } | null
   /** Model pos → top in #pages-local space. null off-page. (M4a — comments-ui) */
@@ -200,6 +202,22 @@ export function createCoordinateAdapter(deps: CoordinateAdapterDeps): Coordinate
       } catch {
         return 1
       }
+    },
+
+    // 018 (Go To Page) — 0-based layout page index of a model pos. Paged: the PE owns the pos→page mapping
+    // (DOM-first, geometry fallback), the same source getCurrentPage uses for the caret. Returns -1 when the
+    // mapping isn't available (overlay / pre-layout / off-page) so the caller can skip rather than mis-jump.
+    pageIndexOfPos(pos: number): number {
+      try {
+        const pe = deps.getPresentation()
+        if (pe && typeof pe.computeCaretLayoutRect === 'function') {
+          const r = pe.computeCaretLayoutRect(pos)
+          return r && Number.isFinite(r.pageIndex) ? r.pageIndex : -1
+        }
+      } catch {
+        /* unavailable → -1 */
+      }
+      return -1
     },
 
     // M4a — VERBATIM port of comments-ui.ts:125-136 localY (#pages-local Y of a model pos), with the only

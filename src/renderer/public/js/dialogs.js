@@ -112,9 +112,13 @@
     let pane = document.getElementById('find-pane');
     if (pane) pane.remove();
     pane = el('div', { class: 'taskpane', id: 'find-pane' });
-    const currentOpts = { caseSensitive: false, wholeWord: false, useWildcards: false };
+    const currentOpts = { caseSensitive: false, wholeWord: false, useWildcards: false, format: {} };
     const input = el('input', { type: 'text', placeholder: 'Find in document' });
     const replInput = el('input', { type: 'text', placeholder: 'Replace with' });
+    // 018: the Special-character menu targets the last-focused box (Find or Replace), like Word.
+    let lastFocused = input;
+    input.addEventListener('focus', () => { lastFocused = input; });
+    replInput.addEventListener('focus', () => { lastFocused = replInput; });
     const counter = el('div', { style: { fontSize: '12px', color: '#666', padding: '4px 0' } });
     const head = el('div', { class: 'tp-head' }, [
       el('div', { class: 'tp-title', text: replace ? 'Replace' : 'Navigation' }),
@@ -153,6 +157,57 @@
     });
     optRow.appendChild(wcLabel);
     body.appendChild(optRow);
+    // 018: advanced tools — Special characters (^p/^t/…) + Find by Formatting. Shown with the other advanced opts.
+    const fmtLabel = el('span', { style: { fontSize: '11px', color: '#2b579a', marginLeft: '6px' } });
+    const refreshFmtLabel = () => {
+      const on = Object.keys(currentOpts.format).filter((k) => currentOpts.format[k]);
+      fmtLabel.textContent = on.length ? 'Format: ' + on.map((k) => k === 'fontFamily' ? currentOpts.format.fontFamily : k === 'fontSize' ? currentOpts.format.fontSize : k.charAt(0).toUpperCase() + k.slice(1)).join(', ') : '';
+    };
+    const toolRow = el('div', { class: 'find-tools', style: { display: advanced ? 'flex' : 'none', gap: '6px', alignItems: 'center', padding: '4px 0', fontSize: '12px' } });
+    const specialBtn = el('button', { class: 'btn', text: 'Special ▾', onclick: () => WC.flyout(specialBtn, (fly) => {
+      [['Paragraph Mark', '^p'], ['Tab Character', '^t'], ['Manual Line Break', '^l'], ['Caret ^', '^^']].forEach(([label, code]) =>
+        fly.appendChild(WC.flyItem(label, { onClick: () => insertSpecial(code) })));
+    }) });
+    const formatBtn = el('button', { class: 'btn', text: 'Format ▾', onclick: () => WC.flyout(formatBtn, (fly) => {
+      fly.appendChild(WC.flyHeader('Find text formatted as'));
+      [['Bold', 'bold'], ['Italic', 'italic'], ['Underline', 'underline']].forEach(([label, key]) =>
+        fly.appendChild(WC.flyItem((currentOpts.format[key] ? '✓ ' : '') + label, { onClick: () => { currentOpts.format[key] = !currentOpts.format[key]; refreshFmtLabel(); runFind(); } })));
+      fly.appendChild(WC.flyItem('Font…', { onClick: () => promptFont() }));
+      fly.appendChild(WC.flySep());
+      fly.appendChild(WC.flyItem('Clear Formatting', { onClick: () => { currentOpts.format = {}; refreshFmtLabel(); runFind(); } }));
+    }) });
+    toolRow.appendChild(specialBtn);
+    toolRow.appendChild(formatBtn);
+    toolRow.appendChild(fmtLabel);
+    body.appendChild(toolRow);
+    function insertSpecial(code) {
+      const t = lastFocused || input;
+      const s = (t.selectionStart != null ? t.selectionStart : t.value.length);
+      const e = (t.selectionEnd != null ? t.selectionEnd : t.value.length);
+      t.value = t.value.slice(0, s) + code + t.value.slice(e);
+      t.focus();
+      const np = s + code.length;
+      try { t.setSelectionRange(np, np); } catch (err) { /* non-text input */ }
+      if (t === input) runFind();
+    }
+    function promptFont() {
+      // Minimal Font filter (name + size) — applies on top of any bold/italic/underline already chosen.
+      const name = el('input', { type: 'text', class: 'grow', placeholder: 'e.g. Calibri', value: currentOpts.format.fontFamily || '' });
+      const size = el('input', { type: 'text', placeholder: 'e.g. 12pt', style: { width: '80px' }, value: currentOpts.format.fontSize || '' });
+      WC.dialog({ title: 'Find Font', width: '340px', body: el('div', {}, [
+        el('div', { class: 'row' }, [el('label', { text: 'Font:', style: { width: '60px' } }), name]),
+        el('div', { class: 'row' }, [el('label', { text: 'Size:', style: { width: '60px' } }), size]),
+      ]), footer: [
+        { label: 'OK', primary: true, onClick: () => {
+          const n = name.value.trim(); const z = size.value.trim();
+          if (n) currentOpts.format.fontFamily = n; else delete currentOpts.format.fontFamily;
+          if (z) currentOpts.format.fontSize = /pt$/.test(z) ? z : (z + 'pt'); else delete currentOpts.format.fontSize;
+          refreshFmtLabel(); runFind();
+        } },
+        { label: 'Cancel' },
+      ] });
+    }
+    function hasFormat() { return Object.keys(currentOpts.format).some((k) => currentOpts.format[k]); }
     if (replace) {
       body.appendChild(el('div', { class: 'tp-search', style: { marginTop: '8px' } }, [replInput]));
       body.appendChild(el('div', { class: 'row', style: { gap: '6px' } }, [
@@ -167,7 +222,7 @@
     let timer;
     input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runFind, 200); });
     // (M3) Enter navigates — runFind is highlight-only (keeps focus in the input).
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pm.findNext(); refreshCount(); } });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (hasFormat()) { stepNav(1); } else { pm.findNext(); refreshCount(); } } });
 
     function refreshCount() {
       const c = pm.findCount();
@@ -175,21 +230,35 @@
     }
     function runFind() {
       const term = input.value;
+      // 018: formatting search is navigation-ONLY (no text-highlight session) — clear any stale highlights so the
+      // highlights never disagree with the navigation target; Next ▼ / Enter drive findFormatting.
+      if (hasFormat()) { pm.clearFind(); counter.textContent = 'Press Next ▼ / Enter to find formatting'; return; }
       if (!term) { pm.clearFind(); counter.textContent = ''; return; }
       pm.findSession(term, currentOpts); // highlight-only, no jump (M3)
       refreshCount();
     }
     function stepNav(d) {
+      // 018: formatting search wins — jump to the next run matching the Format filter (and the text term, if any).
+      // Carry the case-sensitivity flag (it lives on currentOpts, not currentOpts.format) so Match Case is honored.
+      if (hasFormat()) {
+        const r = pm.findFormatting(input.value, Object.assign({}, currentOpts.format, { caseSensitive: currentOpts.caseSensitive }));
+        if (!r || !r.found) WC.toast('No matching formatted text found');
+        return;
+      }
       if (!input.value) return;
       d < 0 ? pm.findPrev() : pm.findNext();
       refreshCount();
     }
     function doReplaceOne() {
+      // 018: Replace-by-formatting is not supported in v1 — guard so a Format filter can't silently replace
+      // UNformatted matches (the replace session ignores the filter). Word-faithful: clear the filter to replace.
+      if (hasFormat()) { WC.toast('Replace by formatting isn’t supported yet — clear the Format filter'); return; }
       if (!pm.findCount().total) { runFind(); if (!pm.findCount().total) return; }
       pm.replaceOne(replInput.value);
       refreshCount();
     }
     function doReplaceAll() {
+      if (hasFormat()) { WC.toast('Replace by formatting isn’t supported yet — clear the Format filter'); return; }
       if (!pm.findCount().total) { runFind(); if (!pm.findCount().total) return; }
       const r = pm.replaceAll(replInput.value);
       WC.toast('Replaced ' + (r && r.replacedCount != null ? r.replacedCount : 0));
@@ -200,7 +269,7 @@
   // ---- Go To dialog ----
   D.goToDialog = function () {
     const pm = WC.PM;
-    const sel = el('select', {}, ['Heading', 'Bookmark', 'Page', 'Line'].map((o) => el('option', { text: o })));
+    const sel = el('select', {}, ['Page', 'Heading', 'Line', 'Bookmark'].map((o) => el('option', { text: o })));
     const input = el('input', { type: 'text', class: 'grow', placeholder: 'Enter target' });
     const body = el('div', {}, [
       el('div', { class: 'row' }, [el('label', { text: 'Go to what:', style: { width: '110px' } }), sel]),
@@ -210,7 +279,9 @@
       { label: 'Go To', primary: true, close: false, onClick: () => {
         const target = sel.value.toLowerCase();
         const ok = pm.goTo(target, input.value);
-        if (!ok) WC.toast('Go To ' + sel.value + ' is available after pagination (Phase 7)');
+        if (!ok) WC.toast(target === 'page'
+          ? 'Enter a page number'
+          : 'Go To ' + sel.value + (target === 'line' || target === 'bookmark' ? ' is not available yet' : ' found no match'));
       } },
       { label: 'Close' },
     ] });

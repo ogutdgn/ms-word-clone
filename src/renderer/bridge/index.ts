@@ -368,6 +368,7 @@ export function preinstallBridge() {
     clearFind: () => false,
     findCount: () => ({ total: 0, activeMatchIndex: -1 }),
     goTo: () => false,
+    findFormatting: () => ({ found: false, pos: -1 }), // 018 pre-mount stub (replaced by installSearch on mount)
     // slice 6: insert-primitive pre-mount stubs (replaced by installInsert on mount)
     insertLink: () => false, removeLink: () => false, insertImage: () => false,
     insertBookmark: () => false, listBookmarks: () => [], goToBookmark: () => false,

@@ -2300,6 +2300,119 @@
     return findOpen && replaceOpen;
   });
 
+  // ---------- 018: Find/Replace advanced (special chars · wildcards {n,m}/() · Go To Page · find by formatting) ----------
+  await t('[5] 018 special char ^p matches across a paragraph break', async () => {
+    setDocs(['redblock', 'blueblock']); await sleep(80);
+    const r = PM().findSession('redblock^pblueblock', {}); PM().clearFind();
+    return r.total === 1 || ('expected 1 cross-paragraph match, got ' + r.total);
+  });
+  await t('[5] 018 special char ^^ matches a literal caret', async () => {
+    setDoc('cost is 50^ percent'); await sleep(60);
+    const r = PM().findSession('50^^', {}); PM().clearFind();
+    return r.total === 1 || ('expected 1, got ' + r.total);
+  });
+  await t('[5] 018 special char ^t is precise (matches a tab, NOT a space)', async () => {
+    setDoc('no tabs here'); await sleep(60); // a SPACE between "no" and "tabs"
+    const r = PM().findSession('no^ttabs', {}); PM().clearFind();
+    return r.total === 0 || ('^t should not match a space; got ' + r.total);
+  });
+  await t('[5] 018 wildcard {2,3} quantifier matches a range', async () => {
+    setDoc('a aa aaa aaaa'); await sleep(60);
+    const r = PM().findSession('a{2,3}', { useWildcards: true }); PM().clearFind();
+    return r.total === 3 || ('expected 3 (aa, aaa, aaa-of-aaaa), got ' + r.total);
+  });
+  await t('[5] 018 wildcard () group is accepted and matches', async () => {
+    setDoc('ababab xyz'); await sleep(60);
+    const r = PM().findSession('(ab){2}', { useWildcards: true }); PM().clearFind();
+    return r.total >= 1 || ('expected >=1 group match, got ' + r.total);
+  });
+  await t('[5] 018 wildcard \\( still matches a literal paren', async () => {
+    setDoc('f(x)=y'); await sleep(60);
+    const r = PM().findSession('\\(x', { useWildcards: true }); PM().clearFind();
+    return r.total === 1 || ('expected 1 literal-paren match, got ' + r.total);
+  });
+  await t('[5] 018 invalid wildcard degrades to 0 matches (no crash)', async () => {
+    setDoc('hello world'); await sleep(60);
+    const r = PM().findSession('(unbalanced', { useWildcards: true }); PM().clearFind();
+    return r.total === 0 || ('expected 0 (caught invalid regex), got ' + r.total);
+  });
+  await t('[5] 018 Go To Page 2 lands the caret on the second page', async () => {
+    setDoc('GTP page one body'); await sleep(120);
+    window.WC.editor.commands.setTextSelection({ from: doc().content.size - 1, to: doc().content.size - 1 });
+    PM().insertPageBreak(); await sleep(220);
+    const coords = PM().coords;
+    if (!coords || typeof coords.pageIndexOfPos !== 'function') return 'no coords.pageIndexOfPos';
+    for (let i = 0; i < 30 && coords.getPageCount() < 2; i++) await sleep(50);
+    if (coords.getPageCount() < 2) return 'expected >=2 pages, got ' + coords.getPageCount();
+    const ok2 = PM().goTo('page', 2); await sleep(60);
+    const pi2 = coords.pageIndexOfPos(window.WC.editor.state.selection.from);
+    const ok1 = PM().goTo('page', 1); await sleep(60);
+    const pi1 = coords.pageIndexOfPos(window.WC.editor.state.selection.from);
+    return (ok2 === true && pi2 === 1 && ok1 === true && pi1 === 0) || ('ok2=' + ok2 + ' pi2=' + pi2 + ' ok1=' + ok1 + ' pi1=' + pi1);
+  });
+  await t('[5] 018 findFormatting selects the next bold run', async () => {
+    setDoc('plainword boldword tailword');
+    selectText('boldword'); PM().cmd('toggleBold'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); await sleep(20);
+    const r = PM().findFormatting('', { bold: true });
+    if (!r || !r.found) return 'no bold run found';
+    const s = window.WC.editor.state.selection;
+    const txt = window.WC.editor.state.doc.textBetween(s.from, s.to);
+    return /boldword/.test(txt) || ('selected: ' + txt);
+  });
+  await t('[5] 018 findFormatting + term skips the plain occurrence, finds the bold one', async () => {
+    setDocs(['plaincat alpha', 'boldcat bravo']);
+    selectText('boldcat'); PM().cmd('toggleBold'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); await sleep(20);
+    const r = PM().findFormatting('cat', { bold: true });
+    if (!r || !r.found) return 'not found';
+    const s = window.WC.editor.state.selection;
+    const txt = window.WC.editor.state.doc.textBetween(s.from, s.to);
+    const $p = window.WC.editor.state.doc.resolve(s.from);
+    return (txt === 'cat' && /bold/.test($p.parent.textContent)) || ('txt=' + txt + ' para=' + $p.parent.textContent);
+  });
+  await t('[5] 018 findFormatting by font family selects the matching run', async () => {
+    setDoc('arialword georgiaword');
+    selectText('georgiaword'); PM().cmd('setFontFamily', 'Georgia'); await sleep(60);
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); await sleep(20);
+    const r = PM().findFormatting('', { fontFamily: 'Georgia' });
+    if (!r || !r.found) return 'not found';
+    const s = window.WC.editor.state.selection;
+    return /georgiaword/.test(window.WC.editor.state.doc.textBetween(s.from, s.to));
+  });
+  await t('[5] 018 findFormatting matches a font by PRIMARY family (ignores the CSS stack tail)', async () => {
+    setDoc('plainfont stackfont');
+    selectText('stackfont'); PM().cmd('setFontFamily', 'Georgia, serif'); await sleep(60); // a full CSS stack
+    window.WC.editor.commands.setTextSelection({ from: 1, to: 1 }); await sleep(20);
+    const r = PM().findFormatting('', { fontFamily: 'Georgia' }); // user types just the family name
+    if (!r || !r.found) return 'not found (stack vs name compare regression)';
+    const s = window.WC.editor.state.selection;
+    return /stackfont/.test(window.WC.editor.state.doc.textBetween(s.from, s.to));
+  });
+  await t('[5] 018 advanced Find pane exposes Special + Format tools', async () => {
+    document.querySelectorAll('#find-pane').forEach((p) => p.remove());
+    window.WC.Dialogs.findPane(false, true); await sleep(60);
+    const pane = document.getElementById('find-pane');
+    if (!pane) return 'find pane did not open';
+    const btns = Array.from(pane.querySelectorAll('button')).map((b) => b.textContent.trim());
+    const ok = btns.some((x) => /Special/.test(x)) && btns.some((x) => /Format/.test(x));
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return ok || ('buttons: ' + btns.join('|'));
+  });
+  await t('[5] 018 Special menu inserts ^t into the Find box', async () => {
+    document.querySelectorAll('#find-pane').forEach((p) => p.remove());
+    window.WC.closeFlyouts && window.WC.closeFlyouts();
+    window.WC.Dialogs.findPane(false, true); await sleep(60);
+    const pane = document.getElementById('find-pane');
+    const specialBtn = Array.from(pane.querySelectorAll('button')).find((b) => /Special/.test(b.textContent));
+    if (!specialBtn) return 'no Special button';
+    specialBtn.click(); await sleep(20);
+    flyClick(/Tab Character/); await sleep(20);
+    const val = pane.querySelector('input[type=text]').value;
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return val === '^t' || ('find box = ' + JSON.stringify(val));
+  });
+
   // ---------- slice 6: insert-basics (link/image/bookmark/symbol/equation/break/hr + table insert) ----------
   // Every insert is a REAL PM transaction. Assert on doc().toJSON() nodes/marks + round-trip,
   // never on legacy #editor DOM.

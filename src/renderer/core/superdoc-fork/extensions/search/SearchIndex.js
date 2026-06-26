@@ -504,6 +504,23 @@ export class SearchIndex {
         out += cls;
         continue;
       }
+      // MS-WORD-CLONE FORK EDIT (018, user-authorized): Word "Use wildcards" quantifier ranges {n}, {n,}, {n,m}
+      // (preceding-atom repetition). Only a well-formed brace group passes through; a stray '{' is escaped literal.
+      if (ch === '{') {
+        const q = /^\{\d+(?:,\d*)?\}/.exec(pattern.slice(i));
+        if (q) {
+          out += q[0];
+          i += q[0].length - 1;
+          continue;
+        }
+      }
+      // MS-WORD-CLONE FORK EDIT (018, user-authorized): Word "Use wildcards" grouping ( ) (capturing groups; a
+      // LITERAL paren is \( \), handled by the escape branch above). Unbalanced groups make new RegExp throw —
+      // setSearchSession wraps construction in try/catch (also an 018 fork edit) so it degrades to 0 matches.
+      if (ch === '(' || ch === ')') {
+        out += ch;
+        continue;
+      }
       out += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
     return out;
