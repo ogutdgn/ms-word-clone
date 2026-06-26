@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-06-26 (COMPLETENESS PASS — HOME TAB: 017 List authoring merged)
+
+> **Branch:** `main` @ `4a1c1a9`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab, "build all
+> non-stub features". Continues the entry below.
+>
+> **🏁 017 List authoring — DONE, COM-validated, merged** (`feat(home)` @ `4a1c1a9`, spec-kit
+> `specs/017-list-authoring/`). The Bullets/Numbering/Multilevel dropdowns now expose Word's list-authoring
+> verbs. **NO-FORK** (spike-confirmed): the fork already ships every numbering primitive —
+> `restartNumbering()`/`continueNumbering()` (paragraph addCommands), `changeListLevelBy(delta)` /
+> `applyListDefinition({listType, levels})` (core commands), all reachable via `WC.PM.cmd`.
+> - **New bridge `src/renderer/bridge/lists.ts`** (`installLists`): `setNumberingValue(N)` + `continueListNumbering()`.
+>   Arbitrary Set-Numbering-Value (the one thing the existing API couldn't do — `restartNumbering` hardcodes
+>   startOverride:1) is done NO-FORK in two SYNCHRONOUS steps: `restartNumbering()` (first item pins the override on
+>   the existing numId; mid-list mints a new numId + remaps caret-onward paragraphs) → re-resolve the caret numId →
+>   `ListHelpers.setLvlOverride({startOverride:N})`. `handleNumberingInvalidation` dispatches synchronously, so the
+>   re-resolve is deterministic. Validated to Word's 0..32767 range BEFORE touching the doc.
+> - **commands.js:** Bullets+Numbering dropdowns gain **Change List Level** + the **Define-New** entry (and **Set
+>   Numbering Value…** for ordered); `multilevelMenu`'s **Define New Multilevel List…** is now a real 9-level dialog
+>   (was a `notImplemented` toast). New dialogs: Set Numbering Value / Define New Bullet / Define New Number Format /
+>   Define New Multilevel List — each dispatches the fork verbs via WC.PM.
+> - **COM oracle (`validate-listauthoring-win.ps1`):** Set Numbering Value 5 → Word `ListValue==5` (next item 6);
+>   Define New Number Format lowerLetter "%1)" → `ListString=="a)","b)"`. Gates: **pm 459** / smoke 9 / roundtrip 27 /
+>   bundle 4. **/code-review high (1 pass):** 3 fixes — value-range validation (NaN/neg/huge no longer half-apply),
+>   multilevel cleared-level fallback keeps its OWN %N (was collapsing to %1), dialog clamps the typed value; +2
+>   regression tests. KNOWN v1 (documented in spec): continue-after-mid-list-set-value restarts at 1 (fork
+>   continueNumbering semantics, no chain remap); bullet-at-level-0 wraps as bulletList.
+>
+> **HOME PROGRESS:** ✅ all 7 bugs · ✅ 015 Font effects · ✅ batch-1 · ✅ 016 Paragraph dialog · ✅ **017 List
+> authoring**. **REMAINING Home features (NEXT):** spec-kit **018** Find/Replace advanced (formatting + ^p/^t search,
+> Go To page/line, wildcard ranges/groups — bridge/search.ts, fork SearchIndex.js, dialogs.js find pane). **Remaining
+> direct medium features:** Show/Hide ¶ full marks (needs a whitespace decoration plugin), Font Color Gradient (w14
+> gradient fill), Create a Style dialog, Selection Pane, Text Effects per-effect Options dialogs, Borders
+> Inside-Vertical + Apply-to-Text, Font-name installed-font catalog (OS fonts via main). The 5 cloud/ML/Office.js
+> stubs stay stubs. After ALL Home features: final Home regression bug-search, then move to the INSERT tab.
+>
+> **LESSON (017):** the fork's numbering layer is far richer than the dropdowns exposed — a code-read spike found
+> restartNumbering/continueNumbering/changeListLevelBy/applyListDefinition all pre-registered; the ONLY net-new
+> bridge logic was arbitrary Set-Numbering-Value (restart + setLvlOverride override). Always spike the fork's
+> existing command surface before assuming a fork edit is needed.
+
 ## 2026-06-25 (COMPLETENESS PASS — HOME TAB: + batch-1 quick wins + 016 Paragraph dialog merged)
 
 > **Branch:** `main` @ `9a76a18`, **pushed**. Phase: COMPLETENESS PASS — Home tab, "build all non-stub

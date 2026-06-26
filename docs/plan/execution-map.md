@@ -506,6 +506,13 @@ hold the single-PM-copy + telemetry-off invariants.
 
 ## Daily work log (newest first — check off what got done)
 
+### 2026-06-26 (COMPLETENESS PASS — Home tab: 017 List authoring)
+- [x] **🏁 017 List authoring COMPLETE + ff-merged → main** (`feat(home)` @ `4a1c1a9`, pushed): Bullets/Numbering/Multilevel dropdowns gain Change List Level + Set Numbering Value… + Define New Bullet/Number Format/Multilevel dialogs. **NO-FORK** — new `bridge/lists.ts` (`setNumberingValue`/`continueListNumbering`) reuses the fork's restartNumbering/continueNumbering/changeListLevelBy/applyListDefinition; arbitrary Set-Value = restart + `ListHelpers.setLvlOverride({startOverride:N})` (synchronous invalidation, range-validated 0..32767).
+- [x] **Spike (code-read):** confirmed the fork pre-registers every numbering primitive → NO fork edit needed (the ONLY net-new logic was arbitrary Set-Numbering-Value). Recorded in `specs/017-list-authoring/spec.md`.
+- [x] **COM oracle** `validate-listauthoring-win.ps1`: Set Numbering Value 5 → Word ListValue 5 (next 6); Define New Number Format lowerLetter "%1)" → "a)","b)". Gates: **pm 459** / smoke 9 / roundtrip 27 / bundle 4.
+- [x] **/code-review high** → 3 fixes (value-range validation; multilevel cleared-level keeps its own %N; dialog value clamp) + 2 regression tests; 2 edges documented as v1 limits.
+- [ ] **NEXT (Home features):** spec-kit **018** Find/Replace advanced; then the direct medium features (Show/Hide ¶ marks, Font Color Gradient, Create-a-Style, Selection Pane, Text-Effects Options, Borders Inside-Vertical/Apply-to-Text, Font-name catalog); then final Home regression sweep → INSERT tab.
+
 ### 2026-06-25 (RE-DISCOVERY campaign — bug-hunt corpus re-baselined; COMPLETENESS PASS active)
 - [x] **Re-discovery campaign roadmap** (`13b4394`) — `docs/bug-hunt/RE-DISCOVERY-CAMPAIGN.md`, a re-runnable playbook (full re-baseline · hybrid method · 3 phases). Designed via brainstorming (user: full re-baseline + hybrid).
 - [x] **Phase 1 sweep** — 102-agent Workflow (per-tab finder → adversarial verify → synthesis): 137 findings → **127 confirmed** (54 bugs · 73 gaps · 0 S1) in **22 spec-kit-feature buckets**. The old layout-keystone cluster did NOT resurface (paged engine retired it).
