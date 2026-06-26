@@ -779,8 +779,12 @@
     ]);
     WC.dialog({ title: 'Set Numbering Value', width: '360px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        const n = parseInt(value.value, 10);
-        const startAt = Number.isFinite(n) ? Math.min(32767, Math.max(0, n)) : 1; // clamp to the bridge's valid range
+        if (!cont.checked) {
+          // Validate the typed start value (Word reports out-of-range instead of silently clamping). 0..32767.
+          const n = parseInt(value.value, 10);
+          if (!Number.isFinite(n) || n < 0 || n > 32767) { WC.toast('Set value to must be between 0 and 32767.'); return true; } // keep dialog open
+        }
+        const startAt = parseInt(value.value, 10) || 0;
         WC.PM.withSelection(() => {
           const ok = cont.checked ? WC.PM.continueListNumbering() : WC.PM.setNumberingValue(startAt);
           if (!ok) WC.toast('Place the cursor in a numbered list first.');
@@ -857,8 +861,13 @@
         const levels = rows.map((r, i) => {
           const fmt = STYLES[Math.max(0, r.sty.selectedIndex)][1];
           let text = (r.txt.value || '').trim();
-          if (fmt === 'bullet') text = text || '•';
-          else if (text.indexOf('%') < 0) text = '%' + (i + 1) + '.'; // a cleared number level keeps ITS OWN counter, not %1
+          if (fmt === 'bullet') { text = text || '•'; }
+          else {
+            // Word constrains %N per level: only %1..%(i+1) are valid (a level can't reference a deeper counter).
+            // Strip out-of-range placeholders, then ensure this level's own counter is present.
+            text = text.replace(/%(\d)/g, (m, d) => (Number(d) >= 1 && Number(d) <= i + 1) ? m : '');
+            if (text.indexOf('%' + (i + 1)) < 0) text = (text + '%' + (i + 1) + '.').trim() || '%' + (i + 1) + '.';
+          }
           return { fmt, text };
         });
         const listType = levels[0].fmt === 'bullet' ? 'bulletList' : 'orderedList';
@@ -2155,7 +2164,8 @@
     ]);
     WC.dialog({ title: 'Gradient Text Fill', width: '340px', body, footer: [
       { label: 'OK', primary: true, onClick: () => {
-        const grad = { type: 'linear', angle: parseInt(angle.value, 10) || 90, stops: [{ pos: 0, color: c1.value }, { pos: 1, color: c2.value }] };
+        const a = parseInt(angle.value, 10); // NaN-aware (||90 would coerce a valid 0° to 90°)
+        const grad = { type: 'linear', angle: Number.isFinite(a) ? a : 90, stops: [{ pos: 0, color: c1.value }, { pos: 1, color: c2.value }] };
         // Word's gradient text fill REPLACES the solid font color — clear w:color so the run doesn't carry a stale
         // solid color alongside the w14:textFill (which would mismatch what Word writes).
         WC.PM.withSelection(() => { WC.PM.cmd('unsetColor'); WC.PM.cmd('setMark', 'textStyle', { textGradient: grad }); });
@@ -2351,12 +2361,10 @@
 
   function pasteMenu(node) {
     const pm = WC.PM;
-    pm.clipboardFlavors().then((fl) => {
+    // Context-aware Paste Options: the button set is fixed but each item's active/inactive state is driven by the
+    // clipboard content type (the state machine lives in the bridge's pure pasteOptionStates(flavors)).
+    const build = (fl) => {
       fl = fl || { hasText: false, hasHtml: false, hasImage: false };
-      // Context-aware Paste Options: the button set is fixed but each item's
-      // active/inactive state is driven by the clipboard content type (Word's
-      // exact labels vary by build, the enablement logic does not). The state
-      // machine lives in the bridge's pure pasteOptionStates(flavors).
       const s = pm.pasteOptionStates(fl);
       WC.flyout(node, (fly) => {
         const item = (label, enabled, onClick) =>
@@ -2369,7 +2377,9 @@
         fly.appendChild(WC.flyItem('Paste Special…', { onClick: () => WC.Dialogs.pasteSpecial() }));
         fly.appendChild(WC.flyItem('Set Default Paste…', { onClick: () => WC.Dialogs.setDefaultPaste() }));
       });
-    });
+    };
+    // Always render the menu (Word shows it even when the clipboard read fails) — a rejected flavors IPC builds with empty flavors.
+    pm.clipboardFlavors().then(build).catch(() => build(null));
   }
 
   function underlineMenu(node) {

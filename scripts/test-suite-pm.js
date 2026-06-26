@@ -1528,6 +1528,57 @@
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
     return ok || 'create-style dialog did not open';
   });
+  // ---------- Home bug-fix regressions (from the Home-tab adversarial bug hunt) ----------
+  await t('[2] BUG Font dialog clears superscript when unchecked (vertAlign null)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('supclr probe'); selectText('supclr');
+    PM().cmd('setMark', 'textStyle', { vertAlign: 'superscript' }); await sleep(50);
+    WC.Dialogs.font();
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'font dialog did not open';
+    const supLbl = Array.from(dlg.querySelectorAll('label')).find((l) => /Superscript/i.test(l.textContent));
+    const cb = supLbl && supLbl.querySelector('input[type=checkbox]');
+    if (!cb) return 'no Superscript checkbox';
+    if (!cb.checked) return 'Superscript was not prefilled checked';
+    cb.checked = false; // uncheck it
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(80);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return !markNames('supclr').some((m) => /"vertAlign":"(super|sub)script"/.test(m)) || ('vertAlign still set: ' + JSON.stringify(markNames('supclr')));
+  });
+  await t('[2] BUG Gradient dialog honors angle 0 (not coerced to 90)', async () => {
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    setDoc('grad0 probe'); selectText('grad0'); PM().captureSelection();
+    window.WC.Commands.dropdown({ cmd: 'fontColor', type: 'split' }, document.body); await sleep(20);
+    flyClick(/Gradient/); await sleep(30);
+    const dlg = document.querySelector('.modal-backdrop .dialog');
+    if (!dlg) return 'gradient dialog did not open';
+    const angleInput = dlg.querySelector('input[type=number]'); // the only number input = Angle
+    angleInput.value = '0';
+    Array.from(dlg.querySelectorAll('button')).find((b) => /^OK$/.test(b.textContent.trim())).click();
+    await sleep(60);
+    document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
+    return markNames('grad0').some((m) => /textGradient/.test(m) && /"angle":0/.test(m)) || ('marks: ' + JSON.stringify(markNames('grad0')));
+  });
+  await t('[2] BUG Go To Heading out-of-range returns false (no silent clamp)', async () => {
+    setDocs(['GTH intro body', 'GTH chapter body']);
+    selectText('GTH chapter body'); PM().applyStyleByName('Heading 1'); await sleep(50);
+    return (PM().goTo('heading', 5) === false && PM().goTo('heading', 1) === true) || ('h5=' + PM().goTo('heading', 5) + ' h1=' + PM().goTo('heading', 1));
+  });
+  await t('[2] BUG Find pane wildcard toggle restores prior Match-case state', async () => {
+    document.querySelectorAll('#find-pane').forEach((p) => p.remove());
+    window.WC.Dialogs.findPane(false, true); // advanced
+    const pane = document.getElementById('find-pane');
+    const mc = Array.from(pane.querySelectorAll('label')).find((l) => /Match case/i.test(l.textContent)).querySelector('input');
+    const wc = Array.from(pane.querySelectorAll('label')).find((l) => /wildcard/i.test(l.textContent)).querySelector('input');
+    const start = mc.checked; // default unchecked
+    wc.checked = true; wc.dispatchEvent(new Event('change', { bubbles: true }));
+    const forced = mc.checked && mc.disabled;
+    wc.checked = false; wc.dispatchEvent(new Event('change', { bubbles: true }));
+    const restored = (mc.checked === start) && !mc.disabled;
+    pane.querySelector('.x') && pane.querySelector('.x').click();
+    return (start === false && forced && restored) || ('start=' + start + ' forced=' + forced + ' restored=' + restored);
+  });
   await t('[2] 019 Borders dialog has an Apply-to: Text option (run-level path)', async () => {
     document.querySelectorAll('.modal-backdrop').forEach((m) => m.remove());
     setDoc('dlgrb probe'); selectText('dlgrb');

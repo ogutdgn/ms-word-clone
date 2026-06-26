@@ -146,14 +146,20 @@
     optRow.appendChild(mkOpt('Whole words only', 'wholeWord'));
     const wcLabel = mkOpt('Use wildcards', 'useWildcards');
     const wcCb = wcLabel.querySelector('input');
-    // Word fidelity: wildcard mode is always case-sensitive — grey Match case when wildcards on.
+    // Word fidelity: wildcard mode is always case-sensitive — grey Match case when wildcards on, then RESTORE the
+    // user's prior choice when wildcards turn off (and keep currentOpts in sync with the forced DOM state).
+    let savedCaseSensitive = null;
     wcCb.addEventListener('change', () => {
       if (wcCb.checked) {
+        savedCaseSensitive = matchCaseCb.checked;
         matchCaseCb.disabled = true;
-        matchCaseCb.checked = true;   // signal that search is now case-sensitive
+        matchCaseCb.checked = true;            // wildcard search is case-sensitive
+        currentOpts.caseSensitive = true;       // sync state (a programmatic .checked= does NOT fire mkOpt's handler)
       } else {
         matchCaseCb.disabled = false;
+        if (savedCaseSensitive !== null) { matchCaseCb.checked = savedCaseSensitive; currentOpts.caseSensitive = savedCaseSensitive; }
       }
+      runFind();
     });
     optRow.appendChild(wcLabel);
     body.appendChild(optRow);
@@ -505,7 +511,9 @@
         if (!name) { WC.toast('Enter a style name.'); return true; } // truthy → keep the dialog open
         let r;
         WC.PM.withSelection(() => { r = WC.PM.createNamedStyle(name); });
-        if (r && r.ok) { WC.toast('Created style “' + (r.name || name) + '”'); try { if (WC.Ribbon && WC.Ribbon.render) WC.Ribbon.render(); } catch (e) { /* gallery refresh best-effort */ } }
+        // The Quick Styles ribbon gallery is curated to built-in names, so a custom style is reached via Apply
+        // Styles / the Styles pane (both list it through allStyleNames) — no ribbon refresh needed.
+        if (r && r.ok) WC.toast('Created style “' + (r.name || name) + '”', 'Apply it from Styles ▸ Apply Styles.');
         else WC.toast('Could not create the style.');
       } },
       { label: 'Cancel' },
@@ -628,8 +636,9 @@
           if (UL[underline.value]) steps.push(['setMark', 'underline', { underlineType: UL[underline.value] }]);
         } else steps.push(['unsetUnderline']);
         steps.push([strike.c.checked ? 'setStrike' : 'unsetStrike']);
-        if (sup.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'superscript' }]);
-        else if (sub.c.checked) steps.push(['setMark', 'textStyle', { vertAlign: 'subscript' }]);
+        // vertAlign must be written UNCONDITIONALLY (setMark merges attrs; an absent key leaves the stale value).
+        // null clears it — otherwise unchecking BOTH Superscript & Subscript can't remove an existing sub/superscript.
+        steps.push(['setMark', 'textStyle', { vertAlign: sup.c.checked ? 'superscript' : (sub.c.checked ? 'subscript' : null) }]);
         pm.withSelection(() => pm.chain(steps)); // ONE transaction = ONE undo step (matches Word)
         // 015: the five advanced effects are now applied above (no more notifyBlocked).
         WC.Ribbon.setComboValue('font', fam.value); WC.Ribbon.setComboValue('fontSize', String(parseFloat(size.value) || 11));
@@ -1441,8 +1450,16 @@
             if (setting === 'shadow' || setting === '3d') flags.push('Shadow / 3-D border depth renders with the layout engine (Phase 4).');
           }
           if (shadingTouched) {
-            if (shadeFill) pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });
-            else pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+            if (shadeApplyTo.value === 'text') {
+              // "Apply to: Text" = run-level character shading (rPr/w:shd) via the highlight mark — the same path
+              // the ribbon's setShading uses for a sub-paragraph selection. null clears both run + paragraph shading.
+              if (shadeFill) pm.cmd('setHighlight', shadeFill);
+              else { pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading'); pm.cmd('unsetHighlight'); }
+            } else if (shadeFill) {
+              pm.cmd('updateAttributes', 'paragraph', { 'paragraphProperties.shading': { val: 'clear', color: 'auto', fill: shadeFill.replace(/^#/, '').toUpperCase() } });
+            } else {
+              pm.cmd('resetAttributes', 'paragraph', 'paragraphProperties.shading');
+            }
           }
         });
         // page borders are section-level (no text selection needed). dePageBorders treats

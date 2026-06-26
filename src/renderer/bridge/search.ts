@@ -58,8 +58,10 @@ function goToImpl(editor: AnyEditor, target: string, value: string | number): bo
       }
       return false // don't descend into paragraph children
     })
-    if (headings.length === 0) return false
-    const target0 = headings[Math.min(idx - 1, headings.length - 1)]
+    // Out-of-range request fails honestly (the Go To dialog then reports "found no match", like Word) instead of
+    // silently clamping to the last heading and reporting success.
+    if (headings.length === 0 || idx > headings.length) return false
+    const target0 = headings[idx - 1]
     const pos = target0.pos + 1 // step inside the paragraph
     try {
       const tr = state.tr
