@@ -7,6 +7,35 @@
 
 ---
 
+## 2026-06-26 (COMPLETENESS PASS — HOME TAB: Home-polish batch merged; 3 COM features remain)
+
+> **Branch:** `main` @ `34e8ebd`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab, ultracode finish-all.
+>
+> **🏁 Home-polish batch — DONE, merged** (`feat(home)` @ `34e8ebd`) — 4 NO-FORK features (no .docx change →
+> test:pm-validated), planned via a 7-reader Workflow:
+> - **Font name catalog:** main-process `fonts:list` IPC (Windows System.Drawing via async execFile + session
+>   cache; mac/Linux dir scan) → the Font dropdown lazily enriches WC.FONTS (built-in fallback, retries on failure).
+> - **Selection Pane:** un-deferred (ENGINE_READY); bridge `listObjects()`/`selectObjectAt()` (doc.descendants →
+>   image/shape; NodeSelection on click; rebuilds on stale pos); unique "Picture N" labels.
+> - **Show/Hide ¶ FULL marks:** OWNED decoration plugin `src/renderer/extensions/formatting-marks.ts` (space dots,
+>   NBSP degree, tab arrows, ↵ on SOFT breaks only) gated on .show-marks; H.showHide → new `WC.PM.touch()` step-less
+>   re-render. KEY: PE DOES paint inline-class decorations into #pm-editor (the .find-hit=0 test is a different class).
+> - **Text Effects Options dialogs** (Shadow/Reflection/Glow/Outline): customize the textStyle effect attrs. Glow/
+>   Outline kept hex (w14 export needs hex; transparency/filled-text render-only → omitted to avoid invalid OOXML).
+> - Gates pm 479 / smoke 9 / roundtrip 27 / bundle 4. **/code-review high → 13 fixes** (glow rgba→hex, async+cached
+>   fonts, marks NBSP/break-type, Selection-Pane stale-pos/icon/labels, WC.PM.touch).
+>
+> **HOME PROGRESS:** ✅ 7 bugs · ✅ 015 · ✅ batch-1 · ✅ 016 · ✅ 017 · ✅ 018 · ✅ Home-polish batch.
+> **REMAINING (3 COM-fidelity features):** **Borders** Inside-Vertical + Apply-to-Text (run-level w:bdr mark; COM) ·
+> **Create-a-Style** (mint a named style into translatedLinkedStyles + syncStylesDiffToConvertedXml — NO-FORK but
+> LARGE/high-risk; COM round-trip) · **Font Color Gradient** (w14:textFill/gradFill — owned textStyle attr + an
+> ADDITIVE w14 fork translator; COM). Then final Home regression sweep → INSERT tab. The 7-reader map + per-feature
+> NO-FORK plans are in the workflow output (logged).
+>
+> **LESSON (Home-polish):** the PE paints inner-editor inline-class decorations into the visible pages (verified) —
+> so Show/Hide marks worked NO-FORK via a decoration plugin (no overlay needed, unlike line-numbers). And w14 export
+> translators (glow/outline) require HEX colors — an rgba silently corrupts the OOXML, so effect Options keep hex.
+
 ## 2026-06-26 (COMPLETENESS PASS — HOME TAB: 018 Find/Replace advanced merged; ultracode "finish all")
 
 > **Branch:** `main` @ `dd33a2a`, **pushed (in sync)**. Phase: COMPLETENESS PASS — Home tab. User directive
